@@ -1,0 +1,4 @@
+[wrap-git]
+directory = wlroots
+url = https://gitlab.freedesktop.org/wlroots/wlroots.git
+revision = head

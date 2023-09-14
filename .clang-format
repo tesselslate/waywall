@@ -1,0 +1,7 @@
+AllowShortFunctionsOnASingleLine: Empty
+AlwaysBreakAfterReturnType: AllDefinitions
+ColumnLimit: 100
+IndentWidth: 4
+SortIncludes: true
+
+# vim:ft=yaml
