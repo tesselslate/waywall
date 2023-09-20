@@ -1,3 +1,6 @@
+#ifndef __COMPOSITOR_H
+#define __COMPOSITOR_H
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <xkbcommon/xkbcommon.h>
@@ -34,3 +37,5 @@ struct compositor_vtable {
 struct compositor *compositor_create(struct compositor_vtable vtable);
 void compositor_destroy(struct compositor *compositor);
 bool compositor_run(struct compositor *compositor);
+
+#endif
