@@ -10,6 +10,7 @@ project('waywall', 'c',
 add_project_arguments(
   [
     '-DWLR_USE_UNSTABLE',
+    '-D_POSIX_C_SOURCE=200809L',
     '-Wno-unused-parameter',
   ],
   language : 'c',

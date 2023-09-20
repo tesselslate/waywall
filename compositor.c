@@ -1,4 +1,5 @@
-#define _POSIX_C_SOURCE 200809L
+// TODO: pointer constraints
+// TODO: get wl backend
 
 #include "compositor.h"
 #include <assert.h>
@@ -52,6 +53,8 @@ struct compositor {
     struct wl_list windows;
     struct wl_listener on_xwayland_new_surface;
     struct wl_listener on_xwayland_ready;
+
+    struct compositor_vtable vtable;
 };
 
 struct keyboard {
@@ -99,9 +102,16 @@ on_cursor_axis(struct wl_listener *listener, void *data) {
 static void
 on_cursor_button(struct wl_listener *listener, void *data) {
     struct compositor *compositor = wl_container_of(listener, compositor, on_cursor_button);
-    struct wlr_pointer_button_event *event = data;
-    wlr_seat_pointer_notify_button(compositor->seat, event->time_msec, event->button, event->state);
-    // TODO: Handle button inputs on wall
+    struct wlr_pointer_button_event *wlr_event = data;
+    struct compositor_button_event event = {
+        .button = wlr_event->button,
+        .time_msec = wlr_event->time_msec,
+        .state = wlr_event->state == WLR_BUTTON_PRESSED,
+    };
+    if (!compositor->vtable.button(event)) {
+        wlr_seat_pointer_notify_button(compositor->seat, wlr_event->time_msec, wlr_event->button,
+                                       wlr_event->state);
+    }
 }
 
 static void
@@ -113,18 +123,30 @@ on_cursor_frame(struct wl_listener *listener, void *data) {
 static void
 on_cursor_motion(struct wl_listener *listener, void *data) {
     struct compositor *compositor = wl_container_of(listener, compositor, on_cursor_motion);
-    struct wlr_pointer_motion_event *event = data;
-    wlr_cursor_move(compositor->cursor, &event->pointer->base, event->delta_x, event->delta_y);
-    // TODO: Handle cursor motion on wall
+    struct wlr_pointer_motion_event *wlr_event = data;
+    wlr_cursor_move(compositor->cursor, &wlr_event->pointer->base, wlr_event->delta_x,
+                    wlr_event->delta_y);
+    struct compositor_motion_event event = {
+        .x = compositor->cursor->x,
+        .y = compositor->cursor->y,
+        .time_msec = wlr_event->time_msec,
+    };
+    compositor->vtable.motion(event);
 }
 
 static void
 on_cursor_motion_absolute(struct wl_listener *listener, void *data) {
     struct compositor *compositor =
         wl_container_of(listener, compositor, on_cursor_motion_absolute);
-    struct wlr_pointer_motion_absolute_event *event = data;
-    wlr_cursor_warp_absolute(compositor->cursor, &event->pointer->base, event->x, event->y);
-    // TODO: Handle cursor motion on wall
+    struct wlr_pointer_motion_absolute_event *wlr_event = data;
+    wlr_cursor_warp_absolute(compositor->cursor, &wlr_event->pointer->base, wlr_event->x,
+                             wlr_event->y);
+    struct compositor_motion_event event = {
+        .x = wlr_event->x,
+        .y = wlr_event->y,
+        .time_msec = wlr_event->time_msec,
+    };
+    compositor->vtable.motion(event);
 }
 
 static void
@@ -141,20 +163,25 @@ static void
 on_keyboard_key(struct wl_listener *listener, void *data) {
     struct keyboard *keyboard = wl_container_of(listener, keyboard, on_key);
     struct compositor *compositor = keyboard->compositor;
-    struct wlr_keyboard_key_event *event = data;
+    struct wlr_keyboard_key_event *wlr_event = data;
 
-    // TODO: Handle keybinds
-    /* // libinput keycode -> xkbcommon keycode */
-    /* uint32_t keycode = event->keycode + 8; */
-    /* const xkb_keysym_t *syms; */
-    /* int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms); */
-    /* uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard); */
-    bool handled = false;
+    // libinput keycode -> xkbcommon keycode
+    uint32_t keycode = wlr_event->keycode + 8;
+    const xkb_keysym_t *syms;
+    int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
+    uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
+    struct compositor_key_event event = {
+        .syms = syms,
+        .nsyms = nsyms,
+        .modifiers = modifiers,
+        .state = wlr_event->state == WL_KEYBOARD_KEY_STATE_PRESSED,
+        .time_msec = wlr_event->time_msec,
+    };
 
-    if (!handled) {
+    if (!compositor->vtable.key(event)) {
         wlr_seat_set_keyboard(compositor->seat, keyboard->wlr_keyboard);
-        wlr_seat_keyboard_notify_key(compositor->seat, event->time_msec, event->keycode,
-                                     event->state);
+        wlr_seat_keyboard_notify_key(compositor->seat, wlr_event->time_msec, wlr_event->keycode,
+                                     wlr_event->state);
     }
 }
 
@@ -360,9 +387,14 @@ static void
 on_xwayland_ready(struct wl_listener *listener, void *data) {}
 
 struct compositor *
-compositor_create() {
+compositor_create(struct compositor_vtable vtable) {
     struct compositor *compositor = calloc(1, sizeof(struct compositor));
     assert(compositor);
+
+    assert(vtable.button);
+    assert(vtable.key);
+    assert(vtable.motion);
+    compositor->vtable = vtable;
 
     compositor->display = wl_display_create();
     if (compositor->display == NULL) {
