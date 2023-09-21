@@ -487,6 +487,11 @@ compositor_create(struct compositor_vtable vtable) {
     return compositor;
 }
 
+struct wl_event_loop *
+compositor_get_loop(struct compositor *compositor) {
+    return wl_display_get_event_loop(compositor->display);
+}
+
 void
 compositor_destroy(struct compositor *compositor) {
     if (compositor->xwayland != NULL) {
@@ -516,7 +521,6 @@ compositor_run(struct compositor *compositor) {
     setenv("WAYLAND_DISPLAY", socket, true);
     setenv("DISPLAY", compositor->xwayland->display_name, true);
 
-    // TODO: handle signals and use poll
     wl_display_run(compositor->display);
     return true;
 }

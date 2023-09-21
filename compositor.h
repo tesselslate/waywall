@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 #include <stdint.h>
+#include <wayland-server-core.h>
 #include <xkbcommon/xkbcommon.h>
 
 struct compositor_button_event {
@@ -36,6 +37,7 @@ struct compositor_vtable {
 
 struct compositor *compositor_create(struct compositor_vtable vtable);
 void compositor_destroy(struct compositor *compositor);
+struct wl_event_loop *compositor_get_loop(struct compositor *compositor);
 bool compositor_run(struct compositor *compositor);
 
 #endif
