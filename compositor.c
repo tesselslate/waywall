@@ -2,7 +2,7 @@
 // TODO: get wl backend
 
 #include "compositor.h"
-#include <assert.h>
+#include "util.h"
 #include <stdlib.h>
 #include <time.h>
 #include <wayland-client.h>
@@ -232,12 +232,12 @@ on_new_output(struct wl_listener *listener, void *data) {
     wlr_output_state_init(&state);
     wlr_output_state_set_enabled(&state, true);
 
-    // No modesetting is necessary since we only support the Wayland backend.
+    // No modesetting is necessary since we only support Wayland.
     wlr_output_commit_state(wlr_output, &state);
     wlr_output_state_finish(&state);
 
     struct output *output = calloc(1, sizeof(struct output));
-    assert(output);
+    ww_assert(output);
     output->compositor = compositor;
     output->wlr_output = wlr_output;
 
@@ -259,7 +259,7 @@ static void
 on_new_keyboard(struct compositor *compositor, struct wlr_input_device *device) {
     struct wlr_keyboard *wlr_keyboard = wlr_keyboard_from_input_device(device);
     struct keyboard *keyboard = calloc(1, sizeof(struct keyboard));
-    assert(keyboard);
+    ww_assert(keyboard);
     keyboard->compositor = compositor;
     keyboard->wlr_keyboard = wlr_keyboard;
 
@@ -389,65 +389,68 @@ on_xwayland_ready(struct wl_listener *listener, void *data) {}
 struct compositor *
 compositor_create(struct compositor_vtable vtable) {
     struct compositor *compositor = calloc(1, sizeof(struct compositor));
-    assert(compositor);
+    if (!compositor) {
+        wlr_log(WLR_ERROR, "failed to allocate compositor");
+        return NULL;
+    }
 
-    assert(vtable.button);
-    assert(vtable.key);
-    assert(vtable.motion);
+    ww_assert(vtable.button);
+    ww_assert(vtable.key);
+    ww_assert(vtable.motion);
     compositor->vtable = vtable;
 
     compositor->display = wl_display_create();
-    if (compositor->display == NULL) {
+    if (!compositor->display) {
         wlr_log(WLR_ERROR, "failed to create wl_display");
         return NULL;
     }
 
     compositor->backend = wlr_wl_backend_create(compositor->display, NULL);
-    if (compositor->backend == NULL) {
+    if (!compositor->backend) {
         wlr_log(WLR_ERROR, "failed to create wlr_backend");
         return NULL;
     }
     wlr_wl_output_create(compositor->backend);
 
     compositor->renderer = wlr_renderer_autocreate(compositor->backend);
-    if (compositor->renderer == NULL) {
+    if (!compositor->renderer) {
         wlr_log(WLR_ERROR, "failed to create wlr_renderer");
         return NULL;
     }
     wlr_renderer_init_wl_display(compositor->renderer, compositor->display);
 
     compositor->allocator = wlr_allocator_autocreate(compositor->backend, compositor->renderer);
-    if (compositor->allocator == NULL) {
+    if (!compositor->allocator) {
         wlr_log(WLR_ERROR, "failed to create wlr_allocator");
         return NULL;
     }
 
     compositor->compositor = wlr_compositor_create(compositor->display, 5, compositor->renderer);
-    if (compositor->compositor == NULL) {
+    if (!compositor->compositor) {
         wlr_log(WLR_ERROR, "failed to create wlr_compositor");
         return NULL;
     }
-    assert(wlr_subcompositor_create(compositor->display));
-    assert(wlr_data_device_manager_create(compositor->display));
+    ww_assert(wlr_subcompositor_create(compositor->display));
+    ww_assert(wlr_data_device_manager_create(compositor->display));
 
     compositor->output_layout = wlr_output_layout_create();
-    assert(compositor->output_layout);
+    ww_assert(compositor->output_layout);
     wl_list_init(&compositor->outputs);
     compositor->on_new_output.notify = on_new_output;
     wl_signal_add(&compositor->backend->events.new_output, &compositor->on_new_output);
 
     compositor->scene = wlr_scene_create();
-    assert(compositor->scene);
+    ww_assert(compositor->scene);
     compositor->scene_layout =
         wlr_scene_attach_output_layout(compositor->scene, compositor->output_layout);
-    assert(compositor->scene_layout);
+    ww_assert(compositor->scene_layout);
 
     compositor->cursor = wlr_cursor_create();
-    assert(compositor->cursor);
+    ww_assert(compositor->cursor);
     wlr_cursor_attach_output_layout(compositor->cursor, compositor->output_layout);
     // TODO: Allow configuring cursor theme and size
     compositor->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
-    assert(compositor->cursor_manager);
+    ww_assert(compositor->cursor_manager);
 
     compositor->on_cursor_axis.notify = on_cursor_axis;
     compositor->on_cursor_button.notify = on_cursor_button;
@@ -462,7 +465,7 @@ compositor_create(struct compositor_vtable vtable) {
                   &compositor->on_cursor_motion_absolute);
 
     compositor->seat = wlr_seat_create(compositor->display, "seat0");
-    assert(compositor->seat);
+    ww_assert(compositor->seat);
     wl_list_init(&compositor->keyboards);
     compositor->on_new_input.notify = on_new_input;
     compositor->on_request_cursor.notify = on_request_cursor;
@@ -473,7 +476,7 @@ compositor_create(struct compositor_vtable vtable) {
                   &compositor->on_request_set_selection);
 
     compositor->xwayland = wlr_xwayland_create(compositor->display, compositor->compositor, false);
-    if (compositor->xwayland == NULL) {
+    if (!compositor->xwayland) {
         wlr_log(WLR_ERROR, "failed to create wlr_xwayland");
         wlr_backend_destroy(compositor->backend);
         return NULL;
@@ -489,11 +492,15 @@ compositor_create(struct compositor_vtable vtable) {
 
 struct wl_event_loop *
 compositor_get_loop(struct compositor *compositor) {
+    ww_assert(compositor);
+
     return wl_display_get_event_loop(compositor->display);
 }
 
 void
 compositor_destroy(struct compositor *compositor) {
+    ww_assert(compositor);
+
     if (compositor->xwayland != NULL) {
         wlr_xwayland_destroy(compositor->xwayland);
     }
@@ -508,13 +515,15 @@ compositor_destroy(struct compositor *compositor) {
 
 bool
 compositor_run(struct compositor *compositor) {
+    ww_assert(compositor);
+
     if (!wlr_backend_start(compositor->backend)) {
         wlr_backend_destroy(compositor->backend);
         return false;
     }
 
     const char *socket = wl_display_add_socket_auto(compositor->display);
-    if (socket == NULL) {
+    if (!socket) {
         wlr_backend_destroy(compositor->backend);
         return false;
     }
