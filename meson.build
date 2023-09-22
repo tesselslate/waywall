@@ -62,6 +62,7 @@ endforeach
 executable('waywall',
   wl_proto_src, wl_proto_header,
   'compositor.c', 'compositor.h',
+  'util.c', 'util.h',
   'main.c',
 
   dependencies : [
