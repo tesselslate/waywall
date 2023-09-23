@@ -556,13 +556,13 @@ compositor_create(struct compositor_vtable vtable) {
     compositor->display = wl_display_create();
     if (!compositor->display) {
         wlr_log(WLR_ERROR, "failed to create wl_display");
-        return NULL;
+        goto fail_display;
     }
 
     compositor->backend = wlr_wl_backend_create(compositor->display, NULL);
     if (!compositor->backend) {
         wlr_log(WLR_ERROR, "failed to create wlr_backend");
-        return NULL;
+        goto fail_backend;
     }
     compositor->remote_display = wlr_wl_backend_get_remote_display(compositor->backend);
     ww_assert(compositor->remote_display);
@@ -571,27 +571,27 @@ compositor_create(struct compositor_vtable vtable) {
     wl_display_roundtrip(compositor->remote_display);
     if (!compositor->remote_pointer || !compositor->remote_pointer_constraints) {
         wlr_log(WLR_ERROR, "failed to acquire objects for pointer constraints");
-        return NULL;
+        goto fail_registry;
     }
     wlr_wl_output_create(compositor->backend);
 
     compositor->renderer = wlr_renderer_autocreate(compositor->backend);
     if (!compositor->renderer) {
         wlr_log(WLR_ERROR, "failed to create wlr_renderer");
-        return NULL;
+        goto fail_renderer;
     }
     wlr_renderer_init_wl_display(compositor->renderer, compositor->display);
 
     compositor->allocator = wlr_allocator_autocreate(compositor->backend, compositor->renderer);
     if (!compositor->allocator) {
         wlr_log(WLR_ERROR, "failed to create wlr_allocator");
-        return NULL;
+        goto fail_allocator;
     }
 
     compositor->compositor = wlr_compositor_create(compositor->display, 5, compositor->renderer);
     if (!compositor->compositor) {
         wlr_log(WLR_ERROR, "failed to create wlr_compositor");
-        return NULL;
+        goto fail_compositor;
     }
     ww_assert(wlr_subcompositor_create(compositor->display));
     ww_assert(wlr_data_device_manager_create(compositor->display));
@@ -642,7 +642,7 @@ compositor_create(struct compositor_vtable vtable) {
     if (!compositor->xdg_shell) {
         wlr_log(WLR_ERROR, "failed to create wlr_xdg_shell");
         wlr_backend_destroy(compositor->backend);
-        return NULL;
+        goto fail_xdg_shell;
     }
     compositor->on_new_xdg_surface.notify = on_xdg_new_surface;
     wl_signal_add(&compositor->xdg_shell->events.new_surface, &compositor->on_new_xdg_surface);
@@ -651,7 +651,7 @@ compositor_create(struct compositor_vtable vtable) {
     if (!compositor->xwayland) {
         wlr_log(WLR_ERROR, "failed to create wlr_xwayland");
         wlr_backend_destroy(compositor->backend);
-        return NULL;
+        goto fail_xwayland;
     }
     wl_list_init(&compositor->windows);
     compositor->on_xwayland_new_surface.notify = on_xwayland_new_surface;
@@ -660,6 +660,42 @@ compositor_create(struct compositor_vtable vtable) {
     wl_signal_add(&compositor->xwayland->events.ready, &compositor->on_xwayland_ready);
 
     return compositor;
+
+fail_xwayland:
+    wlr_xwayland_destroy(compositor->xwayland);
+
+fail_xdg_shell:
+    wlr_seat_destroy(compositor->seat);
+    wlr_xcursor_manager_destroy(compositor->cursor_manager);
+    wlr_cursor_destroy(compositor->cursor);
+    wlr_scene_node_destroy(&compositor->scene->tree.node);
+    wlr_output_layout_destroy(compositor->output_layout);
+
+fail_compositor:
+    wlr_allocator_destroy(compositor->allocator);
+
+fail_allocator:
+    wlr_renderer_destroy(compositor->renderer);
+
+fail_renderer:
+fail_registry:
+    if (compositor->remote_pointer_constraints) {
+        zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
+    }
+    if (compositor->remote_pointer) {
+        wl_pointer_destroy(compositor->remote_pointer);
+    }
+    if (compositor->remote_seat) {
+        wl_seat_destroy(compositor->remote_seat);
+    }
+    wlr_backend_destroy(compositor->backend);
+
+fail_backend:
+    wl_display_destroy(compositor->display);
+
+fail_display:
+    free(compositor);
+    return NULL;
 }
 
 struct wl_event_loop *
@@ -673,13 +709,19 @@ void
 compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
 
-    if (compositor->xwayland != NULL) {
-        wlr_xwayland_destroy(compositor->xwayland);
-    }
-    if (compositor->display != NULL) {
-        wl_display_destroy_clients(compositor->display);
-        wl_display_destroy(compositor->display);
-    }
+    wlr_xwayland_destroy(compositor->xwayland);
+    wlr_xcursor_manager_destroy(compositor->cursor_manager);
+    wlr_cursor_destroy(compositor->cursor);
+    wlr_scene_node_destroy(&compositor->scene->tree.node);
+    wlr_output_layout_destroy(compositor->output_layout);
+    wlr_allocator_destroy(compositor->allocator);
+    wlr_renderer_destroy(compositor->renderer);
+    zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
+    wl_pointer_destroy(compositor->remote_pointer);
+    wl_seat_destroy(compositor->remote_seat);
+    wlr_backend_destroy(compositor->backend);
+    wl_display_destroy_clients(compositor->display);
+    wl_display_destroy(compositor->display);
     free(compositor);
 }
 
