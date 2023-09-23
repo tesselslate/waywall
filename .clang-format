@@ -4,6 +4,7 @@ ColumnLimit: 100
 IndentWidth: 4
 SortIncludes: true
 ForEachMacros:
+  - wl_list_for_each
   - wl_list_for_each_safe
 
 # vim:ft=yaml

@@ -38,11 +38,35 @@ struct compositor_vtable {
     compositor_motion_func_t motion;
 };
 
+struct synthetic_input {};
+
+// Attempts to create a new compositor. Returns NULL on failure.
 struct compositor *compositor_create(struct compositor_vtable vtable);
+
+// Releases resources associated with `compositor`.
 void compositor_destroy(struct compositor *compositor);
+
+// Returns the internal event loop of `compositor`, to which various callbacks can be added.
 struct wl_event_loop *compositor_get_loop(struct compositor *compositor);
+
+// Runs the compositor event loop. Returns true on success, false on failure.
 bool compositor_run(struct compositor *compositor);
 
+// Configures the given window to the given position and size.
+void compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t w, int16_t h);
+
+// Transfers input focus to the given window. If `window` is NULL, input focus is removed from
+// whichever window currently has it (if any).
 void compositor_focus_window(struct compositor *compositor, struct window *window);
+
+// Returns the number of existing windows. If there are more than 0 windows, a buffer is allocated
+// and placed in the user-provided `windows` pointer. The caller must free the buffer.
+int compositor_get_windows(struct compositor *compositor, struct window ***windows);
+
+// Attempts to get the process ID of the given `window`. Returns -1 on failure.
+pid_t compositor_get_window_pid(struct window *window);
+
+// Sends a keyboard input to the given `window`.
+void compositor_send_key(struct window *window, struct synthetic_input key);
 
 #endif

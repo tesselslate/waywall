@@ -42,11 +42,6 @@ struct compositor {
     struct wl_listener on_cursor_axis;
     struct wl_listener on_cursor_frame;
 
-    struct wlr_pointer_constraints_v1 *pointer_constraints;
-    struct wlr_pointer_constraint_v1 *active_constraint;
-    struct zwp_locked_pointer_v1 *locked_pointer;
-    struct wl_listener on_new_constraint;
-
     struct wlr_seat *seat;
     struct wl_list keyboards;
     struct wl_listener on_new_input;
@@ -65,6 +60,8 @@ struct compositor {
 
     struct wlr_xwayland *xwayland;
     struct wl_list windows;
+    xcb_connection_t *xcb_conn;
+    uint64_t xcb_offset;
     struct window *focused_window;
     struct wl_listener on_xwayland_new_surface;
     struct wl_listener on_xwayland_ready;
@@ -73,6 +70,10 @@ struct compositor {
     struct wl_pointer *remote_pointer;
     struct wl_seat *remote_seat;
     struct zwp_pointer_constraints_v1 *remote_pointer_constraints;
+    struct zwp_locked_pointer_v1 *remote_locked_pointer;
+    struct wlr_pointer_constraints_v1 *pointer_constraints;
+    struct wlr_pointer_constraint_v1 *active_constraint;
+    struct wl_listener on_new_constraint;
 
     struct compositor_vtable vtable;
 };
@@ -446,9 +447,9 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
 
     if (compositor->active_constraint) {
         if (!constraint) {
-            ww_assert(compositor->locked_pointer);
-            zwp_locked_pointer_v1_destroy(compositor->locked_pointer);
-            compositor->locked_pointer = NULL;
+            ww_assert(compositor->remote_locked_pointer);
+            zwp_locked_pointer_v1_destroy(compositor->remote_locked_pointer);
+            compositor->remote_locked_pointer = NULL;
             compositor->active_constraint = NULL;
             return;
         }
@@ -461,14 +462,14 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
         int32_t height = compositor->main_output->wlr_output->height;
         wlr_cursor_warp(compositor->cursor, NULL, width / 2, height / 2);
 
-        if (!compositor->locked_pointer) {
-            compositor->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
+        if (!compositor->remote_locked_pointer) {
+            compositor->remote_locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
                 compositor->remote_pointer_constraints,
                 wlr_wl_output_get_surface(compositor->main_output->wlr_output),
                 compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            ww_assert(compositor->locked_pointer);
+            ww_assert(compositor->remote_locked_pointer);
         }
-        zwp_locked_pointer_v1_set_cursor_position_hint(compositor->locked_pointer,
+        zwp_locked_pointer_v1_set_cursor_position_hint(compositor->remote_locked_pointer,
                                                        wl_fixed_from_int(width / 2),
                                                        wl_fixed_from_int(height / 2));
 
@@ -725,7 +726,78 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
 
 static void
 on_xwayland_ready(struct wl_listener *listener, void *data) {
-    // TODO: ?
+    struct compositor *compositor = wl_container_of(listener, compositor, on_xwayland_ready);
+    int screens;
+    compositor->xcb_conn = xcb_connect(NULL, &screens);
+    int err = xcb_connection_has_error(compositor->xcb_conn);
+    if (err) {
+        compositor->xcb_conn = NULL;
+        wlr_log(WLR_ERROR, "failed to connect to xwayland: %d", err);
+        return;
+    }
+    wlr_log(WLR_DEBUG, "connected to xwayland with %d screens", screens + 1);
+
+    // TODO: investigate methods of sending synthetic keypresses
+    /*
+    const xcb_setup_t *setup = xcb_get_setup(compositor->xcb_conn);
+    xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
+    xcb_screen_t *screen = iter.data;
+    ww_assert(screen);
+    xcb_window_t root = screen->root;
+    wlr_log(WLR_DEBUG, "xwayland root window: %d", root);
+
+    xcb_generic_error_t *error = NULL;
+    xcb_intern_atom_cookie_t atom_cookie =
+        xcb_intern_atom(compositor->xcb_conn, 0, strlen("WM_NAME"), "WM_NAME");
+    xcb_intern_atom_reply_t *atom_reply =
+        xcb_intern_atom_reply(compositor->xcb_conn, atom_cookie, &error);
+    if (error) {
+        wlr_log(WLR_ERROR, "failed to get WM_NAME atom: %d", error->error_code);
+        free(error);
+        return;
+    }
+    ww_assert(atom_reply);
+    xcb_atom_t wm_name = atom_reply->atom;
+    free(atom_reply);
+
+    xcb_event_mask_t mask = XCB_EVENT_MASK_PROPERTY_CHANGE | XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY;
+    xcb_void_cookie_t cookie =
+        xcb_change_window_attributes_checked(compositor->xcb_conn, root, XCB_CW_EVENT_MASK, &mask);
+    error = xcb_request_check(compositor->xcb_conn, cookie);
+    if (error) {
+        wlr_log(WLR_ERROR, "failed to change root window attributes: %d", error->error_code);
+        free(error);
+        return;
+    }
+
+    uint64_t sum = 0;
+    for (int i = 0; i < 10; i++) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+
+        xcb_change_property(compositor->xcb_conn, XCB_PROP_MODE_APPEND, root, wm_name,
+                            XCB_ATOM_STRING, 8, 0, NULL);
+        xcb_generic_event_t *event = xcb_wait_for_event(compositor->xcb_conn);
+        if (!event) {
+            int err = xcb_connection_has_error(compositor->xcb_conn);
+            if (err) {
+                wlr_log(WLR_ERROR, "failed to get xwayland time offset: %d", err);
+            } else {
+                wlr_log(WLR_ERROR, "failed to get xwayland time offset (no error reported)");
+            }
+            return;
+        }
+        if (event->response_type != XCB_PROPERTY_NOTIFY) {
+            wlr_log(WLR_ERROR, "returned xwayland event was not PROPERTY_NOTIFY");
+            return;
+        }
+        xcb_property_notify_event_t *prop_event = (xcb_property_notify_event_t *)event;
+        uint64_t now_ms = now.tv_sec * 1000 + (now.tv_nsec / 1000000);
+        sum += now_ms - (uint64_t)prop_event->time;
+    }
+    wlr_log(WLR_INFO, "found xwayland time offset of %" PRIu64, sum / 10);
+    compositor->xcb_offset = sum / 10;
+    */
 }
 
 struct compositor *
@@ -903,6 +975,7 @@ void
 compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
 
+    xcb_disconnect(compositor->xcb_conn);
     wlr_xwayland_destroy(compositor->xwayland);
     wlr_xcursor_manager_destroy(compositor->cursor_manager);
     wlr_cursor_destroy(compositor->cursor);
@@ -941,7 +1014,17 @@ compositor_run(struct compositor *compositor) {
 }
 
 void
+compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t h, int16_t w) {
+    ww_assert(window);
+
+    wlr_scene_node_set_position(&window->scene_tree->node, x, y);
+    wlr_xwayland_surface_configure(window->surface, x, y, w, h);
+}
+
+void
 compositor_focus_window(struct compositor *compositor, struct window *window) {
+    ww_assert(compositor);
+
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
 
     if (window) {
@@ -972,3 +1055,33 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
     }
     compositor->focused_window = window;
 }
+
+int
+compositor_get_windows(struct compositor *compositor, struct window ***windows) {
+    ww_assert(compositor);
+    ww_assert(windows);
+
+    int count = wl_list_length(&compositor->windows);
+    if (count == 0) {
+        return 0;
+    }
+    struct window **data = calloc(count, sizeof(struct window *));
+    *windows = data;
+
+    struct window *window;
+    int i = 0;
+    wl_list_for_each (window, &compositor->windows, link) {
+        data[i++] = window;
+    };
+    return count;
+}
+
+pid_t
+compositor_get_window_pid(struct window *window) {
+    ww_assert(window);
+
+    return window->surface->pid > 0 ? window->surface->pid : -1;
+}
+
+void
+compositor_send_key(struct window *window, struct synthetic_input key) {}
