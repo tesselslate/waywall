@@ -1,4 +1,3 @@
-// TODO: pointer constraints
 // TODO: is xdg-shell even needed??
 
 #include "compositor.h"
@@ -16,6 +15,7 @@
 #include <wlr/types/wlr_data_device.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
+#include <wlr/types/wlr_pointer_constraints_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xcursor_manager.h>
@@ -42,6 +42,11 @@ struct compositor {
     struct wl_listener on_cursor_axis;
     struct wl_listener on_cursor_frame;
 
+    struct wlr_pointer_constraints_v1 *pointer_constraints;
+    struct wlr_pointer_constraint_v1 *active_constraint;
+    struct zwp_locked_pointer_v1 *locked_pointer;
+    struct wl_listener on_new_constraint;
+
     struct wlr_seat *seat;
     struct wl_list keyboards;
     struct wl_listener on_new_input;
@@ -51,6 +56,8 @@ struct compositor {
     struct wlr_output_layout *output_layout;
     struct wl_list outputs;
     struct wl_listener on_new_output;
+    struct output *main_output;
+    struct output *alt_output;
 
     struct wlr_xdg_shell *xdg_shell;
     struct wl_list views;
@@ -90,6 +97,14 @@ struct output {
 
     struct wl_listener on_frame;
     struct wl_listener on_request_state;
+    struct wl_listener on_destroy;
+};
+
+struct pointer_constraint {
+    struct compositor *compositor;
+    struct wlr_pointer_constraint_v1 *constraint;
+
+    struct wl_listener on_set_region;
     struct wl_listener on_destroy;
 };
 
@@ -356,6 +371,14 @@ on_new_output(struct wl_listener *listener, void *data) {
         wlr_output_layout_add_auto(compositor->output_layout, wlr_output);
     struct wlr_scene_output *scene_output = wlr_scene_output_create(compositor->scene, wlr_output);
     wlr_scene_output_layout_add_output(compositor->scene_layout, layout_output, scene_output);
+
+    // TODO: improve output handling logic
+    if (!compositor->main_output) {
+        compositor->main_output = output;
+    } else {
+        ww_assert(!compositor->alt_output);
+        compositor->alt_output = output;
+    }
 }
 
 static void
@@ -411,6 +434,83 @@ on_new_input(struct wl_listener *listener, void *data) {
         caps |= WL_SEAT_CAPABILITY_KEYBOARD;
     }
     wlr_seat_set_capabilities(compositor->seat, caps);
+}
+
+static void
+handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v1 *constraint) {
+    // Since all we care about is Minecraft, we can assume that all constraints keep the pointer
+    // at the center of the screen.
+    if (compositor->active_constraint == constraint) {
+        return;
+    }
+
+    if (compositor->active_constraint) {
+        if (!constraint) {
+            ww_assert(compositor->locked_pointer);
+            zwp_locked_pointer_v1_destroy(compositor->locked_pointer);
+            compositor->locked_pointer = NULL;
+            compositor->active_constraint = NULL;
+            return;
+        }
+        wlr_pointer_constraint_v1_send_deactivated(compositor->active_constraint);
+    }
+
+    if (compositor->focused_window &&
+        compositor->focused_window->surface->surface == constraint->surface) {
+        int32_t width = compositor->main_output->wlr_output->width;
+        int32_t height = compositor->main_output->wlr_output->height;
+        wlr_cursor_warp(compositor->cursor, NULL, width / 2, height / 2);
+
+        if (!compositor->locked_pointer) {
+            compositor->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
+                compositor->remote_pointer_constraints,
+                wlr_wl_output_get_surface(compositor->main_output->wlr_output),
+                compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            ww_assert(compositor->locked_pointer);
+        }
+        zwp_locked_pointer_v1_set_cursor_position_hint(compositor->locked_pointer,
+                                                       wl_fixed_from_int(width / 2),
+                                                       wl_fixed_from_int(height / 2));
+
+        wlr_pointer_constraint_v1_send_activated(constraint);
+        compositor->active_constraint = constraint;
+    }
+}
+
+static void
+on_constraint_set_region(struct wl_listener *listener, void *data) {
+    wlr_log(WLR_DEBUG, "received set_region event for pointer constraint. ignoring");
+}
+
+static void
+on_constraint_destroy(struct wl_listener *listener, void *data) {
+    struct wlr_pointer_constraint_v1 *wlr_constraint = data;
+    struct pointer_constraint *constraint = wlr_constraint->data;
+    if (constraint->compositor->active_constraint == wlr_constraint) {
+        handle_constraint(constraint->compositor, NULL);
+    }
+    wl_list_remove(&constraint->on_destroy.link);
+    wl_list_remove(&constraint->on_set_region.link);
+}
+
+static void
+on_new_constraint(struct wl_listener *listener, void *data) {
+    struct compositor *compositor = wl_container_of(listener, compositor, on_new_constraint);
+    struct wlr_pointer_constraint_v1 *wlr_constraint = data;
+    struct pointer_constraint *constraint = calloc(1, sizeof(struct pointer_constraint));
+    ww_assert(constraint);
+
+    wlr_constraint->data = constraint;
+    constraint->compositor = compositor;
+    constraint->constraint = wlr_constraint;
+    constraint->on_set_region.notify = on_constraint_set_region;
+    constraint->on_destroy.notify = on_constraint_destroy;
+    wl_signal_add(&wlr_constraint->events.set_region, &constraint->on_set_region);
+    wl_signal_add(&wlr_constraint->events.destroy, &constraint->on_destroy);
+    if (compositor->focused_window &&
+        wlr_constraint->surface == compositor->focused_window->surface->surface) {
+        handle_constraint(compositor, wlr_constraint);
+    }
 }
 
 static void
@@ -630,7 +730,6 @@ on_xwayland_ready(struct wl_listener *listener, void *data) {
 
 struct compositor *
 compositor_create(struct compositor_vtable vtable) {
-    // TODO: proper teardown on failure
     struct compositor *compositor = calloc(1, sizeof(struct compositor));
     if (!compositor) {
         wlr_log(WLR_ERROR, "failed to allocate compositor");
@@ -699,6 +798,11 @@ compositor_create(struct compositor_vtable vtable) {
 
     compositor->cursor = wlr_cursor_create();
     ww_assert(compositor->cursor);
+    compositor->pointer_constraints = wlr_pointer_constraints_v1_create(compositor->display);
+    ww_assert(compositor->pointer_constraints);
+    compositor->on_new_constraint.notify = on_new_constraint;
+    wl_signal_add(&compositor->pointer_constraints->events.new_constraint,
+                  &compositor->on_new_constraint);
     wlr_cursor_attach_output_layout(compositor->cursor, compositor->output_layout);
     // TODO: Allow configuring cursor theme and size
     compositor->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
@@ -853,10 +957,16 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
         global_to_surface(compositor, &window->scene_tree->node, compositor->cursor->x,
                           compositor->cursor->y, &x, &y);
         wlr_seat_pointer_notify_enter(compositor->seat, window->surface->surface, x, y);
+
+        struct wlr_pointer_constraint_v1 *constraint =
+            wlr_pointer_constraints_v1_constraint_for_surface(
+                compositor->pointer_constraints, window->surface->surface, compositor->seat);
+        handle_constraint(compositor, constraint);
     } else {
         if (!compositor->focused_window) {
             return;
         }
+        handle_constraint(compositor, NULL);
         wlr_seat_keyboard_notify_clear_focus(compositor->seat);
         wlr_seat_pointer_notify_clear_focus(compositor->seat);
     }
