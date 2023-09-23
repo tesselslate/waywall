@@ -43,6 +43,7 @@ wl_proto_dir = wayland_protocols.get_variable('pkgdatadir')
 wl_proto_xml = [
   'stable/xdg-shell/xdg-shell.xml',
   'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
+  'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
 ]
 
 wl_proto_header = []

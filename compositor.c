@@ -2,6 +2,7 @@
 
 #include "compositor.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
+#include "relative-pointer-unstable-v1-protocol.h"
 #include "util.h"
 #include "xdg-shell-protocol.h"
 #include <stdlib.h>
@@ -16,6 +17,7 @@
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
+#include <wlr/types/wlr_relative_pointer_v1.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xcursor_manager.h>
@@ -69,11 +71,16 @@ struct compositor {
     struct wl_display *remote_display;
     struct wl_pointer *remote_pointer;
     struct wl_seat *remote_seat;
-    struct zwp_pointer_constraints_v1 *remote_pointer_constraints;
-    struct zwp_locked_pointer_v1 *remote_locked_pointer;
+
     struct wlr_pointer_constraints_v1 *pointer_constraints;
     struct wlr_pointer_constraint_v1 *active_constraint;
+    struct zwp_pointer_constraints_v1 *remote_pointer_constraints;
+    struct zwp_locked_pointer_v1 *remote_locked_pointer;
     struct wl_listener on_new_constraint;
+
+    struct wlr_relative_pointer_manager_v1 *relative_pointer;
+    struct zwp_relative_pointer_manager_v1 *remote_relative_pointer_manager;
+    struct zwp_relative_pointer_v1 *remote_relative_pointer;
 
     struct compositor_vtable vtable;
 };
@@ -185,6 +192,10 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
         compositor->remote_pointer_constraints =
             wl_registry_bind(registry, name, &zwp_pointer_constraints_v1_interface, 1);
         ww_assert(compositor->remote_pointer_constraints);
+    } else if (strcmp(interface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
+        compositor->remote_relative_pointer_manager =
+            wl_registry_bind(registry, name, &zwp_relative_pointer_manager_v1_interface, 1);
+        ww_assert(compositor->remote_relative_pointer_manager);
     }
 }
 
@@ -196,6 +207,21 @@ on_registry_global_remove(void *data, struct wl_registry *registry, uint32_t nam
 static struct wl_registry_listener registry_listener = {
     .global = on_registry_global,
     .global_remove = on_registry_global_remove,
+};
+
+static void
+on_relative_pointer_motion(void *data, struct zwp_relative_pointer_v1 *relative_pointer,
+                           uint32_t utime_hi, uint32_t utime_lo, wl_fixed_t dx, wl_fixed_t dy,
+                           wl_fixed_t dx_unaccel, wl_fixed_t dy_unaccel) {
+    struct compositor *compositor = data;
+    uint64_t time = (uint64_t)utime_hi * 0xFFFFFFFF + (uint64_t)utime_lo;
+    wlr_relative_pointer_manager_v1_send_relative_motion(
+        compositor->relative_pointer, compositor->seat, time, wl_fixed_to_double(dx),
+        wl_fixed_to_double(dy), wl_fixed_to_double(dx_unaccel), wl_fixed_to_double(dy_unaccel));
+}
+
+static struct zwp_relative_pointer_v1_listener relative_pointer_listener = {
+    .relative_motion = on_relative_pointer_motion,
 };
 
 static void
@@ -829,10 +855,23 @@ compositor_create(struct compositor_vtable vtable) {
     struct wl_registry *remote_registry = wl_display_get_registry(compositor->remote_display);
     wl_registry_add_listener(remote_registry, &registry_listener, compositor);
     wl_display_roundtrip(compositor->remote_display);
-    if (!compositor->remote_pointer || !compositor->remote_pointer_constraints) {
-        wlr_log(WLR_ERROR, "failed to acquire objects for pointer constraints");
+    if (!compositor->remote_pointer) {
+        wlr_log(WLR_ERROR, "failed to acquire remote pointer");
         goto fail_registry;
     }
+    if (!compositor->remote_pointer_constraints) {
+        wlr_log(WLR_ERROR, "failed to acquire remote pointer constraints");
+        goto fail_registry;
+    }
+    if (!compositor->remote_relative_pointer_manager) {
+        wlr_log(WLR_ERROR, "failed to acquire remote relative pointer manager");
+        goto fail_registry;
+    }
+    compositor->remote_relative_pointer = zwp_relative_pointer_manager_v1_get_relative_pointer(
+        compositor->remote_relative_pointer_manager, compositor->remote_pointer);
+    ww_assert(compositor->remote_relative_pointer);
+    zwp_relative_pointer_v1_add_listener(compositor->remote_relative_pointer,
+                                         &relative_pointer_listener, compositor);
     wlr_wl_output_create(compositor->backend);
 
     compositor->renderer = wlr_renderer_autocreate(compositor->backend);
@@ -872,6 +911,8 @@ compositor_create(struct compositor_vtable vtable) {
     ww_assert(compositor->cursor);
     compositor->pointer_constraints = wlr_pointer_constraints_v1_create(compositor->display);
     ww_assert(compositor->pointer_constraints);
+    compositor->relative_pointer = wlr_relative_pointer_manager_v1_create(compositor->display);
+    ww_assert(compositor->relative_pointer);
     compositor->on_new_constraint.notify = on_new_constraint;
     wl_signal_add(&compositor->pointer_constraints->events.new_constraint,
                   &compositor->on_new_constraint);
@@ -973,20 +1014,23 @@ compositor_get_loop(struct compositor *compositor) {
 
 void
 compositor_destroy(struct compositor *compositor) {
+    // TODO: Figure out how to destroy objects without causing UAF's
     ww_assert(compositor);
 
     xcb_disconnect(compositor->xcb_conn);
     wlr_xwayland_destroy(compositor->xwayland);
-    wlr_xcursor_manager_destroy(compositor->cursor_manager);
-    wlr_cursor_destroy(compositor->cursor);
-    wlr_scene_node_destroy(&compositor->scene->tree.node);
-    wlr_output_layout_destroy(compositor->output_layout);
-    wlr_allocator_destroy(compositor->allocator);
-    wlr_renderer_destroy(compositor->renderer);
-    zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
-    wl_pointer_destroy(compositor->remote_pointer);
-    wl_seat_destroy(compositor->remote_seat);
-    wlr_backend_destroy(compositor->backend);
+    /* wlr_xcursor_manager_destroy(compositor->cursor_manager); */
+    /* wlr_cursor_destroy(compositor->cursor); */
+    /* wlr_scene_node_destroy(&compositor->scene->tree.node); */
+    /* wlr_output_layout_destroy(compositor->output_layout); */
+    /* wlr_allocator_destroy(compositor->allocator); */
+    /* wlr_renderer_destroy(compositor->renderer); */
+    /* zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer); */
+    /* zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager); */
+    /* zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints); */
+    /* wl_pointer_destroy(compositor->remote_pointer); */
+    /* wl_seat_destroy(compositor->remote_seat); */
+    /* wlr_backend_destroy(compositor->backend); */
     wl_display_destroy_clients(compositor->display);
     wl_display_destroy(compositor->display);
     free(compositor);
