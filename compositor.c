@@ -113,7 +113,14 @@ struct window {
 
     struct compositor *compositor;
     struct wlr_xwayland_surface *surface;
+    struct wlr_scene_tree *scene_tree;
+    struct wlr_scene_tree *scene_surface;
 
+    struct wl_listener on_associate;
+    struct wl_listener on_dissociate;
+
+    struct wl_listener on_map;
+    struct wl_listener on_unmap;
     struct wl_listener on_destroy;
     struct wl_listener on_request_activate;
     struct wl_listener on_request_configure;
@@ -396,13 +403,49 @@ on_request_set_selection(struct wl_listener *listener, void *data) {
 }
 
 static void
+on_window_associate(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_associate);
+    wl_signal_add(&window->surface->surface->events.map, &window->on_map);
+    wl_signal_add(&window->surface->surface->events.unmap, &window->on_unmap);
+}
+
+static void
+on_window_dissociate(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_dissociate);
+    wl_list_remove(&window->on_map.link);
+    wl_list_remove(&window->on_unmap.link);
+}
+
+static void
+on_window_map(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_map);
+    wl_list_insert(&window->compositor->windows, &window->link);
+
+    window->scene_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
+    wlr_scene_node_set_enabled(&window->scene_tree->node, true);
+    window->scene_surface =
+        wlr_scene_subsurface_tree_create(window->scene_tree, window->surface->surface);
+    window->scene_tree->node.data = window;
+    window->scene_surface->node.data = window;
+    wlr_scene_node_set_position(&window->scene_tree->node, 0, 0);
+}
+
+static void
+on_window_unmap(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_unmap);
+    wl_list_remove(&window->link);
+    wlr_scene_node_destroy(&window->scene_tree->node);
+}
+
+static void
 on_window_destroy(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_destroy);
+    wl_list_remove(&window->on_associate.link);
+    wl_list_remove(&window->on_dissociate.link);
     wl_list_remove(&window->on_destroy.link);
     wl_list_remove(&window->on_request_activate.link);
     wl_list_remove(&window->on_request_configure.link);
     wl_list_remove(&window->on_request_fullscreen.link);
-    wl_list_remove(&window->link);
     free(window);
 }
 
@@ -524,12 +567,20 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
     ww_assert(window);
     window->compositor = compositor;
     surface->data = window;
-    wl_list_insert(&compositor->windows, &window->link);
     window->surface = surface;
+
+    window->on_associate.notify = on_window_associate;
+    window->on_dissociate.notify = on_window_dissociate;
+
+    // map and unmap are managed by on_window_map and on_window_unmap
+    window->on_map.notify = on_window_map;
+    window->on_unmap.notify = on_window_unmap;
     window->on_destroy.notify = on_window_destroy;
     window->on_request_activate.notify = on_window_request_activate;
     window->on_request_configure.notify = on_window_request_configure;
     window->on_request_fullscreen.notify = on_window_request_fullscreen;
+    wl_signal_add(&surface->events.associate, &window->on_associate);
+    wl_signal_add(&surface->events.dissociate, &window->on_dissociate);
     wl_signal_add(&surface->events.destroy, &window->on_destroy);
     wl_signal_add(&surface->events.request_activate, &window->on_request_activate);
     wl_signal_add(&surface->events.request_configure, &window->on_request_configure);
@@ -537,7 +588,9 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
 }
 
 static void
-on_xwayland_ready(struct wl_listener *listener, void *data) {}
+on_xwayland_ready(struct wl_listener *listener, void *data) {
+    // TODO: ?
+}
 
 struct compositor *
 compositor_create(struct compositor_vtable vtable) {
@@ -644,6 +697,7 @@ compositor_create(struct compositor_vtable vtable) {
         wlr_backend_destroy(compositor->backend);
         goto fail_xdg_shell;
     }
+    wl_list_init(&compositor->views);
     compositor->on_new_xdg_surface.notify = on_xdg_new_surface;
     wl_signal_add(&compositor->xdg_shell->events.new_surface, &compositor->on_new_xdg_surface);
 
