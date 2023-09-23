@@ -40,20 +40,23 @@ endif
 
 wl_scanner = find_program(wayland_scanner.get_variable('wayland_scanner'), native: true)
 wl_proto_dir = wayland_protocols.get_variable('pkgdatadir')
-wl_proto_xml = []
+wl_proto_xml = [
+  'stable/xdg-shell/xdg-shell.xml',
+  'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
+]
 
 wl_proto_header = []
 wl_proto_src = []
 foreach proto : wl_proto_xml
   wl_proto_header += custom_target(
     proto.underscorify() + '-header',
-    input: proto,
+    input: wl_proto_dir + '/' + proto,
     output: '@BASENAME@-protocol.h',
     command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
   )
   wl_proto_src += custom_target(
     proto.underscorify() + '-src',
-    input: proto,
+    input: wl_proto_dir + '/' + proto,
     output: '@BASENAME@.c',
     command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
   )
