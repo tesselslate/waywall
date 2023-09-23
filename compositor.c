@@ -1,5 +1,5 @@
 // TODO: pointer constraints
-// TODO: get wl backend
+// TODO: is xdg-shell even needed??
 
 #include "compositor.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
@@ -58,6 +58,7 @@ struct compositor {
 
     struct wlr_xwayland *xwayland;
     struct wl_list windows;
+    struct window *focused_window;
     struct wl_listener on_xwayland_new_surface;
     struct wl_listener on_xwayland_ready;
 
@@ -128,6 +129,29 @@ struct window {
 };
 
 static void
+global_to_surface(struct compositor *compositor, struct wlr_scene_node *node, double cx, double cy,
+                  double *x, double *y) {
+    int ix, iy;
+    wlr_scene_node_coords(node, &ix, &iy);
+    *x = cx - (double)ix;
+    *y = cy - (double)iy;
+}
+
+static void
+handle_cursor_motion(struct compositor *compositor, uint32_t time_msec) {
+    if (!compositor->focused_window) {
+        wlr_seat_pointer_clear_focus(compositor->seat);
+        return;
+    }
+    double x, y;
+    global_to_surface(compositor, &compositor->focused_window->scene_tree->node,
+                      compositor->cursor->x, compositor->cursor->y, &x, &y);
+    wlr_seat_pointer_notify_enter(compositor->seat, compositor->focused_window->surface->surface, x,
+                                  y);
+    wlr_seat_pointer_notify_motion(compositor->seat, time_msec, x, y);
+}
+
+static void
 on_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface,
                    uint32_t version) {
     struct compositor *compositor = data;
@@ -193,12 +217,16 @@ on_cursor_motion(struct wl_listener *listener, void *data) {
     struct wlr_pointer_motion_event *wlr_event = data;
     wlr_cursor_move(compositor->cursor, &wlr_event->pointer->base, wlr_event->delta_x,
                     wlr_event->delta_y);
+    handle_cursor_motion(compositor, wlr_event->time_msec);
     struct compositor_motion_event event = {
         .x = compositor->cursor->x,
         .y = compositor->cursor->y,
         .time_msec = wlr_event->time_msec,
     };
     compositor->vtable.motion(event);
+
+    // TODO: cursor image logic
+    wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
 }
 
 static void
@@ -208,6 +236,7 @@ on_cursor_motion_absolute(struct wl_listener *listener, void *data) {
     struct wlr_pointer_motion_absolute_event *wlr_event = data;
     wlr_cursor_warp_absolute(compositor->cursor, &wlr_event->pointer->base, wlr_event->x,
                              wlr_event->y);
+    handle_cursor_motion(compositor, wlr_event->time_msec);
     struct compositor_motion_event event = {
         .x = wlr_event->x,
         .y = wlr_event->y,
@@ -428,6 +457,8 @@ on_window_map(struct wl_listener *listener, void *data) {
     window->scene_tree->node.data = window;
     window->scene_surface->node.data = window;
     wlr_scene_node_set_position(&window->scene_tree->node, 0, 0);
+
+    compositor_focus_window(window->compositor, window);
 }
 
 static void
@@ -435,6 +466,11 @@ on_window_unmap(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_unmap);
     wl_list_remove(&window->link);
     wlr_scene_node_destroy(&window->scene_tree->node);
+
+    if (window == window->compositor->focused_window) {
+        wlr_log(WLR_DEBUG, "focused window was unmapped");
+        compositor_focus_window(window->compositor, NULL);
+    }
 }
 
 static void
@@ -798,4 +834,31 @@ compositor_run(struct compositor *compositor) {
 
     wl_display_run(compositor->display);
     return true;
+}
+
+void
+compositor_focus_window(struct compositor *compositor, struct window *window) {
+    struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
+
+    if (window) {
+        wlr_xwayland_surface_activate(window->surface, true);
+        wlr_scene_node_raise_to_top(&window->scene_tree->node);
+
+        if (keyboard) {
+            wlr_seat_keyboard_notify_enter(compositor->seat, window->surface->surface,
+                                           keyboard->keycodes, keyboard->num_keycodes,
+                                           &keyboard->modifiers);
+        }
+        double x, y;
+        global_to_surface(compositor, &window->scene_tree->node, compositor->cursor->x,
+                          compositor->cursor->y, &x, &y);
+        wlr_seat_pointer_notify_enter(compositor->seat, window->surface->surface, x, y);
+    } else {
+        if (!compositor->focused_window) {
+            return;
+        }
+        wlr_seat_keyboard_notify_clear_focus(compositor->seat);
+        wlr_seat_pointer_notify_clear_focus(compositor->seat);
+    }
+    compositor->focused_window = window;
 }

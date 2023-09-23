@@ -6,6 +6,9 @@
 #include <wayland-server-core.h>
 #include <xkbcommon/xkbcommon.h>
 
+struct compositor;
+struct window;
+
 struct compositor_button_event {
     uint32_t button;
     uint32_t time_msec;
@@ -39,5 +42,7 @@ struct compositor *compositor_create(struct compositor_vtable vtable);
 void compositor_destroy(struct compositor *compositor);
 struct wl_event_loop *compositor_get_loop(struct compositor *compositor);
 bool compositor_run(struct compositor *compositor);
+
+void compositor_focus_window(struct compositor *compositor, struct window *window);
 
 #endif
