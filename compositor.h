@@ -28,14 +28,21 @@ struct compositor_motion_event {
     uint32_t time_msec;
 };
 
+struct compositor_key {
+    uint32_t keycode;
+    bool state;
+};
+
 typedef bool (*compositor_button_func_t)(struct compositor_button_event event);
 typedef bool (*compositor_key_func_t)(struct compositor_key_event event);
+typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
 typedef void (*compositor_motion_func_t)(struct compositor_motion_event event);
 typedef bool (*compositor_window_func_t)(struct window *window, bool map);
 
 struct compositor_vtable {
     compositor_button_func_t button;
     compositor_key_func_t key;
+    compositor_modifiers_func_t modifiers;
     compositor_motion_func_t motion;
     compositor_window_func_t window;
 };
@@ -55,6 +62,9 @@ bool compositor_run(struct compositor *compositor);
 // Stops the compositor event loop.
 void compositor_stop(struct compositor *compositor);
 
+// Clicks the given window.
+void compositor_click(struct window *window);
+
 // Configures the given window to the given position and size.
 void compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t w, int16_t h);
 
@@ -69,7 +79,7 @@ int compositor_get_windows(struct compositor *compositor, struct window ***windo
 // Attempts to get the process ID of the given `window`. Returns -1 on failure.
 pid_t compositor_get_window_pid(struct window *window);
 
-// Sends a keyboard input to the given `window`.
-void compositor_send_key(struct window *window, uint32_t key, bool state);
+// Sends a sequence of keyboard inputs to the given `window`.
+void compositor_send_keys(struct window *window, const struct compositor_key *keys, int count);
 
 #endif

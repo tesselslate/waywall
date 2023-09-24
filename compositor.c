@@ -1,10 +1,12 @@
 // TODO: is xdg-shell even needed??
+// TODO: figure out how to have instance crash logs not pop up
 
 #include "compositor.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "relative-pointer-unstable-v1-protocol.h"
 #include "util.h"
 #include "xdg-shell-protocol.h"
+#include <linux/input-event-codes.h>
 #include <stdlib.h>
 #include <time.h>
 #include <wayland-client.h>
@@ -24,6 +26,7 @@
 #include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>
+#include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
 
 struct compositor {
@@ -60,6 +63,7 @@ struct compositor {
     struct wl_listener on_new_xdg_surface;
 
     struct wlr_xwayland *xwayland;
+    struct xcb_connection_t *xcb;
     struct wl_list windows;
     struct window *focused_window;
     struct wl_listener on_xwayland_new_surface;
@@ -148,16 +152,6 @@ struct window {
     struct wl_listener on_request_fullscreen;
 };
 
-static uint32_t
-now_msec() {
-    // HACK: This needs to be kept up-to-date with the wlroots implementation in time.c if it
-    // changes.
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
-    return (uint32_t)ms;
-}
-
 static void
 global_to_surface(struct compositor *compositor, struct wlr_scene_node *node, double cx, double cy,
                   double *x, double *y) {
@@ -165,6 +159,32 @@ global_to_surface(struct compositor *compositor, struct wlr_scene_node *node, do
     wlr_scene_node_coords(node, &ix, &iy);
     *x = cx - (double)ix;
     *y = cy - (double)iy;
+}
+
+static uint32_t
+now_msec() {
+    static uint32_t last_now = 0;
+    // HACK: This needs to be kept up-to-date with the wlroots implementation in time.c if it
+    // changes.
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+    if (ms <= last_now) {
+        ms = ++last_now;
+    }
+    return (uint32_t)ms;
+}
+
+static bool
+send_event(xcb_connection_t *xcb, xcb_window_t window, uint32_t mask, const char *event) {
+    xcb_void_cookie_t cookie = xcb_send_event_checked(xcb, true, window, mask, event);
+    xcb_generic_error_t *err = xcb_request_check(xcb, cookie);
+    if (err) {
+        int opcode = (int)(event[0]);
+        wlr_log(WLR_ERROR, "failed to send event (opcode: %d): %d\n", opcode, err->error_code);
+        free(err);
+    }
+    return err == NULL;
 }
 
 static void
@@ -288,12 +308,6 @@ on_cursor_motion_absolute(struct wl_listener *listener, void *data) {
     wlr_cursor_warp_absolute(compositor->cursor, &wlr_event->pointer->base, wlr_event->x,
                              wlr_event->y);
     handle_cursor_motion(compositor, wlr_event->time_msec);
-    struct compositor_motion_event event = {
-        .x = wlr_event->x,
-        .y = wlr_event->y,
-        .time_msec = wlr_event->time_msec,
-    };
-    compositor->vtable.motion(event);
 }
 
 static void
@@ -338,6 +352,7 @@ on_keyboard_modifiers(struct wl_listener *listener, void *data) {
     wlr_seat_set_keyboard(keyboard->compositor->seat, keyboard->wlr_keyboard);
     wlr_seat_keyboard_notify_modifiers(keyboard->compositor->seat,
                                        &keyboard->wlr_keyboard->modifiers);
+    keyboard->compositor->vtable.modifiers(keyboard->wlr_keyboard->modifiers.depressed);
 }
 
 static void
@@ -370,7 +385,7 @@ on_output_destroy(struct wl_listener *listener, void *data) {
     if (wl_list_length(&output->compositor->outputs) == 0) {
         // TODO: change compositor kill logic
         wlr_log(WLR_INFO, "last output destroyed - stopping");
-        wl_display_terminate(output->compositor->display);
+        compositor_stop(output->compositor);
     }
     free(output);
 }
@@ -586,6 +601,7 @@ on_window_map(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_map);
     wl_list_insert(&window->compositor->windows, &window->link);
 
+    window->surface->surface->data = window;
     window->scene_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
     wlr_scene_node_set_enabled(&window->scene_tree->node, true);
     window->scene_surface =
@@ -594,7 +610,6 @@ on_window_map(struct wl_listener *listener, void *data) {
     window->scene_surface->node.data = window;
     wlr_scene_node_set_position(&window->scene_tree->node, 0, 0);
     window->compositor->vtable.window(window, true);
-    compositor_focus_window(window->compositor, window);
 }
 
 static void
@@ -761,7 +776,16 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
 }
 
 static void
-on_xwayland_ready(struct wl_listener *listener, void *data) {}
+on_xwayland_ready(struct wl_listener *listener, void *data) {
+    struct compositor *compositor = wl_container_of(listener, compositor, on_xwayland_ready);
+    xcb_connection_t *conn = xcb_connect(NULL, NULL);
+    int err = xcb_connection_has_error(conn);
+    if (err) {
+        wlr_log(WLR_ERROR, "failed to connect to xwayland: %d", err);
+        return;
+    }
+    compositor->xcb = conn;
+}
 
 struct compositor *
 compositor_create(struct compositor_vtable vtable) {
@@ -774,6 +798,8 @@ compositor_create(struct compositor_vtable vtable) {
     ww_assert(vtable.button);
     ww_assert(vtable.key);
     ww_assert(vtable.motion);
+    ww_assert(vtable.modifiers);
+    ww_assert(vtable.window);
     compositor->vtable = vtable;
 
     compositor->display = wl_display_create();
@@ -954,6 +980,8 @@ compositor_destroy(struct compositor *compositor) {
     // TODO: Figure out how to destroy objects without causing UAF's
     ww_assert(compositor);
 
+    xcb_disconnect(compositor->xcb);
+    wl_display_destroy_clients(compositor->display);
     wlr_xwayland_destroy(compositor->xwayland);
     /* wlr_xcursor_manager_destroy(compositor->cursor_manager); */
     /* wlr_cursor_destroy(compositor->cursor); */
@@ -967,7 +995,6 @@ compositor_destroy(struct compositor *compositor) {
     /* wl_pointer_destroy(compositor->remote_pointer); */
     /* wl_seat_destroy(compositor->remote_seat); */
     /* wlr_backend_destroy(compositor->backend); */
-    wl_display_destroy_clients(compositor->display);
     wl_display_destroy(compositor->display);
     free(compositor);
 }
@@ -999,7 +1026,37 @@ compositor_stop(struct compositor *compositor) {
 }
 
 void
-compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t h, int16_t w) {
+compositor_click(struct window *window) {
+    xcb_enter_notify_event_t event = {
+        .response_type = XCB_ENTER_NOTIFY,
+        .root = window->surface->window_id,
+        .event = window->surface->window_id,
+        .child = window->surface->window_id,
+        0,
+    };
+    send_event(window->compositor->xcb, window->surface->window_id,
+               XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW, (char *)&event);
+    event.response_type = XCB_LEAVE_NOTIFY;
+    send_event(window->compositor->xcb, window->surface->window_id,
+               XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW, (char *)&event);
+
+    xcb_button_press_event_t event2 = {
+        .response_type = XCB_BUTTON_PRESS,
+        .detail = XCB_BUTTON_INDEX_1,
+        .root = window->surface->window_id,
+        .event = window->surface->window_id,
+        .child = window->surface->window_id,
+        0,
+    };
+    send_event(window->compositor->xcb, window->surface->window_id,
+               XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE, (char *)&event2);
+    event2.response_type = XCB_BUTTON_RELEASE;
+    send_event(window->compositor->xcb, window->surface->window_id,
+               XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE, (char *)&event2);
+}
+
+void
+compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t w, int16_t h) {
     ww_assert(window);
 
     wlr_scene_node_set_position(&window->scene_tree->node, x, y);
@@ -1070,14 +1127,19 @@ compositor_get_window_pid(struct window *window) {
 }
 
 void
-compositor_send_key(struct window *window, uint32_t key, bool state) {
-    struct compositor *compositor = window->compositor;
-    struct wlr_surface *focus = compositor->seat->keyboard_state.focused_surface;
-    wlr_seat_keyboard_notify_enter(compositor->seat, window->surface->surface, NULL, 0, NULL);
-    wlr_seat_keyboard_notify_key(compositor->seat, now_msec(), key,
-                                 state ? WL_KEYBOARD_KEY_STATE_PRESSED
-                                       : WL_KEYBOARD_KEY_STATE_RELEASED);
-    struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
-    wlr_seat_keyboard_notify_enter(compositor->seat, focus, keyboard->keycodes,
-                                   keyboard->num_keycodes, &keyboard->modifiers);
+compositor_send_keys(struct window *window, const struct compositor_key *keys, int count) {
+    for (int i = 0; i < count; i++) {
+        xcb_key_press_event_t event = {
+            .response_type = keys[i].state ? XCB_KEY_PRESS : XCB_KEY_RELEASE,
+            .time = now_msec(),
+            .detail = keys[i].keycode + 8,
+            .root = window->surface->window_id,
+            .event = window->surface->window_id,
+            .child = window->surface->window_id,
+            .same_screen = true,
+            0,
+        };
+        send_event(window->compositor->xcb, window->surface->window_id,
+                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
+    }
 }

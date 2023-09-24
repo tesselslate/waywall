@@ -31,6 +31,7 @@ wayland_server = dependency('wayland-server')
 wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner', native: true)
 wlroots = wlroots_subproject.get_variable('wlroots')
+xcb = dependency('xcb')
 xkbcommon = dependency('xkbcommon')
 
 cc = meson.get_compiler('c')
@@ -73,6 +74,7 @@ executable('waywall',
     wlroots,
     wayland_client,
     wayland_server,
+    xcb,
     xkbcommon,
   ],
 )
