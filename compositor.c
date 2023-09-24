@@ -1,11 +1,9 @@
-// TODO: is xdg-shell even needed??
 // TODO: figure out how to have instance crash logs not pop up
 
 #include "compositor.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "relative-pointer-unstable-v1-protocol.h"
 #include "util.h"
-#include "xdg-shell-protocol.h"
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
 #include <time.h>
@@ -23,7 +21,6 @@
 #include <wlr/types/wlr_scene.h>
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xcursor_manager.h>
-#include <wlr/types/wlr_xdg_shell.h>
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>
 #include <xcb/xproto.h>
@@ -57,10 +54,6 @@ struct compositor {
     struct wl_listener on_new_output;
     struct output *main_output;
     struct output *alt_output;
-
-    struct wlr_xdg_shell *xdg_shell;
-    struct wl_list views;
-    struct wl_listener on_new_xdg_surface;
 
     struct wlr_xwayland *xwayland;
     struct xcb_connection_t *xcb;
@@ -115,22 +108,6 @@ struct pointer_constraint {
 
     struct wl_listener on_set_region;
     struct wl_listener on_destroy;
-};
-
-struct view {
-    struct wl_list link;
-
-    struct compositor *compositor;
-    struct wlr_xdg_toplevel *xdg_toplevel;
-    struct wlr_scene_tree *scene_tree;
-
-    struct wl_listener on_map;
-    struct wl_listener on_unmap;
-    struct wl_listener on_destroy;
-    struct wl_listener on_request_move;
-    struct wl_listener on_request_resize;
-    struct wl_listener on_request_maximize;
-    struct wl_listener on_request_fullscreen;
 };
 
 struct window {
@@ -661,88 +638,6 @@ on_window_request_fullscreen(struct wl_listener *listener, void *data) {
 }
 
 static void
-on_xdg_toplevel_map(struct wl_listener *listener, void *data) {
-    struct view *view = wl_container_of(listener, view, on_map);
-    wl_list_insert(&view->compositor->views, &view->link);
-}
-
-static void
-on_xdg_toplevel_unmap(struct wl_listener *listener, void *data) {
-    struct view *view = wl_container_of(listener, view, on_unmap);
-    wl_list_remove(&view->link);
-}
-
-static void
-on_xdg_toplevel_destroy(struct wl_listener *listener, void *data) {
-    struct view *view = wl_container_of(listener, view, on_destroy);
-    wl_list_remove(&view->on_map.link);
-    wl_list_remove(&view->on_unmap.link);
-    wl_list_remove(&view->on_destroy.link);
-    wl_list_remove(&view->on_request_move.link);
-    wl_list_remove(&view->on_request_resize.link);
-    wl_list_remove(&view->on_request_maximize.link);
-    wl_list_remove(&view->on_request_fullscreen.link);
-    free(view);
-}
-
-static void
-on_xdg_toplevel_request_move(struct wl_listener *listener, void *data) {
-    // Do nothing. We do not want interactive window moving.
-}
-
-static void
-on_xdg_toplevel_request_resize(struct wl_listener *listener, void *data) {
-    // Do nothing. We do not want interactive window resizing.
-}
-
-static void
-on_xdg_toplevel_request_maximize(struct wl_listener *listener, void *data) {
-    struct view *view = wl_container_of(listener, view, on_request_maximize);
-    // Windows cannot maximize themselves but a response must be sent.
-    wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
-}
-
-static void
-on_xdg_toplevel_request_fullscreen(struct wl_listener *listener, void *data) {
-    struct view *view = wl_container_of(listener, view, on_request_fullscreen);
-    // Windows cannot fullscreen themselves but a response must be sent.
-    wlr_xdg_surface_schedule_configure(view->xdg_toplevel->base);
-}
-
-static void
-on_xdg_new_surface(struct wl_listener *listener, void *data) {
-    struct compositor *compositor = wl_container_of(listener, compositor, on_new_xdg_surface);
-    struct wlr_xdg_surface *xdg_surface = data;
-
-    if (xdg_surface->role != WLR_XDG_SURFACE_ROLE_TOPLEVEL) {
-        wlr_log(WLR_DEBUG, "ignoring non-toplevel xdg surface");
-        return;
-    }
-    struct view *view = calloc(1, sizeof(struct view));
-    ww_assert(view);
-    view->compositor = compositor;
-    view->xdg_toplevel = xdg_surface->toplevel;
-    view->scene_tree =
-        wlr_scene_xdg_surface_create(&compositor->scene->tree, view->xdg_toplevel->base);
-    view->scene_tree->node.data = view;
-    xdg_surface->data = view->scene_tree;
-    view->on_map.notify = on_xdg_toplevel_map;
-    view->on_unmap.notify = on_xdg_toplevel_unmap;
-    view->on_destroy.notify = on_xdg_toplevel_destroy;
-    view->on_request_move.notify = on_xdg_toplevel_request_move;
-    view->on_request_resize.notify = on_xdg_toplevel_request_resize;
-    view->on_request_maximize.notify = on_xdg_toplevel_request_maximize;
-    view->on_request_fullscreen.notify = on_xdg_toplevel_request_fullscreen;
-    wl_signal_add(&xdg_surface->surface->events.map, &view->on_map);
-    wl_signal_add(&xdg_surface->surface->events.unmap, &view->on_unmap);
-    wl_signal_add(&xdg_surface->surface->events.destroy, &view->on_destroy);
-    wl_signal_add(&view->xdg_toplevel->events.request_move, &view->on_request_move);
-    wl_signal_add(&view->xdg_toplevel->events.request_resize, &view->on_request_resize);
-    wl_signal_add(&view->xdg_toplevel->events.request_maximize, &view->on_request_maximize);
-    wl_signal_add(&view->xdg_toplevel->events.request_fullscreen, &view->on_request_fullscreen);
-}
-
-static void
 on_xwayland_new_surface(struct wl_listener *listener, void *data) {
     struct compositor *compositor = wl_container_of(listener, compositor, on_xwayland_new_surface);
     struct wlr_xwayland_surface *surface = data;
@@ -907,20 +802,9 @@ compositor_create(struct compositor_vtable vtable) {
     wl_signal_add(&compositor->seat->events.request_set_selection,
                   &compositor->on_request_set_selection);
 
-    compositor->xdg_shell = wlr_xdg_shell_create(compositor->display, 6);
-    if (!compositor->xdg_shell) {
-        wlr_log(WLR_ERROR, "failed to create wlr_xdg_shell");
-        wlr_backend_destroy(compositor->backend);
-        goto fail_xdg_shell;
-    }
-    wl_list_init(&compositor->views);
-    compositor->on_new_xdg_surface.notify = on_xdg_new_surface;
-    wl_signal_add(&compositor->xdg_shell->events.new_surface, &compositor->on_new_xdg_surface);
-
     compositor->xwayland = wlr_xwayland_create(compositor->display, compositor->compositor, false);
     if (!compositor->xwayland) {
         wlr_log(WLR_ERROR, "failed to create wlr_xwayland");
-        wlr_backend_destroy(compositor->backend);
         goto fail_xwayland;
     }
     wl_list_init(&compositor->windows);
@@ -932,10 +816,6 @@ compositor_create(struct compositor_vtable vtable) {
     return compositor;
 
 fail_xwayland:
-    wlr_xwayland_destroy(compositor->xwayland);
-
-fail_xdg_shell:
-    wlr_seat_destroy(compositor->seat);
     wlr_xcursor_manager_destroy(compositor->cursor_manager);
     wlr_cursor_destroy(compositor->cursor);
     wlr_scene_node_destroy(&compositor->scene->tree.node);
@@ -948,7 +828,12 @@ fail_allocator:
     wlr_renderer_destroy(compositor->renderer);
 
 fail_renderer:
+    zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
+
 fail_registry:
+    if (compositor->remote_relative_pointer_manager) {
+        zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager);
+    }
     if (compositor->remote_pointer_constraints) {
         zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
     }
@@ -977,24 +862,23 @@ compositor_get_loop(struct compositor *compositor) {
 
 void
 compositor_destroy(struct compositor *compositor) {
-    // TODO: Figure out how to destroy objects without causing UAF's
     ww_assert(compositor);
 
     xcb_disconnect(compositor->xcb);
     wl_display_destroy_clients(compositor->display);
     wlr_xwayland_destroy(compositor->xwayland);
-    /* wlr_xcursor_manager_destroy(compositor->cursor_manager); */
-    /* wlr_cursor_destroy(compositor->cursor); */
-    /* wlr_scene_node_destroy(&compositor->scene->tree.node); */
-    /* wlr_output_layout_destroy(compositor->output_layout); */
-    /* wlr_allocator_destroy(compositor->allocator); */
-    /* wlr_renderer_destroy(compositor->renderer); */
-    /* zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer); */
-    /* zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager); */
-    /* zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints); */
-    /* wl_pointer_destroy(compositor->remote_pointer); */
-    /* wl_seat_destroy(compositor->remote_seat); */
-    /* wlr_backend_destroy(compositor->backend); */
+    wlr_xcursor_manager_destroy(compositor->cursor_manager);
+    wlr_cursor_destroy(compositor->cursor);
+    wlr_scene_node_destroy(&compositor->scene->tree.node);
+    wlr_output_layout_destroy(compositor->output_layout);
+    wlr_allocator_destroy(compositor->allocator);
+    wlr_renderer_destroy(compositor->renderer);
+    zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
+    zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager);
+    zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
+    wl_pointer_destroy(compositor->remote_pointer);
+    wl_seat_destroy(compositor->remote_seat);
+    wlr_backend_destroy(compositor->backend);
     wl_display_destroy(compositor->display);
     free(compositor);
 }
