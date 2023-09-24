@@ -8,6 +8,7 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
+#include <wlr/types/wlr_keyboard.h>
 #include <wlr/util/log.h>
 
 // TODO: config
@@ -45,20 +46,79 @@ static struct instance {
     const char *dir;
     int wd;
     int fd;
-    bool alive;
     struct state state;
 
+    bool alive;
 } instances[128];
+static bool locks[128];
 static int instance_count;
+static int active_instance = -1;
+static int last_click = -1;
 static bool dead_instance;
 
-static inline void
+static int cursor_x, cursor_y;
+static uint32_t held_modifiers;
+static bool held_buttons[10]; // FIXME: dont rely on low pointer button count?
+
+static inline int
+instance_get_id(struct instance *instance) {
+    return instance - instances;
+}
+
+static void
 instance_pause(struct instance *instance) {
-    compositor_send_key(instance->window, KEY_F3, true);
-    compositor_send_key(instance->window, KEY_ESC, true);
-    compositor_send_key(instance->window, KEY_ESC, false);
-    compositor_send_key(instance->window, KEY_F3, false);
-    wlr_log(WLR_INFO, "Pause");
+    static const struct compositor_key pause_keys[4] = {
+        {KEY_F3, true},
+        {KEY_ESC, true},
+        {KEY_ESC, false},
+        {KEY_F3, false},
+    };
+    compositor_send_keys(instance->window, pause_keys, 4);
+}
+
+static void
+instance_play(struct instance *instance) {
+    // TODO: F1 option
+    static const struct compositor_key unpause_keys[4] = {
+        {KEY_ESC, true},
+        {KEY_ESC, false},
+        {KEY_F1, true},
+        {KEY_F1, false},
+    };
+    active_instance = instance_get_id(instance);
+    compositor_send_keys(instance->window, unpause_keys, 4);
+    compositor_configure_window(instance->window, 0, 0, INST_WIDTH, INST_HEIGHT);
+    compositor_focus_window(compositor, instance->window);
+    locks[active_instance] = false;
+}
+
+static void
+instance_reset(struct instance *instance) {
+    // TODO: get reset key
+    // TODO: get and use leave preview key
+    static const struct compositor_key reset_keys[2] = {
+        {KEY_F12, true},
+        {KEY_F12, false},
+    };
+
+    if (instance->state.screen == TITLE) {
+        // Atum requires the window is clicked at least once ever before the reset hotkey will work.
+        printf("ON TITLE\n");
+        compositor_click(instance->window);
+    }
+    compositor_send_keys(instance->window, reset_keys, 2);
+    int i = instance_get_id(instance);
+    if (i == active_instance) {
+        compositor_configure_window(instance->window, INST_WALL_WIDTH * (i % WALL_WIDTH),
+                                    INST_WALL_HEIGHT * (i / WALL_WIDTH), INST_WALL_WIDTH,
+                                    INST_WALL_HEIGHT);
+    }
+}
+
+static void
+wall_focus() {
+    compositor_focus_window(compositor, NULL);
+    active_instance = -1;
 }
 
 static void
@@ -106,7 +166,8 @@ process_state(struct instance *instance) {
         } else if (strcmp(a, "inworld") == 0) {
             instance->state.screen = INWORLD;
             if (strcmp(b, "unpaused") == 0) {
-                if (last_state.screen == PREVIEWING) {
+                if (last_state.screen == PREVIEWING &&
+                    instance_get_id(instance) != active_instance) {
                     instance_pause(instance);
                 }
                 instance->state.data.world = UNPAUSED;
@@ -123,18 +184,92 @@ process_state(struct instance *instance) {
     }
 }
 
+static void
+process_mouse_input(bool click) {
+    if (!held_buttons[BTN_LEFT - BTN_MOUSE]) {
+        return;
+    }
+    int x = cursor_x / INST_WALL_WIDTH, y = cursor_y / INST_WALL_HEIGHT;
+    int id = (y * WALL_WIDTH) + x;
+    if (!click && id == last_click) {
+        return;
+    }
+    last_click = id;
+    if (!instances[id].alive) {
+        return;
+    }
+    switch (held_modifiers) {
+    case 0:
+        instance_reset(&instances[id]);
+        break;
+    case WLR_MODIFIER_SHIFT:
+        instance_play(&instances[id]);
+        break;
+    case WLR_MODIFIER_CTRL:
+        locks[id] = !locks[id];
+        break;
+    }
+}
+
 static bool
 handle_button(struct compositor_button_event event) {
-    return false;
+    int id = event.button - BTN_MOUSE;
+    ww_assert(id >= 0 && id < 10);
+    if (!event.state) {
+        held_buttons[id] = false;
+        return false;
+    }
+    if (active_instance >= 0) {
+        return false;
+    }
+    held_buttons[id] = true;
+    process_mouse_input(true);
+
+    return true;
 }
 
 static bool
 handle_key(struct compositor_key_event event) {
+    bool in_instance = active_instance >= 0;
+
+    for (int i = 0; i < event.nsyms; i++) {
+        xkb_keysym_t sym = event.syms[i];
+        switch (sym) {
+        case XKB_KEY_D:
+            if (event.state && (event.modifiers & (WLR_MODIFIER_CTRL | WLR_MODIFIER_SHIFT)) ==
+                                   (WLR_MODIFIER_CTRL | WLR_MODIFIER_SHIFT)) {
+                if (in_instance) {
+                    instance_reset(&instances[active_instance]);
+                    wall_focus();
+                } else {
+                    for (int i = 0; i < instance_count; i++) {
+                        if (!locks[i] && instances[i].alive) {
+                            instance_reset(&instances[i]);
+                        }
+                    }
+                }
+                return true;
+            }
+            break;
+        };
+    }
     return false;
 }
 
 static void
-handle_motion(struct compositor_motion_event event) {}
+handle_modifiers(uint32_t modifiers) {
+    held_modifiers = modifiers;
+}
+
+static void
+handle_motion(struct compositor_motion_event event) {
+    if (active_instance >= 0) {
+        return;
+    }
+    cursor_x = event.x;
+    cursor_y = event.y;
+    process_mouse_input(false);
+}
 
 static bool
 handle_window(struct window *window, bool map) {
@@ -203,6 +338,10 @@ handle_window(struct window *window, bool map) {
     instance->state.screen = TITLE;
 
     wlr_log(WLR_INFO, "created instance %d (%s)", instance_count, instance->dir);
+    int i = instance_count - 1;
+    compositor_configure_window(window, INST_WALL_WIDTH * (i % WALL_WIDTH),
+                                INST_WALL_HEIGHT * (i / WALL_WIDTH), INST_WALL_WIDTH,
+                                INST_WALL_HEIGHT);
     return false;
 }
 
@@ -241,7 +380,7 @@ handle_inotify(int fd, uint32_t mask, void *data) {
 
 int
 main() {
-    wlr_log_init(WLR_DEBUG, NULL);
+    wlr_log_init(WLR_INFO, NULL);
 
     inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (inotify_fd == -1) {
@@ -252,6 +391,7 @@ main() {
     struct compositor_vtable vtable = {
         .button = handle_button,
         .key = handle_key,
+        .modifiers = handle_modifiers,
         .motion = handle_motion,
         .window = handle_window,
     };
