@@ -29,7 +29,7 @@ struct compositor_motion_event {
 };
 
 struct compositor_key {
-    uint32_t keycode;
+    uint8_t keycode;
     bool state;
 };
 
@@ -71,6 +71,9 @@ void compositor_configure_window(struct window *window, int16_t x, int16_t y, in
 // Transfers input focus to the given window. If `window` is NULL, input focus is removed from
 // whichever window currently has it (if any).
 void compositor_focus_window(struct compositor *compositor, struct window *window);
+
+// Returns the size of the compositor's main output.
+void compositor_get_screen_size(struct compositor *compositor, int32_t *w, int32_t *h);
 
 // Returns the number of existing windows. If there are more than 0 windows, a buffer is allocated
 // and placed in the user-provided `windows` pointer. The caller must free the buffer.

@@ -862,13 +862,6 @@ fail_display:
     return NULL;
 }
 
-struct wl_event_loop *
-compositor_get_loop(struct compositor *compositor) {
-    ww_assert(compositor);
-
-    return wl_display_get_event_loop(compositor->display);
-}
-
 void
 compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
@@ -890,6 +883,13 @@ compositor_destroy(struct compositor *compositor) {
     wlr_backend_destroy(compositor->backend);
     wl_display_destroy(compositor->display);
     free(compositor);
+}
+
+struct wl_event_loop *
+compositor_get_loop(struct compositor *compositor) {
+    ww_assert(compositor);
+
+    return wl_display_get_event_loop(compositor->display);
 }
 
 bool
@@ -993,6 +993,14 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
         wlr_seat_pointer_notify_clear_focus(compositor->seat);
     }
     compositor->focused_window = window;
+}
+
+void
+compositor_get_screen_size(struct compositor *compositor, int32_t *w, int32_t *h) {
+    ww_assert(compositor);
+    ww_assert(compositor->main_output);
+    *w = compositor->main_output->wlr_output->width;
+    *h = compositor->main_output->wlr_output->width;
 }
 
 int
