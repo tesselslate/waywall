@@ -988,6 +988,7 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
             return;
         }
         handle_constraint(compositor, NULL);
+        wlr_xwayland_surface_activate(compositor->focused_window->surface, false);
         wlr_seat_keyboard_notify_clear_focus(compositor->seat);
         wlr_seat_pointer_notify_clear_focus(compositor->seat);
     }
