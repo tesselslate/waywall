@@ -5,7 +5,7 @@ project('waywall', 'c',
     'c_std=c11',
     'warning_level=2',
 
-    'wlroots:default_library=static', # TODO: Don't force static linking (required right now for xwm_destroy)
+    'default_library=static', # TODO: Don't force static linking (required right now for xwm_destroy)
     'wlroots:allocators=auto',
     'wlroots:backends=x11',
     'wlroots:examples=false',
@@ -30,10 +30,11 @@ if not wlroots_subproject.get_variable('features').get('xwayland')
   error('wlroots xwayland is required')
 endif
 
+toml = subproject('tomlc99').get_variable('toml')
 wayland_client = dependency('wayland-client')
 wayland_server = dependency('wayland-server')
 wayland_protocols = dependency('wayland-protocols')
-wayland_scanner = dependency('wayland-scanner', native: true)
+wayland_scanner = dependency('wayland-scanner', native : true)
 wlroots = wlroots_subproject.get_variable('wlroots')
 xcb = dependency('xcb')
 xkbcommon = dependency('xkbcommon')
@@ -43,7 +44,7 @@ if get_option('buildtype').startswith('debug')
   add_project_arguments('-DDEBUG', language : 'c')
 endif
 
-wl_scanner = find_program(wayland_scanner.get_variable('wayland_scanner'), native: true)
+wl_scanner = find_program(wayland_scanner.get_variable('wayland_scanner'), native : true)
 wl_proto_dir = wayland_protocols.get_variable('pkgdatadir')
 wl_proto_xml = [
   'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
@@ -55,15 +56,15 @@ wl_proto_src = []
 foreach proto : wl_proto_xml
   wl_proto_header += custom_target(
     proto.underscorify() + '-header',
-    input: wl_proto_dir + '/' + proto,
-    output: '@BASENAME@-protocol.h',
-    command: [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
+    input : wl_proto_dir + '/' + proto,
+    output : '@BASENAME@-protocol.h',
+    command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
   )
   wl_proto_src += custom_target(
     proto.underscorify() + '-src',
-    input: wl_proto_dir + '/' + proto,
-    output: '@BASENAME@.c',
-    command: [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+    input : wl_proto_dir + '/' + proto,
+    output : '@BASENAME@.c',
+    command : [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
   )
 endforeach
 
@@ -74,6 +75,7 @@ executable('waywall',
   'waywall.c',
 
   dependencies : [
+    toml,
     wlroots,
     wayland_client,
     wayland_server,
