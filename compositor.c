@@ -22,9 +22,13 @@
 #include <wlr/types/wlr_subcompositor.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/log.h>
-#include <wlr/xwayland.h>
+#include <wlr/xwayland/xwayland.h>
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
+
+// HACK: Any reason xwm_destroy isn't called already by wlr_xwayland_destroy? Maybe ask wlroots
+// people about this.
+extern void xwm_destroy(struct wlr_xwm *xwm);
 
 struct compositor {
     struct wl_display *display;
@@ -140,9 +144,14 @@ global_to_surface(struct compositor *compositor, struct wlr_scene_node *node, do
 
 static uint32_t
 now_msec() {
+    // HACK: For now Xwayland uses CLOCK_MONOTONIC and CLOCK_MONOTONIC uses some point near system
+    // boot as its epoch. Hopefully this remains the case forever, since I don't want to replicate
+    // the awful time calculation logic from resetti.
+
+    // HACK: GLFW expects each keypress to have an ascending timestamp. We must make sure each
+    // timestamp returned by this function is greater than the last.
+
     static uint32_t last_now = 0;
-    // HACK: This needs to be kept up-to-date with the wlroots implementation in time.c if it
-    // changes.
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
@@ -865,7 +874,7 @@ compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
 
     xcb_disconnect(compositor->xcb);
-    wl_display_destroy_clients(compositor->display);
+    xwm_destroy(compositor->xwayland->xwm);
     wlr_xwayland_destroy(compositor->xwayland);
     wlr_xcursor_manager_destroy(compositor->cursor_manager);
     wlr_cursor_destroy(compositor->cursor);
@@ -911,6 +920,8 @@ compositor_stop(struct compositor *compositor) {
 
 void
 compositor_click(struct window *window) {
+    // HACK: We send enter and leave notify events to get GLFW to update the cursor position.
+
     xcb_enter_notify_event_t event = {
         .response_type = XCB_ENTER_NOTIFY,
         .root = window->surface->window_id,
@@ -1016,7 +1027,7 @@ compositor_send_keys(struct window *window, const struct compositor_key *keys, i
         xcb_key_press_event_t event = {
             .response_type = keys[i].state ? XCB_KEY_PRESS : XCB_KEY_RELEASE,
             .time = now_msec(),
-            .detail = keys[i].keycode + 8,
+            .detail = keys[i].keycode + 8, // libinput keycode -> xkb keycode
             .root = window->surface->window_id,
             .event = window->surface->window_id,
             .child = window->surface->window_id,

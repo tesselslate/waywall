@@ -398,12 +398,19 @@ main() {
     compositor = compositor_create(vtable);
     ww_assert(compositor);
     event_loop = compositor_get_loop(compositor);
-    wl_event_loop_add_signal(event_loop, SIGINT, handle_signal, NULL);
-    wl_event_loop_add_signal(event_loop, SIGTERM, handle_signal, NULL);
-    wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
+
+    struct wl_event_source *event_sigint =
+        wl_event_loop_add_signal(event_loop, SIGINT, handle_signal, NULL);
+    struct wl_event_source *event_sigterm =
+        wl_event_loop_add_signal(event_loop, SIGTERM, handle_signal, NULL);
+    struct wl_event_source *event_inotify =
+        wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
     compositor_run(compositor);
 
+    wl_event_source_remove(event_sigint);
+    wl_event_source_remove(event_sigterm);
+    wl_event_source_remove(event_inotify);
     compositor_destroy(compositor);
     close(inotify_fd);
     return 0;

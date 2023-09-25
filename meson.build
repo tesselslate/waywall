@@ -4,6 +4,15 @@ project('waywall', 'c',
   default_options : [
     'c_std=c11',
     'warning_level=2',
+
+    'wlroots:default_library=static', # TODO: Don't force static linking (required right now for xwm_destroy)
+    'wlroots:allocators=auto',
+    'wlroots:backends=x11',
+    'wlroots:examples=false',
+    'wlroots:renderers=auto',
+    'wlroots:session=disabled',
+    'wlroots:xcb-errors=auto',
+    'wlroots:xwayland=enabled',
   ],
 )
 
@@ -16,14 +25,9 @@ add_project_arguments(
   language : 'c',
 )
 
-wlroots_subproject = subproject(
-  'wlroots',
-  default_options : [
-    'examples=false',
-  ],
-)
+wlroots_subproject = subproject('wlroots')
 if not wlroots_subproject.get_variable('features').get('xwayland')
-  error('xwayland is required')
+  error('wlroots xwayland is required')
 endif
 
 wayland_client = dependency('wayland-client')
