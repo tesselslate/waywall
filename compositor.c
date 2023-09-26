@@ -664,7 +664,7 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
     window->on_associate.notify = on_window_associate;
     window->on_dissociate.notify = on_window_dissociate;
 
-    // map and unmap are managed by on_window_map and on_window_unmap
+    // The signals for map and unmap are handled by associate and dissociate.
     window->on_map.notify = on_window_map;
     window->on_unmap.notify = on_window_unmap;
     window->on_destroy.notify = on_window_destroy;
