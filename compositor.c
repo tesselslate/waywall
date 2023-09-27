@@ -314,13 +314,19 @@ on_keyboard_key(struct wl_listener *listener, void *data) {
 
     // libinput keycode -> xkbcommon keycode
     uint32_t keycode = wlr_event->keycode + 8;
+
+    // We need to do whatever this is to avoid XKB changing keysyms based on modifiers.
+    // I took this from river (Mapping.zig:75, c16628) so I have no idea what this does to be
+    // honest.
     const xkb_keysym_t *syms;
-    int nsyms = xkb_state_key_get_syms(keyboard->wlr_keyboard->xkb_state, keycode, &syms);
-    uint32_t modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard);
+    struct xkb_keymap *keymap = xkb_state_get_keymap(keyboard->wlr_keyboard->xkb_state);
+    xkb_layout_index_t index = xkb_state_key_get_layout(keyboard->wlr_keyboard->xkb_state, keycode);
+    int nsyms = xkb_keymap_key_get_syms_by_level(keymap, keycode, index, 0, &syms);
+
     struct compositor_key_event event = {
         .syms = syms,
         .nsyms = nsyms,
-        .modifiers = modifiers,
+        .modifiers = wlr_keyboard_get_modifiers(keyboard->wlr_keyboard),
         .state = wlr_event->state == WL_KEYBOARD_KEY_STATE_PRESSED,
         .time_msec = wlr_event->time_msec,
     };
