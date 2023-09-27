@@ -1,0 +1,33 @@
+[input]
+repeat_delay = 300
+repeat_rate = 40
+# TODO: sensitivities
+# TODO: language
+
+[appearance]
+# TODO: background color
+# TODO: cursor theme
+# TODO: cursor size
+
+[wall]
+wall_width = 2
+wall_height = 3
+stretch_width = 960
+stretch_height = 360
+# TODO: alt width
+# TODO: alt height
+# TODO: confine pointer on wall
+use_f1 = false
+
+[reset]
+# TODO: reset counter path
+# TODO: reset on unlock
+# TODO: wall bypass
+# TODO: grace period
+
+[keybinds]
+"Ctrl-Shift-D"      = ["wall_reset_all", "ingame_reset"]
+"LMB"               = ["wall_reset"]
+"Shift-LMB"         = ["wall_play"]
+"Ctrl-LMB"          = ["wall_lock"]
+"Ctrl-Shift-LMB"    = ["wall_focus_reset"]
