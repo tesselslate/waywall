@@ -873,21 +873,25 @@ void
 compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
 
-    xcb_disconnect(compositor->xcb);
-    xwm_destroy(compositor->xwayland->xwm);
-    wlr_xwayland_destroy(compositor->xwayland);
-    wlr_xcursor_manager_destroy(compositor->cursor_manager);
-    wlr_cursor_destroy(compositor->cursor);
-    wlr_scene_node_destroy(&compositor->scene->tree.node);
-    wlr_output_layout_destroy(compositor->output_layout);
-    wlr_allocator_destroy(compositor->allocator);
-    wlr_renderer_destroy(compositor->renderer);
     zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
     zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager);
     zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
     wl_pointer_destroy(compositor->remote_pointer);
     wl_seat_destroy(compositor->remote_seat);
+
+    xcb_disconnect(compositor->xcb);
+    wl_list_remove(&compositor->on_xwayland_new_surface.link);
+    xwm_destroy(compositor->xwayland->xwm);
+    wlr_xwayland_destroy(compositor->xwayland);
+    wl_display_destroy_clients(compositor->display);
+    wlr_xcursor_manager_destroy(compositor->cursor_manager);
+    wlr_cursor_destroy(compositor->cursor);
     wlr_backend_destroy(compositor->backend);
+    wlr_renderer_destroy(compositor->renderer);
+    wlr_allocator_destroy(compositor->allocator);
+    wlr_scene_node_destroy(&compositor->scene->tree.node);
+    wlr_output_layout_destroy(compositor->output_layout);
+
     wl_display_destroy(compositor->display);
     free(compositor);
 }
