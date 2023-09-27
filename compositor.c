@@ -534,6 +534,7 @@ on_constraint_destroy(struct wl_listener *listener, void *data) {
     }
     wl_list_remove(&constraint->on_destroy.link);
     wl_list_remove(&constraint->on_set_region.link);
+    free(constraint);
 }
 
 static void
