@@ -1006,7 +1006,7 @@ compositor_get_screen_size(struct compositor *compositor, int32_t *w, int32_t *h
     ww_assert(compositor);
     ww_assert(compositor->main_output);
     *w = compositor->main_output->wlr_output->width;
-    *h = compositor->main_output->wlr_output->width;
+    *h = compositor->main_output->wlr_output->height;
 }
 
 int
