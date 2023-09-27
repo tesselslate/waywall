@@ -488,6 +488,7 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
     }
 
     if (compositor->active_constraint) {
+        wlr_pointer_constraint_v1_send_deactivated(compositor->active_constraint);
         if (!constraint) {
             ww_assert(compositor->remote_locked_pointer);
             zwp_locked_pointer_v1_destroy(compositor->remote_locked_pointer);
@@ -495,7 +496,6 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
             compositor->active_constraint = NULL;
             return;
         }
-        wlr_pointer_constraint_v1_send_deactivated(compositor->active_constraint);
     }
 
     if (compositor->focused_window &&
