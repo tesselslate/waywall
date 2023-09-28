@@ -39,6 +39,10 @@ typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
 typedef void (*compositor_motion_func_t)(struct compositor_motion_event event);
 typedef bool (*compositor_window_func_t)(struct window *window, bool map);
 
+struct compositor_config {
+    int repeat_rate, repeat_delay;
+};
+
 struct compositor_vtable {
     compositor_button_func_t button;
     compositor_key_func_t key;
@@ -48,7 +52,8 @@ struct compositor_vtable {
 };
 
 // Attempts to create a new compositor. Returns NULL on failure.
-struct compositor *compositor_create(struct compositor_vtable vtable);
+struct compositor *compositor_create(struct compositor_vtable vtable,
+                                     struct compositor_config config);
 
 // Releases resources associated with `compositor`.
 void compositor_destroy(struct compositor *compositor);
@@ -84,5 +89,8 @@ pid_t compositor_get_window_pid(struct window *window);
 
 // Sends a sequence of keyboard inputs to the given `window`.
 void compositor_send_keys(struct window *window, const struct compositor_key *keys, int count);
+
+// Updates user-defined settings for the compositor.
+void compositor_load_config(struct compositor *compositor, struct compositor_config config);
 
 #endif

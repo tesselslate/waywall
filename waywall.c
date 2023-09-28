@@ -18,6 +18,7 @@
 // TODO: handle remote window resizing
 // TODO: handle fullscreen
 // TODO: handle remote window aspect ratio that is incompatible with wall aspect ratio
+// TODO: config hotreload
 
 #define WALL -1
 
@@ -701,7 +702,11 @@ main() {
         .motion = handle_motion,
         .window = handle_window,
     };
-    compositor = compositor_create(vtable);
+    struct compositor_config compositor_config = {
+        .repeat_rate = config->repeat_rate,
+        .repeat_delay = config->repeat_delay,
+    };
+    compositor = compositor_create(vtable, compositor_config);
     ww_assert(compositor);
     event_loop = compositor_get_loop(compositor);
 

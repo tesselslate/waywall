@@ -80,6 +80,7 @@ struct compositor {
     struct zwp_relative_pointer_manager_v1 *remote_relative_pointer_manager;
     struct zwp_relative_pointer_v1 *remote_relative_pointer;
 
+    struct compositor_config config;
     struct compositor_vtable vtable;
 };
 
@@ -438,8 +439,8 @@ on_new_keyboard(struct compositor *compositor, struct wlr_input_device *device) 
     wlr_keyboard_set_keymap(wlr_keyboard, keymap);
     xkb_keymap_unref(keymap);
     xkb_context_unref(context);
-    // TODO: Allow configuring repeat rate
-    wlr_keyboard_set_repeat_info(wlr_keyboard, 25, 600);
+    wlr_keyboard_set_repeat_info(wlr_keyboard, compositor->config.repeat_rate,
+                                 compositor->config.repeat_delay);
 
     keyboard->on_destroy.notify = on_keyboard_destroy;
     keyboard->on_key.notify = on_keyboard_key;
@@ -699,12 +700,13 @@ on_xwayland_ready(struct wl_listener *listener, void *data) {
 }
 
 struct compositor *
-compositor_create(struct compositor_vtable vtable) {
+compositor_create(struct compositor_vtable vtable, struct compositor_config config) {
     struct compositor *compositor = calloc(1, sizeof(struct compositor));
     if (!compositor) {
         wlr_log(WLR_ERROR, "failed to allocate compositor");
         return NULL;
     }
+    compositor->config = config;
 
     ww_assert(vtable.button);
     ww_assert(vtable.key);
@@ -1010,6 +1012,7 @@ void
 compositor_get_screen_size(struct compositor *compositor, int32_t *w, int32_t *h) {
     ww_assert(compositor);
     ww_assert(compositor->main_output);
+
     *w = compositor->main_output->wlr_output->width;
     *h = compositor->main_output->wlr_output->height;
 }
@@ -1043,6 +1046,8 @@ compositor_get_window_pid(struct window *window) {
 
 void
 compositor_send_keys(struct window *window, const struct compositor_key *keys, int count) {
+    ww_assert(window);
+
     for (int i = 0; i < count; i++) {
         xcb_key_press_event_t event = {
             .response_type = keys[i].state ? XCB_KEY_PRESS : XCB_KEY_RELEASE,
@@ -1057,4 +1062,9 @@ compositor_send_keys(struct window *window, const struct compositor_key *keys, i
         send_event(window->compositor->xcb, window->surface->window_id,
                    XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
     }
+}
+
+void
+compositor_load_config(struct compositor *compositor, struct compositor_config config) {
+    // TODO
 }
