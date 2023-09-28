@@ -38,6 +38,7 @@ wayland_scanner = dependency('wayland-scanner', native : true)
 wlroots = wlroots_subproject.get_variable('wlroots')
 xcb = dependency('xcb')
 xkbcommon = dependency('xkbcommon')
+zip = dependency('libzip')
 
 cc = meson.get_compiler('c')
 if get_option('buildtype').startswith('debug')
@@ -82,5 +83,6 @@ executable('waywall',
     wayland_server,
     xcb,
     xkbcommon,
+    zip,
   ],
 )

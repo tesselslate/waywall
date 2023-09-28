@@ -36,7 +36,7 @@ static const struct mapping modifiers[] = {
     {"mod5", WLR_MODIFIER_MOD5},
 };
 
-static const char *config_name = "/waywall.toml";
+static const char config_name[] = "/waywall.toml";
 
 static char *
 get_config_path() {
