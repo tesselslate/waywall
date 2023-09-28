@@ -390,7 +390,7 @@ process_bind(struct keybind *keybind, bool held) {
             }
             break;
         case ACTION_WALL_PLAY:
-            if (hovered) {
+            if (hovered && hovered->state.screen == INWORLD) {
                 instance_play(hovered);
             }
             break;
