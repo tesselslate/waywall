@@ -16,7 +16,6 @@
 
 // TODO: handle ninjabrain bot
 // TODO: handle fullscreen
-// TODO: config hotreload
 
 #define WALL -1
 
@@ -38,10 +37,12 @@ struct state {
     } data;
 };
 
+static char *config_path;
 static struct config *config;
 static struct compositor *compositor;
 static struct wl_event_loop *event_loop;
 static int inotify_fd;
+static int config_wd;
 
 static struct instance {
     struct window *window;
@@ -68,6 +69,7 @@ static bool held_buttons[8]; // NOTE: Button count is a bit low here, but this s
                              // mouse buttons.
 static int held_buttons_count;
 
+static void config_update();
 static struct compositor_config create_compositor_config();
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
@@ -87,6 +89,21 @@ static void handle_resize(int32_t, int32_t);
 static bool handle_window(struct window *, bool);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
+
+static void
+config_update() {
+    wlr_log(WLR_INFO, "configuration file was updated");
+    struct config *new_config = config_read();
+    if (!new_config) {
+        return;
+    }
+    config_destroy(config);
+    config = new_config;
+
+    compositor_load_config(compositor, create_compositor_config());
+    handle_resize(screen_width, screen_height);
+    wlr_log(WLR_INFO, "applied new config");
+}
 
 static struct compositor_config
 create_compositor_config() {
@@ -731,7 +748,12 @@ handle_inotify(int fd, uint32_t mask, void *data) {
                 for (int i = 0; i < instance_count; i++) {
                     if (instances[i].wd == event->wd) {
                         process_state(&instances[i]);
+                        break;
                     }
+                }
+            } else if (event->mask & IN_CREATE) {
+                if (config_wd == event->wd && strcmp(event->name, config_filename) == 0) {
+                    config_update();
                 }
             }
         }
@@ -753,6 +775,17 @@ main() {
         wlr_log_errno(WLR_ERROR, "failed to create inotify instance");
         return 1;
     }
+    config_path = config_get_dir();
+    if (!config_path) {
+        wlr_log(WLR_ERROR, "failed to get config path");
+        return 1;
+    }
+    config_wd = inotify_add_watch(inotify_fd, config_path, IN_CREATE);
+    if (config_wd == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to watch config directory");
+        return 1;
+    }
+    free(config_path);
 
     struct compositor_vtable vtable = {
         .button = handle_button,

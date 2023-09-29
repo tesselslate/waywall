@@ -36,28 +36,48 @@ static const struct mapping modifiers[] = {
     {"mod5", WLR_MODIFIER_MOD5},
 };
 
-static const char config_name[] = "/waywall.toml";
+const char config_filename[] = "waywall.toml";
+static const char xdg_config_dir[] = "/.config";
 
-static char *
-get_config_path() {
+char *
+config_get_dir() {
+    const char *dir;
+    if ((dir = getenv("XDG_CONFIG_HOME"))) {
+        return strdup(dir);
+    }
+    if ((dir = getenv("HOME"))) {
+        char *confdir = malloc(strlen(dir) + strlen(xdg_config_dir));
+        memcpy(confdir, dir, strlen(dir) + 1);
+        strcat(confdir, xdg_config_dir);
+        return confdir;
+    }
+    wlr_log(WLR_ERROR, "could not find config directory");
+    return NULL;
+}
+
+char *
+config_get_path() {
     char *path = NULL;
     const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
     if (xdg_config_home) {
         size_t len = strlen(xdg_config_home);
-        path = malloc(len + strlen(config_name) + 1);
+        path = malloc(len + strlen(config_filename) + 2);
         ww_assert(path);
         strcpy(path, xdg_config_home);
-        strcat(path, config_name);
+        strcat(path, "/");
+        strcat(path, config_filename);
         return path;
     }
 
     const char *home = getenv("HOME");
     if (home) {
         size_t len = strlen(home);
-        path = malloc(len + strlen(config_name) + 1);
+        path = malloc(len + strlen(xdg_config_dir) + strlen(config_filename) + 2);
         ww_assert(path);
         strcpy(path, home);
-        strcat(path, config_name);
+        strcat(path, xdg_config_dir);
+        strcat(path, "/");
+        strcat(path, config_filename);
         return path;
     }
 
@@ -131,7 +151,7 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
 
 struct config *
 config_read() {
-    char *path = get_config_path();
+    char *path = config_get_path();
     if (!path) {
         return false;
     }
@@ -370,4 +390,6 @@ fail_file:
 }
 
 void
-config_destroy(struct config *config) {}
+config_destroy(struct config *config) {
+    free(config);
+}

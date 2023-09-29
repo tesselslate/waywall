@@ -13,6 +13,8 @@
 #define MAX_BINDS 32
 #define IS_INGAME_ACTION(x) ((x) >= ACTION_INGAME_RESET)
 
+extern const char config_filename[];
+
 enum action {
     ACTION_WALL_RESET_ALL,
     ACTION_WALL_RESET_ONE,
@@ -99,7 +101,9 @@ get_minecraft_keycode(const char *name) {
     return NULL;
 }
 
-struct config *config_read();
 void config_destroy(struct config *config);
+char *config_get_dir();
+char *config_get_path();
+struct config *config_read();
 
 #endif
