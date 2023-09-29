@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
+#include <wlr/util/box.h>
 #include <xkbcommon/xkbcommon.h>
 
 struct compositor;
@@ -37,6 +38,7 @@ typedef bool (*compositor_button_func_t)(struct compositor_button_event event);
 typedef bool (*compositor_key_func_t)(struct compositor_key_event event);
 typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
 typedef void (*compositor_motion_func_t)(struct compositor_motion_event event);
+typedef void (*compositor_resize_func_t)(int32_t width, int32_t height);
 typedef bool (*compositor_window_func_t)(struct window *window, bool map);
 
 struct compositor_config {
@@ -48,6 +50,7 @@ struct compositor_vtable {
     compositor_key_func_t key;
     compositor_modifiers_func_t modifiers;
     compositor_motion_func_t motion;
+    compositor_resize_func_t resize;
     compositor_window_func_t window;
 };
 
@@ -71,14 +74,11 @@ void compositor_stop(struct compositor *compositor);
 void compositor_click(struct window *window);
 
 // Configures the given window to the given position and size.
-void compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t w, int16_t h);
+void compositor_configure_window(struct window *window, int16_t w, int16_t h);
 
 // Transfers input focus to the given window. If `window` is NULL, input focus is removed from
 // whichever window currently has it (if any).
 void compositor_focus_window(struct compositor *compositor, struct window *window);
-
-// Returns the size of the compositor's main output.
-void compositor_get_screen_size(struct compositor *compositor, int32_t *w, int32_t *h);
 
 // Returns the number of existing windows. If there are more than 0 windows, a buffer is allocated
 // and placed in the user-provided `windows` pointer. The caller must free the buffer.
@@ -89,6 +89,9 @@ pid_t compositor_get_window_pid(struct window *window);
 
 // Sends a sequence of keyboard inputs to the given `window`.
 void compositor_send_keys(struct window *window, const struct compositor_key *keys, int count);
+
+// Sets the location and size of the window on the output.
+void compositor_set_window_render_dest(struct window *window, struct wlr_box);
 
 // Updates user-defined settings for the compositor.
 void compositor_load_config(struct compositor *compositor, struct compositor_config config);

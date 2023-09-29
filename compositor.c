@@ -121,7 +121,7 @@ struct window {
     struct compositor *compositor;
     struct wlr_xwayland_surface *surface;
     struct wlr_scene_tree *scene_tree;
-    struct wlr_scene_tree *scene_surface;
+    struct wlr_scene_surface *scene_surface;
 
     struct wl_listener on_associate;
     struct wl_listener on_dissociate;
@@ -365,6 +365,10 @@ on_output_request_state(struct wl_listener *listener, void *data) {
     struct output *output = wl_container_of(listener, output, on_request_state);
     const struct wlr_output_event_request_state *event = data;
     wlr_output_commit_state(output->wlr_output, event->state);
+
+    if (output == output->compositor->main_output) {
+        output->compositor->vtable.resize(output->wlr_output->width, output->wlr_output->height);
+    }
 }
 
 static void
@@ -598,10 +602,8 @@ on_window_map(struct wl_listener *listener, void *data) {
     window->surface->surface->data = window;
     window->scene_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
     wlr_scene_node_set_enabled(&window->scene_tree->node, true);
-    window->scene_surface =
-        wlr_scene_subsurface_tree_create(window->scene_tree, window->surface->surface);
+    window->scene_surface = wlr_scene_surface_create(window->scene_tree, window->surface->surface);
     window->scene_tree->node.data = window;
-    window->scene_surface->node.data = window;
     wlr_scene_node_set_position(&window->scene_tree->node, 0, 0);
     window->compositor->vtable.window(window, true);
 }
@@ -642,10 +644,7 @@ on_window_request_configure(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_request_configure);
     wlr_log(WLR_DEBUG, "window %d requested configuration", window->surface->window_id);
 
-    // TODO: Update this logic to do what it's supposed to (for now just accept whatever)
-    struct wlr_xwayland_surface_configure_event *event = data;
-    wlr_xwayland_surface_configure(window->surface, event->x, event->y, event->width,
-                                   event->height);
+    // TODO: Allow ninb to be resized (when that's implemented)
 }
 
 static void
@@ -712,6 +711,7 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
     ww_assert(vtable.key);
     ww_assert(vtable.motion);
     ww_assert(vtable.modifiers);
+    ww_assert(vtable.resize);
     ww_assert(vtable.window);
     compositor->vtable = vtable;
 
@@ -964,11 +964,10 @@ compositor_click(struct window *window) {
 }
 
 void
-compositor_configure_window(struct window *window, int16_t x, int16_t y, int16_t w, int16_t h) {
+compositor_configure_window(struct window *window, int16_t w, int16_t h) {
     ww_assert(window);
 
-    wlr_scene_node_set_position(&window->scene_tree->node, x, y);
-    wlr_xwayland_surface_configure(window->surface, x, y, w, h);
+    wlr_xwayland_surface_configure(window->surface, 0, 0, w, h);
 }
 
 void
@@ -1006,15 +1005,6 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
         wlr_seat_pointer_notify_clear_focus(compositor->seat);
     }
     compositor->focused_window = window;
-}
-
-void
-compositor_get_screen_size(struct compositor *compositor, int32_t *w, int32_t *h) {
-    ww_assert(compositor);
-    ww_assert(compositor->main_output);
-
-    *w = compositor->main_output->wlr_output->width;
-    *h = compositor->main_output->wlr_output->height;
 }
 
 int
@@ -1062,6 +1052,12 @@ compositor_send_keys(struct window *window, const struct compositor_key *keys, i
         send_event(window->compositor->xcb, window->surface->window_id,
                    XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
     }
+}
+
+void
+compositor_set_window_render_dest(struct window *window, struct wlr_box box) {
+    wlr_scene_node_set_position(&window->scene_tree->node, box.x, box.y);
+    wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
 }
 
 void

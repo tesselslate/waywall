@@ -15,9 +15,7 @@
 #include <zip.h>
 
 // TODO: handle ninjabrain bot
-// TODO: handle remote window resizing
 // TODO: handle fullscreen
-// TODO: handle remote window aspect ratio that is incompatible with wall aspect ratio
 // TODO: config hotreload
 
 #define WALL -1
@@ -62,6 +60,7 @@ static struct instance {
 } instances[128];
 static int instance_count;
 static int active_instance = WALL;
+static int32_t screen_width, screen_height;
 
 static int cursor_x, cursor_y;
 static uint32_t held_modifiers;
@@ -76,12 +75,14 @@ static void instance_pause(struct instance *);
 static void instance_play(struct instance *);
 static bool instance_reset(struct instance *);
 static void wall_focus();
+static void wall_resize_instance(struct instance *);
 static void process_bind(struct keybind *, bool);
 static void process_state(struct instance *);
 static bool handle_button(struct compositor_button_event);
 static bool handle_key(struct compositor_key_event);
 static void handle_modifiers(uint32_t);
 static void handle_motion(struct compositor_motion_event);
+static void handle_resize(int32_t, int32_t);
 static bool handle_window(struct window *, bool);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
@@ -92,8 +93,6 @@ instance_get_hovered() {
         return NULL;
     }
 
-    int32_t screen_width, screen_height;
-    compositor_get_screen_size(compositor, &screen_width, &screen_height);
     int x = cursor_x / (screen_width / config->wall_width);
     int y = cursor_y / (screen_height / config->wall_height);
     int id = x + y * config->wall_width;
@@ -288,10 +287,15 @@ instance_play(struct instance *instance) {
     ww_assert(instance_get_id(instance) != active_instance);
     ww_assert(instance->alive);
 
-    int32_t screen_width, screen_height;
-    compositor_get_screen_size(compositor, &screen_width, &screen_height);
     compositor_focus_window(compositor, instance->window);
-    compositor_configure_window(instance->window, 0, 0, screen_width, screen_height);
+    compositor_configure_window(instance->window, screen_width, screen_height);
+    struct wlr_box box = {
+        .x = 0,
+        .y = 0,
+        .width = screen_width,
+        .height = screen_height,
+    };
+    compositor_set_window_render_dest(instance->window, box);
 
     static const struct compositor_key unpause_keys[] = {
         {KEY_ESC, true},
@@ -337,11 +341,7 @@ instance_reset(struct instance *instance) {
 
     // Adjust the instance's resolution as needed. TODO: Fullscreen
     if (instance_get_id(instance) == active_instance) {
-        int id = instance_get_id(instance);
-        compositor_configure_window(instance->window,
-                                    config->stretch_width * (id % config->wall_width),
-                                    config->stretch_height * (id / config->wall_width),
-                                    config->stretch_width, config->stretch_height);
+        wall_resize_instance(instance);
     }
 
     // Press the appropriate reset hotkey.
@@ -362,8 +362,28 @@ instance_reset(struct instance *instance) {
 
 static void
 wall_focus() {
+    ww_assert(active_instance != WALL);
+
     compositor_focus_window(compositor, NULL);
     active_instance = WALL;
+}
+
+static void
+wall_resize_instance(struct instance *instance) {
+    ww_assert(instance);
+
+    int id = instance_get_id(instance);
+    int disp_width = screen_width / config->wall_width;
+    int disp_height = screen_height / config->wall_height;
+
+    struct wlr_box box = {
+        .x = disp_width * (id % config->wall_width),
+        .y = disp_height * (id % config->wall_height),
+        .width = disp_width,
+        .height = disp_height,
+    };
+    compositor_configure_window(instance->window, config->stretch_width, config->stretch_height);
+    compositor_set_window_render_dest(instance->window, box);
 }
 
 static void
@@ -577,6 +597,36 @@ handle_motion(struct compositor_motion_event event) {
     }
 }
 
+static void
+handle_resize(int32_t width, int32_t height) {
+    screen_width = width, screen_height = height;
+    if (active_instance != WALL) {
+        // TODO: handle alt res
+        struct wlr_box box = {
+            .x = 0,
+            .y = 0,
+            .width = width,
+            .height = height,
+        };
+        compositor_configure_window(instances[active_instance].window, width, height);
+        compositor_set_window_render_dest(instances[active_instance].window, box);
+    }
+
+    for (int i = 0; i < instance_count; i++) {
+        if (i != active_instance) {
+            int inst_width = width / config->wall_width;
+            int inst_height = height / config->wall_height;
+            struct wlr_box box = {
+                .x = inst_width * (i % config->wall_width),
+                .y = inst_height * (i / config->wall_width),
+                .width = inst_width,
+                .height = inst_height,
+            };
+            compositor_set_window_render_dest(instances[i].window, box);
+        }
+    }
+}
+
 static bool
 handle_window(struct window *window, bool map) {
     // TODO: some way to kill the window if we don't want it
@@ -640,9 +690,7 @@ handle_window(struct window *window, bool map) {
     int id = instance_count;
     instances[instance_count++] = instance;
     wlr_log(WLR_INFO, "created instance %d (%s)", instance_count, instance.dir);
-    compositor_configure_window(window, config->stretch_width * (id % config->wall_width),
-                                config->stretch_height * (id / config->wall_width),
-                                config->stretch_width, config->stretch_height);
+    wall_resize_instance(&instances[id]);
     return false;
 }
 
@@ -700,6 +748,7 @@ main() {
         .key = handle_key,
         .modifiers = handle_modifiers,
         .motion = handle_motion,
+        .resize = handle_resize,
         .window = handle_window,
     };
     struct compositor_config compositor_config = {

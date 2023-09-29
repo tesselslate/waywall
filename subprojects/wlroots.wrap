@@ -2,3 +2,5 @@
 directory = wlroots
 url = https://gitlab.freedesktop.org/wlroots/wlroots.git
 revision = head
+
+diff_files = wlroots-no-dest-size.patch
