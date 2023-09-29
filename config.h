@@ -45,7 +45,7 @@ struct config {
     // TODO: alternative languages
 
     // appearance
-    // TODO: char background_color[3];
+    float background_color[4];
     // TODO: char *cursor_theme;
     // TODO: int cursor_size;
 
@@ -100,5 +100,6 @@ get_minecraft_keycode(const char *name) {
 }
 
 struct config *config_read();
+void config_destroy(struct config *config);
 
 #endif

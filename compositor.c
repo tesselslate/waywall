@@ -38,6 +38,7 @@ struct compositor {
     struct wlr_renderer *renderer;
     struct wlr_scene *scene;
     struct wlr_scene_output_layout *scene_layout;
+    struct wlr_scene_rect *background;
 
     struct wlr_cursor *cursor;
     struct wlr_xcursor_manager *cursor_manager;
@@ -56,8 +57,7 @@ struct compositor {
     struct wlr_output_layout *output_layout;
     struct wl_list outputs;
     struct wl_listener on_new_output;
-    struct output *main_output;
-    struct output *alt_output;
+    struct output *wl_output;
 
     struct wlr_xwayland *xwayland;
     struct xcb_connection_t *xcb;
@@ -366,7 +366,7 @@ on_output_request_state(struct wl_listener *listener, void *data) {
     const struct wlr_output_event_request_state *event = data;
     wlr_output_commit_state(output->wlr_output, event->state);
 
-    if (output == output->compositor->main_output) {
+    if (output == output->compositor->wl_output) {
         output->compositor->vtable.resize(output->wlr_output->width, output->wlr_output->height);
     }
 }
@@ -420,13 +420,13 @@ on_new_output(struct wl_listener *listener, void *data) {
     struct wlr_scene_output *scene_output = wlr_scene_output_create(compositor->scene, wlr_output);
     wlr_scene_output_layout_add_output(compositor->scene_layout, layout_output, scene_output);
 
-    // TODO: improve output handling logic
-    if (!compositor->main_output) {
-        compositor->main_output = output;
-    } else {
-        ww_assert(!compositor->alt_output);
-        compositor->alt_output = output;
-    }
+    ww_assert(!compositor->wl_output);
+    compositor->wl_output = output;
+    compositor->background =
+        wlr_scene_rect_create(&compositor->scene->tree, 16384, 16384,
+                              (const float *)&compositor->config.background_color);
+    wlr_scene_node_lower_to_bottom(&compositor->background->node);
+    ww_assert(compositor->background);
 }
 
 static void
@@ -505,14 +505,14 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
 
     if (compositor->focused_window &&
         compositor->focused_window->surface->surface == constraint->surface) {
-        int32_t width = compositor->main_output->wlr_output->width;
-        int32_t height = compositor->main_output->wlr_output->height;
+        int32_t width = compositor->wl_output->wlr_output->width;
+        int32_t height = compositor->wl_output->wlr_output->height;
         wlr_cursor_warp(compositor->cursor, NULL, width / 2, height / 2);
 
         if (!compositor->remote_locked_pointer) {
             compositor->remote_locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
                 compositor->remote_pointer_constraints,
-                wlr_wl_output_get_surface(compositor->main_output->wlr_output),
+                wlr_wl_output_get_surface(compositor->wl_output->wlr_output),
                 compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             ww_assert(compositor->remote_locked_pointer);
         }
@@ -1062,5 +1062,14 @@ compositor_set_window_render_dest(struct window *window, struct wlr_box box) {
 
 void
 compositor_load_config(struct compositor *compositor, struct compositor_config config) {
-    // TODO
+    ww_assert(compositor);
+
+    struct keyboard *keyboard;
+    wl_list_for_each (keyboard, &compositor->keyboards, link) {
+        wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, config.repeat_rate,
+                                     config.repeat_delay);
+    }
+
+    ww_assert(compositor->background);
+    wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
 }

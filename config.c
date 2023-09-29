@@ -169,6 +169,34 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'appearance'");
         goto fail_read;
     }
+    { // background color
+        toml_datum_t datum = toml_string_in(appearance, "background_color");
+        if (!datum.ok) {
+            wlr_log(WLR_ERROR, "config: missing string value 'background_color'");
+            goto fail_read;
+        }
+        char *background_color = datum.u.s;
+        size_t len = strlen(background_color);
+        bool maybe_valid = (len == 6) || (len == 7 && background_color[0] == '#');
+        if (!maybe_valid) {
+            wlr_log(WLR_ERROR, "config: invalid background color '%s'", background_color);
+            free(background_color);
+            goto fail_read;
+        }
+        int r, g, b;
+        int n = sscanf(background_color[0] == '#' ? background_color + 1 : background_color,
+                       "%02x%02x%02x", &r, &g, &b);
+        if (n != 3) {
+            wlr_log(WLR_ERROR, "config: invalid background color '%s'", background_color);
+            free(background_color);
+            goto fail_read;
+        }
+        free(background_color);
+        config->background_color[0] = r / 255.0;
+        config->background_color[1] = g / 255.0;
+        config->background_color[2] = b / 255.0;
+        config->background_color[3] = 1.0;
+    }
 
     // wall
     toml_table_t *wall = toml_table_in(conf, "wall");
@@ -340,3 +368,6 @@ fail_parse:
 fail_file:
     return false;
 }
+
+void
+config_destroy(struct config *config) {}

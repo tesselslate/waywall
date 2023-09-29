@@ -68,6 +68,7 @@ static bool held_buttons[8]; // NOTE: Button count is a bit low here, but this s
                              // mouse buttons.
 static int held_buttons_count;
 
+static struct compositor_config create_compositor_config();
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
 static bool instance_get_info(struct instance *);
@@ -86,6 +87,16 @@ static void handle_resize(int32_t, int32_t);
 static bool handle_window(struct window *, bool);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
+
+static struct compositor_config
+create_compositor_config() {
+    struct compositor_config compositor_config = {
+        .repeat_rate = config->repeat_rate,
+        .repeat_delay = config->repeat_delay,
+    };
+    memcpy(compositor_config.background_color, config->background_color, sizeof(float) * 4);
+    return compositor_config;
+}
 
 static struct instance *
 instance_get_hovered() {
@@ -751,11 +762,7 @@ main() {
         .resize = handle_resize,
         .window = handle_window,
     };
-    struct compositor_config compositor_config = {
-        .repeat_rate = config->repeat_rate,
-        .repeat_delay = config->repeat_delay,
-    };
-    compositor = compositor_create(vtable, compositor_config);
+    compositor = compositor_create(vtable, create_compositor_config());
     ww_assert(compositor);
     event_loop = compositor_get_loop(compositor);
 
