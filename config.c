@@ -187,9 +187,39 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
 
 #define PARSE_STRING(table, name)                                                                  \
     do {                                                                                           \
-        if (!parse_string(&config->name, table, STR(name), STR(table) "." STR(name))) {            \
+        if (!parse_str(&config->name, table, STR(name), STR(table) "." STR(name))) {               \
             goto fail_read;                                                                        \
         }                                                                                          \
+    } while (0)
+
+#define PARSE_ENUM(table, confname, ...)                                                           \
+    do {                                                                                           \
+        char *str;                                                                                 \
+        if (!parse_str(&str, table, STR(confname), STR(table) "." STR(confname))) {                \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+        bool ok = false;                                                                           \
+        static const struct mapping mappings[] = __VA_ARGS__;                                      \
+        for (unsigned long i = 0; i < ARRAY_LEN(mappings); i++) {                                  \
+            if (strcmp(mappings[i].name, str) == 0) {                                              \
+                ok = true;                                                                         \
+                config->confname = mappings[i].val;                                                \
+                break;                                                                             \
+            }                                                                                      \
+        }                                                                                          \
+        if (!ok) {                                                                                 \
+            char buf[1024], *ptr = buf;                                                            \
+            for (unsigned long i = 0; i < ARRAY_LEN(mappings); i++) {                              \
+                ww_assert(ptr - buf < 1024);                                                       \
+                ptr += snprintf(ptr, 1024 - (ptr - buf), "'%s'%s", mappings[i].name,               \
+                                (ARRAY_LEN(mappings) - i) == 1 ? "" : ", ");                       \
+            }                                                                                      \
+            wlr_log(WLR_ERROR, "config: invalid enum value '%s' for '%s' (use one of: %s)", str,   \
+                    STR(table) "." STR(confname), buf);                                            \
+            free(str);                                                                             \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+        free(str);                                                                                 \
     } while (0)
 
 #define CHECK_MIN_MAX(table, name, min, max)                                                       \
@@ -271,6 +301,12 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'reset'");
         goto fail_read;
     }
+    PARSE_ENUM(reset, unlock_behavior,
+               {
+                   {"unlock", UNLOCK_ACCEPT},
+                   {"remain_locked", UNLOCK_IGNORE},
+                   {"reset", UNLOCK_RESET},
+               });
 
     // keybinds
     toml_table_t *keybinds = toml_table_in(conf, "keybinds");

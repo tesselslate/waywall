@@ -17,6 +17,7 @@
 // TODO: handle ninjabrain bot
 // TODO: handle fullscreen
 // TODO: handle extra instances
+// TODO: make drag mouse binds work right (dont dupe inputs)
 
 #define WALL -1
 
@@ -339,17 +340,34 @@ instance_pause(struct instance *instance) {
 
 static void
 instance_lock(struct instance *instance) {
+    ww_assert(active_instance == WALL);
     ww_assert(instance->alive);
 
-    instance->locked = !instance->locked;
-    struct wlr_box box = instance_get_wall_box(instance);
-    if (!instance->lock_indicator) {
-        instance->lock_indicator = compositor_rect_create(compositor, box, config->lock_color);
-    }
-    compositor_rect_toggle(instance->lock_indicator, instance->locked);
+    if (!instance->locked) {
+        // Lock the instance.
+        instance->locked = true;
+        if (!instance->lock_indicator) {
+            struct wlr_box box = instance_get_wall_box(instance);
+            instance->lock_indicator = compositor_rect_create(compositor, box, config->lock_color);
+        }
+        compositor_rect_toggle(instance->lock_indicator, instance->locked);
+    } else {
+        // Unlock the instance.
+        ww_assert(instance->lock_indicator);
 
-    if (active_instance == WALL && !instance->locked) {
-        // TODO: behavior on unlock config option (reset, stay locked, unlock)
+        switch (config->unlock_behavior) {
+        case UNLOCK_ACCEPT:
+            instance->locked = false;
+            compositor_rect_toggle(instance->lock_indicator, false);
+            break;
+        case UNLOCK_IGNORE:
+            break;
+        case UNLOCK_RESET:
+            instance->locked = false;
+            compositor_rect_toggle(instance->lock_indicator, false);
+            instance_reset(instance);
+            break;
+        }
     }
 }
 

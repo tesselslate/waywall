@@ -22,7 +22,7 @@ use_f1 = false
 
 [reset]
 # TODO: reset counter path
-# TODO: reset on unlock
+unlock_behavior = "reset" # ignore, unlock, reset
 # TODO: wall bypass
 # TODO: grace period
 

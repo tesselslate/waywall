@@ -25,6 +25,12 @@ enum action {
     // TODO: alt res
 };
 
+enum unlock_behavior {
+    UNLOCK_ACCEPT,
+    UNLOCK_IGNORE,
+    UNLOCK_RESET,
+};
+
 struct keybind {
     union {
         xkb_keysym_t sym;
@@ -60,8 +66,8 @@ struct config {
     bool use_f1;
 
     // reset options
+    enum unlock_behavior unlock_behavior;
     // TODO: char *reset_count_path;
-    // TODO: bool reset_on_unlock;
     // TODO: bool wall_bypass;
     // TODO: int grace_period;
 
