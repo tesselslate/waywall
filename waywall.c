@@ -105,8 +105,15 @@ config_update() {
     config_destroy(config);
     config = new_config;
 
+    // Apply changes from the new configuration.
     compositor_load_config(compositor, create_compositor_config());
+    for (unsigned long i = 0; i < ARRAY_LEN(instances); i++) {
+        if (instances[i].lock_indicator) {
+            compositor_rect_set_color(instances[i].lock_indicator, config->lock_color);
+        }
+    }
     handle_resize(screen_width, screen_height);
+
     wlr_log(WLR_INFO, "applied new config");
 }
 
