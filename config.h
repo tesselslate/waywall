@@ -48,6 +48,7 @@ struct config {
 
     // appearance
     float background_color[4];
+    float lock_color[4];
     // TODO: char *cursor_theme;
     // TODO: int cursor_size;
 

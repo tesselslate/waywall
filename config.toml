@@ -6,6 +6,7 @@ repeat_rate = 40
 
 [appearance]
 background_color = '#000000'
+lock_color = '#00000099'
 # TODO: cursor theme
 # TODO: cursor size
 

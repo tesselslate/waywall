@@ -97,6 +97,52 @@ parse_bool(bool *value, toml_table_t *table, const char *value_name, const char 
 }
 
 static bool
+parse_color(float value[4], toml_table_t *table, const char *value_name, const char *full_name) {
+    toml_datum_t datum = toml_string_in(table, value_name);
+    if (!datum.ok) {
+        wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+        return false;
+    }
+    char *color = datum.u.s;
+    size_t len = strlen(color);
+    bool maybe_valid_rgb = len == 6 || (len == 7 && color[0] == '#');
+    bool maybe_valid_rgba = len == 8 || (len == 9 && color[0] == '#');
+    if (!maybe_valid_rgb && !maybe_valid_rgba) {
+        wlr_log(WLR_ERROR, "config: invalid value ('%s') for color value '%s'", color, full_name);
+        free(color);
+        return false;
+    }
+    int r, g, b, a;
+    if (maybe_valid_rgb) {
+        int n = sscanf(color[0] == '#' ? color + 1 : color, "%02x%02x%02x", &r, &g, &b);
+        if (n != 3) {
+            wlr_log(WLR_ERROR, "config: invalud value ('%s') for color value '%s'", color,
+                    full_name);
+            free(color);
+            return false;
+        }
+        value[0] = r / 255.0;
+        value[1] = g / 255.0;
+        value[2] = b / 255.0;
+        value[3] = 1.0;
+    } else {
+        int n = sscanf(color[0] == '#' ? color + 1 : color, "%02x%02x%02x%02x", &r, &g, &b, &a);
+        if (n != 4) {
+            wlr_log(WLR_ERROR, "config: invalud value ('%s') for color value '%s'", color,
+                    full_name);
+            free(color);
+            return false;
+        }
+        value[0] = r / 255.0;
+        value[1] = g / 255.0;
+        value[2] = b / 255.0;
+        value[3] = a / 255.0;
+    }
+    free(color);
+    return true;
+}
+
+static bool
 parse_int(int *value, toml_table_t *table, const char *value_name, const char *full_name) {
     toml_datum_t datum = toml_int_in(table, value_name);
     if (!datum.ok) {
@@ -118,18 +164,30 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
     return true;
 }
 
-/*
- * Sorry for the preprocessor crimes.
- * These should only be called from `config_read`, where `config` is in scope.
- * The names of config values in the file and in the C struct must be identical.
- * The names of the tables in the file and the associated `toml_table_t *` values must be identical.
- */
-#define PARSE_VALUE(table, name)                                                                   \
+#define PARSE_BOOL(table, name)                                                                    \
     do {                                                                                           \
-        bool ret = _Generic((config->name), bool: parse_bool, int: parse_int, char *: parse_str)(  \
-            &(config->name), table, WW_STRINGIFY(name),                                            \
-            WW_STRINGIFY(table) "." WW_STRINGIFY(name));                                           \
-        if (!ret) {                                                                                \
+        if (!parse_bool(&config->name, table, STR(name), STR(table) "." STR(name))) {              \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+    } while (0)
+
+#define PARSE_COLOR(table, name)                                                                   \
+    do {                                                                                           \
+        if (!parse_color(config->name, table, STR(name), STR(table) "." STR(name))) {              \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+    } while (0)
+
+#define PARSE_INT(table, name)                                                                     \
+    do {                                                                                           \
+        if (!parse_int(&config->name, table, STR(name), STR(table) "." STR(name))) {               \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+    } while (0)
+
+#define PARSE_STRING(table, name)                                                                  \
+    do {                                                                                           \
+        if (!parse_string(&config->name, table, STR(name), STR(table) "." STR(name))) {            \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
@@ -138,13 +196,11 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
     do {                                                                                           \
         if ((config->name) < min) {                                                                \
             wlr_log(WLR_ERROR, "config: integer value '%s' below minimum (%d < %s)",               \
-                    WW_STRINGIFY(table) "." WW_STRINGIFY(name), (config->name),                    \
-                    WW_STRINGIFY(min));                                                            \
+                    STR(table) "." STR(name), (config->name), STR(min));                           \
             goto fail_read;                                                                        \
         } else if ((config->name) > max) {                                                         \
             wlr_log(WLR_ERROR, "config: integer value '%s' above maximum (%d > %s)",               \
-                    WW_STRINGIFY(table) "." WW_STRINGIFY(name), (config->name),                    \
-                    WW_STRINGIFY(max));                                                            \
+                    STR(table) "." STR(name), (config->name), STR(max));                           \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
@@ -171,6 +227,7 @@ config_read() {
     }
 
     struct config *config = calloc(1, sizeof(struct config));
+    ww_assert(config);
 
     // input
     toml_table_t *input = toml_table_in(conf, "input");
@@ -178,9 +235,9 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'input'");
         goto fail_read;
     }
-    PARSE_VALUE(input, repeat_delay);
+    PARSE_INT(input, repeat_delay);
     CHECK_MIN_MAX(input, repeat_delay, 1, 1000);
-    PARSE_VALUE(input, repeat_rate);
+    PARSE_INT(input, repeat_rate);
     CHECK_MIN_MAX(input, repeat_rate, 1, 100);
 
     // appearance
@@ -189,34 +246,8 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'appearance'");
         goto fail_read;
     }
-    { // background color
-        toml_datum_t datum = toml_string_in(appearance, "background_color");
-        if (!datum.ok) {
-            wlr_log(WLR_ERROR, "config: missing string value 'background_color'");
-            goto fail_read;
-        }
-        char *background_color = datum.u.s;
-        size_t len = strlen(background_color);
-        bool maybe_valid = (len == 6) || (len == 7 && background_color[0] == '#');
-        if (!maybe_valid) {
-            wlr_log(WLR_ERROR, "config: invalid background color '%s'", background_color);
-            free(background_color);
-            goto fail_read;
-        }
-        int r, g, b;
-        int n = sscanf(background_color[0] == '#' ? background_color + 1 : background_color,
-                       "%02x%02x%02x", &r, &g, &b);
-        if (n != 3) {
-            wlr_log(WLR_ERROR, "config: invalid background color '%s'", background_color);
-            free(background_color);
-            goto fail_read;
-        }
-        free(background_color);
-        config->background_color[0] = r / 255.0;
-        config->background_color[1] = g / 255.0;
-        config->background_color[2] = b / 255.0;
-        config->background_color[3] = 1.0;
-    }
+    PARSE_COLOR(appearance, background_color);
+    PARSE_COLOR(appearance, lock_color);
 
     // wall
     toml_table_t *wall = toml_table_in(conf, "wall");
@@ -224,15 +255,15 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'wall'");
         goto fail_read;
     }
-    PARSE_VALUE(wall, wall_width);
+    PARSE_INT(wall, wall_width);
     CHECK_MIN_MAX(wall, wall_width, 1, 10);
-    PARSE_VALUE(wall, wall_height);
+    PARSE_INT(wall, wall_height);
     CHECK_MIN_MAX(wall, wall_height, 1, 10);
-    PARSE_VALUE(wall, stretch_width);
+    PARSE_INT(wall, stretch_width);
     CHECK_MIN_MAX(wall, stretch_width, 1, 4096);
-    PARSE_VALUE(wall, stretch_height);
+    PARSE_INT(wall, stretch_height);
     CHECK_MIN_MAX(wall, stretch_height, 1, 4096);
-    PARSE_VALUE(wall, use_f1);
+    PARSE_BOOL(wall, use_f1);
 
     // reset
     toml_table_t *reset = toml_table_in(conf, "reset");
