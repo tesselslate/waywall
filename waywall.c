@@ -16,6 +16,7 @@
 
 // TODO: handle ninjabrain bot
 // TODO: handle fullscreen
+// TODO: handle extra instances
 
 #define WALL -1
 

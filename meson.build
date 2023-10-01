@@ -41,9 +41,6 @@ xkbcommon = dependency('xkbcommon')
 zip = dependency('libzip')
 
 cc = meson.get_compiler('c')
-if get_option('buildtype').startswith('debug')
-  add_project_arguments('-DDEBUG', language : 'c')
-endif
 
 wl_scanner = find_program(wayland_scanner.get_variable('wayland_scanner'), native : true)
 wl_proto_dir = wayland_protocols.get_variable('pkgdatadir')
