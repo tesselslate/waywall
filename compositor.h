@@ -9,6 +9,7 @@
 
 struct compositor;
 struct window;
+struct wlr_scene_rect;
 
 struct compositor_button_event {
     uint32_t button;
@@ -88,13 +89,25 @@ int compositor_get_windows(struct compositor *compositor, struct window ***windo
 // Attempts to get the process ID of the given `window`. Returns -1 on failure.
 pid_t compositor_get_window_pid(struct window *window);
 
+// Updates user-defined settings for the compositor.
+void compositor_load_config(struct compositor *compositor, struct compositor_config config);
+
+// Configures a rectangle on the compositor scene.
+void compositor_rect_configure(struct wlr_scene_rect *, struct wlr_box);
+
+// Creates a rectangle on the compositor scene.
+struct wlr_scene_rect *compositor_rect_create(struct compositor *, struct wlr_box, float[4]);
+
+// Sets the color of a rectangle on the compositor scene.
+void compositor_rect_set_color(struct wlr_scene_rect *, float[4]);
+
+// Toggles the visibility of a rectangle on the compositor scene.
+void compositor_rect_toggle(struct wlr_scene_rect *, bool);
+
 // Sends a sequence of keyboard inputs to the given `window`.
 void compositor_send_keys(struct window *window, const struct compositor_key *keys, int count);
 
 // Sets the location and size of the window on the output.
 void compositor_set_window_render_dest(struct window *window, struct wlr_box);
-
-// Updates user-defined settings for the compositor.
-void compositor_load_config(struct compositor *compositor, struct compositor_config config);
 
 #endif

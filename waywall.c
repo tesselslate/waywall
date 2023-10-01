@@ -58,6 +58,8 @@ static struct instance {
         uint8_t preview;
         uint8_t fullscreen;
     } hotkeys;
+
+    struct wlr_scene_rect *lock_indicator;
 } instances[128];
 static int instance_count;
 static int active_instance = WALL;
@@ -74,6 +76,8 @@ static struct compositor_config create_compositor_config();
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
 static bool instance_get_info(struct instance *);
+static struct wlr_box instance_get_wall_box(struct instance *);
+static void instance_lock(struct instance *);
 static void instance_pause(struct instance *);
 static void instance_play(struct instance *);
 static bool instance_reset(struct instance *);
@@ -297,6 +301,21 @@ instance_get_info(struct instance *instance) {
     return true;
 }
 
+static struct wlr_box
+instance_get_wall_box(struct instance *instance) {
+    int id = instance_get_id(instance);
+    int disp_width = screen_width / config->wall_width;
+    int disp_height = screen_height / config->wall_height;
+
+    struct wlr_box box = {
+        .x = disp_width * (id % config->wall_width),
+        .y = disp_height * (id / config->wall_width),
+        .width = disp_width,
+        .height = disp_height,
+    };
+    return box;
+}
+
 static void
 instance_pause(struct instance *instance) {
     ww_assert(instance->alive);
@@ -308,6 +327,22 @@ instance_pause(struct instance *instance) {
         {KEY_F3, false},
     };
     compositor_send_keys(instance->window, keys, ARRAY_LEN(keys));
+}
+
+static void
+instance_lock(struct instance *instance) {
+    ww_assert(instance->alive);
+
+    instance->locked = !instance->locked;
+    struct wlr_box box = instance_get_wall_box(instance);
+    if (!instance->lock_indicator) {
+        instance->lock_indicator = compositor_rect_create(compositor, box, config->lock_color);
+    }
+    compositor_rect_toggle(instance->lock_indicator, instance->locked);
+
+    if (active_instance == WALL && !instance->locked) {
+        // TODO: behavior on unlock config option (reset, stay locked, unlock)
+    }
 }
 
 static void
@@ -335,6 +370,11 @@ instance_play(struct instance *instance) {
                          config->use_f1 ? ARRAY_LEN(unpause_keys) : ARRAY_LEN(unpause_keys) - 2);
 
     active_instance = instance_get_id(instance);
+    if (instance->locked) {
+        ww_assert(instance->lock_indicator);
+        compositor_rect_toggle(instance->lock_indicator, false);
+        instance->locked = false;
+    }
 }
 
 static bool
@@ -400,18 +440,12 @@ static void
 wall_resize_instance(struct instance *instance) {
     ww_assert(instance);
 
-    int id = instance_get_id(instance);
-    int disp_width = screen_width / config->wall_width;
-    int disp_height = screen_height / config->wall_height;
-
-    struct wlr_box box = {
-        .x = disp_width * (id % config->wall_width),
-        .y = disp_height * (id % config->wall_height),
-        .width = disp_width,
-        .height = disp_height,
-    };
+    struct wlr_box box = instance_get_wall_box(instance);
     compositor_configure_window(instance->window, config->stretch_width, config->stretch_height);
     compositor_set_window_render_dest(instance->window, box);
+    if (instance->lock_indicator) {
+        compositor_rect_configure(instance->lock_indicator, box);
+    }
 }
 
 static void
@@ -444,8 +478,7 @@ process_bind(struct keybind *keybind, bool held) {
             break;
         case ACTION_WALL_LOCK:
             if (hovered) {
-                // TODO: show lock status
-                hovered->locked = !hovered->locked;
+                instance_lock(hovered);
             }
             break;
         case ACTION_WALL_FOCUS_RESET:

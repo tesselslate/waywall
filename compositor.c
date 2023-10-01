@@ -36,6 +36,7 @@ struct compositor {
     struct wlr_backend *backend;
     struct wlr_compositor *compositor;
     struct wlr_renderer *renderer;
+
     struct wlr_scene *scene;
     struct wlr_scene_output_layout *scene_layout;
     struct wlr_scene_rect *background;
@@ -425,8 +426,8 @@ on_new_output(struct wl_listener *listener, void *data) {
     compositor->background =
         wlr_scene_rect_create(&compositor->scene->tree, 16384, 16384,
                               (const float *)&compositor->config.background_color);
-    wlr_scene_node_lower_to_bottom(&compositor->background->node);
     ww_assert(compositor->background);
+    wlr_scene_node_lower_to_bottom(&compositor->background->node);
 }
 
 static void
@@ -1017,6 +1018,7 @@ compositor_get_windows(struct compositor *compositor, struct window ***windows) 
         return 0;
     }
     struct window **data = calloc(count, sizeof(struct window *));
+    ww_assert(data);
     *windows = data;
 
     struct window *window;
@@ -1032,6 +1034,50 @@ compositor_get_window_pid(struct window *window) {
     ww_assert(window);
 
     return window->surface->pid > 0 ? window->surface->pid : -1;
+}
+
+void
+compositor_load_config(struct compositor *compositor, struct compositor_config config) {
+    ww_assert(compositor);
+
+    struct keyboard *keyboard;
+    wl_list_for_each (keyboard, &compositor->keyboards, link) {
+        wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, config.repeat_rate,
+                                     config.repeat_delay);
+    }
+
+    ww_assert(compositor->background);
+    wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
+}
+
+void
+compositor_rect_configure(struct wlr_scene_rect *rect, struct wlr_box box) {
+    wlr_scene_node_set_position(&rect->node, box.x, box.y);
+    wlr_scene_rect_set_size(rect, box.width, box.height);
+}
+
+struct wlr_scene_rect *
+compositor_rect_create(struct compositor *compositor, struct wlr_box box, float color[4]) {
+    struct wlr_scene_rect *rect =
+        wlr_scene_rect_create(&compositor->scene->tree, box.width, box.height, color);
+    wlr_scene_node_set_position(&rect->node, box.x, box.y);
+    ww_assert(rect);
+    return rect;
+}
+
+void
+compositor_rect_set_color(struct wlr_scene_rect *rect, float color[4]) {
+    wlr_scene_rect_set_color(rect, color);
+}
+
+void
+compositor_rect_toggle(struct wlr_scene_rect *rect, bool state) {
+    if (state) {
+        wlr_scene_node_set_enabled(&rect->node, true);
+        wlr_scene_node_raise_to_top(&rect->node);
+    } else {
+        wlr_scene_node_set_enabled(&rect->node, false);
+    }
 }
 
 void
@@ -1058,18 +1104,4 @@ void
 compositor_set_window_render_dest(struct window *window, struct wlr_box box) {
     wlr_scene_node_set_position(&window->scene_tree->node, box.x, box.y);
     wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
-}
-
-void
-compositor_load_config(struct compositor *compositor, struct compositor_config config) {
-    ww_assert(compositor);
-
-    struct keyboard *keyboard;
-    wl_list_for_each (keyboard, &compositor->keyboards, link) {
-        wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, config.repeat_rate,
-                                     config.repeat_delay);
-    }
-
-    ww_assert(compositor->background);
-    wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
 }
