@@ -72,6 +72,10 @@ static uint32_t held_modifiers;
 static bool held_buttons[8]; // NOTE: Button count is a bit low here, but this supports all current
                              // mouse buttons.
 static int held_buttons_count;
+static struct {
+    int instance;
+    struct keybind *bind;
+} last_held;
 
 static void config_update();
 static struct compositor_config create_compositor_config();
@@ -483,6 +487,10 @@ process_bind(struct keybind *keybind, bool held) {
             continue;
         }
         struct instance *hovered = instance_get_hovered();
+        if (hovered) {
+            last_held.instance = instance_get_id(hovered);
+            last_held.bind = keybind;
+        }
 
         switch (action) {
         case ACTION_WALL_RESET_ALL:
@@ -679,7 +687,12 @@ handle_motion(struct compositor_motion_event event) {
         if (!held_buttons[config->binds[i].input.button - BTN_MOUSE]) {
             continue;
         }
-        process_bind(&config->binds[i], true);
+        bool same_last_instance = last_held.instance == instance_get_id(instance_get_hovered());
+        bool same_last_bind = last_held.bind == &config->binds[i];
+
+        if (!same_last_instance || !same_last_bind) {
+            process_bind(&config->binds[i], true);
+        }
         return;
     }
 }
