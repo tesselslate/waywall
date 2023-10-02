@@ -1,6 +1,7 @@
 [input]
 repeat_delay = 300
 repeat_rate = 40
+confine_pointer = false
 # TODO: sensitivities
 # TODO: language
 
@@ -17,7 +18,6 @@ stretch_width = 960
 stretch_height = 360
 # TODO: alt width
 # TODO: alt height
-# TODO: confine pointer on wall
 use_f1 = false
 
 [reset]

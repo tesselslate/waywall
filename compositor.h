@@ -45,6 +45,7 @@ typedef bool (*compositor_window_func_t)(struct window *window, bool map);
 struct compositor_config {
     int repeat_rate, repeat_delay;
     float background_color[4];
+    bool confine_pointer;
 };
 
 struct compositor_vtable {

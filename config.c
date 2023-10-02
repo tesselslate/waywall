@@ -269,6 +269,7 @@ config_read() {
     CHECK_MIN_MAX(input, repeat_delay, 1, 1000);
     PARSE_INT(input, repeat_rate);
     CHECK_MIN_MAX(input, repeat_rate, 1, 100);
+    PARSE_BOOL(input, confine_pointer);
 
     // appearance
     toml_table_t *appearance = toml_table_in(conf, "appearance");

@@ -75,6 +75,7 @@ struct compositor {
     struct wlr_pointer_constraint_v1 *active_constraint;
     struct zwp_pointer_constraints_v1 *remote_pointer_constraints;
     struct zwp_locked_pointer_v1 *remote_locked_pointer;
+    struct zwp_confined_pointer_v1 *remote_confined_pointer;
     struct wl_listener on_new_constraint;
 
     struct wlr_relative_pointer_manager_v1 *relative_pointer;
@@ -500,6 +501,13 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
             zwp_locked_pointer_v1_destroy(compositor->remote_locked_pointer);
             compositor->remote_locked_pointer = NULL;
             compositor->active_constraint = NULL;
+            if (compositor->config.confine_pointer) {
+                compositor->remote_confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+                    compositor->remote_pointer_constraints, compositor->wl_output->remote_surface,
+                    compositor->remote_pointer, NULL,
+                    ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+                ww_assert(compositor->remote_confined_pointer);
+            }
             return;
         }
     }
@@ -510,10 +518,13 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
         int32_t height = compositor->wl_output->wlr_output->height;
         wlr_cursor_warp(compositor->cursor, NULL, width / 2, height / 2);
 
+        if (compositor->remote_confined_pointer) {
+            zwp_confined_pointer_v1_destroy(compositor->remote_confined_pointer);
+            compositor->remote_confined_pointer = NULL;
+        }
         if (!compositor->remote_locked_pointer) {
             compositor->remote_locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
-                compositor->remote_pointer_constraints,
-                wlr_wl_output_get_surface(compositor->wl_output->wlr_output),
+                compositor->remote_pointer_constraints, compositor->wl_output->remote_surface,
                 compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             ww_assert(compositor->remote_locked_pointer);
         }
@@ -1045,9 +1056,23 @@ compositor_load_config(struct compositor *compositor, struct compositor_config c
         wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, config.repeat_rate,
                                      config.repeat_delay);
     }
+    if (config.confine_pointer && !compositor->remote_confined_pointer) {
+        if (!compositor->active_constraint) {
+            ww_assert(!compositor->remote_locked_pointer);
+
+            compositor->remote_confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+                compositor->remote_pointer_constraints, compositor->wl_output->remote_surface,
+                compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            ww_assert(compositor->remote_confined_pointer);
+        }
+    } else if (!config.confine_pointer && compositor->remote_confined_pointer) {
+        zwp_confined_pointer_v1_destroy(compositor->remote_confined_pointer);
+        compositor->remote_confined_pointer = NULL;
+    }
 
     ww_assert(compositor->background);
     wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
+    compositor->config = config;
 }
 
 void

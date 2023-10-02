@@ -49,6 +49,7 @@ struct config {
     // input
     int repeat_delay;
     int repeat_rate;
+    bool confine_pointer;
     // TODO: main sens, alt sens
     // TODO: alternative languages
 
@@ -62,7 +63,6 @@ struct config {
     int wall_width, wall_height;
     int stretch_width, stretch_height;
     // TODO: int alt_width, alt_height;
-    // TODO: bool confine_on_wall;
     bool use_f1;
 
     // reset options

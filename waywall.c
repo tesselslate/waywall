@@ -154,6 +154,7 @@ create_compositor_config() {
     struct compositor_config compositor_config = {
         .repeat_rate = config->repeat_rate,
         .repeat_delay = config->repeat_delay,
+        .confine_pointer = config->confine_pointer,
     };
     memcpy(compositor_config.background_color, config->background_color, sizeof(float) * 4);
     return compositor_config;
