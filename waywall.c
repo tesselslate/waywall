@@ -17,7 +17,6 @@
 // TODO: handle ninjabrain bot
 // TODO: handle fullscreen
 // TODO: handle extra instances
-// TODO: make drag mouse binds work right (dont dupe inputs)
 
 #define WALL -1
 
