@@ -29,6 +29,13 @@
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
 
+#define HEADLESS_WIDTH 1920
+#define HEADLESS_HEIGHT 1080
+#define WL_X 0
+#define WL_Y 0
+#define HEADLESS_X 16384
+#define HEADLESS_Y 16384
+
 // HACK: Any reason xwm_destroy isn't called already by wlr_xwayland_destroy? Maybe ask wlroots
 // people about this.
 extern void xwm_destroy(struct wlr_xwm *xwm);
@@ -111,6 +118,8 @@ struct output {
 
     struct compositor *compositor;
     struct wlr_output *wlr_output;
+    struct wlr_output_layout_output *layout;
+    struct wlr_scene_output *scene;
 
     bool headless;
     struct wl_surface *remote_surface;
@@ -301,6 +310,13 @@ on_cursor_motion_absolute(struct wl_listener *listener, void *data) {
     struct compositor *compositor =
         wl_container_of(listener, compositor, on_cursor_motion_absolute);
     struct wlr_pointer_motion_absolute_event *wlr_event = data;
+
+    // We can assume that the pointer motion is being reported by the sole Wayland output and not
+    // the headless output.
+    ww_assert(compositor->wl_output);
+    wlr_cursor_map_input_to_output(compositor->cursor, &wlr_event->pointer->base,
+                                   compositor->wl_output->wlr_output);
+
     wlr_cursor_warp_absolute(compositor->cursor, &wlr_event->pointer->base, wlr_event->x,
                              wlr_event->y);
     handle_cursor_motion(compositor, wlr_event->time_msec);
@@ -375,7 +391,7 @@ on_output_request_state(struct wl_listener *listener, void *data) {
     const struct wlr_output_event_request_state *event = data;
     wlr_output_commit_state(output->wlr_output, event->state);
 
-    if (output == output->compositor->wl_output) {
+    if (!output->headless) {
         output->compositor->vtable.resize(output->wlr_output->width, output->wlr_output->height);
     }
 }
@@ -388,9 +404,10 @@ on_output_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&output->on_request_state.link);
     wl_list_remove(&output->link);
 
-    if (wl_list_length(&output->compositor->outputs) == 0) {
-        // TODO: change compositor kill logic
-        wlr_log(WLR_INFO, "last output destroyed - stopping");
+    // TODO: change compositor kill logic (let instances persist in background and window is
+    // reopened?)
+    if (!output->headless) {
+        wlr_log(WLR_INFO, "output destroyed - stopping");
         compositor_stop(output->compositor);
     }
     free(output);
@@ -424,10 +441,12 @@ on_new_output(struct wl_listener *listener, void *data) {
     wl_signal_add(&wlr_output->events.destroy, &output->on_destroy);
     wl_list_insert(&compositor->outputs, &output->link);
 
-    struct wlr_output_layout_output *layout_output =
-        wlr_output_layout_add_auto(compositor->output_layout, wlr_output);
-    struct wlr_scene_output *scene_output = wlr_scene_output_create(compositor->scene, wlr_output);
-    wlr_scene_output_layout_add_output(compositor->scene_layout, layout_output, scene_output);
+    int coord = output->headless ? HEADLESS_X : 0;
+    output->layout = wlr_output_layout_add(compositor->output_layout, wlr_output, coord, coord);
+    ww_assert(output->layout);
+    output->scene = wlr_scene_output_create(compositor->scene, wlr_output);
+    ww_assert(output->scene);
+    wlr_scene_output_layout_add_output(compositor->scene_layout, output->layout, output->scene);
 
     if (!output->headless) {
         output->remote_surface = wlr_wl_output_get_surface(wlr_output);
@@ -630,12 +649,11 @@ on_window_map(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_map);
     wl_list_insert(&window->compositor->windows, &window->link);
 
-    window->surface->surface->data = window;
     window->scene_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
     wlr_scene_node_set_enabled(&window->scene_tree->node, true);
     window->scene_surface = wlr_scene_surface_create(window->scene_tree, window->surface->surface);
-    window->scene_tree->node.data = window;
-    wlr_scene_node_set_position(&window->scene_tree->node, 0, 0);
+    wlr_scene_node_set_position(&window->scene_tree->node, WL_X, WL_Y);
+
     window->compositor->vtable.window(window, true);
 }
 
@@ -696,7 +714,6 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
     struct window *window = calloc(1, sizeof(struct window));
     ww_assert(window);
     window->compositor = compositor;
-    surface->data = window;
     window->surface = surface;
 
     window->on_associate.notify = on_window_associate;
@@ -757,6 +774,8 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
         wlr_log(WLR_ERROR, "failed to create headless backend");
         goto fail_backend_headless;
     }
+    // TODO: make verification output size configurable
+    wlr_headless_add_output(compositor->backend_headless, HEADLESS_WIDTH, HEADLESS_HEIGHT);
 
     compositor->backend_wl = wlr_wl_backend_create(compositor->display, NULL);
     if (!compositor->backend_wl) {
@@ -1127,7 +1146,7 @@ compositor_load_config(struct compositor *compositor, struct compositor_config c
 
 void
 compositor_rect_configure(struct wlr_scene_rect *rect, struct wlr_box box) {
-    wlr_scene_node_set_position(&rect->node, box.x, box.y);
+    wlr_scene_node_set_position(&rect->node, WL_X + box.x, WL_Y + box.y);
     wlr_scene_rect_set_size(rect, box.width, box.height);
 }
 
@@ -1135,7 +1154,7 @@ struct wlr_scene_rect *
 compositor_rect_create(struct compositor *compositor, struct wlr_box box, float color[4]) {
     struct wlr_scene_rect *rect =
         wlr_scene_rect_create(&compositor->scene->tree, box.width, box.height, color);
-    wlr_scene_node_set_position(&rect->node, box.x, box.y);
+    wlr_scene_node_set_position(&rect->node, WL_X + box.x, WL_Y + box.y);
     ww_assert(rect);
     return rect;
 }
@@ -1182,6 +1201,6 @@ compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplie
 
 void
 compositor_set_window_render_dest(struct window *window, struct wlr_box box) {
-    wlr_scene_node_set_position(&window->scene_tree->node, box.x, box.y);
+    wlr_scene_node_set_position(&window->scene_tree->node, WL_X + box.x, WL_Y + box.y);
     wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
 }
