@@ -231,6 +231,9 @@ instance_get_hovered() {
     if (active_instance != WALL) {
         return NULL;
     }
+    if (cursor_x < 0 || cursor_x > screen_width || cursor_y < 0 || cursor_y > screen_height) {
+        return NULL;
+    }
 
     int x = cursor_x / (screen_width / config->wall_width);
     int y = cursor_y / (screen_height / config->wall_height);
@@ -826,6 +829,7 @@ handle_motion(struct compositor_motion_event event) {
 
 static void
 handle_resize(int32_t width, int32_t height) {
+    wlr_log(WLR_INFO, "handling screen resize of %" PRIi32 " x %" PRIi32, width, height);
     screen_width = width, screen_height = height;
     if (active_instance != WALL) {
         // TODO: handle alt res
@@ -841,15 +845,7 @@ handle_resize(int32_t width, int32_t height) {
 
     for (int i = 0; i < instance_count; i++) {
         if (i != active_instance) {
-            int inst_width = width / config->wall_width;
-            int inst_height = height / config->wall_height;
-            struct wlr_box box = {
-                .x = inst_width * (i % config->wall_width),
-                .y = inst_height * (i / config->wall_width),
-                .width = inst_width,
-                .height = inst_height,
-            };
-            compositor_set_window_render_dest(instances[i].window, box);
+            wall_resize_instance(&instances[i]);
         }
     }
 }
