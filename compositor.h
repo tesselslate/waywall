@@ -46,6 +46,8 @@ struct compositor_config {
     int repeat_rate, repeat_delay;
     float background_color[4];
     bool confine_pointer;
+    const char *cursor_theme;
+    int cursor_size;
 };
 
 struct compositor_vtable {

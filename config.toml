@@ -8,8 +8,8 @@ confine_pointer = false
 [appearance]
 background_color = '#000000'
 lock_color = '#00000099'
-# TODO: cursor theme
-# TODO: cursor size
+cursor_theme = "" # can be left empty / deleted
+cursor_size = 24 # can be deleted
 
 [wall]
 wall_width = 2

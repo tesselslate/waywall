@@ -279,6 +279,14 @@ config_read() {
     }
     PARSE_COLOR(appearance, background_color);
     PARSE_COLOR(appearance, lock_color);
+    if (!parse_str(&config->cursor_theme, appearance, "cursor_theme", "appearance.cursor_theme")) {
+        config->cursor_theme = NULL;
+    }
+    if (!parse_int(&config->cursor_size, appearance, "cursor_size", "appearance.cursor_size")) {
+        config->cursor_size = 24;
+    } else {
+        CHECK_MIN_MAX(appearance, cursor_size, 1, 64);
+    }
 
     // wall
     toml_table_t *wall = toml_table_in(conf, "wall");
@@ -466,6 +474,9 @@ fail_file:
 
 void
 config_destroy(struct config *config) {
+    if (config->cursor_theme) {
+        free(config->cursor_theme);
+    }
     if (config->resets_file) {
         free(config->resets_file);
     }

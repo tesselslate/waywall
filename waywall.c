@@ -135,6 +135,16 @@ config_update() {
             reset_count_fd = INT_MIN;
         }
     }
+
+    bool same_size = config->cursor_size == new_config->cursor_size;
+    bool same_theme = (config->cursor_theme && new_config->cursor_theme)
+                          ? strcmp(config->cursor_theme, new_config->cursor_theme) == 0
+                          : !config->cursor_theme && !new_config->cursor_theme;
+    if (!same_size || !same_theme) {
+        // TODO: Figure out how to update cursor theme in xcursor manager
+        wlr_log(WLR_ERROR,
+                "changing cursor options will not take effect until waywall is restarted");
+    }
     config_destroy(config);
     config = new_config;
 
@@ -156,6 +166,8 @@ create_compositor_config() {
         .repeat_rate = config->repeat_rate,
         .repeat_delay = config->repeat_delay,
         .confine_pointer = config->confine_pointer,
+        .cursor_theme = config->cursor_theme,
+        .cursor_size = config->cursor_size,
     };
     memcpy(compositor_config.background_color, config->background_color, sizeof(float) * 4);
     return compositor_config;

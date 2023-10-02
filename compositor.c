@@ -805,8 +805,8 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
     wl_signal_add(&compositor->pointer_constraints->events.new_constraint,
                   &compositor->on_new_constraint);
     wlr_cursor_attach_output_layout(compositor->cursor, compositor->output_layout);
-    // TODO: Allow configuring cursor theme and size
-    compositor->cursor_manager = wlr_xcursor_manager_create(NULL, 24);
+    compositor->cursor_manager =
+        wlr_xcursor_manager_create(compositor->config.cursor_theme, compositor->config.cursor_size);
     ww_assert(compositor->cursor_manager);
 
     compositor->on_cursor_axis.notify = on_cursor_axis;
