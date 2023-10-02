@@ -145,6 +145,12 @@ struct window {
     struct wlr_scene_tree *scene_tree;
     struct wlr_scene_surface *scene_surface;
 
+    struct headless_view {
+        struct wlr_scene_tree *tree;
+        struct wlr_scene_surface *surface;
+    } headless_views[4];
+    int headless_view_count;
+
     struct wl_listener on_associate;
     struct wl_listener on_dissociate;
 
@@ -662,10 +668,11 @@ on_window_unmap(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_unmap);
     wl_list_remove(&window->link);
     wlr_scene_node_destroy(&window->scene_tree->node);
+    compositor_window_destroy_headless_views(window);
 
     if (window == window->compositor->focused_window) {
         wlr_log(WLR_DEBUG, "focused window was unmapped");
-        compositor_focus_window(window->compositor, NULL);
+        compositor_window_focus(window->compositor, NULL);
     }
     window->compositor->vtable.window(window, false);
 }
@@ -1043,15 +1050,97 @@ compositor_click(struct window *window) {
                XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE, (char *)&event2);
 }
 
+int
+compositor_get_windows(struct compositor *compositor, struct window ***windows) {
+    ww_assert(compositor);
+    ww_assert(windows);
+
+    int count = wl_list_length(&compositor->windows);
+    if (count == 0) {
+        return 0;
+    }
+    struct window **data = calloc(count, sizeof(struct window *));
+    ww_assert(data);
+    *windows = data;
+
+    struct window *window;
+    int i = 0;
+    wl_list_for_each (window, &compositor->windows, link) {
+        data[i++] = window;
+    };
+    return count;
+}
+
 void
-compositor_configure_window(struct window *window, int16_t w, int16_t h) {
+compositor_load_config(struct compositor *compositor, struct compositor_config config) {
+    ww_assert(compositor);
+
+    struct keyboard *keyboard;
+    wl_list_for_each (keyboard, &compositor->keyboards, link) {
+        wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, config.repeat_rate,
+                                     config.repeat_delay);
+    }
+    if (config.confine_pointer && !compositor->remote_confined_pointer) {
+        if (!compositor->active_constraint) {
+            ww_assert(!compositor->remote_locked_pointer);
+
+            compositor->remote_confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+                compositor->remote_pointer_constraints, compositor->wl_output->remote_surface,
+                compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            ww_assert(compositor->remote_confined_pointer);
+        }
+    } else if (!config.confine_pointer && compositor->remote_confined_pointer) {
+        zwp_confined_pointer_v1_destroy(compositor->remote_confined_pointer);
+        compositor->remote_confined_pointer = NULL;
+    }
+
+    ww_assert(compositor->background);
+    wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
+    compositor->config = config;
+}
+
+void
+compositor_send_keys(struct window *window, const struct compositor_key *keys, int count) {
+    ww_assert(window);
+
+    for (int i = 0; i < count; i++) {
+        xcb_key_press_event_t event = {
+            .response_type = keys[i].state ? XCB_KEY_PRESS : XCB_KEY_RELEASE,
+            .time = now_msec(),
+            .detail = keys[i].keycode + 8, // libinput keycode -> xkb keycode
+            .root = window->surface->window_id,
+            .event = window->surface->window_id,
+            .child = window->surface->window_id,
+            .same_screen = true,
+            0,
+        };
+        send_event(window->compositor->xcb, window->surface->window_id,
+                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
+    }
+}
+
+void
+compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplier) {
+    compositor->mouse_sens = multiplier;
+}
+
+void
+compositor_window_configure(struct window *window, int16_t w, int16_t h) {
     ww_assert(window);
 
     wlr_xwayland_surface_configure(window->surface, 0, 0, w, h);
 }
 
 void
-compositor_focus_window(struct compositor *compositor, struct window *window) {
+compositor_window_destroy_headless_views(struct window *window) {
+    for (int i = 0; i < window->headless_view_count; i++) {
+        wlr_scene_node_destroy(&window->headless_views[i].tree->node);
+    }
+    window->headless_view_count = 0;
+}
+
+void
+compositor_window_focus(struct compositor *compositor, struct window *window) {
     ww_assert(compositor);
 
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
@@ -1088,60 +1177,33 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
     compositor->focused_window = window;
 }
 
-int
-compositor_get_windows(struct compositor *compositor, struct window ***windows) {
-    ww_assert(compositor);
-    ww_assert(windows);
-
-    int count = wl_list_length(&compositor->windows);
-    if (count == 0) {
-        return 0;
-    }
-    struct window **data = calloc(count, sizeof(struct window *));
-    ww_assert(data);
-    *windows = data;
-
-    struct window *window;
-    int i = 0;
-    wl_list_for_each (window, &compositor->windows, link) {
-        data[i++] = window;
-    };
-    return count;
-}
-
 pid_t
-compositor_get_window_pid(struct window *window) {
+compositor_window_get_pid(struct window *window) {
     ww_assert(window);
 
     return window->surface->pid > 0 ? window->surface->pid : -1;
 }
 
+struct headless_view *
+compositor_window_make_headless_view(struct window *window) {
+    ww_assert(window);
+    ww_assert(window->headless_view_count < (int)ARRAY_LEN(window->headless_views));
+
+    struct headless_view *view = &window->headless_views[window->headless_view_count++];
+    view->tree = wlr_scene_tree_create(&window->compositor->scene->tree);
+    ww_assert(view->tree);
+    wlr_scene_node_set_enabled(&view->tree->node, true);
+    view->surface = wlr_scene_surface_create(view->tree, window->surface->surface);
+    ww_assert(view->surface);
+    wlr_scene_node_set_position(&view->tree->node, HEADLESS_X, HEADLESS_Y);
+
+    return view;
+}
+
 void
-compositor_load_config(struct compositor *compositor, struct compositor_config config) {
-    ww_assert(compositor);
-
-    struct keyboard *keyboard;
-    wl_list_for_each (keyboard, &compositor->keyboards, link) {
-        wlr_keyboard_set_repeat_info(keyboard->wlr_keyboard, config.repeat_rate,
-                                     config.repeat_delay);
-    }
-    if (config.confine_pointer && !compositor->remote_confined_pointer) {
-        if (!compositor->active_constraint) {
-            ww_assert(!compositor->remote_locked_pointer);
-
-            compositor->remote_confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-                compositor->remote_pointer_constraints, compositor->wl_output->remote_surface,
-                compositor->remote_pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            ww_assert(compositor->remote_confined_pointer);
-        }
-    } else if (!config.confine_pointer && compositor->remote_confined_pointer) {
-        zwp_confined_pointer_v1_destroy(compositor->remote_confined_pointer);
-        compositor->remote_confined_pointer = NULL;
-    }
-
-    ww_assert(compositor->background);
-    wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
-    compositor->config = config;
+compositor_window_set_dest(struct window *window, struct wlr_box box) {
+    wlr_scene_node_set_position(&window->scene_tree->node, WL_X + box.x, WL_Y + box.y);
+    wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
 }
 
 void
@@ -1172,35 +1234,4 @@ compositor_rect_toggle(struct wlr_scene_rect *rect, bool state) {
     } else {
         wlr_scene_node_set_enabled(&rect->node, false);
     }
-}
-
-void
-compositor_send_keys(struct window *window, const struct compositor_key *keys, int count) {
-    ww_assert(window);
-
-    for (int i = 0; i < count; i++) {
-        xcb_key_press_event_t event = {
-            .response_type = keys[i].state ? XCB_KEY_PRESS : XCB_KEY_RELEASE,
-            .time = now_msec(),
-            .detail = keys[i].keycode + 8, // libinput keycode -> xkb keycode
-            .root = window->surface->window_id,
-            .event = window->surface->window_id,
-            .child = window->surface->window_id,
-            .same_screen = true,
-            0,
-        };
-        send_event(window->compositor->xcb, window->surface->window_id,
-                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
-    }
-}
-
-void
-compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplier) {
-    compositor->mouse_sens = multiplier;
-}
-
-void
-compositor_set_window_render_dest(struct window *window, struct wlr_box box) {
-    wlr_scene_node_set_position(&window->scene_tree->node, WL_X + box.x, WL_Y + box.y);
-    wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
 }

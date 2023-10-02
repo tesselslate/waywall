@@ -477,15 +477,15 @@ instance_play(struct instance *instance) {
     ww_assert(instance_get_id(instance) != active_instance);
     ww_assert(instance->alive);
 
-    compositor_focus_window(compositor, instance->window);
-    compositor_configure_window(instance->window, screen_width, screen_height);
+    compositor_window_focus(compositor, instance->window);
+    compositor_window_configure(instance->window, screen_width, screen_height);
     struct wlr_box box = {
         .x = 0,
         .y = 0,
         .width = screen_width,
         .height = screen_height,
     };
-    compositor_set_window_render_dest(instance->window, box);
+    compositor_window_set_dest(instance->window, box);
 
     static const struct compositor_key unpause_keys[] = {
         {KEY_ESC, true},
@@ -573,7 +573,7 @@ static void
 wall_focus() {
     ww_assert(active_instance != WALL);
 
-    compositor_focus_window(compositor, NULL);
+    compositor_window_focus(compositor, NULL);
     active_instance = WALL;
 }
 
@@ -582,8 +582,8 @@ wall_resize_instance(struct instance *instance) {
     ww_assert(instance);
 
     struct wlr_box box = instance_get_wall_box(instance);
-    compositor_configure_window(instance->window, config->stretch_width, config->stretch_height);
-    compositor_set_window_render_dest(instance->window, box);
+    compositor_window_configure(instance->window, config->stretch_width, config->stretch_height);
+    compositor_window_set_dest(instance->window, box);
     if (instance->lock_indicator) {
         compositor_rect_configure(instance->lock_indicator, box);
     }
@@ -839,8 +839,8 @@ handle_resize(int32_t width, int32_t height) {
             .width = width,
             .height = height,
         };
-        compositor_configure_window(instances[active_instance].window, width, height);
-        compositor_set_window_render_dest(instances[active_instance].window, box);
+        compositor_window_configure(instances[active_instance].window, width, height);
+        compositor_window_set_dest(instances[active_instance].window, box);
     }
 
     for (int i = 0; i < instance_count; i++) {
@@ -869,7 +869,7 @@ handle_window(struct window *window, bool map) {
     }
 
     // Find the instance's directory.
-    pid_t pid = compositor_get_window_pid(window);
+    pid_t pid = compositor_window_get_pid(window);
     char buf[PATH_MAX], dir_path[PATH_MAX];
     if (snprintf(buf, PATH_MAX, "/proc/%d/cwd", (int)pid) >= PATH_MAX) {
         wlr_log(WLR_ERROR, "tried to readlink of path longer than 512 bytes");
