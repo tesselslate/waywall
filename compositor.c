@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <time.h>
 #include <wayland-client.h>
+#include <wlr/backend/headless.h>
+#include <wlr/backend/multi.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/render/allocator.h>
 #include <wlr/render/wlr_renderer.h>
@@ -34,6 +36,8 @@ struct compositor {
     struct wl_display *display;
     struct wlr_allocator *allocator;
     struct wlr_backend *backend;
+    struct wlr_backend *backend_wl;
+    struct wlr_backend *backend_headless;
     struct wlr_compositor *compositor;
     struct wlr_renderer *renderer;
 
@@ -60,6 +64,7 @@ struct compositor {
     struct wl_list outputs;
     struct wl_listener on_new_output;
     struct output *wl_output;
+    struct output *headless_output;
 
     struct wlr_xwayland *xwayland;
     struct xcb_connection_t *xcb;
@@ -104,6 +109,8 @@ struct output {
 
     struct compositor *compositor;
     struct wlr_output *wlr_output;
+
+    bool headless;
     struct wl_surface *remote_surface;
 
     struct wl_listener on_frame;
@@ -402,7 +409,7 @@ on_new_output(struct wl_listener *listener, void *data) {
     wlr_output_state_init(&state);
     wlr_output_state_set_enabled(&state, true);
 
-    // No modesetting is necessary since we only support Wayland.
+    // No modesetting is necessary since we only use the Wayland and headless backends.
     wlr_output_commit_state(wlr_output, &state);
     wlr_output_state_finish(&state);
 
@@ -410,7 +417,7 @@ on_new_output(struct wl_listener *listener, void *data) {
     ww_assert(output);
     output->compositor = compositor;
     output->wlr_output = wlr_output;
-    output->remote_surface = wlr_wl_output_get_surface(wlr_output);
+    output->headless = wlr_output_is_headless(wlr_output);
 
     output->on_frame.notify = on_output_frame;
     output->on_request_state.notify = on_output_request_state;
@@ -425,13 +432,21 @@ on_new_output(struct wl_listener *listener, void *data) {
     struct wlr_scene_output *scene_output = wlr_scene_output_create(compositor->scene, wlr_output);
     wlr_scene_output_layout_add_output(compositor->scene_layout, layout_output, scene_output);
 
-    ww_assert(!compositor->wl_output);
-    compositor->wl_output = output;
-    compositor->background =
-        wlr_scene_rect_create(&compositor->scene->tree, 16384, 16384,
-                              (const float *)&compositor->config.background_color);
-    ww_assert(compositor->background);
-    wlr_scene_node_lower_to_bottom(&compositor->background->node);
+    if (!output->headless) {
+        output->remote_surface = wlr_wl_output_get_surface(wlr_output);
+
+        ww_assert(!compositor->wl_output);
+        compositor->wl_output = output;
+
+        compositor->background =
+            wlr_scene_rect_create(&compositor->scene->tree, 16384, 16384,
+                                  (const float *)&compositor->config.background_color);
+        ww_assert(compositor->background);
+        wlr_scene_node_lower_to_bottom(&compositor->background->node);
+    } else {
+        ww_assert(!compositor->headless_output);
+        compositor->headless_output = output;
+    }
 }
 
 static void
@@ -740,12 +755,18 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
         goto fail_display;
     }
 
-    compositor->backend = wlr_wl_backend_create(compositor->display, NULL);
-    if (!compositor->backend) {
-        wlr_log(WLR_ERROR, "failed to create wlr_backend");
-        goto fail_backend;
+    compositor->backend_headless = wlr_headless_backend_create(compositor->display);
+    if (!compositor->backend_headless) {
+        wlr_log(WLR_ERROR, "failed to create headless backend");
+        goto fail_backend_headless;
     }
-    compositor->remote_display = wlr_wl_backend_get_remote_display(compositor->backend);
+
+    compositor->backend_wl = wlr_wl_backend_create(compositor->display, NULL);
+    if (!compositor->backend_wl) {
+        wlr_log(WLR_ERROR, "failed to create wayland backend");
+        goto fail_backend_wl;
+    }
+    compositor->remote_display = wlr_wl_backend_get_remote_display(compositor->backend_wl);
     ww_assert(compositor->remote_display);
     struct wl_registry *remote_registry = wl_display_get_registry(compositor->remote_display);
     wl_registry_add_listener(remote_registry, &registry_listener, compositor);
@@ -767,7 +788,18 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
     ww_assert(compositor->remote_relative_pointer);
     zwp_relative_pointer_v1_add_listener(compositor->remote_relative_pointer,
                                          &relative_pointer_listener, compositor);
-    wlr_wl_output_create(compositor->backend);
+    wlr_wl_output_create(compositor->backend_wl);
+
+    compositor->backend = wlr_multi_backend_create(compositor->display);
+    ww_assert(compositor->backend);
+    if (!wlr_multi_backend_add(compositor->backend, compositor->backend_wl)) {
+        wlr_log(WLR_ERROR, "failed to add wl backend to multi backend");
+        goto fail_backend_multi;
+    }
+    if (!wlr_multi_backend_add(compositor->backend, compositor->backend_headless)) {
+        wlr_log(WLR_ERROR, "failed to add headless backend to multi backend");
+        goto fail_backend_multi;
+    }
 
     compositor->renderer = wlr_renderer_autocreate(compositor->backend);
     if (!compositor->renderer) {
@@ -865,6 +897,7 @@ fail_compositor:
 fail_allocator:
     wlr_renderer_destroy(compositor->renderer);
 
+fail_backend_multi:
 fail_renderer:
     zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
 
@@ -883,7 +916,10 @@ fail_registry:
     }
     wlr_backend_destroy(compositor->backend);
 
-fail_backend:
+fail_backend_wl:
+    wlr_backend_destroy(compositor->backend_headless);
+
+fail_backend_headless:
     wl_display_destroy(compositor->display);
 
 fail_display:
