@@ -599,10 +599,10 @@ process_bind(struct keybind *keybind, bool held) {
             }
             break;
         case ACTION_WALL_FOCUS_RESET:
-            if (hovered) {
+            if (hovered && (hovered->state.screen == INWORLD)) {
                 bool hovered_id = instance_get_id(hovered);
                 for (int i = 0; i < instance_count; i++) {
-                    if (i != hovered_id && instances[i].alive && instances[i].locked) {
+                    if (i != hovered_id && instances[i].alive && !instances[i].locked) {
                         instance_reset(&instances[i]);
                     }
                 }
