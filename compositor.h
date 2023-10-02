@@ -110,6 +110,9 @@ void compositor_rect_toggle(struct wlr_scene_rect *, bool);
 // Sends a sequence of keyboard inputs to the given `window`.
 void compositor_send_keys(struct window *window, const struct compositor_key *keys, int count);
 
+// Sets the mouse sensitivity.
+void compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplier);
+
 // Sets the location and size of the window on the output.
 void compositor_set_window_render_dest(struct window *window, struct wlr_box);
 

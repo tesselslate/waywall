@@ -2,7 +2,7 @@
 repeat_delay = 300
 repeat_rate = 40
 confine_pointer = false
-# TODO: sensitivities
+main_sens = 1.0
 # TODO: language
 
 [appearance]

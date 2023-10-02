@@ -143,6 +143,17 @@ parse_color(float value[4], toml_table_t *table, const char *value_name, const c
 }
 
 static bool
+parse_double(double *value, toml_table_t *table, const char *value_name, const char *full_name) {
+    toml_datum_t datum = toml_double_in(table, value_name);
+    if (!datum.ok) {
+        wlr_log(WLR_ERROR, "config: missing double value '%s'", full_name);
+        return false;
+    }
+    *value = datum.u.d;
+    return true;
+}
+
+static bool
 parse_int(int *value, toml_table_t *table, const char *value_name, const char *full_name) {
     toml_datum_t datum = toml_int_in(table, value_name);
     if (!datum.ok) {
@@ -174,6 +185,13 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
 #define PARSE_COLOR(table, name)                                                                   \
     do {                                                                                           \
         if (!parse_color(config->name, table, STR(name), STR(table) "." STR(name))) {              \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+    } while (0)
+
+#define PARSE_DOUBLE(table, name)                                                                  \
+    do {                                                                                           \
+        if (!parse_double(&config->name, table, STR(name), STR(table) "." STR(name))) {            \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
@@ -235,6 +253,19 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
         }                                                                                          \
     } while (0)
 
+#define CHECK_MIN_MAX_DOUBLE(table, name, min, max)                                                \
+    do {                                                                                           \
+        if ((config->name) < min) {                                                                \
+            wlr_log(WLR_ERROR, "config: double value '%s' below minimum (%lf < %s)",               \
+                    STR(table) "." STR(name), (config->name), STR(min));                           \
+            goto fail_read;                                                                        \
+        } else if ((config->name) > max) {                                                         \
+            wlr_log(WLR_ERROR, "config: double value '%s' above maximum (%lf > %s)",               \
+                    STR(table) "." STR(name), (config->name), STR(max));                           \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+    } while (0)
+
 struct config *
 config_read() {
     char *path = config_get_path();
@@ -270,6 +301,8 @@ config_read() {
     PARSE_INT(input, repeat_rate);
     CHECK_MIN_MAX(input, repeat_rate, 1, 100);
     PARSE_BOOL(input, confine_pointer);
+    PARSE_DOUBLE(input, main_sens);
+    CHECK_MIN_MAX_DOUBLE(input, main_sens, 0.01, 10.0);
 
     // appearance
     toml_table_t *appearance = toml_table_in(conf, "appearance");

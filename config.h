@@ -50,7 +50,7 @@ struct config {
     int repeat_delay;
     int repeat_rate;
     bool confine_pointer;
-    // TODO: main sens, alt sens
+    double main_sens;
     // TODO: alternative languages
 
     // appearance

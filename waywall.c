@@ -156,6 +156,8 @@ config_update() {
         }
     }
     handle_resize(screen_width, screen_height);
+    // TODO: Handle alt sensitivity
+    compositor_set_mouse_sensitivity(compositor, config->main_sens);
 
     wlr_log(WLR_INFO, "applied new config");
 }
@@ -999,6 +1001,7 @@ main() {
     compositor = compositor_create(vtable, create_compositor_config());
     ww_assert(compositor);
     event_loop = compositor_get_loop(compositor);
+    compositor_set_mouse_sensitivity(compositor, config->main_sens);
 
     struct wl_event_source *event_sigint =
         wl_event_loop_add_signal(event_loop, SIGINT, handle_signal, NULL);

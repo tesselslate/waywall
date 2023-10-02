@@ -43,6 +43,7 @@ struct compositor {
 
     struct wlr_cursor *cursor;
     struct wlr_xcursor_manager *cursor_manager;
+    double mouse_sens;
     struct wl_listener on_cursor_motion;
     struct wl_listener on_cursor_motion_absolute;
     struct wl_listener on_cursor_button;
@@ -234,7 +235,8 @@ on_relative_pointer_motion(void *data, struct zwp_relative_pointer_v1 *relative_
     uint64_t time = (uint64_t)utime_hi * 0xFFFFFFFF + (uint64_t)utime_lo;
     wlr_relative_pointer_manager_v1_send_relative_motion(
         compositor->relative_pointer, compositor->seat, time, wl_fixed_to_double(dx),
-        wl_fixed_to_double(dy), wl_fixed_to_double(dx_unaccel), wl_fixed_to_double(dy_unaccel));
+        wl_fixed_to_double(dy), wl_fixed_to_double(dx_unaccel) * compositor->mouse_sens,
+        wl_fixed_to_double(dy_unaccel) * compositor->mouse_sens);
 }
 
 static struct zwp_relative_pointer_v1_listener relative_pointer_listener = {
@@ -800,6 +802,7 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
         wlr_scene_attach_output_layout(compositor->scene, compositor->output_layout);
     ww_assert(compositor->scene_layout);
 
+    compositor->mouse_sens = 1.0;
     compositor->cursor = wlr_cursor_create();
     ww_assert(compositor->cursor);
     compositor->pointer_constraints = wlr_pointer_constraints_v1_create(compositor->display);
@@ -1129,6 +1132,11 @@ compositor_send_keys(struct window *window, const struct compositor_key *keys, i
         send_event(window->compositor->xcb, window->surface->window_id,
                    XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
     }
+}
+
+void
+compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplier) {
+    compositor->mouse_sens = multiplier;
 }
 
 void
