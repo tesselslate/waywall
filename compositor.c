@@ -294,11 +294,6 @@ on_cursor_motion(struct wl_listener *listener, void *data) {
         .time_msec = wlr_event->time_msec,
     };
     compositor->vtable.motion(event);
-
-    if (!compositor->focused_window) {
-        // TODO: get cursor working on minecraft title screen
-        wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
-    }
 }
 
 static void
@@ -856,6 +851,7 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
     compositor->cursor_manager =
         wlr_xcursor_manager_create(compositor->config.cursor_theme, compositor->config.cursor_size);
     ww_assert(compositor->cursor_manager);
+    wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
 
     compositor->on_cursor_axis.notify = on_cursor_axis;
     compositor->on_cursor_button.notify = on_cursor_button;
@@ -1040,6 +1036,7 @@ compositor_focus_window(struct compositor *compositor, struct window *window) {
     ww_assert(compositor);
 
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
+    wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
 
     if (window) {
         wlr_xwayland_set_seat(compositor->xwayland, compositor->seat);
