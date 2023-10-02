@@ -84,6 +84,7 @@ struct compositor {
 
     struct compositor_config config;
     struct compositor_vtable vtable;
+    bool stopped;
 };
 
 struct keyboard {
@@ -490,6 +491,10 @@ static void
 handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v1 *constraint) {
     // Since all we care about is Minecraft, we can assume that all constraints keep the pointer
     // at the center of the screen.
+    if (compositor->stopped) {
+        // TODO: Figure out how to not UAF in this function during shutdown
+        return;
+    }
     if (compositor->active_constraint == constraint) {
         return;
     }
@@ -886,6 +891,7 @@ fail_display:
 void
 compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
+    compositor->stopped = true;
 
     zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
     zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager);
