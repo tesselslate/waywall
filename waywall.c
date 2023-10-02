@@ -612,8 +612,21 @@ process_bind(struct keybind *keybind, bool held) {
             break;
         case ACTION_INGAME_RESET:
             instance_reset(&instances[active_instance]);
-            write_reset_count();
+            if (config->wall_bypass) {
+                for (int i = 0; i < instance_count; i++) {
+                    if (i == active_instance) {
+                        continue;
+                    }
+                    struct instance *inst = &instances[i];
+                    if (inst->alive && inst->locked && inst->state.screen == INWORLD) {
+                        instance_play(inst);
+                        write_reset_count();
+                        return;
+                    }
+                }
+            }
             wall_focus();
+            write_reset_count();
             break;
         }
     }

@@ -69,7 +69,7 @@ struct config {
     enum unlock_behavior unlock_behavior;
     bool count_resets;
     char *resets_file;
-    // TODO: bool wall_bypass;
+    bool wall_bypass;
     // TODO: int grace_period;
 
     // keybinds

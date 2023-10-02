@@ -24,7 +24,7 @@ use_f1 = false
 unlock_behavior = "reset" # ignore, unlock, reset
 count_resets = false
 resets_file = "/home/user/resets.txt"
-# TODO: wall bypass
+wall_bypass = false
 # TODO: grace period
 
 [keybinds]

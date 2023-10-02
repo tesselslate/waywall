@@ -311,6 +311,7 @@ config_read() {
     if (config->count_resets) {
         PARSE_STRING(reset, resets_file);
     }
+    PARSE_BOOL(reset, wall_bypass);
 
     // keybinds
     toml_table_t *keybinds = toml_table_in(conf, "keybinds");
