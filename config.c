@@ -307,6 +307,10 @@ config_read() {
                    {"remain_locked", UNLOCK_IGNORE},
                    {"reset", UNLOCK_RESET},
                });
+    PARSE_BOOL(reset, count_resets);
+    if (config->count_resets) {
+        PARSE_STRING(reset, resets_file);
+    }
 
     // keybinds
     toml_table_t *keybinds = toml_table_in(conf, "keybinds");
@@ -458,5 +462,8 @@ fail_file:
 
 void
 config_destroy(struct config *config) {
+    if (config->resets_file) {
+        free(config->resets_file);
+    }
     free(config);
 }

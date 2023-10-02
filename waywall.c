@@ -77,8 +77,13 @@ static struct {
     struct keybind *bind;
 } last_held;
 
+static uint64_t reset_count;
+static int reset_count_fd = INT_MIN;
+
 static void config_update();
 static struct compositor_config create_compositor_config();
+static bool prepare_reset_counter();
+static void write_reset_count();
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
 static bool instance_get_info(struct instance *);
@@ -107,6 +112,28 @@ config_update() {
     if (!new_config) {
         return;
     }
+
+    if (new_config->count_resets) {
+        ww_assert(new_config->resets_file);
+
+        // TODO: Try handling this? Even though it's annoying
+        if (!config->resets_file || strcmp(config->resets_file, new_config->resets_file) != 0) {
+            wlr_log(
+                WLR_ERROR,
+                "updating the reset counter file will not take effect until waywall is restarted");
+        }
+        if (!config->count_resets) {
+            wlr_log(WLR_ERROR,
+                    "enabling the reset counter will not take effect until waywall is restarted");
+        }
+    } else {
+        if (reset_count_fd >= 0) {
+            wlr_log(WLR_INFO, "disabling reset counting (stopping at %" PRIu64 " resets)",
+                    reset_count);
+            close(reset_count_fd);
+            reset_count_fd = INT_MIN;
+        }
+    }
     config_destroy(config);
     config = new_config;
 
@@ -130,6 +157,58 @@ create_compositor_config() {
     };
     memcpy(compositor_config.background_color, config->background_color, sizeof(float) * 4);
     return compositor_config;
+}
+
+static bool
+prepare_reset_counter() {
+    if (!config->count_resets) {
+        return true;
+    }
+
+    ww_assert(config->resets_file);
+    reset_count_fd = open(config->resets_file, O_CREAT | O_RDWR, 0644);
+    if (reset_count_fd == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to open reset counter");
+        return false;
+    }
+    char buf[64];
+    ssize_t len = read(reset_count_fd, buf, STRING_LEN(buf));
+    if (len == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to read reset counter");
+        return false;
+    }
+    if (len == 0) {
+        reset_count = 0;
+        return true;
+    }
+    buf[len] = '\0';
+    char *endptr;
+    int64_t count = strtoll(buf, &endptr, 10);
+    if (endptr == buf) {
+        wlr_log(WLR_ERROR, "failed to parse existing reset count ('%s')", buf);
+        return false;
+    }
+    wlr_log(WLR_INFO, "read reset count of %" PRIi64, count);
+    reset_count = count;
+    return true;
+}
+
+static void
+write_reset_count() {
+    if (reset_count_fd < 0) {
+        return;
+    }
+
+    if (lseek(reset_count_fd, 0, SEEK_SET) == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to seek reset count");
+        return;
+    }
+    char buf[64];
+    int written = snprintf(buf, ARRAY_LEN(buf), "%" PRIu64 "\n", reset_count);
+    ssize_t n = write(reset_count_fd, buf, written);
+    if (n != written) {
+        wlr_log_errno(WLR_ERROR, "failed to write reset count");
+    }
 }
 
 static struct instance *
@@ -212,8 +291,8 @@ instance_get_info(struct instance *instance) {
                 return false;
             }
 
-            // NOTE: This is a bit of a weird method, but I think it's better than a list of hashes
-            // or annoying version comparisons (and JSON parsing.)
+            // NOTE: This is a bit of a weird method, but I think it's better than a list of
+            // hashes or annoying version comparisons (and JSON parsing.)
             if (strcmp(stat.name, "me/voidxwalker/autoreset/") == 0) {
                 has_atum = true;
                 break;
@@ -455,6 +534,7 @@ instance_reset(struct instance *instance) {
     };
     compositor_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
 
+    reset_count++;
     return true;
 }
 
@@ -499,10 +579,13 @@ process_bind(struct keybind *keybind, bool held) {
                     instance_reset(&instances[i]);
                 }
             }
+            write_reset_count();
             break;
         case ACTION_WALL_RESET_ONE:
             if (hovered && !hovered->locked) {
-                instance_reset(hovered);
+                if (instance_reset(hovered)) {
+                    write_reset_count();
+                }
             }
             break;
         case ACTION_WALL_PLAY:
@@ -522,12 +605,14 @@ process_bind(struct keybind *keybind, bool held) {
                     if (i != hovered_id && instances[i].alive && instances[i].locked) {
                         instance_reset(&instances[i]);
                     }
-                    instance_play(hovered);
                 }
+                instance_play(hovered);
+                write_reset_count();
             }
             break;
         case ACTION_INGAME_RESET:
             instance_reset(&instances[active_instance]);
+            write_reset_count();
             wall_focus();
             break;
         }
@@ -671,8 +756,8 @@ handle_motion(struct compositor_motion_event event) {
         return;
     }
 
-    // Mouse binds take effect if the user drags the cursor across several instances, but keyboard
-    // binds do not.
+    // Mouse binds take effect if the user drags the cursor across several instances, but
+    // keyboard binds do not.
     if (held_buttons_count == 0) {
         return;
     }
@@ -841,6 +926,9 @@ main() {
     if (!config) {
         return 1;
     }
+    if (!prepare_reset_counter()) {
+        return 1;
+    }
 
     inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (inotify_fd == -1) {
@@ -879,6 +967,11 @@ main() {
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
     compositor_run(compositor);
+
+    if (reset_count_fd > 0) {
+        write_reset_count();
+        wlr_log(WLR_INFO, "finished with reset count of %" PRIu64, reset_count);
+    }
 
     wl_event_source_remove(event_sigint);
     wl_event_source_remove(event_sigterm);

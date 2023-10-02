@@ -67,7 +67,8 @@ struct config {
 
     // reset options
     enum unlock_behavior unlock_behavior;
-    // TODO: char *reset_count_path;
+    bool count_resets;
+    char *resets_file;
     // TODO: bool wall_bypass;
     // TODO: int grace_period;
 
