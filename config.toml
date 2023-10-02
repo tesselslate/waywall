@@ -21,7 +21,7 @@ stretch_height = 360
 use_f1 = false
 
 [reset]
-unlock_behavior = "reset" # ignore, unlock, reset
+unlock_behavior = "reset" # unlock, remain_locked, reset
 count_resets = false
 resets_file = "/home/user/resets.txt"
 wall_bypass = false
