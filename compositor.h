@@ -60,59 +60,71 @@ struct compositor_vtable {
 };
 
 // Attempts to create a new compositor. Returns NULL on failure.
-struct compositor *compositor_create(struct compositor_vtable vtable,
-                                     struct compositor_config config);
+struct compositor *compositor_create(struct compositor_vtable, struct compositor_config);
 
 // Releases resources associated with `compositor`.
-void compositor_destroy(struct compositor *compositor);
+void compositor_destroy(struct compositor *);
 
 // Returns the internal event loop of `compositor`, to which various callbacks can be added.
-struct wl_event_loop *compositor_get_loop(struct compositor *compositor);
+struct wl_event_loop *compositor_get_loop(struct compositor *);
 
 // Runs the compositor event loop. Returns true on success, false on failure.
-bool compositor_run(struct compositor *compositor);
+bool compositor_run(struct compositor *);
 
 // Stops the compositor event loop.
-void compositor_stop(struct compositor *compositor);
+void compositor_stop(struct compositor *);
 
 // Clicks the given window.
-void compositor_click(struct window *window);
+void compositor_click(struct window *);
 
 // Returns the number of existing windows. If there are more than 0 windows, a buffer is allocated
 // and placed in the user-provided `windows` pointer. The caller must free the buffer.
-int compositor_get_windows(struct compositor *compositor, struct window ***windows);
+int compositor_get_windows(struct compositor *, struct window ***);
 
 // Updates user-defined settings for the compositor.
-void compositor_load_config(struct compositor *compositor, struct compositor_config config);
+void compositor_load_config(struct compositor *, struct compositor_config);
 
 // Sends a sequence of keyboard inputs to the given `window`.
-void compositor_send_keys(struct window *window, const struct compositor_key *keys, int count);
+void compositor_send_keys(struct window *, const struct compositor_key *, int);
 
 // Sets the mouse sensitivity.
-void compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplier);
+void compositor_set_mouse_sensitivity(struct compositor *, double);
 
 /*
    WINDOWS
  */
 
 // Configures the given window to the given position and size.
-void compositor_window_configure(struct window *window, int16_t w, int16_t h);
+void compositor_window_configure(struct window *, int16_t, int16_t);
 
 // Destroys all headless views for the given window.
 void compositor_window_destroy_headless_views(struct window *);
 
 // Transfers input focus to the given window. If `window` is NULL, input focus is removed from
 // whichever window currently has it (if any).
-void compositor_window_focus(struct compositor *compositor, struct window *window);
+void compositor_window_focus(struct compositor *, struct window *);
 
 // Attempts to get the process ID of the given `window`. Returns -1 on failure.
-pid_t compositor_window_get_pid(struct window *window);
+pid_t compositor_window_get_pid(struct window *);
 
 // Creates a new headless view for the given window.
 struct headless_view *compositor_window_make_headless_view(struct window *);
 
 // Sets the location and size of the window on the output.
-void compositor_window_set_dest(struct window *window, struct wlr_box);
+void compositor_window_set_dest(struct window *, struct wlr_box);
+
+/*
+   HEADLESS VIEWS
+ */
+
+// Configures a headless view's size and position on the output.
+void compositor_hview_set_dest(struct headless_view *, struct wlr_box);
+
+// Configures the portion of the window which is captured by the headless view.
+void compositor_hview_set_src(struct headless_view *, struct wlr_box);
+
+// Moves this headless view to the top of the stack.
+void compositor_hview_set_top(struct headless_view*);
 
 /*
  * RECTANGLES

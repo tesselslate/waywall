@@ -1207,6 +1207,28 @@ compositor_window_set_dest(struct window *window, struct wlr_box box) {
 }
 
 void
+compositor_hview_set_dest(struct headless_view *view, struct wlr_box box) {
+    wlr_scene_node_set_position(&view->tree->node, HEADLESS_X + box.x, HEADLESS_Y + box.y);
+    wlr_scene_buffer_set_dest_size(view->surface->buffer, box.width, box.height);
+}
+
+void
+compositor_hview_set_src(struct headless_view *view, struct wlr_box box) {
+    const struct wlr_fbox fbox = {
+        .x = box.x,
+        .y = box.y,
+        .width = box.width,
+        .height = box.height,
+    };
+    wlr_scene_buffer_set_source_box(view->surface->buffer, &fbox);
+}
+
+void
+compositor_hview_set_top(struct headless_view *view) {
+    wlr_scene_node_raise_to_top(&view->tree->node);
+}
+
+void
 compositor_rect_configure(struct wlr_scene_rect *rect, struct wlr_box box) {
     wlr_scene_node_set_position(&rect->node, WL_X + box.x, WL_Y + box.y);
     wlr_scene_rect_set_size(rect, box.width, box.height);
