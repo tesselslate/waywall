@@ -52,6 +52,7 @@ static struct instance {
     int wd;
     int fd;
     struct state state;
+    struct timespec last_preview;
 
     bool alive, locked;
     bool has_stateout, has_wp;
@@ -496,6 +497,19 @@ instance_reset(struct instance *instance) {
         return false;
     }
 
+    // Do not allow resets in grace period.
+    if (instance->state.screen != INWORLD && config->grace_period > 0) {
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+
+        uint64_t preview_msec =
+            instance->last_preview.tv_sec * 1000 + instance->last_preview.tv_nsec / 1000000;
+        uint64_t now_msec = now.tv_sec * 1000 + instance->last_preview.tv_nsec / 1000000;
+        if (now_msec - preview_msec < (uint64_t)config->grace_period) {
+            return false;
+        }
+    }
+
     // If the instance is still on the title screen, send a fake mouse click. This is necessary
     // because Atum refuses to reset until the window has been clicked once for some reason.
     if (instance->state.screen == TITLE) {
@@ -672,6 +686,7 @@ process_state(struct instance *instance) {
         } else if (strcmp(a, "previewing") == 0) {
             if (last_state.screen != PREVIEWING) {
                 instance_pause(instance);
+                clock_gettime(CLOCK_MONOTONIC, &instance->last_preview);
             }
             instance->state.screen = PREVIEWING;
             instance->state.data.percent = atoi(b);

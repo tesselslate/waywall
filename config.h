@@ -70,7 +70,7 @@ struct config {
     bool count_resets;
     char *resets_file;
     bool wall_bypass;
-    // TODO: int grace_period;
+    int grace_period;
 
     // keybinds
     struct keybind binds[MAX_BINDS];

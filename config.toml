@@ -25,7 +25,7 @@ unlock_behavior = "reset" # ignore, unlock, reset
 count_resets = false
 resets_file = "/home/user/resets.txt"
 wall_bypass = false
-# TODO: grace period
+grace_period = 100
 
 [keybinds]
 "Ctrl-Shift-D"      = ["wall_reset_all", "ingame_reset"]

@@ -313,6 +313,8 @@ config_read() {
         PARSE_STRING(reset, resets_file);
     }
     PARSE_BOOL(reset, wall_bypass);
+    PARSE_INT(reset, grace_period);
+    CHECK_MIN_MAX(reset, grace_period, 0, 60000);
 
     // keybinds
     toml_table_t *keybinds = toml_table_in(conf, "keybinds");
