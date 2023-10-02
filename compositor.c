@@ -16,6 +16,7 @@
 #include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
+#include <wlr/types/wlr_export_dmabuf_v1.h>
 #include <wlr/types/wlr_output.h>
 #include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_pointer_constraints_v1.h>
@@ -40,6 +41,7 @@ struct compositor {
     struct wlr_backend *backend_headless;
     struct wlr_compositor *compositor;
     struct wlr_renderer *renderer;
+    struct wlr_export_dmabuf_manager_v1 *dmabuf_export;
 
     struct wlr_scene *scene;
     struct wlr_scene_output_layout *scene_layout;
@@ -821,6 +823,12 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
     }
     ww_assert(wlr_subcompositor_create(compositor->display));
     ww_assert(wlr_data_device_manager_create(compositor->display));
+
+    compositor->dmabuf_export = wlr_export_dmabuf_manager_v1_create(compositor->display);
+    if (!compositor->dmabuf_export) {
+        wlr_log(WLR_ERROR, "failed to create dmabuf_export_manager");
+        goto fail_compositor;
+    }
 
     compositor->output_layout = wlr_output_layout_create();
     ww_assert(compositor->output_layout);
