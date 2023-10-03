@@ -17,6 +17,7 @@
 // TODO: handle ninjabrain bot
 // TODO: handle fullscreen
 // TODO: handle extra instances
+// TODO: watch instance options.txt for changes in important values
 
 #define WALL -1
 
@@ -60,8 +61,10 @@ static struct instance {
         uint8_t preview;
         uint8_t fullscreen;
     } hotkeys;
+    int gui_scale;
 
     struct wlr_scene_rect *lock_indicator;
+    struct headless_view *hview_inst, *hview_wp;
 } instances[128];
 static int instance_count;
 static int active_instance = WALL;
@@ -92,6 +95,7 @@ static void instance_lock(struct instance *);
 static void instance_pause(struct instance *);
 static void instance_play(struct instance *);
 static bool instance_reset(struct instance *);
+static void instance_update_verification(struct instance *);
 static void wall_focus();
 static void wall_resize_instance(struct instance *);
 static void process_bind(struct keybind *, bool);
@@ -152,6 +156,9 @@ config_update() {
     for (unsigned long i = 0; i < ARRAY_LEN(instances); i++) {
         if (instances[i].lock_indicator) {
             compositor_rect_set_color(instances[i].lock_indicator, config->lock_color);
+        }
+        if (instances[i].alive) {
+            instance_update_verification(&instances[i]);
         }
     }
     handle_resize(screen_width, screen_height);
@@ -354,6 +361,7 @@ instance_get_info(struct instance *instance) {
         const char atum[] = "key_Create New World:";
         const char wp[] = "key_Leave Preview:";
         const char fullscreen[] = "key_key.fullscreen:";
+        const char gui_scale[] = "guiScale:";
 
         uint8_t *keycode;
         char *end = strrchr(line, '\n');
@@ -391,6 +399,15 @@ instance_get_info(struct instance *instance) {
                         "unknown fullscreen hotkey '%s' in '%s': setting to default of F11", key,
                         buf);
                 instance->hotkeys.fullscreen = KEY_F11 + 8;
+            }
+        } else if (strncmp(line, gui_scale, STRING_LEN(gui_scale)) == 0) {
+            const char *scale = line + STRING_LEN(gui_scale);
+            char *endptr;
+            instance->gui_scale = strtol(scale, &endptr, 10);
+            if (endptr == scale) {
+                wlr_log(WLR_ERROR, "failed to parse GUI scale ('%s')", scale);
+                fclose(file);
+                return false;
             }
         }
     }
@@ -567,6 +584,44 @@ instance_reset(struct instance *instance) {
 
     reset_count++;
     return true;
+}
+
+static void
+instance_update_verification(struct instance *instance) {
+    ww_assert(instance->hview_inst && instance->hview_wp);
+
+    // TODO: Make generation more robust for weird sizes
+
+    // Copied from Julti
+    // TODO: Handle unicode font changing GUI scale
+    int i = 1;
+    while (i != instance->gui_scale && i < config->stretch_width && i < config->stretch_height &&
+           (config->stretch_width / (i + 1)) >= 320 && (config->stretch_height / (i + 1)) >= 240) {
+        i++;
+    }
+    int square_size = i * 90;
+    int extra_height = i * 19;
+
+    // Calculate position on verification output.
+    int id = instance_get_id(instance);
+    int w = HEADLESS_WIDTH / config->wall_width, h = HEADLESS_HEIGHT / config->wall_height;
+    int x = (id % config->wall_width) * w, y = (id / config->wall_width) * h;
+
+    // Whole instance capture
+    compositor_hview_set_src(instance->hview_inst,
+                             (struct wlr_box){0, 0, config->stretch_width, config->stretch_height});
+    compositor_hview_set_dest(instance->hview_inst, (struct wlr_box){x, y, w, h});
+
+    // Loading square capture
+    compositor_hview_set_src(
+        instance->hview_wp,
+        (struct wlr_box){.x = 0,
+                         .y = config->stretch_height - (square_size + extra_height),
+                         .width = square_size,
+                         .height = square_size + extra_height});
+    compositor_hview_set_dest(instance->hview_wp,
+                              (struct wlr_box){x, y - h, square_size, square_size + extra_height});
+    compositor_hview_set_top(instance->hview_wp);
 }
 
 static void
@@ -910,10 +965,15 @@ handle_window(struct window *window, bool map) {
     instance.window = window;
     instance.state.screen = TITLE;
 
+    // Create the headless views for this instance's verification recording.
+    instance.hview_inst = compositor_window_make_headless_view(instance.window);
+    instance.hview_wp = compositor_window_make_headless_view(instance.window);
+
     int id = instance_count;
     instances[instance_count++] = instance;
     wlr_log(WLR_INFO, "created instance %d (%s)", instance_count, instance.dir);
     wall_resize_instance(&instances[id]);
+    instance_update_verification(&instances[id]);
     return false;
 }
 
