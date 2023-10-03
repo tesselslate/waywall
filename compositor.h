@@ -7,6 +7,9 @@
 #include <wlr/util/box.h>
 #include <xkbcommon/xkbcommon.h>
 
+#define HEADLESS_WIDTH 1920
+#define HEADLESS_HEIGHT 1080
+
 struct compositor;
 struct window;
 struct wlr_scene_rect;

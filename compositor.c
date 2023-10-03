@@ -7,6 +7,7 @@
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 #include <wayland-client.h>
 #include <wlr/backend/headless.h>
 #include <wlr/backend/multi.h>
@@ -29,8 +30,6 @@
 #include <xcb/xproto.h>
 #include <xkbcommon/xkbcommon.h>
 
-#define HEADLESS_WIDTH 1920
-#define HEADLESS_HEIGHT 1080
 #define WL_X 0
 #define WL_Y 0
 #define HEADLESS_X 16384
@@ -1008,6 +1007,17 @@ compositor_run(struct compositor *compositor) {
     }
     setenv("WAYLAND_DISPLAY", socket, true);
     setenv("DISPLAY", compositor->xwayland->display_name, true);
+    FILE *file = fopen("/tmp/waywall-display", "w");
+    size_t len = strlen(socket);
+    if (fwrite(socket, 1, len, file) != len) {
+        wlr_log_errno(WLR_ERROR, "failed to write waywall display");
+        fclose(file);
+        return false;
+    }
+    fclose(file);
+    if (truncate("/tmp/waywall-display", len) == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to truncate waywall display");
+    }
 
     wl_display_run(compositor->display);
     return true;
