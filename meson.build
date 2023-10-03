@@ -30,6 +30,7 @@ if not wlroots_subproject.get_variable('features').get('xwayland')
   error('wlroots xwayland is required')
 endif
 
+obs = dependency('libobs')
 toml = subproject('tomlc99').get_variable('toml')
 wayland_client = dependency('wayland-client')
 wayland_server = dependency('wayland-server')
@@ -81,5 +82,27 @@ executable('waywall',
     xcb,
     xkbcommon,
     zip,
+  ],
+)
+
+dmabuf_export_header = custom_target(
+  'dmabuf-export-header',
+  input : 'wlr-export-dmabuf-unstable-v1.xml',
+  output : 'wlr-export-dmabuf-unstable-v1-protocol.h',
+  command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
+)
+dmabuf_export_src = custom_target(
+  'dmabuf-export-src',
+  input : 'wlr-export-dmabuf-unstable-v1.xml',
+  output : 'wlr-export-dmabuf-unstable-v1-protocol.c',
+  command : [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
+)
+
+shared_library('waywall-obs',
+  'waywall-obs.c',
+  dmabuf_export_src, dmabuf_export_header,
+  dependencies : [
+    obs,
+    wayland_client,
   ],
 )
