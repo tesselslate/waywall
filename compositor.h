@@ -43,7 +43,7 @@ typedef bool (*compositor_key_func_t)(struct compositor_key_event event);
 typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
 typedef void (*compositor_motion_func_t)(struct compositor_motion_event event);
 typedef void (*compositor_resize_func_t)(int32_t width, int32_t height);
-typedef bool (*compositor_window_func_t)(struct window *window, bool map);
+typedef void (*compositor_window_func_t)(struct window *window, bool map);
 
 struct compositor_config {
     int repeat_rate, repeat_delay;

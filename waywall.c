@@ -105,7 +105,7 @@ static bool handle_key(struct compositor_key_event);
 static void handle_modifiers(uint32_t);
 static void handle_motion(struct compositor_motion_event);
 static void handle_resize(int32_t, int32_t);
-static bool handle_window(struct window *, bool);
+static void handle_window(struct window *, bool);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
 
@@ -905,7 +905,7 @@ handle_resize(int32_t width, int32_t height) {
     }
 }
 
-static bool
+static void
 handle_window(struct window *window, bool map) {
     // TODO: some way to kill the window if we don't want it
 
@@ -917,10 +917,10 @@ handle_window(struct window *window, bool map) {
                 wlr_log(WLR_ERROR, "instance %d died", i);
                 instances[i].alive = false;
                 instances[i].window = NULL;
-                return false;
+                return;
             }
         }
-        return false;
+        return;
     }
 
     // Find the instance's directory.
@@ -928,7 +928,7 @@ handle_window(struct window *window, bool map) {
     char buf[PATH_MAX], dir_path[PATH_MAX];
     if (snprintf(buf, PATH_MAX, "/proc/%d/cwd", (int)pid) >= PATH_MAX) {
         wlr_log(WLR_ERROR, "tried to readlink of path longer than 512 bytes");
-        return false;
+        return;
     }
     ssize_t len = readlink(buf, dir_path, PATH_MAX - 1);
     dir_path[len] = '\0';
@@ -939,7 +939,7 @@ handle_window(struct window *window, bool map) {
     instance.dir = strdup(dir_path);
     if (!instance_get_info(&instance)) {
         free((void *)instance.dir);
-        return false;
+        return;
     }
 
     // Open the correct file for reading the instance's state.
@@ -949,18 +949,18 @@ handle_window(struct window *window, bool map) {
     size_t limit = PATH_MAX - len - 1;
     if (limit < strlen(state_name)) {
         wlr_log(WLR_ERROR, "instance path too long");
-        return false;
+        return;
     }
     strcat(dir_path, state_name);
     instance.fd = open(dir_path, O_CLOEXEC | O_NONBLOCK | O_RDONLY);
     if (instance.fd == -1) {
         wlr_log_errno(WLR_ERROR, "failed to open instance state file (%s)", dir_path);
-        return false;
+        return;
     }
     instance.wd = inotify_add_watch(inotify_fd, dir_path, IN_MODIFY);
     if (instance.wd == -1) {
         wlr_log_errno(WLR_ERROR, "failed to add instance state file (%s) to inotify", dir_path);
-        return false;
+        return;
     }
     instance.window = window;
     instance.state.screen = TITLE;
@@ -974,7 +974,7 @@ handle_window(struct window *window, bool map) {
     wlr_log(WLR_INFO, "created instance %d (%s)", instance_count, instance.dir);
     wall_resize_instance(&instances[id]);
     instance_update_verification(&instances[id]);
-    return false;
+    return;
 }
 
 static int

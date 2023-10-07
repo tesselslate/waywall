@@ -242,7 +242,8 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
 
 static void
 on_registry_global_remove(void *data, struct wl_registry *registry, uint32_t name) {
-    // TODO
+    // TODO: Handle seat destruction?
+    wlr_log(WLR_INFO, "waywall: global %" PRIu32 "removed", name);
 }
 
 static struct wl_registry_listener registry_listener = {
