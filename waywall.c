@@ -15,7 +15,6 @@
 #include <zip.h>
 
 // TODO: handle ninjabrain bot
-// TODO: handle fullscreen
 // TODO: handle extra instances
 // TODO: watch instance options.txt for changes in important values
 
@@ -60,7 +59,6 @@ static struct instance {
     struct {
         uint8_t atum;
         uint8_t preview;
-        uint8_t fullscreen;
     } hotkeys;
     int gui_scale;
 
@@ -343,7 +341,7 @@ instance_get_info(struct instance *instance) {
     }
     closedir(dir);
 
-    // Check for the user's Atum, WorldPreview, and fullscreen hotkeys.
+    // Check for the user's Atum and WorldPreview hotkeys.
     strncpy(buf, instance->dir, PATH_MAX);
     const char options[] = "/options.txt";
     limit = PATH_MAX - strlen(buf) - 1;
@@ -358,11 +356,10 @@ instance_get_info(struct instance *instance) {
         return false;
     }
     char line[256];
-    bool atum_hotkey = false, wp_hotkey = false, fullscreen_hotkey = false;
+    bool atum_hotkey = false, wp_hotkey = false;
     while (fgets(line, STRING_LEN(line), file)) {
         const char atum[] = "key_Create New World:";
         const char wp[] = "key_Leave Preview:";
-        const char fullscreen[] = "key_key.fullscreen:";
         const char gui_scale[] = "guiScale:";
 
         uint8_t *keycode;
@@ -391,17 +388,6 @@ instance_get_info(struct instance *instance) {
                         buf);
                 instance->hotkeys.preview = KEY_H + 8;
             }
-        } else if (strncmp(line, fullscreen, STRING_LEN(fullscreen)) == 0) {
-            const char *key = line + STRING_LEN(fullscreen);
-            fullscreen_hotkey = true;
-            if ((keycode = get_minecraft_keycode(key))) {
-                instance->hotkeys.fullscreen = *keycode;
-            } else {
-                wlr_log(WLR_INFO,
-                        "unknown fullscreen hotkey '%s' in '%s': setting to default of F11", key,
-                        buf);
-                instance->hotkeys.fullscreen = KEY_F11 + 8;
-            }
         } else if (strncmp(line, gui_scale, STRING_LEN(gui_scale)) == 0) {
             const char *scale = line + STRING_LEN(gui_scale);
             char *endptr;
@@ -421,10 +407,6 @@ instance_get_info(struct instance *instance) {
     if (!wp_hotkey) {
         wlr_log(WLR_INFO, "no leave preview hotkey found in '%s': setting to default of H", buf);
         instance->hotkeys.preview = KEY_H + 8;
-    }
-    if (!fullscreen_hotkey) {
-        wlr_log(WLR_INFO, "no fullscreen hotkey found in '%s': setting to default of F11", buf);
-        instance->hotkeys.fullscreen = KEY_F11 + 8;
     }
 
     return true;
@@ -566,7 +548,7 @@ instance_reset(struct instance *instance) {
         }
     }
 
-    // Adjust the instance's resolution as needed. TODO: Fullscreen
+    // Adjust the instance's resolution as needed.
     if (instance_get_id(instance) == active_instance) {
         wall_resize_instance(instance);
     }
