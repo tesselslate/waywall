@@ -19,6 +19,7 @@
 
 #include "wlr-export-dmabuf-unstable-v1-protocol.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <obs-module.h>
 #include <pthread.h>
 #include <unistd.h>
@@ -323,14 +324,25 @@ disconnect() {
 
 static void
 try_connect() {
-    FILE *file = fopen("/tmp/waywall-display", "r");
-    if (!file) {
-        blog(LOG_ERROR, "waywall: failed to get waywall display");
+    int fd = open("/tmp/waywall-display", O_RDONLY);
+    if (fd == -1) {
+        blog(LOG_ERROR, "waywall: failed to get waywall display: %s", strerror(errno));
         goto fail;
     }
     char buf[256];
-    fgets(buf, 256, file);
-    fclose(file);
+    ssize_t len = read(fd, buf, 255);
+    close(fd);
+    if (len == -1) {
+        blog(LOG_ERROR, "waywall: failed to read waywall display: %s", strerror(errno));
+        goto fail;
+    }
+    buf[len] = '\0';
+    char *newline = strchr(buf, '\n');
+    if (!newline) {
+        blog(LOG_ERROR, "waywall: invalid waywall display");
+        goto fail;
+    }
+    *newline = '\0';
 
     display = wl_display_connect(buf);
     if (!display) {
@@ -461,7 +473,8 @@ waywall_source_tick(void *data, float seconds) {
     if (!ww->output_weak) {
         struct output_weak *weak;
         wl_list_for_each (weak, &outputs, link) {
-            if (weak->output && weak->output->is_verification == ww->is_verification) {
+            assert(weak->output);
+            if (weak->output->is_verification == ww->is_verification) {
                 ref_output(weak);
                 ww->output_weak = weak;
             }
@@ -474,6 +487,16 @@ waywall_source_render(void *data, gs_effect_t *effect) {
     in_graphics_ctx = true;
     struct waywall_source *ww = data;
 
+    if (!connected) {
+        return;
+    }
+
+    if (wl_display_roundtrip(display) == -1) {
+        blog(LOG_ERROR, "waywall: roundtrip failed");
+        disconnect();
+        goto end;
+    }
+
     if (!ww->output_weak) {
         goto end;
     }
@@ -482,13 +505,8 @@ waywall_source_render(void *data, gs_effect_t *effect) {
         ww->output_weak = NULL;
         goto end;
     }
-
     struct output *output = ww->output_weak->output;
-    if (wl_display_roundtrip(display) == -1) {
-        blog(LOG_ERROR, "waywall: roundtrip failed");
-        disconnect();
-        goto end;
-    }
+
     if (output->current_frame) {
         gs_effect_t *effect = obs_get_base_effect(OBS_EFFECT_DEFAULT);
         gs_eparam_t *image = gs_effect_get_param_by_name(effect, "image");
