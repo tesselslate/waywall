@@ -51,6 +51,7 @@ struct compositor_config {
     bool confine_pointer;
     const char *cursor_theme;
     int cursor_size;
+    bool stop_on_close;
 };
 
 struct compositor_vtable {
@@ -86,6 +87,9 @@ int compositor_get_windows(struct compositor *, struct window ***);
 
 // Updates user-defined settings for the compositor.
 void compositor_load_config(struct compositor *, struct compositor_config);
+
+// Recreates the Wayland output if it is destroyed.
+bool compositor_recreate_output(struct compositor *);
 
 // Sends a sequence of keyboard inputs to the given `window`.
 void compositor_send_keys(struct window *, const struct compositor_key *, int);

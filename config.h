@@ -64,6 +64,7 @@ struct config {
     int stretch_width, stretch_height;
     // TODO: int alt_width, alt_height;
     bool use_f1;
+    bool remain_in_background;
 
     // reset options
     enum unlock_behavior unlock_behavior;

@@ -177,6 +177,7 @@ create_compositor_config() {
         .confine_pointer = config->confine_pointer,
         .cursor_theme = config->cursor_theme,
         .cursor_size = config->cursor_size,
+        .stop_on_close = !config->remain_in_background,
     };
     memcpy(compositor_config.background_color, config->background_color, sizeof(float) * 4);
     return compositor_config;
@@ -980,8 +981,17 @@ handle_window(struct window *window, bool map) {
 
 static int
 handle_signal(int signal_number, void *data) {
-    wlr_log(WLR_INFO, "received signal %d; stopping", signal_number);
-    compositor_stop(compositor);
+    switch (signal_number) {
+    case SIGUSR1:
+        if (compositor_recreate_output(compositor)) {
+            wlr_log(WLR_INFO, "recreated wayland output");
+        }
+        break;
+    default:
+        wlr_log(WLR_INFO, "received signal %d; stopping", signal_number);
+        compositor_stop(compositor);
+        break;
+    };
     return 0;
 }
 
@@ -1021,7 +1031,7 @@ main() {
     // TODO: add WLR_DEBUG flag
     wlr_log_init(WLR_INFO, NULL);
 
-    int display_file_fd = open(WAYWALL_DISPLAY_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    int display_file_fd = open(WAYWALL_DISPLAY_PATH, O_WRONLY | O_CREAT, 0644);
     struct flock lock = {
         .l_type = F_WRLCK,
         .l_whence = SEEK_SET,
@@ -1034,6 +1044,7 @@ main() {
         close(display_file_fd);
         return false;
     }
+    ftruncate(display_file_fd, 0);
 
     config = config_read();
     if (!config) {
@@ -1077,6 +1088,8 @@ main() {
         wl_event_loop_add_signal(event_loop, SIGINT, handle_signal, NULL);
     struct wl_event_source *event_sigterm =
         wl_event_loop_add_signal(event_loop, SIGTERM, handle_signal, NULL);
+    struct wl_event_source *event_sigusr =
+        wl_event_loop_add_signal(event_loop, SIGUSR1, handle_signal, NULL);
     struct wl_event_source *event_inotify =
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
@@ -1089,6 +1102,7 @@ main() {
 
     wl_event_source_remove(event_sigint);
     wl_event_source_remove(event_sigterm);
+    wl_event_source_remove(event_sigusr);
     wl_event_source_remove(event_inotify);
     compositor_destroy(compositor);
     close(inotify_fd);

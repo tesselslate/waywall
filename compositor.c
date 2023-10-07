@@ -1,5 +1,3 @@
-// TODO: figure out how to have instance crash logs not pop up
-
 #include "compositor.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "relative-pointer-unstable-v1-protocol.h"
@@ -99,7 +97,7 @@ struct compositor {
 
     struct compositor_config config;
     struct compositor_vtable vtable;
-    bool stopped;
+    bool should_stop;
 };
 
 struct keyboard {
@@ -411,11 +409,13 @@ on_output_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&output->on_request_state.link);
     wl_list_remove(&output->link);
 
-    // TODO: change compositor kill logic (let instances persist in background and window is
-    // reopened?)
     if (!output->headless) {
-        wlr_log(WLR_INFO, "output destroyed - stopping");
-        compositor_stop(output->compositor);
+        output->compositor->wl_output = NULL;
+        wlr_log(WLR_INFO, "wayland output destroyed");
+        if (output->compositor->config.stop_on_close) {
+            wlr_log(WLR_INFO, "stopping compositor due to window closing");
+            compositor_stop(output->compositor);
+        }
     }
     free(output);
 }
@@ -461,11 +461,13 @@ on_new_output(struct wl_listener *listener, void *data) {
         ww_assert(!compositor->wl_output);
         compositor->wl_output = output;
 
-        compositor->background =
-            wlr_scene_rect_create(&compositor->scene->tree, 16384, 16384,
-                                  (const float *)&compositor->config.background_color);
-        ww_assert(compositor->background);
-        wlr_scene_node_lower_to_bottom(&compositor->background->node);
+        if (!compositor->background) {
+            compositor->background =
+                wlr_scene_rect_create(&compositor->scene->tree, 16384, 16384,
+                                      (const float *)&compositor->config.background_color);
+            ww_assert(compositor->background);
+            wlr_scene_node_lower_to_bottom(&compositor->background->node);
+        }
     } else {
         ww_assert(!compositor->headless_output);
         compositor->headless_output = output;
@@ -531,11 +533,10 @@ static void
 handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v1 *constraint) {
     // Since all we care about is Minecraft, we can assume that all constraints keep the pointer
     // at the center of the screen.
-    if (compositor->stopped) {
-        // TODO: Figure out how to not UAF in this function during shutdown
+    if (compositor->active_constraint == constraint) {
         return;
     }
-    if (compositor->active_constraint == constraint) {
+    if (!compositor->wl_output) {
         return;
     }
 
@@ -576,7 +577,6 @@ handle_constraint(struct compositor *compositor, struct wlr_pointer_constraint_v
         zwp_locked_pointer_v1_set_cursor_position_hint(compositor->remote_locked_pointer,
                                                        wl_fixed_from_int(width / 2),
                                                        wl_fixed_from_int(height / 2));
-
         wlr_pointer_constraint_v1_send_activated(constraint);
         compositor->active_constraint = constraint;
     }
@@ -687,7 +687,12 @@ on_window_destroy(struct wl_listener *listener, void *data) {
     wl_list_remove(&window->on_request_activate.link);
     wl_list_remove(&window->on_request_configure.link);
     wl_list_remove(&window->on_request_fullscreen.link);
+
+    struct compositor *compositor = window->compositor;
     free(window);
+    if (compositor->should_stop && wl_list_length(&compositor->windows) == 0) {
+        wl_display_terminate(compositor->display);
+    }
 }
 
 static void
@@ -961,13 +966,6 @@ fail_display:
 void
 compositor_destroy(struct compositor *compositor) {
     ww_assert(compositor);
-    compositor->stopped = true;
-
-    zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
-    zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager);
-    zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
-    wl_pointer_destroy(compositor->remote_pointer);
-    wl_seat_destroy(compositor->remote_seat);
 
     xcb_disconnect(compositor->xcb);
     wl_list_remove(&compositor->on_xwayland_new_surface.link);
@@ -976,6 +974,15 @@ compositor_destroy(struct compositor *compositor) {
     wl_display_destroy_clients(compositor->display);
     wlr_xcursor_manager_destroy(compositor->cursor_manager);
     wlr_cursor_destroy(compositor->cursor);
+
+    // We must destroy remote objects before the remote display (from the Wayland backend) is
+    // closed.
+    zwp_relative_pointer_v1_destroy(compositor->remote_relative_pointer);
+    zwp_relative_pointer_manager_v1_destroy(compositor->remote_relative_pointer_manager);
+    zwp_pointer_constraints_v1_destroy(compositor->remote_pointer_constraints);
+    wl_pointer_destroy(compositor->remote_pointer);
+    wl_seat_destroy(compositor->remote_seat);
+
     wlr_backend_destroy(compositor->backend);
     wlr_renderer_destroy(compositor->renderer);
     wlr_allocator_destroy(compositor->allocator);
@@ -1031,7 +1038,21 @@ compositor_run(struct compositor *compositor, int display_file_fd) {
 
 void
 compositor_stop(struct compositor *compositor) {
-    wl_display_terminate(compositor->display);
+    if (compositor->should_stop) {
+        wlr_log(WLR_INFO, "received 2nd stop call - terminating");
+        wl_display_terminate(compositor->display);
+        return;
+    }
+    compositor->should_stop = true;
+    if (wl_list_length(&compositor->windows) == 0) {
+        wl_display_terminate(compositor->display);
+        return;
+    }
+
+    struct window *window;
+    wl_list_for_each (window, &compositor->windows, link) {
+        wlr_xwayland_surface_close(window->surface);
+    }
 }
 
 void
@@ -1113,6 +1134,15 @@ compositor_load_config(struct compositor *compositor, struct compositor_config c
     ww_assert(compositor->background);
     wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
     compositor->config = config;
+}
+
+bool
+compositor_recreate_output(struct compositor *compositor) {
+    if (compositor->wl_output) {
+        return false;
+    }
+    wlr_wl_output_create(compositor->backend_wl);
+    return true;
 }
 
 void

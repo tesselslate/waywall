@@ -19,6 +19,7 @@ stretch_height = 360
 # TODO: alt width
 # TODO: alt height
 use_f1 = false
+remain_in_background = true
 
 [reset]
 unlock_behavior = "reset" # unlock, remain_locked, reset

@@ -336,6 +336,7 @@ config_read() {
     PARSE_INT(wall, stretch_height);
     CHECK_MIN_MAX(wall, stretch_height, 1, 4096);
     PARSE_BOOL(wall, use_f1);
+    PARSE_BOOL(wall, remain_in_background);
 
     // reset
     toml_table_t *reset = toml_table_in(conf, "reset");
