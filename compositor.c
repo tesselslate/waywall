@@ -4,6 +4,7 @@
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "relative-pointer-unstable-v1-protocol.h"
 #include "util.h"
+#include <fcntl.h>
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
 #include <time.h>
@@ -993,7 +994,7 @@ compositor_get_loop(struct compositor *compositor) {
 }
 
 bool
-compositor_run(struct compositor *compositor) {
+compositor_run(struct compositor *compositor, int display_file_fd) {
     ww_assert(compositor);
 
     if (!wlr_backend_start(compositor->backend)) {
@@ -1008,16 +1009,20 @@ compositor_run(struct compositor *compositor) {
     }
     setenv("WAYLAND_DISPLAY", socket, true);
     setenv("DISPLAY", compositor->xwayland->display_name, true);
-    FILE *file = fopen("/tmp/waywall-display", "w");
-    size_t len = strlen(socket);
-    if (fwrite(socket, 1, len, file) != len) {
-        wlr_log_errno(WLR_ERROR, "failed to write waywall display");
-        fclose(file);
+    char buf[256];
+    ssize_t len =
+        snprintf(buf, ARRAY_LEN(buf), "%s\n%s", socket, compositor->xwayland->display_name);
+    if (len >= (ssize_t)ARRAY_LEN(buf) || len < 0) {
+        wlr_log(WLR_ERROR, "failed to write waywall-display file (%zd)", len);
         return false;
     }
-    fclose(file);
-    if (truncate("/tmp/waywall-display", len) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to truncate waywall display");
+    if (write(display_file_fd, buf, len) == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to write waywall-display");
+        return false;
+    }
+    if (ftruncate(display_file_fd, len) == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to truncate waywall-display");
+        return false;
     }
 
     wl_display_run(compositor->display);

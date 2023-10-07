@@ -72,7 +72,7 @@ void compositor_destroy(struct compositor *);
 struct wl_event_loop *compositor_get_loop(struct compositor *);
 
 // Runs the compositor event loop. Returns true on success, false on failure.
-bool compositor_run(struct compositor *);
+bool compositor_run(struct compositor *, int);
 
 // Stops the compositor event loop.
 void compositor_stop(struct compositor *);

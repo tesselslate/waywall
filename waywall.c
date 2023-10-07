@@ -20,6 +20,7 @@
 // TODO: watch instance options.txt for changes in important values
 
 #define WALL -1
+#define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
 
 struct state {
     enum {
@@ -1020,6 +1021,20 @@ main() {
     // TODO: add WLR_DEBUG flag
     wlr_log_init(WLR_INFO, NULL);
 
+    int display_file_fd = open(WAYWALL_DISPLAY_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    struct flock lock = {
+        .l_type = F_WRLCK,
+        .l_whence = SEEK_SET,
+        .l_start = 0,
+        .l_len = 0,
+        .l_pid = getpid(),
+    };
+    if (fcntl(display_file_fd, F_SETLK, &lock) == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to lock waywall-display");
+        close(display_file_fd);
+        return false;
+    }
+
     config = config_read();
     if (!config) {
         return 1;
@@ -1065,7 +1080,7 @@ main() {
     struct wl_event_source *event_inotify =
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
-    compositor_run(compositor);
+    compositor_run(compositor, display_file_fd);
 
     if (reset_count_fd > 0) {
         write_reset_count();
@@ -1077,5 +1092,7 @@ main() {
     wl_event_source_remove(event_inotify);
     compositor_destroy(compositor);
     close(inotify_fd);
+    close(display_file_fd);
+    remove(WAYWALL_DISPLAY_PATH);
     return 0;
 }
