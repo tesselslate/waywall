@@ -325,7 +325,7 @@ disconnect() {
 static void
 try_connect() {
     int fd = open("/tmp/waywall-display", O_RDONLY);
-    if (fd == -1) {
+    if (fd == -1 && errno != ENOENT) {
         blog(LOG_ERROR, "waywall: failed to get waywall display: %s", strerror(errno));
         goto fail;
     }
