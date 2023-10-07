@@ -498,7 +498,7 @@ waywall_source_render(void *data, gs_effect_t *effect) {
         }
     }
 
-    if (output && !output->frame_queued) {
+    if (!output->frame_queued) {
         queue_frame(output);
         wl_display_roundtrip(display);
     }
