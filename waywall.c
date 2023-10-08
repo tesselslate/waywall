@@ -13,7 +13,6 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/util/log.h>
 
-// TODO: handle extra instances
 // TODO: fix verification output
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
@@ -883,6 +882,9 @@ handle_window(struct window *window, bool map) {
         wlr_log(WLR_INFO, "created instance %d (%s)", id, instance.dir);
         wall_resize_instance(&instances[id]);
         instance_update_verification(&instances[id]);
+        if (id >= config->wall_width * config->wall_height) {
+            wlr_log(WLR_INFO, "more instances than spots on wall - some are invisible");
+        }
         return;
     } else if (strstr(name, "Ninjabrain Bot")) {
         if (ninb_window) {
