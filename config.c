@@ -1,3 +1,5 @@
+// TODO: overhaul parse macros
+
 #include "config.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
@@ -20,6 +22,7 @@ static const struct mapping actions[] = {
     {"wall_lock", ACTION_WALL_LOCK},
     {"wall_focus_reset", ACTION_WALL_FOCUS_RESET},
     {"ingame_reset", ACTION_INGAME_RESET},
+    {"alt_res", ACTION_INGAME_ALT_RES},
 };
 
 static const struct mapping buttons[] = {
@@ -303,6 +306,9 @@ config_read() {
     PARSE_BOOL(input, confine_pointer);
     PARSE_DOUBLE(input, main_sens);
     CHECK_MIN_MAX_DOUBLE(input, main_sens, 0.01, 10.0);
+    if (!parse_double(&config->alt_sens, input, "alt_sens", "input.alt_sens")) {
+        config->alt_sens = config->main_sens;
+    }
 
     // appearance
     toml_table_t *appearance = toml_table_in(conf, "appearance");
@@ -337,6 +343,20 @@ config_read() {
     CHECK_MIN_MAX(wall, stretch_height, 1, 4096);
     PARSE_BOOL(wall, use_f1);
     PARSE_BOOL(wall, remain_in_background);
+    bool alt_width = parse_int(&config->alt_width, wall, "alt_width", "wall.alt_width");
+    bool alt_height = parse_int(&config->alt_height, wall, "alt_height", "wall.alt_height");
+    if (alt_width != alt_height) {
+        wlr_log(WLR_ERROR, "config: only one alt res value is present");
+        goto fail_read;
+    }
+    if (!alt_width) {
+        config->alt_width = -1;
+        config->alt_height = -1;
+    } else {
+        CHECK_MIN_MAX(wall, alt_width, 1, 16384);
+        CHECK_MIN_MAX(wall, alt_height, 1, 16384);
+    }
+    config->has_alt_res = alt_width;
 
     // reset
     toml_table_t *reset = toml_table_in(conf, "reset");

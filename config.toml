@@ -3,6 +3,7 @@ repeat_delay = 300
 repeat_rate = 40
 confine_pointer = false
 main_sens = 1.0
+alt_sens = 1.0
 # TODO: language
 
 [appearance]
@@ -16,8 +17,8 @@ wall_width = 2
 wall_height = 3
 stretch_width = 960
 stretch_height = 360
-# TODO: alt width
-# TODO: alt height
+alt_width = 1920
+alt_height = 16384
 use_f1 = false
 remain_in_background = true
 
@@ -34,3 +35,4 @@ grace_period = 100
 "Shift-LMB"         = ["wall_play"]
 "Ctrl-LMB"          = ["wall_lock"]
 "Ctrl-Shift-LMB"    = ["wall_focus_reset"]
+"H"                 = ["alt_res"]

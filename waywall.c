@@ -61,6 +61,7 @@ static struct instance {
         uint8_t preview;
     } hotkeys;
     int gui_scale;
+    bool alt_res;
 
     struct wlr_scene_rect *lock_indicator;
     struct headless_view *hview_inst, *hview_wp;
@@ -83,6 +84,7 @@ static uint64_t reset_count;
 static int reset_count_fd = INT_MIN;
 
 static void config_update();
+static struct wlr_box compute_alt_res();
 static struct compositor_config create_compositor_config();
 static bool prepare_reset_counter();
 static void write_reset_count();
@@ -161,10 +163,24 @@ config_update() {
         }
     }
     handle_resize(screen_width, screen_height);
-    // TODO: Handle alt sensitivity
-    compositor_set_mouse_sensitivity(compositor, config->main_sens);
+    if (active_instance != WALL && instances[active_instance].alt_res) {
+        compositor_set_mouse_sensitivity(compositor, config->alt_sens);
+    } else {
+        compositor_set_mouse_sensitivity(compositor, config->main_sens);
+    }
 
     wlr_log(WLR_INFO, "applied new config");
+}
+
+static struct wlr_box
+compute_alt_res() {
+    ww_assert(config->has_alt_res);
+    return (struct wlr_box){
+        .x = (screen_width - config->alt_width) / 2,
+        .y = (screen_height - config->alt_height) / 2,
+        .width = config->alt_width,
+        .height = config->alt_height,
+    };
 }
 
 static struct compositor_config
@@ -550,6 +566,8 @@ instance_reset(struct instance *instance) {
 
     // Adjust the instance's resolution as needed.
     if (instance_get_id(instance) == active_instance) {
+        compositor_set_mouse_sensitivity(compositor, config->main_sens);
+        instance->alt_res = false;
         wall_resize_instance(instance);
     }
 
@@ -592,8 +610,6 @@ instance_update_verification(struct instance *instance) {
     int x = (id % config->wall_width) * w, y = (id / config->wall_width) * h;
 
     // Whole instance capture
-    compositor_hview_set_src(instance->hview_inst,
-                             (struct wlr_box){0, 0, config->stretch_width, config->stretch_height});
     compositor_hview_set_dest(instance->hview_inst, (struct wlr_box){x, y, w, h});
 
     // Loading square capture
@@ -697,6 +713,24 @@ process_bind(struct keybind *keybind, bool held) {
             }
             wall_focus();
             write_reset_count();
+            break;
+        case ACTION_INGAME_ALT_RES:
+            if (!config->has_alt_res) {
+                break;
+            }
+            struct instance *instance = &instances[active_instance];
+            if (instance->alt_res) {
+                compositor_window_configure(instance->window, screen_width, screen_height);
+                compositor_window_set_dest(instance->window,
+                                           (struct wlr_box){0, 0, screen_width, screen_height});
+                compositor_set_mouse_sensitivity(compositor, config->main_sens);
+            } else {
+                compositor_window_configure(instance->window, config->alt_width,
+                                            config->alt_height);
+                compositor_window_set_dest(instance->window, compute_alt_res());
+                compositor_set_mouse_sensitivity(compositor, config->alt_sens);
+            }
+            instance->alt_res = !instance->alt_res;
             break;
         }
     }
@@ -871,15 +905,20 @@ handle_resize(int32_t width, int32_t height) {
     wlr_log(WLR_INFO, "handling screen resize of %" PRIi32 " x %" PRIi32, width, height);
     screen_width = width, screen_height = height;
     if (active_instance != WALL) {
-        // TODO: handle alt res
-        struct wlr_box box = {
-            .x = 0,
-            .y = 0,
-            .width = width,
-            .height = height,
-        };
-        compositor_window_configure(instances[active_instance].window, width, height);
-        compositor_window_set_dest(instances[active_instance].window, box);
+        if (instances[active_instance].alt_res && config->has_alt_res) {
+            compositor_window_configure(instances[active_instance].window, config->alt_width,
+                                        config->alt_height);
+            compositor_window_set_dest(instances[active_instance].window, compute_alt_res());
+        } else {
+            struct wlr_box box = {
+                .x = 0,
+                .y = 0,
+                .width = width,
+                .height = height,
+            };
+            compositor_window_configure(instances[active_instance].window, width, height);
+            compositor_window_set_dest(instances[active_instance].window, box);
+        }
     }
 
     for (int i = 0; i < instance_count; i++) {

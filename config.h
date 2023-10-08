@@ -22,7 +22,7 @@ enum action {
     ACTION_WALL_LOCK,
     ACTION_WALL_FOCUS_RESET,
     ACTION_INGAME_RESET,
-    // TODO: alt res
+    ACTION_INGAME_ALT_RES,
 };
 
 enum unlock_behavior {
@@ -50,7 +50,7 @@ struct config {
     int repeat_delay;
     int repeat_rate;
     bool confine_pointer;
-    double main_sens;
+    double main_sens, alt_sens;
     // TODO: alternative languages
 
     // appearance
@@ -62,7 +62,7 @@ struct config {
     // wall
     int wall_width, wall_height;
     int stretch_width, stretch_height;
-    // TODO: int alt_width, alt_height;
+    int alt_width, alt_height;
     bool use_f1;
     bool remain_in_background;
 
@@ -76,6 +76,9 @@ struct config {
     // keybinds
     struct keybind binds[MAX_BINDS];
     int bind_count;
+
+    // not part of config file
+    bool has_alt_res;
 };
 
 static struct {

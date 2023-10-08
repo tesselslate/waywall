@@ -1260,6 +1260,7 @@ compositor_hview_set_dest(struct headless_view *view, struct wlr_box box) {
 
 void
 compositor_hview_set_src(struct headless_view *view, struct wlr_box box) {
+    // TODO: This can trigger an assert in wlroots:render/pass.c. Should investigate for stability.
     const struct wlr_fbox fbox = {
         .x = box.x,
         .y = box.y,
