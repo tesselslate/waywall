@@ -71,6 +71,7 @@ executable('waywall',
   wl_proto_src, wl_proto_header,
   'compositor.c', 'compositor.h',
   'config.c', 'config.h',
+  'instance.c', 'instance.h',
   'util.c', 'util.h',
   'waywall.c',
 
