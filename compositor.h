@@ -100,7 +100,7 @@ void compositor_send_keys(struct window *, const struct compositor_key *, int);
 void compositor_set_mouse_sensitivity(struct compositor *, double);
 
 /*
-   WINDOWS
+ *  WINDOWS
  */
 
 // Requests the client owning the given window to close it.
@@ -138,7 +138,7 @@ void compositor_window_set_opacity(struct window *, float);
 void compositor_window_set_top(struct window *);
 
 /*
-   HEADLESS VIEWS
+ *  HEADLESS VIEWS
  */
 
 // Configures a headless view's size and position on the output.
@@ -151,7 +151,7 @@ void compositor_hview_set_src(struct headless_view *, struct wlr_box);
 void compositor_hview_set_top(struct headless_view *);
 
 /*
- * RECTANGLES
+ *  RECTANGLES
  */
 
 // Configures a rectangle on the compositor scene.
