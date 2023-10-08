@@ -149,6 +149,7 @@ config_update() {
 static struct wlr_box
 compute_alt_res() {
     ww_assert(config->has_alt_res);
+
     return (struct wlr_box){
         .x = (screen_width - config->alt_width) / 2,
         .y = (screen_height - config->alt_height) / 2,
@@ -207,10 +208,9 @@ ninb_reposition(int16_t w, int16_t h) {
 
 static void
 ninb_set_visible(bool visible) {
+    ww_assert(ninb_window);
+
     ninb_shown = visible;
-    if (!ninb_window) {
-        return;
-    }
     ninb_reposition(0, 0);
     compositor_window_set_opacity(ninb_window, visible ? config->ninb_opacity : 0.0f);
     compositor_window_set_top(ninb_window);
@@ -288,11 +288,15 @@ instance_get_hovered() {
 
 static inline int
 instance_get_id(struct instance *instance) {
+    ww_assert(instance);
+
     return instance - instances;
 }
 
 static struct wlr_box
 instance_get_wall_box(struct instance *instance) {
+    ww_assert(instance);
+
     int id = instance_get_id(instance);
     int disp_width = screen_width / config->wall_width;
     int disp_height = screen_height / config->wall_height;
@@ -308,6 +312,7 @@ instance_get_wall_box(struct instance *instance) {
 
 static void
 instance_pause(struct instance *instance) {
+    ww_assert(instance);
     ww_assert(instance->alive);
 
     static const struct compositor_key keys[] = {
@@ -321,8 +326,9 @@ instance_pause(struct instance *instance) {
 
 static void
 instance_lock(struct instance *instance) {
-    ww_assert(active_instance == WALL);
+    ww_assert(instance);
     ww_assert(instance->alive);
+    ww_assert(active_instance == WALL);
 
     if (!instance->locked) {
         // Lock the instance.
@@ -354,8 +360,9 @@ instance_lock(struct instance *instance) {
 
 static void
 instance_play(struct instance *instance) {
-    ww_assert(instance_get_id(instance) != active_instance);
+    ww_assert(instance);
     ww_assert(instance->alive);
+    ww_assert(instance_get_id(instance) != active_instance);
 
     compositor_window_focus(compositor, instance->window);
     compositor_window_configure(instance->window, screen_width, screen_height);
@@ -391,6 +398,7 @@ instance_play(struct instance *instance) {
 
 static bool
 instance_reset(struct instance *instance) {
+    ww_assert(instance);
     ww_assert(instance->alive);
 
     // Do not allow resets on the dirt screen.
@@ -437,7 +445,9 @@ instance_reset(struct instance *instance) {
         compositor_set_mouse_sensitivity(compositor, config->main_sens);
         instance->alt_res = false;
         wall_resize_instance(instance);
-        ninb_set_visible(false);
+        if (ninb_window) {
+            ninb_set_visible(false);
+        }
     }
 
     // Press the appropriate reset hotkey.
@@ -459,6 +469,8 @@ instance_reset(struct instance *instance) {
 
 static void
 instance_update_verification(struct instance *instance) {
+    ww_assert(instance);
+    ww_assert(instance->alive);
     ww_assert(instance->hview_inst && instance->hview_wp);
 
     // TODO: Make generation more robust for weird sizes
@@ -606,7 +618,9 @@ process_bind(struct keybind *keybind, bool held) {
             instance->alt_res = !instance->alt_res;
             break;
         case ACTION_INGAME_TOGGLE_NINB:
-            ninb_set_visible(!ninb_shown);
+            if (ninb_window) {
+                ninb_set_visible(!ninb_shown);
+            }
             break;
         }
     }
@@ -614,6 +628,8 @@ process_bind(struct keybind *keybind, bool held) {
 
 static void
 process_state(struct instance *instance) {
+    ww_assert(instance->alive);
+
     char buf[128];
     if (lseek(instance->state_fd, 0, SEEK_SET) == -1) {
         wlr_log_errno(WLR_ERROR, "failed to seek wpstateout");
