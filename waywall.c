@@ -657,9 +657,16 @@ process_state(struct instance *instance) {
         } else if (strcmp(a, "inworld") == 0) {
             instance->state.screen = INWORLD;
             if (strcmp(b, "unpaused") == 0) {
-                if (last_state.screen == PREVIEWING &&
-                    instance_get_id(instance) != active_instance) {
-                    instance_pause(instance);
+                if (last_state.screen == PREVIEWING) {
+                    if (instance_get_id(instance) != active_instance) {
+                        instance_pause(instance);
+                    } else if (config->use_f1) {
+                        static const struct compositor_key f1_keys[] = {
+                            {KEY_F1, true},
+                            {KEY_F1, false},
+                        };
+                        compositor_send_keys(instance->window, f1_keys, ARRAY_LEN(f1_keys));
+                    }
                 }
                 instance->state.data.world = UNPAUSED;
             } else if (strcmp(b, "paused") == 0) {
