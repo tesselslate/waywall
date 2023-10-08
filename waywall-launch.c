@@ -56,6 +56,6 @@ fail:
     return 1;
 
 print_help:
-    fprintf(stderr, "USAGE: %s [--try] COMMAND [ARGS...]\n", argc > 0 ? argv[0] : "waywall-launch");
+    fprintf(stderr, "USAGE: %s [--try] COMMAND [ARGS...]\n", argc ? argv[0] : "waywall-launch");
     return 1;
 }

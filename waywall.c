@@ -964,10 +964,28 @@ handle_inotify(int fd, uint32_t mask, void *data) {
     }
 }
 
+static void
+print_help(int argc, char **argv) {
+    fprintf(stderr, "USAGE: %s [--debug]\n", argc ? argv[0] : "waywall");
+}
+
 int
-main() {
-    // TODO: add WLR_DEBUG flag
-    wlr_log_init(WLR_INFO, NULL);
+main(int argc, char **argv) {
+    enum wlr_log_importance log_level = WLR_INFO;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--debug") == 0) {
+            if (log_level == WLR_DEBUG) {
+                print_help(argc, argv);
+                return 1;
+            }
+            log_level = WLR_DEBUG;
+        } else {
+            print_help(argc, argv);
+            return 1;
+        }
+    }
+
+    wlr_log_init(log_level, NULL);
 
     int display_file_fd = open(WAYWALL_DISPLAY_PATH, O_WRONLY | O_CREAT, 0644);
     struct flock lock = {
