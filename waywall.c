@@ -33,7 +33,7 @@ static int inotify_fd;
 static int config_wd;
 
 static struct instance instances[128];
-static int instance_count;
+static int max_instance_id;
 static int active_instance = WALL;
 static int32_t screen_width, screen_height;
 static struct window *ninb_window;
@@ -280,7 +280,7 @@ instance_get_hovered() {
     int x = cursor_x / (screen_width / config->wall_width);
     int y = cursor_y / (screen_height / config->wall_height);
     int id = x + y * config->wall_width;
-    if (!instances[id].alive || id >= instance_count) {
+    if (!instances[id].alive || id >= max_instance_id) {
         return NULL;
     }
     return &instances[id];
@@ -507,6 +507,7 @@ wall_focus() {
 static void
 wall_resize_instance(struct instance *instance) {
     ww_assert(instance);
+    ww_assert(instance->alive);
 
     struct wlr_box box = instance_get_wall_box(instance);
     compositor_window_configure(instance->window, config->stretch_width, config->stretch_height);
@@ -532,7 +533,7 @@ process_bind(struct keybind *keybind, bool held) {
 
         switch (action) {
         case ACTION_WALL_RESET_ALL:
-            for (int i = 0; i < instance_count; i++) {
+            for (int i = 0; i < max_instance_id; i++) {
                 if (instances[i].alive && !instances[i].locked) {
                     instance_reset(&instances[i]);
                 }
@@ -559,7 +560,7 @@ process_bind(struct keybind *keybind, bool held) {
         case ACTION_WALL_FOCUS_RESET:
             if (hovered && (hovered->state.screen == INWORLD)) {
                 bool hovered_id = instance_get_id(hovered);
-                for (int i = 0; i < instance_count; i++) {
+                for (int i = 0; i < max_instance_id; i++) {
                     if (i != hovered_id && instances[i].alive && !instances[i].locked) {
                         instance_reset(&instances[i]);
                     }
@@ -571,7 +572,7 @@ process_bind(struct keybind *keybind, bool held) {
         case ACTION_INGAME_RESET:
             instance_reset(&instances[active_instance]);
             if (config->wall_bypass) {
-                for (int i = 0; i < instance_count; i++) {
+                for (int i = 0; i < max_instance_id; i++) {
                     if (i == active_instance) {
                         continue;
                     }
@@ -823,8 +824,8 @@ handle_resize(int32_t width, int32_t height) {
         }
     }
 
-    for (int i = 0; i < instance_count; i++) {
-        if (i != active_instance) {
+    for (int i = 0; i < max_instance_id; i++) {
+        if (i != active_instance && instances[i].alive) {
             wall_resize_instance(&instances[i]);
         }
     }
@@ -837,7 +838,7 @@ handle_window(struct window *window, bool map) {
         if (window == ninb_window) {
             ninb_window = NULL;
         }
-        for (int i = 0; i < instance_count; i++) {
+        for (int i = 0; i < max_instance_id; i++) {
             if (instances[i].window == window) {
                 wlr_log(WLR_ERROR, "instance %d died", i);
                 instances[i].alive = false;
@@ -851,11 +852,19 @@ handle_window(struct window *window, bool map) {
     struct instance instance = {0};
     const char *name = compositor_window_get_name(window);
     if (instance_try_from(window, &instance, inotify_fd)) {
-        // TODO: Check to see if this instance has the same properties of a dead instance and
-        // replace it
-        int id = instance_count;
-        instances[instance_count++] = instance;
-        wlr_log(WLR_INFO, "created instance %d (%s)", instance_count, instance.dir);
+        int id = -1;
+        for (int i = 0; i < max_instance_id; i++) {
+            if (strcmp(instance.dir, instances[i].dir) == 0) {
+                wlr_log(WLR_INFO, "detected instance %d reboot", i);
+                id = i;
+                break;
+            }
+        }
+        if (id == -1) {
+            id = max_instance_id++;
+        }
+        instances[id] = instance;
+        wlr_log(WLR_INFO, "created instance %d (%s)", id, instance.dir);
         wall_resize_instance(&instances[id]);
         instance_update_verification(&instances[id]);
         return;
@@ -922,7 +931,7 @@ handle_inotify(int fd, uint32_t mask, void *data) {
         for (char *ptr = buf; ptr < buf + len; ptr += sizeof(struct inotify_event) + event->len) {
             event = (const struct inotify_event *)ptr;
             if (event->mask & IN_MODIFY) {
-                for (int i = 0; i < instance_count; i++) {
+                for (int i = 0; i < max_instance_id; i++) {
                     if (instances[i].state_wd == event->wd) {
                         process_state(&instances[i]);
                         break;
