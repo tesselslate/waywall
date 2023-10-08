@@ -13,12 +13,14 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/util/log.h>
 
-// TODO: handle ninjabrain bot
 // TODO: handle extra instances
 // TODO: fix verification output
-
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
+// TODO: free dir paths in instances
+
+// TODO: make config reloading reliable (reads file before written sometimes? also might not handle
+// some editors correctly)
 
 #define WALL -1
 #define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
@@ -34,6 +36,8 @@ static struct instance instances[128];
 static int instance_count;
 static int active_instance = WALL;
 static int32_t screen_width, screen_height;
+static struct window *ninb_window;
+static bool ninb_shown;
 
 static int cursor_x, cursor_y;
 static uint32_t held_modifiers;
@@ -51,6 +55,8 @@ static int reset_count_fd = INT_MIN;
 static void config_update();
 static struct wlr_box compute_alt_res();
 static struct compositor_config create_compositor_config();
+static void ninb_reposition(int16_t, int16_t);
+static void ninb_set_visible(bool);
 static bool prepare_reset_counter();
 static void write_reset_count();
 static struct instance *instance_get_hovered();
@@ -65,6 +71,7 @@ static void wall_focus();
 static void wall_resize_instance(struct instance *);
 static void process_bind(struct keybind *, bool);
 static void process_state(struct instance *);
+static bool handle_allow_configure(struct window *, int16_t, int16_t);
 static bool handle_button(struct compositor_button_event);
 static bool handle_key(struct compositor_key_event);
 static void handle_modifiers(uint32_t);
@@ -132,6 +139,9 @@ config_update() {
     } else {
         compositor_set_mouse_sensitivity(compositor, config->main_sens);
     }
+    if (ninb_window) {
+        ninb_reposition(0, 0);
+    }
 
     wlr_log(WLR_INFO, "applied new config");
 }
@@ -159,6 +169,51 @@ create_compositor_config() {
     };
     memcpy(compositor_config.background_color, config->background_color, sizeof(float) * 4);
     return compositor_config;
+}
+
+static void
+ninb_reposition(int16_t w, int16_t h) {
+    ww_assert(ninb_window);
+
+    if (w <= 0 || h <= 0) {
+        compositor_window_get_size(ninb_window, &w, &h);
+    }
+    struct wlr_box size = {0, 0, w, h};
+
+    int x, y;
+    enum ninb_location loc = config->ninb_location;
+    if (loc == TOP_LEFT || loc == LEFT || loc == BOTTOM_LEFT) {
+        x = 0;
+    } else if (loc == TOP_RIGHT || loc == RIGHT || loc == BOTTOM_RIGHT) {
+        x = screen_width - size.width;
+    } else if (loc == TOP) {
+        x = (screen_width - size.width) / 2;
+    } else {
+        ww_assert(!"unreachable");
+        exit(1);
+    }
+    if (loc == TOP_LEFT || loc == TOP || loc == TOP_RIGHT) {
+        y = 0;
+    } else if (loc == LEFT || loc == RIGHT) {
+        y = (screen_height - size.height) / 2;
+    } else if (loc == BOTTOM_LEFT || loc == BOTTOM_RIGHT) {
+        y = screen_height - size.height;
+    } else {
+        ww_assert(!"unreachable");
+        exit(1);
+    }
+    compositor_window_set_dest(ninb_window, (struct wlr_box){x, y, size.width, size.height});
+}
+
+static void
+ninb_set_visible(bool visible) {
+    ninb_shown = visible;
+    if (!ninb_window) {
+        return;
+    }
+    ninb_reposition(0, 0);
+    compositor_window_set_opacity(ninb_window, visible ? config->ninb_opacity : 0.0f);
+    compositor_window_set_top(ninb_window);
 }
 
 static bool
@@ -382,6 +437,7 @@ instance_reset(struct instance *instance) {
         compositor_set_mouse_sensitivity(compositor, config->main_sens);
         instance->alt_res = false;
         wall_resize_instance(instance);
+        ninb_set_visible(false);
     }
 
     // Press the appropriate reset hotkey.
@@ -548,6 +604,9 @@ process_bind(struct keybind *keybind, bool held) {
             }
             instance->alt_res = !instance->alt_res;
             break;
+        case ACTION_INGAME_TOGGLE_NINB:
+            ninb_set_visible(!ninb_shown);
+            break;
         }
     }
 }
@@ -614,6 +673,16 @@ process_state(struct instance *instance) {
             ww_assert(false);
         }
     }
+}
+
+static bool
+handle_allow_configure(struct window *window, int16_t w, int16_t h) {
+    if (window != ninb_window) {
+        return false;
+    }
+
+    ninb_reposition(w, h);
+    return true;
 }
 
 static bool
@@ -735,6 +804,9 @@ handle_resize(int32_t width, int32_t height) {
             compositor_window_configure(instances[active_instance].window, width, height);
             compositor_window_set_dest(instances[active_instance].window, box);
         }
+        if (ninb_window) {
+            ninb_reposition(0, 0);
+        }
     }
 
     for (int i = 0; i < instance_count; i++) {
@@ -746,13 +818,13 @@ handle_resize(int32_t width, int32_t height) {
 
 static void
 handle_window(struct window *window, bool map) {
-    // TODO: some way to kill the window if we don't want it
-
     // Instance death needs to be handled elegantly.
     if (!map) {
+        if (window == ninb_window) {
+            ninb_window = NULL;
+        }
         for (int i = 0; i < instance_count; i++) {
             if (instances[i].window == window) {
-                // TODO: handle instance death and reboot
                 wlr_log(WLR_ERROR, "instance %d died", i);
                 instances[i].alive = false;
                 instances[i].window = NULL;
@@ -763,12 +835,44 @@ handle_window(struct window *window, bool map) {
     }
 
     struct instance instance = {0};
+    const char *name = compositor_window_get_name(window);
     if (instance_try_from(window, &instance, inotify_fd)) {
+        // TODO: Check to see if this instance has the same properties of a dead instance and
+        // replace it
         int id = instance_count;
         instances[instance_count++] = instance;
         wlr_log(WLR_INFO, "created instance %d (%s)", instance_count, instance.dir);
         wall_resize_instance(&instances[id]);
         instance_update_verification(&instances[id]);
+        return;
+    } else if (strstr(name, "Ninjabrain Bot")) {
+        if (ninb_window) {
+            wlr_log(WLR_INFO, "duplicate ninjabrain bot window opened - closing");
+            compositor_window_close(window);
+            return;
+        }
+        ninb_window = window;
+        ninb_set_visible(ninb_shown);
+        return;
+    } else {
+        compositor_window_set_opacity(window, 0.0f);
+
+        char procbuf[PATH_MAX], linkbuf[PATH_MAX];
+        snprintf(procbuf, ARRAY_LEN(procbuf), "/proc/%d/exe", compositor_window_get_pid(window));
+        ssize_t len = readlink(procbuf, linkbuf, ARRAY_LEN(linkbuf) - 1);
+        if (len == -1) {
+            wlr_log_errno(WLR_ERROR, "failed to read executable of process");
+            compositor_window_close(window);
+            return;
+        }
+        linkbuf[len] = '\0';
+        char *name = strrchr(linkbuf, '/');
+        if (!name || strncmp(name, "/java", STRING_LEN("/java")) != 0) {
+            wlr_log(WLR_INFO, "closing unknown window '%s' (exe: '%s')", name ? name : "unnamed",
+                    linkbuf);
+            compositor_window_close(window);
+        }
+        return;
     }
 }
 
@@ -865,6 +969,7 @@ main() {
     free(config_path);
 
     struct compositor_vtable vtable = {
+        .allow_configure = handle_allow_configure,
         .button = handle_button,
         .key = handle_key,
         .modifiers = handle_modifiers,

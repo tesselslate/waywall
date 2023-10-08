@@ -23,6 +23,7 @@ static const struct mapping actions[] = {
     {"wall_focus_reset", ACTION_WALL_FOCUS_RESET},
     {"ingame_reset", ACTION_INGAME_RESET},
     {"alt_res", ACTION_INGAME_ALT_RES},
+    {"toggle_ninb", ACTION_INGAME_TOGGLE_NINB},
 };
 
 static const struct mapping buttons[] = {
@@ -326,6 +327,18 @@ config_read() {
     } else {
         CHECK_MIN_MAX(appearance, cursor_size, 1, 64);
     }
+    PARSE_DOUBLE(appearance, ninb_opacity);
+    CHECK_MIN_MAX_DOUBLE(appearance, ninb_opacity, 0.1, 1.0);
+    PARSE_ENUM(appearance, ninb_location,
+               {
+                   {"topleft", TOP_LEFT},
+                   {"top", TOP},
+                   {"top_right", TOP_RIGHT},
+                   {"left", LEFT},
+                   {"right", RIGHT},
+                   {"bottomleft", BOTTOM_LEFT},
+                   {"bottomright", BOTTOM_RIGHT},
+               });
 
     // wall
     toml_table_t *wall = toml_table_in(conf, "wall");

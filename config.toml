@@ -11,6 +11,8 @@ background_color = '#000000'
 lock_color = '#00000099'
 cursor_theme = "" # can be left empty / deleted
 cursor_size = 24 # can be deleted
+ninb_opacity = 0.8
+ninb_location = "right" # topleft, top, topright, left, right, bottomleft, bottomright
 
 [wall]
 wall_width = 2
@@ -36,3 +38,4 @@ grace_period = 100
 "Ctrl-LMB"          = ["wall_lock"]
 "Ctrl-Shift-LMB"    = ["wall_focus_reset"]
 "H"                 = ["alt_res"]
+"K"                 = ["toggle_ninb"]

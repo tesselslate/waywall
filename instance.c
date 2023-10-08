@@ -197,6 +197,36 @@ instance_try_from(struct window *window, struct instance *instance, int inotify_
     ssize_t len = readlink(buf, dir_path, PATH_MAX - 1);
     dir_path[len] = '\0';
 
+    // Check to see if this process has normal directories for a Minecraft instance before spewing
+    // errors to the console.
+    {
+        static const char *dir_names[] = {
+            "config",
+            "logs",
+            "mods",
+            "saves",
+        };
+        DIR *dir = opendir(buf);
+        if (!dir) {
+            wlr_log_errno(WLR_ERROR, "failed to open process directory");
+            return false;
+        }
+        struct dirent *dirent;
+        int found_count = 0;
+        while ((dirent = readdir(dir))) {
+            for (size_t i = 0; i < ARRAY_LEN(dir_names); i++) {
+                if (strcmp(dirent->d_name, dir_names[i]) == 0) {
+                    found_count++;
+                    break;
+                }
+            }
+        }
+        closedir(dir);
+        if (found_count != ARRAY_LEN(dir_names)) {
+            return false;
+        }
+    }
+
     // Check that the instance has the relevant mods and hotkeys.
     instance->alive = true;
     instance->dir = strdup(dir_path);

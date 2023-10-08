@@ -705,8 +705,11 @@ static void
 on_window_request_configure(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_request_configure);
     wlr_log(WLR_DEBUG, "window %d requested configuration", window->surface->window_id);
-
-    // TODO: Allow ninb to be resized (when that's implemented)
+    struct wlr_xwayland_surface_configure_event *event = data;
+    if (window->compositor->vtable.allow_configure(window, event->width, event->height)) {
+        wlr_xwayland_surface_configure(window->surface, event->x, event->y, event->width,
+                                       event->height);
+    }
 }
 
 static void
@@ -768,6 +771,7 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
     }
     compositor->config = config;
 
+    ww_assert(vtable.allow_configure);
     ww_assert(vtable.button);
     ww_assert(vtable.key);
     ww_assert(vtable.motion);
@@ -1171,6 +1175,11 @@ compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplie
 }
 
 void
+compositor_window_close(struct window *window) {
+    wlr_xwayland_surface_close(window->surface);
+}
+
+void
 compositor_window_configure(struct window *window, int16_t w, int16_t h) {
     ww_assert(window);
 
@@ -1230,6 +1239,21 @@ compositor_window_get_pid(struct window *window) {
     return window->surface->pid > 0 ? window->surface->pid : -1;
 }
 
+const char *
+compositor_window_get_name(struct window *window) {
+    ww_assert(window);
+
+    return window->surface->title;
+}
+
+void
+compositor_window_get_size(struct window *window, int16_t *w, int16_t *h) {
+    ww_assert(window);
+
+    *w = window->surface->width;
+    *h = window->surface->height;
+}
+
 struct headless_view *
 compositor_window_make_headless_view(struct window *window) {
     ww_assert(window);
@@ -1250,6 +1274,16 @@ void
 compositor_window_set_dest(struct window *window, struct wlr_box box) {
     wlr_scene_node_set_position(&window->scene_tree->node, WL_X + box.x, WL_Y + box.y);
     wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
+}
+
+void
+compositor_window_set_opacity(struct window *window, float opacity) {
+    wlr_scene_buffer_set_opacity(window->scene_surface->buffer, opacity);
+}
+
+void
+compositor_window_set_top(struct window *window) {
+    wlr_scene_node_raise_to_top(&window->scene_tree->node);
 }
 
 void

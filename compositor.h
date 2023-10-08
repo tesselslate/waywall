@@ -38,6 +38,7 @@ struct compositor_key {
     bool state;
 };
 
+typedef bool (*compositor_allow_configure_func_t)(struct window *, int16_t, int16_t);
 typedef bool (*compositor_button_func_t)(struct compositor_button_event event);
 typedef bool (*compositor_key_func_t)(struct compositor_key_event event);
 typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
@@ -55,6 +56,7 @@ struct compositor_config {
 };
 
 struct compositor_vtable {
+    compositor_allow_configure_func_t allow_configure;
     compositor_button_func_t button;
     compositor_key_func_t key;
     compositor_modifiers_func_t modifiers;
@@ -101,6 +103,9 @@ void compositor_set_mouse_sensitivity(struct compositor *, double);
    WINDOWS
  */
 
+// Requests the client owning the given window to close it.
+void compositor_window_close(struct window *);
+
 // Configures the given window to the given position and size.
 void compositor_window_configure(struct window *, int16_t, int16_t);
 
@@ -114,11 +119,23 @@ void compositor_window_focus(struct compositor *, struct window *);
 // Attempts to get the process ID of the given `window`. Returns -1 on failure.
 pid_t compositor_window_get_pid(struct window *);
 
+// Attempts to get the title of the given `window`.
+const char *compositor_window_get_name(struct window *);
+
+// Gets the size of the given `window`.
+void compositor_window_get_size(struct window *, int16_t *, int16_t *);
+
 // Creates a new headless view for the given window.
 struct headless_view *compositor_window_make_headless_view(struct window *);
 
 // Sets the location and size of the window on the output.
 void compositor_window_set_dest(struct window *, struct wlr_box);
+
+// Sets the opacity of the window.
+void compositor_window_set_opacity(struct window *, float);
+
+// Moves the given window to the top of the stack
+void compositor_window_set_top(struct window *);
 
 /*
    HEADLESS VIEWS
@@ -131,7 +148,7 @@ void compositor_hview_set_dest(struct headless_view *, struct wlr_box);
 void compositor_hview_set_src(struct headless_view *, struct wlr_box);
 
 // Moves this headless view to the top of the stack.
-void compositor_hview_set_top(struct headless_view*);
+void compositor_hview_set_top(struct headless_view *);
 
 /*
  * RECTANGLES

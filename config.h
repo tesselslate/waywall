@@ -23,12 +23,23 @@ enum action {
     ACTION_WALL_FOCUS_RESET,
     ACTION_INGAME_RESET,
     ACTION_INGAME_ALT_RES,
+    ACTION_INGAME_TOGGLE_NINB,
 };
 
 enum unlock_behavior {
     UNLOCK_ACCEPT,
     UNLOCK_IGNORE,
     UNLOCK_RESET,
+};
+
+enum ninb_location {
+    TOP_LEFT,
+    TOP,
+    TOP_RIGHT,
+    LEFT,
+    RIGHT,
+    BOTTOM_LEFT,
+    BOTTOM_RIGHT,
 };
 
 struct keybind {
@@ -58,6 +69,8 @@ struct config {
     float lock_color[4];
     char *cursor_theme;
     int cursor_size;
+    double ninb_opacity;
+    enum ninb_location ninb_location;
 
     // wall
     int wall_width, wall_height;
