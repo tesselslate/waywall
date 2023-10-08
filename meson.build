@@ -86,6 +86,8 @@ executable('waywall',
   ],
 )
 
+executable('waywall-launch', 'waywall-launch.c')
+
 dmabuf_export_header = custom_target(
   'dmabuf-export-header',
   input : 'wlr-export-dmabuf-unstable-v1.xml',
