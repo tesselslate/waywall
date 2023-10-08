@@ -1,5 +1,3 @@
-// TODO: overhaul parse macros
-
 #include "config.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
@@ -145,10 +143,13 @@ config_get_path() {
 }
 
 static bool
-parse_bool(bool *value, toml_table_t *table, const char *value_name, const char *full_name) {
+parse_bool(bool *value, toml_table_t *table, const char *value_name, const char *full_name,
+           bool warn) {
     toml_datum_t datum = toml_bool_in(table, value_name);
     if (!datum.ok) {
-        wlr_log(WLR_ERROR, "config: missing boolean value '%s'", full_name);
+        if (warn) {
+            wlr_log(WLR_ERROR, "config: missing boolean value '%s'", full_name);
+        }
         return false;
     }
     *value = datum.u.b;
@@ -156,10 +157,13 @@ parse_bool(bool *value, toml_table_t *table, const char *value_name, const char 
 }
 
 static bool
-parse_color(float value[4], toml_table_t *table, const char *value_name, const char *full_name) {
+parse_color(float value[4], toml_table_t *table, const char *value_name, const char *full_name,
+            bool warn) {
     toml_datum_t datum = toml_string_in(table, value_name);
     if (!datum.ok) {
-        wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+        if (warn) {
+            wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+        }
         return false;
     }
     char *color = datum.u.s;
@@ -175,7 +179,7 @@ parse_color(float value[4], toml_table_t *table, const char *value_name, const c
     if (maybe_valid_rgb) {
         int n = sscanf(color[0] == '#' ? color + 1 : color, "%02x%02x%02x", &r, &g, &b);
         if (n != 3) {
-            wlr_log(WLR_ERROR, "config: invalud value ('%s') for color value '%s'", color,
+            wlr_log(WLR_ERROR, "config: invalid value ('%s') for color value '%s'", color,
                     full_name);
             free(color);
             return false;
@@ -202,10 +206,13 @@ parse_color(float value[4], toml_table_t *table, const char *value_name, const c
 }
 
 static bool
-parse_double(double *value, toml_table_t *table, const char *value_name, const char *full_name) {
+parse_double(double *value, toml_table_t *table, const char *value_name, const char *full_name,
+             bool warn) {
     toml_datum_t datum = toml_double_in(table, value_name);
     if (!datum.ok) {
-        wlr_log(WLR_ERROR, "config: missing double value '%s'", full_name);
+        if (warn) {
+            wlr_log(WLR_ERROR, "config: missing double value '%s'", full_name);
+        }
         return false;
     }
     *value = datum.u.d;
@@ -213,10 +220,13 @@ parse_double(double *value, toml_table_t *table, const char *value_name, const c
 }
 
 static bool
-parse_int(int *value, toml_table_t *table, const char *value_name, const char *full_name) {
+parse_int(int *value, toml_table_t *table, const char *value_name, const char *full_name,
+          bool warn) {
     toml_datum_t datum = toml_int_in(table, value_name);
     if (!datum.ok) {
-        wlr_log(WLR_ERROR, "config: missing integer value '%s'", full_name);
+        if (warn) {
+            wlr_log(WLR_ERROR, "config: missing integer value '%s'", full_name);
+        }
         return false;
     }
     *value = datum.u.i;
@@ -224,80 +234,102 @@ parse_int(int *value, toml_table_t *table, const char *value_name, const char *f
 }
 
 static bool
-parse_str(char **value, toml_table_t *table, const char *value_name, const char *full_name) {
+parse_str(char **value, toml_table_t *table, const char *value_name, const char *full_name,
+          bool warn) {
     toml_datum_t datum = toml_string_in(table, value_name);
     if (!datum.ok) {
-        wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+        if (warn) {
+            wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+        }
         return false;
     }
     *value = datum.u.s;
     return true;
 }
 
+static int
+parse_enum(bool *ok, toml_table_t *table, const char *value_name, const char *full_name,
+           const struct mapping *mappings, size_t mappings_count, bool warn) {
+    char *str;
+    if (!parse_str(&str, table, value_name, full_name, warn)) {
+        *ok = false;
+        return 0;
+    }
+    for (size_t i = 0; i < mappings_count; i++) {
+        if (strcmp(mappings[i].name, str) == 0) {
+            *ok = true;
+            return mappings[i].val;
+        }
+    }
+    *ok = false;
+
+    // Generate the error message.
+    char buf[1024], *ptr = buf;
+    for (size_t i = 0; i < mappings_count; i++) {
+        ww_assert((size_t)(ptr - buf) < ARRAY_LEN(buf));
+        ptr += snprintf(ptr, 1024 - (ptr - buf), "'%s'%s", mappings[i].name,
+                        (mappings_count - i) == 1 ? "" : ", ");
+    }
+    wlr_log(WLR_ERROR, "config: invalid enum value '%s' for '%s' (use one of: %s)", str, full_name,
+            buf);
+    free(str);
+    return 0;
+}
+
 #define PARSE_BOOL(table, name)                                                                    \
     do {                                                                                           \
-        if (!parse_bool(&config->name, table, STR(name), STR(table) "." STR(name))) {              \
+        if (!parse_bool(&config->name, table, STR(name), STR(table) "." STR(name), true)) {        \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
 
 #define PARSE_COLOR(table, name)                                                                   \
     do {                                                                                           \
-        if (!parse_color(config->name, table, STR(name), STR(table) "." STR(name))) {              \
+        if (!parse_color(config->name, table, STR(name), STR(table) "." STR(name), true)) {        \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
 
 #define PARSE_DOUBLE(table, name)                                                                  \
     do {                                                                                           \
-        if (!parse_double(&config->name, table, STR(name), STR(table) "." STR(name))) {            \
+        if (!parse_double(&config->name, table, STR(name), STR(table) "." STR(name), true)) {      \
+            goto fail_read;                                                                        \
+        }                                                                                          \
+    } while (0)
+
+#define PARSE_DOUBLE_OR(table, name)                                                               \
+    if (!parse_double(&config->name, table, STR(name), STR(table) "." STR(name), false))
+
+#define PARSE_ENUM(table, name, ...)                                                               \
+    do {                                                                                           \
+        bool ok;                                                                                   \
+        const struct mapping mappings[] = __VA_ARGS__;                                             \
+        config->name = parse_enum(&ok, table, STR(name), STR(table) "." STR(name), mappings,       \
+                                  ARRAY_LEN(mappings), true);                                      \
+        if (!ok) {                                                                                 \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
 
 #define PARSE_INT(table, name)                                                                     \
     do {                                                                                           \
-        if (!parse_int(&config->name, table, STR(name), STR(table) "." STR(name))) {               \
+        if (!parse_int(&config->name, table, STR(name), STR(table) "." STR(name), true)) {         \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
+
+#define PARSE_INT_OR(table, name)                                                                  \
+    if (!parse_int(&config->name, table, STR(name), STR(table) "." STR(name), false))
 
 #define PARSE_STRING(table, name)                                                                  \
     do {                                                                                           \
-        if (!parse_str(&config->name, table, STR(name), STR(table) "." STR(name))) {               \
+        if (!parse_str(&config->name, table, STR(name), STR(table) "." STR(name), true)) {         \
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
 
-#define PARSE_ENUM(table, confname, ...)                                                           \
-    do {                                                                                           \
-        char *str;                                                                                 \
-        if (!parse_str(&str, table, STR(confname), STR(table) "." STR(confname))) {                \
-            goto fail_read;                                                                        \
-        }                                                                                          \
-        bool ok = false;                                                                           \
-        static const struct mapping mappings[] = __VA_ARGS__;                                      \
-        for (unsigned long i = 0; i < ARRAY_LEN(mappings); i++) {                                  \
-            if (strcmp(mappings[i].name, str) == 0) {                                              \
-                ok = true;                                                                         \
-                config->confname = mappings[i].val;                                                \
-                break;                                                                             \
-            }                                                                                      \
-        }                                                                                          \
-        if (!ok) {                                                                                 \
-            char buf[1024], *ptr = buf;                                                            \
-            for (unsigned long i = 0; i < ARRAY_LEN(mappings); i++) {                              \
-                ww_assert(ptr - buf < 1024);                                                       \
-                ptr += snprintf(ptr, 1024 - (ptr - buf), "'%s'%s", mappings[i].name,               \
-                                (ARRAY_LEN(mappings) - i) == 1 ? "" : ", ");                       \
-            }                                                                                      \
-            wlr_log(WLR_ERROR, "config: invalid enum value '%s' for '%s' (use one of: %s)", str,   \
-                    STR(table) "." STR(confname), buf);                                            \
-            free(str);                                                                             \
-            goto fail_read;                                                                        \
-        }                                                                                          \
-        free(str);                                                                                 \
-    } while (0)
+#define PARSE_STRING_OR(table, name)                                                               \
+    if (!parse_str(&config->name, table, STR(name), STR(table) "." STR(name), false))
 
 #define CHECK_MIN_MAX(table, name, min, max)                                                       \
     do {                                                                                           \
@@ -362,7 +394,7 @@ config_read() {
     PARSE_BOOL(input, confine_pointer);
     PARSE_DOUBLE(input, main_sens);
     CHECK_MIN_MAX_DOUBLE(input, main_sens, 0.01, 10.0);
-    if (!parse_double(&config->alt_sens, input, "alt_sens", "input.alt_sens")) {
+    PARSE_DOUBLE_OR(input, alt_sens) {
         config->alt_sens = config->main_sens;
     }
 
@@ -374,14 +406,13 @@ config_read() {
     }
     PARSE_COLOR(appearance, background_color);
     PARSE_COLOR(appearance, lock_color);
-    if (!parse_str(&config->cursor_theme, appearance, "cursor_theme", "appearance.cursor_theme")) {
+    PARSE_STRING_OR(appearance, cursor_theme) {
         config->cursor_theme = NULL;
     }
-    if (!parse_int(&config->cursor_size, appearance, "cursor_size", "appearance.cursor_size")) {
+    PARSE_INT_OR(appearance, cursor_size) {
         config->cursor_size = 24;
-    } else {
-        CHECK_MIN_MAX(appearance, cursor_size, 1, 64);
     }
+    CHECK_MIN_MAX(appearance, cursor_size, 1, 64);
     PARSE_DOUBLE(appearance, ninb_opacity);
     CHECK_MIN_MAX_DOUBLE(appearance, ninb_opacity, 0.1, 1.0);
     PARSE_ENUM(appearance, ninb_location,
@@ -411,20 +442,20 @@ config_read() {
     CHECK_MIN_MAX(wall, stretch_height, 1, 4096);
     PARSE_BOOL(wall, use_f1);
     PARSE_BOOL(wall, remain_in_background);
-    bool alt_width = parse_int(&config->alt_width, wall, "alt_width", "wall.alt_width");
-    bool alt_height = parse_int(&config->alt_height, wall, "alt_height", "wall.alt_height");
-    if (alt_width != alt_height) {
-        wlr_log(WLR_ERROR, "config: only one alt res value is present");
+    PARSE_INT_OR(wall, alt_width) {
+        config->alt_width = -1;
+    }
+    PARSE_INT_OR(wall, alt_height) {
+        config->alt_height = -1;
+    }
+    if ((config->alt_width < 0) != (config->alt_height < 0)) {
+        wlr_log(WLR_ERROR, "config: only one dimension present in alternate resolution");
         goto fail_read;
     }
-    if (!alt_width) {
-        config->alt_width = -1;
-        config->alt_height = -1;
-    } else {
+    if ((config->has_alt_res = config->alt_width > 0)) {
         CHECK_MIN_MAX(wall, alt_width, 1, 16384);
         CHECK_MIN_MAX(wall, alt_height, 1, 16384);
     }
-    config->has_alt_res = alt_width;
 
     // reset
     toml_table_t *reset = toml_table_in(conf, "reset");
