@@ -16,7 +16,11 @@
 
 // TODO: handle ninjabrain bot
 // TODO: handle extra instances
-// TODO: watch instance options.txt for changes in important values
+// TODO: fix verification output
+
+// TODO: refactor handle_window and instance data gathering
+// TODO: improve string handling in options/mod gathering
+// TODO: improve error handling (prevent fd leaks, etc) in instance creation
 
 #define WALL -1
 #define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
@@ -49,18 +53,18 @@ static int config_wd;
 static struct instance {
     struct window *window;
     const char *dir;
-    int wd;
-    int fd;
+    int state_wd;
+    int state_fd;
     struct state state;
     struct timespec last_preview;
 
     bool alive, locked;
     bool has_stateout, has_wp;
     struct {
-        uint8_t atum;
-        uint8_t preview;
-    } hotkeys;
-    int gui_scale;
+        uint8_t atum_hotkey, preview_hotkey;
+        int gui_scale;
+        bool unicode;
+    } options;
     bool alt_res;
 
     struct wlr_scene_rect *lock_indicator;
@@ -90,7 +94,8 @@ static bool prepare_reset_counter();
 static void write_reset_count();
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
-static bool instance_get_info(struct instance *);
+static bool instance_get_mods(struct instance *);
+static bool instance_get_options(struct instance *);
 static struct wlr_box instance_get_wall_box(struct instance *);
 static void instance_lock(struct instance *);
 static void instance_pause(struct instance *);
@@ -273,13 +278,13 @@ instance_get_id(struct instance *instance) {
 }
 
 static bool
-instance_get_info(struct instance *instance) {
+instance_get_mods(struct instance *instance) {
     // Open the instance's mods directory.
     char buf[PATH_MAX];
     strncpy(buf, instance->dir, PATH_MAX);
     static const char mods[] = "/mods/";
-    size_t limit = PATH_MAX - strlen(buf) - 1;
-    if (limit < STRING_LEN(mods)) {
+    ssize_t limit = PATH_MAX - strlen(buf) - 1;
+    if (limit < (ssize_t)STRING_LEN(mods)) {
         wlr_log(WLR_ERROR, "instance path too long");
         return false;
     }
@@ -305,7 +310,7 @@ instance_get_info(struct instance *instance) {
         }
         char buf_file[PATH_MAX];
         strncpy(buf_file, buf, PATH_MAX);
-        if (limit < strlen(dirent->d_name)) {
+        if (limit < (ssize_t)strlen(dirent->d_name)) {
             wlr_log(WLR_ERROR, "failed to open mod '%s': path too long", buf_file);
             continue;
         }
@@ -356,12 +361,17 @@ instance_get_info(struct instance *instance) {
         return false;
     }
     closedir(dir);
+    return true;
+}
 
+static bool
+instance_get_options(struct instance *instance) {
     // Check for the user's Atum and WorldPreview hotkeys.
+    char buf[PATH_MAX];
     strncpy(buf, instance->dir, PATH_MAX);
     const char options[] = "/options.txt";
-    limit = PATH_MAX - strlen(buf) - 1;
-    if (limit < STRING_LEN(options)) {
+    ssize_t limit = PATH_MAX - strlen(buf) - 1;
+    if (limit < (ssize_t)STRING_LEN(options)) {
         wlr_log(WLR_ERROR, "instance path too long");
         return false;
     }
@@ -377,6 +387,7 @@ instance_get_info(struct instance *instance) {
         const char atum[] = "key_Create New World:";
         const char wp[] = "key_Leave Preview:";
         const char gui_scale[] = "guiScale:";
+        const char unicode_font[] = "forceUnicodeFont:";
 
         uint8_t *keycode;
         char *end = strrchr(line, '\n');
@@ -387,29 +398,40 @@ instance_get_info(struct instance *instance) {
             const char *key = line + STRING_LEN(atum);
             atum_hotkey = true;
             if ((keycode = get_minecraft_keycode(key))) {
-                instance->hotkeys.atum = *keycode;
+                instance->options.atum_hotkey = *keycode;
             } else {
                 wlr_log(WLR_INFO, "unknown atum hotkey '%s' in '%s': setting to default of F6", key,
                         buf);
-                instance->hotkeys.atum = KEY_F6 + 8;
+                instance->options.atum_hotkey = KEY_F6 + 8;
             }
         } else if (strncmp(line, wp, STRING_LEN(wp)) == 0) {
             const char *key = line + STRING_LEN(wp);
             wp_hotkey = true;
             if ((keycode = get_minecraft_keycode(key))) {
-                instance->hotkeys.preview = *keycode;
+                instance->options.preview_hotkey = *keycode;
             } else {
                 wlr_log(WLR_INFO,
                         "unknown leave preview hotkey '%s' in '%s': setting to default of H", key,
                         buf);
-                instance->hotkeys.preview = KEY_H + 8;
+                instance->options.preview_hotkey = KEY_H + 8;
             }
         } else if (strncmp(line, gui_scale, STRING_LEN(gui_scale)) == 0) {
             const char *scale = line + STRING_LEN(gui_scale);
             char *endptr;
-            instance->gui_scale = strtol(scale, &endptr, 10);
+            instance->options.gui_scale = strtol(scale, &endptr, 10);
             if (endptr == scale) {
                 wlr_log(WLR_ERROR, "failed to parse GUI scale ('%s')", scale);
+                fclose(file);
+                return false;
+            }
+        } else if (strncmp(line, unicode_font, STRING_LEN(unicode_font)) == 0) {
+            const char *unicode = line + STRING_LEN(unicode_font);
+            if (strcmp(unicode, "false") == 0) {
+                instance->options.unicode = false;
+            } else if (strcmp(unicode, "true") == 0) {
+                instance->options.unicode = true;
+            } else {
+                wlr_log(WLR_ERROR, "failed to parse forceUnicodeFont ('%s')", unicode);
                 fclose(file);
                 return false;
             }
@@ -418,11 +440,11 @@ instance_get_info(struct instance *instance) {
 
     if (!atum_hotkey) {
         wlr_log(WLR_INFO, "no atum hotkey found in '%s': setting to default of F6", buf);
-        instance->hotkeys.atum = KEY_F6 + 8;
+        instance->options.atum_hotkey = KEY_F6 + 8;
     }
     if (!wp_hotkey) {
         wlr_log(WLR_INFO, "no leave preview hotkey found in '%s': setting to default of H", buf);
-        instance->hotkeys.preview = KEY_H + 8;
+        instance->options.preview_hotkey = KEY_H + 8;
     }
 
     return true;
@@ -519,6 +541,11 @@ instance_play(struct instance *instance) {
         compositor_rect_toggle(instance->lock_indicator, false);
         instance->locked = false;
     }
+
+    // We attempt to reread the instance's options file here for any changes. Using inotify to read
+    // it when it is updated is unfortunately a bit cumbersome as the game seems to write the file
+    // in 512 byte chunks.
+    instance_get_options(instance);
 }
 
 static bool
@@ -574,9 +601,9 @@ instance_reset(struct instance *instance) {
     // Press the appropriate reset hotkey.
     uint32_t keycode;
     if (instance->state.screen == PREVIEWING) {
-        keycode = instance->hotkeys.preview;
+        keycode = instance->options.preview_hotkey;
     } else {
-        keycode = instance->hotkeys.atum;
+        keycode = instance->options.atum_hotkey;
     }
     const struct compositor_key reset_keys[] = {
         {keycode, true},
@@ -597,8 +624,9 @@ instance_update_verification(struct instance *instance) {
     // Copied from Julti
     // TODO: Handle unicode font changing GUI scale
     int i = 1;
-    while (i != instance->gui_scale && i < config->stretch_width && i < config->stretch_height &&
-           (config->stretch_width / (i + 1)) >= 320 && (config->stretch_height / (i + 1)) >= 240) {
+    while (i != instance->options.gui_scale && i < config->stretch_width &&
+           i < config->stretch_height && (config->stretch_width / (i + 1)) >= 320 &&
+           (config->stretch_height / (i + 1)) >= 240) {
         i++;
     }
     int square_size = i * 90;
@@ -739,11 +767,11 @@ process_bind(struct keybind *keybind, bool held) {
 static void
 process_state(struct instance *instance) {
     char buf[128];
-    if (lseek(instance->fd, 0, SEEK_SET) == -1) {
+    if (lseek(instance->state_fd, 0, SEEK_SET) == -1) {
         wlr_log_errno(WLR_ERROR, "failed to seek wpstateout");
         return;
     }
-    ssize_t len = read(instance->fd, buf, 127);
+    ssize_t len = read(instance->state_fd, buf, 127);
     if (len == 0) {
         return;
     }
@@ -774,8 +802,8 @@ process_state(struct instance *instance) {
             instance->state.data.percent = atoi(b);
         } else if (strcmp(a, "previewing") == 0) {
             if (last_state.screen != PREVIEWING) {
-                instance_pause(instance);
                 clock_gettime(CLOCK_MONOTONIC, &instance->last_preview);
+                instance_pause(instance);
             }
             instance->state.screen = PREVIEWING;
             instance->state.data.percent = atoi(b);
@@ -960,7 +988,11 @@ handle_window(struct window *window, bool map) {
     struct instance instance;
     instance.alive = true;
     instance.dir = strdup(dir_path);
-    if (!instance_get_info(&instance)) {
+    if (!instance_get_mods(&instance)) {
+        free((void *)instance.dir);
+        return;
+    }
+    if (!instance_get_options(&instance)) {
         free((void *)instance.dir);
         return;
     }
@@ -975,13 +1007,13 @@ handle_window(struct window *window, bool map) {
         return;
     }
     strcat(dir_path, state_name);
-    instance.fd = open(dir_path, O_CLOEXEC | O_NONBLOCK | O_RDONLY);
-    if (instance.fd == -1) {
+    instance.state_fd = open(dir_path, O_CLOEXEC | O_NONBLOCK | O_RDONLY);
+    if (instance.state_fd == -1) {
         wlr_log_errno(WLR_ERROR, "failed to open instance state file (%s)", dir_path);
         return;
     }
-    instance.wd = inotify_add_watch(inotify_fd, dir_path, IN_MODIFY);
-    if (instance.wd == -1) {
+    instance.state_wd = inotify_add_watch(inotify_fd, dir_path, IN_MODIFY);
+    if (instance.state_wd == -1) {
         wlr_log_errno(WLR_ERROR, "failed to add instance state file (%s) to inotify", dir_path);
         return;
     }
@@ -1033,7 +1065,7 @@ handle_inotify(int fd, uint32_t mask, void *data) {
             event = (const struct inotify_event *)ptr;
             if (event->mask & IN_MODIFY) {
                 for (int i = 0; i < instance_count; i++) {
-                    if (instances[i].wd == event->wd) {
+                    if (instances[i].state_wd == event->wd) {
                         process_state(&instances[i]);
                         break;
                     }
