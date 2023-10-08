@@ -622,11 +622,13 @@ instance_update_verification(struct instance *instance) {
     // TODO: Make generation more robust for weird sizes
 
     // Copied from Julti
-    // TODO: Handle unicode font changing GUI scale
     int i = 1;
     while (i != instance->options.gui_scale && i < config->stretch_width &&
            i < config->stretch_height && (config->stretch_width / (i + 1)) >= 320 &&
            (config->stretch_height / (i + 1)) >= 240) {
+        i++;
+    }
+    if (instance->options.unicode && i % 2 != 0) {
         i++;
     }
     int square_size = i * 90;
