@@ -54,6 +54,7 @@ struct keybind {
     uint32_t modifiers;
     enum action actions[MAX_ACTIONS];
     int action_count;
+    bool allow_in_menu;
 };
 
 struct config {

@@ -734,6 +734,13 @@ handle_key(struct compositor_key_event event) {
         if (config->binds[i].modifiers != held_modifiers) {
             continue;
         }
+        if (!config->binds[i].allow_in_menu && active_instance != WALL) {
+            struct state state = instances[active_instance].state;
+            if (state.screen == INWORLD && state.data.world != UNPAUSED) {
+                return false;
+            }
+        }
+
         for (int j = 0; j < event.nsyms; j++) {
             if (event.syms[j] == config->binds[i].input.sym) {
                 process_bind(&config->binds[i], false);

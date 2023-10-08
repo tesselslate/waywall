@@ -43,6 +43,61 @@ static const struct mapping modifiers[] = {
 const char config_filename[] = "waywall.toml";
 static const char xdg_config_dir[] = "/.config";
 
+static bool
+parse_bind_array(toml_array_t *array, struct keybind *keybind, const char *key) {
+    if (toml_array_nelem(array) > MAX_ACTIONS) {
+        wlr_log(WLR_ERROR, "config: too many actions assigned to keybind '%s'", key);
+        return false;
+    } else if (toml_array_nelem(array) == 0) {
+        wlr_log(WLR_ERROR, "config: no actions assigned to keybind '%s'", key);
+        return false;
+    }
+    for (int j = 0; j < toml_array_nelem(array); j++) {
+        toml_datum_t action = toml_string_at(array, j);
+        if (!action.ok) {
+            wlr_log(WLR_ERROR, "config: found non-string value for action %d of keybind '%s'", j,
+                    key);
+            free(action.u.s);
+            return false;
+        }
+        bool found_action = false;
+        for (unsigned long k = 0; k < ARRAY_LEN(actions); k++) {
+            if (strcasecmp(action.u.s, actions[k].name) == 0) {
+                keybind->actions[keybind->action_count++] = actions[k].val;
+                found_action = true;
+                break;
+            }
+        }
+        if (!found_action) {
+            wlr_log(WLR_ERROR, "config: unknown action '%s' assigned to keybind '%s'", action.u.s,
+                    key);
+            free(action.u.s);
+            return false;
+        }
+        free(action.u.s);
+    }
+    return true;
+}
+
+static bool
+parse_bind_table(toml_table_t *table, struct keybind *keybind, const char *key) {
+    toml_array_t *actions = toml_array_in(table, "actions");
+    if (!actions) {
+        wlr_log(WLR_ERROR, "config: keybind '%s' has no 'actions' array", key);
+        return false;
+    }
+    if (!parse_bind_array(actions, keybind, key)) {
+        return false;
+    }
+    toml_datum_t allow_in_menu = toml_bool_in(table, "allow_in_menu");
+    if (!allow_in_menu.ok) {
+        wlr_log(WLR_ERROR, "config: keybind '%s' has no 'allow_in_menu' boolean", key);
+        return false;
+    }
+    keybind->allow_in_menu = allow_in_menu.u.b;
+    return true;
+}
+
 char *
 config_get_dir() {
     const char *dir;
@@ -489,40 +544,20 @@ config_read() {
         free(keyname);
 
         toml_array_t *array = toml_array_in(keybinds, key);
-        if (!array) {
-            wlr_log(WLR_ERROR, "config: found non-array value at keybind '%s'", key);
-            goto fail_read;
-        }
-        if (toml_array_nelem(array) > MAX_ACTIONS) {
-            wlr_log(WLR_ERROR, "config: too many actions assigned to keybind '%s'", key);
-            goto fail_read;
-        } else if (toml_array_nelem(array) == 0) {
-            wlr_log(WLR_ERROR, "config: no actions assigned to keybind '%s'", key);
-            goto fail_read;
-        }
-        for (int j = 0; j < toml_array_nelem(array); j++) {
-            toml_datum_t action = toml_string_at(array, j);
-            if (!action.ok) {
-                wlr_log(WLR_ERROR, "config: found non-string value at index %d of keybind '%s'", j,
-                        key);
-                free(action.u.s);
+        if (array) {
+            if (!parse_bind_array(array, keybind, key)) {
                 goto fail_read;
             }
-            bool found_action = false;
-            for (unsigned long k = 0; k < ARRAY_LEN(actions); k++) {
-                if (strcasecmp(action.u.s, actions[k].name) == 0) {
-                    keybind->actions[keybind->action_count++] = actions[k].val;
-                    found_action = true;
-                    break;
-                }
-            }
-            if (!found_action) {
-                wlr_log(WLR_ERROR, "config: unknown action '%s' assigned to keybind '%s'",
-                        action.u.s, key);
-                free(action.u.s);
+            keybind->allow_in_menu = true;
+        } else {
+            toml_table_t *table = toml_table_in(keybinds, key);
+            if (!table) {
+                wlr_log(WLR_ERROR, "config: invalid type for keybind '%s'", key);
                 goto fail_read;
             }
-            free(action.u.s);
+            if (!parse_bind_table(table, keybind, key)) {
+                goto fail_read;
+            }
         }
         config->bind_count++;
     }
