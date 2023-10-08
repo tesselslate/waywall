@@ -762,7 +762,7 @@ handle_window(struct window *window, bool map) {
         return;
     }
 
-    struct instance instance;
+    struct instance instance = {0};
     if (instance_try_from(window, &instance, inotify_fd)) {
         int id = instance_count;
         instances[instance_count++] = instance;
