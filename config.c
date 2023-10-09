@@ -258,6 +258,7 @@ parse_enum(bool *ok, toml_table_t *table, const char *value_name, const char *fu
     for (size_t i = 0; i < mappings_count; i++) {
         if (strcmp(mappings[i].name, str) == 0) {
             *ok = true;
+            free(str);
             return mappings[i].val;
         }
     }
