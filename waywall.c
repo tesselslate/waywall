@@ -13,7 +13,6 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/util/log.h>
 
-// TODO: fix verification output
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
 // TODO: free dir paths in instances
@@ -503,7 +502,8 @@ instance_update_verification(struct instance *instance) {
                          .width = square_size,
                          .height = square_size + extra_height});
     compositor_hview_set_dest(instance->hview_wp,
-                              (struct wlr_box){x, y - h, square_size, square_size + extra_height});
+                              (struct wlr_box){x, y + h - (square_size + extra_height), square_size,
+                                               square_size + extra_height});
     compositor_hview_set_top(instance->hview_wp);
 }
 
