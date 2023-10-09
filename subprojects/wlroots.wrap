@@ -1,6 +1,6 @@
 [wrap-git]
 directory = wlroots
 url = https://gitlab.freedesktop.org/wlroots/wlroots.git
-revision = head
+revision = 078540e086c8dd80905dc95e8dcb6ab05ad52030
 
 diff_files = wlroots-no-dest-size.patch
