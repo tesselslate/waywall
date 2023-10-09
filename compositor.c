@@ -147,6 +147,7 @@ struct window {
         struct wlr_scene_tree *tree;
         struct wlr_scene_surface *surface;
     } headless_views[4];
+    struct wlr_scene_tree *headless_tree;
     int headless_view_count;
 
     struct wl_listener on_associate;
@@ -1259,13 +1260,19 @@ compositor_window_make_headless_view(struct window *window) {
     ww_assert(window);
     ww_assert(window->headless_view_count < (int)ARRAY_LEN(window->headless_views));
 
+    if (!window->headless_tree) {
+        window->headless_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
+        ww_assert(window->headless_tree);
+        wlr_scene_node_set_enabled(&window->headless_tree->node, true);
+        wlr_scene_node_set_position(&window->headless_tree->node, HEADLESS_X, HEADLESS_Y);
+    }
+
     struct headless_view *view = &window->headless_views[window->headless_view_count++];
-    view->tree = wlr_scene_tree_create(&window->compositor->scene->tree);
+    view->tree = wlr_scene_tree_create(window->headless_tree);
     ww_assert(view->tree);
-    wlr_scene_node_set_enabled(&view->tree->node, true);
     view->surface = wlr_scene_surface_create(view->tree, window->surface->surface);
     ww_assert(view->surface);
-    wlr_scene_node_set_position(&view->tree->node, HEADLESS_X, HEADLESS_Y);
+    wlr_scene_node_set_enabled(&view->tree->node, true);
 
     return view;
 }
@@ -1288,13 +1295,12 @@ compositor_window_set_top(struct window *window) {
 
 void
 compositor_hview_set_dest(struct headless_view *view, struct wlr_box box) {
-    wlr_scene_node_set_position(&view->tree->node, HEADLESS_X + box.x, HEADLESS_Y + box.y);
+    wlr_scene_node_set_position(&view->tree->node, box.x, box.y);
     wlr_scene_buffer_set_dest_size(view->surface->buffer, box.width, box.height);
 }
 
 void
 compositor_hview_set_src(struct headless_view *view, struct wlr_box box) {
-    // TODO: This can trigger an assert in wlroots:render/pass.c. Should investigate for stability.
     const struct wlr_fbox fbox = {
         .x = box.x,
         .y = box.y,

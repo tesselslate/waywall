@@ -1,0 +1,60 @@
+diff --git a/types/scene/surface.c b/types/scene/surface.c
+index 1fe0762b..094e9e06 100644
+--- a/types/scene/surface.c
++++ b/types/scene/surface.c
+@@ -106,11 +106,13 @@ static void set_buffer_with_surface_state(struct wlr_scene_buffer *scene_buffer,
+ 
+ 	wlr_scene_buffer_set_opaque_region(scene_buffer, &surface->opaque_region);
+ 
+-	struct wlr_fbox src_box;
+-	wlr_surface_get_buffer_source_box(surface, &src_box);
+-	wlr_scene_buffer_set_source_box(scene_buffer, &src_box);
++	// WAYWALL: Do not change the source box. We handle this ourselves in scene_entry_render.
++	// struct wlr_fbox src_box;
++	// wlr_surface_get_buffer_source_box(surface, &src_box);
++	// wlr_scene_buffer_set_source_box(scene_buffer, &src_box);
+ 
+-	wlr_scene_buffer_set_dest_size(scene_buffer, state->width, state->height);
++	// WAYWALL: We want to control the destination size of the window.
++	// wlr_scene_buffer_set_dest_size(scene_buffer, state->width, state->height);
+ 	wlr_scene_buffer_set_transform(scene_buffer, state->transform);
+ 
+ 	scene_buffer_unmark_client_buffer(scene_buffer);
+diff --git a/types/scene/wlr_scene.c b/types/scene/wlr_scene.c
+index 03d80eab..29dd71cd 100644
+--- a/types/scene/wlr_scene.c
++++ b/types/scene/wlr_scene.c
+@@ -1171,9 +1171,32 @@ static void scene_entry_render(struct render_list_entry *entry, const struct ren
+ 			wlr_output_transform_invert(scene_buffer->transform);
+ 		transform = wlr_output_transform_compose(transform, data->transform);
+ 
++		// WAYWALL: Calculate the intersection of our source box and the surface's maximum source box
++		// to prevent triggering an assert in wlr_render_pass_add_texture. If we have not specified a
++		// source box, then use the surface source box.
++		struct wlr_fbox src_box;
++		struct wlr_scene_surface *scene_surface = wlr_scene_surface_try_from_buffer(scene_buffer);
++		if (scene_surface) {
++			struct wlr_fbox a, b = scene_buffer->src_box;
++			wlr_surface_get_buffer_source_box(scene_surface->surface, &a);
++			if (b.x == 0 && b.y == 0 && b.width == 0 && b.height == 0) {
++				src_box = a;
++			} else {
++				double x1 = fmax(a.x, b.x);
++				double x2 = fmin(a.x + a.width, b.x + b.width);
++				double y1 = fmax(a.y, b.y);
++				double y2 = fmax(a.y + a.height, b.y + b.height);
++				src_box.x = x1;
++				src_box.y = y1;
++				src_box.width = x2 - x1;
++				src_box.height = y2 - y1;
++			}
++		} else {
++			src_box = scene_buffer->src_box;
++		}
+ 		wlr_render_pass_add_texture(data->render_pass, &(struct wlr_render_texture_options) {
+ 			.texture = texture,
+-			.src_box = scene_buffer->src_box,
++			.src_box = src_box,
+ 			.dst_box = dst_box,
+ 			.transform = transform,
+ 			.clip = &render_region,
