@@ -109,15 +109,6 @@ config_update() {
         }
     }
 
-    bool same_size = config->cursor_size == new_config->cursor_size;
-    bool same_theme = (config->cursor_theme && new_config->cursor_theme)
-                          ? strcmp(config->cursor_theme, new_config->cursor_theme) == 0
-                          : !config->cursor_theme && !new_config->cursor_theme;
-    if (!same_size || !same_theme) {
-        // TODO: Figure out how to update cursor theme in xcursor manager
-        wlr_log(WLR_ERROR,
-                "changing cursor options will not take effect until waywall is restarted");
-    }
     config_destroy(config);
     config = new_config;
 

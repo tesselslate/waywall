@@ -1154,6 +1154,20 @@ compositor_load_config(struct compositor *compositor, struct compositor_config c
         zwp_confined_pointer_v1_destroy(compositor->remote_confined_pointer);
         compositor->remote_confined_pointer = NULL;
     }
+    if (config.cursor_size != compositor->config.cursor_size ||
+        config.cursor_theme != compositor->config.cursor_theme) {
+        struct wlr_xcursor_manager *cursor_manager =
+            wlr_xcursor_manager_create(config.cursor_theme, config.cursor_size);
+        if (!cursor_manager) {
+            wlr_log(WLR_ERROR, "failed to create new cursor manager");
+            goto fail_cursor_manager;
+        }
+        wlr_xcursor_manager_destroy(compositor->cursor_manager);
+        compositor->cursor_manager = cursor_manager;
+        wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
+        set_xwayland_cursor(compositor);
+    fail_cursor_manager:;
+    }
 
     ww_assert(compositor->background);
     wlr_scene_rect_set_color(compositor->background, (const float *)&config.background_color);
