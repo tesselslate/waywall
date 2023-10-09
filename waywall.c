@@ -794,6 +794,10 @@ handle_motion(struct compositor_motion_event event) {
     if (held_buttons_count == 0) {
         return;
     }
+    struct instance *hovered = instance_get_hovered();
+    if (!hovered) {
+        return;
+    }
 
     for (int i = 0; i < config->bind_count; i++) {
         if (config->binds[i].type != BIND_MOUSE) {
@@ -805,7 +809,7 @@ handle_motion(struct compositor_motion_event event) {
         if (!held_buttons[config->binds[i].input.button - BTN_MOUSE]) {
             continue;
         }
-        bool same_last_instance = last_held.instance == instance_get_id(instance_get_hovered());
+        bool same_last_instance = last_held.instance == instance_get_id(hovered);
         bool same_last_bind = last_held.bind == &config->binds[i];
 
         if (!same_last_instance || !same_last_bind) {
