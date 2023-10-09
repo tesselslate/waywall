@@ -190,7 +190,7 @@ ninb_reposition(int16_t w, int16_t h) {
         x = (screen_width - size.width) / 2;
     } else {
         ww_assert(!"unreachable");
-        exit(1);
+        __builtin_unreachable();
     }
     if (loc == TOP_LEFT || loc == TOP || loc == TOP_RIGHT) {
         y = 0;
@@ -200,7 +200,7 @@ ninb_reposition(int16_t w, int16_t h) {
         y = screen_height - size.height;
     } else {
         ww_assert(!"unreachable");
-        exit(1);
+        __builtin_unreachable();
     }
     compositor_window_set_dest(ninb_window, (struct wlr_box){x, y, size.width, size.height});
 }
