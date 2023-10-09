@@ -763,6 +763,24 @@ on_xwayland_ready(struct wl_listener *listener, void *data) {
     compositor->xcb = conn;
 }
 
+static void
+set_xwayland_cursor(struct compositor *compositor) {
+    if (!wlr_xcursor_manager_load(compositor->cursor_manager, 1)) {
+        wlr_log(WLR_ERROR, "failed to load theme");
+        return;
+    }
+    struct wlr_xcursor *cursor =
+        wlr_xcursor_manager_get_xcursor(compositor->cursor_manager, "default", 1);
+    if (cursor->image_count < 1) {
+        wlr_log(WLR_ERROR, "no images for cursor");
+        return;
+    }
+    wlr_xwayland_set_cursor(compositor->xwayland, cursor->images[0]->buffer,
+                            cursor->images[0]->width * 4, cursor->images[0]->width,
+                            cursor->images[0]->height, cursor->images[0]->hotspot_x,
+                            cursor->images[0]->hotspot_y);
+}
+
 struct compositor *
 compositor_create(struct compositor_vtable vtable, struct compositor_config config) {
     struct compositor *compositor = calloc(1, sizeof(struct compositor));
@@ -918,6 +936,7 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
         wlr_log(WLR_ERROR, "failed to create wlr_xwayland");
         goto fail_xwayland;
     }
+    set_xwayland_cursor(compositor);
     wl_list_init(&compositor->windows);
     compositor->on_xwayland_new_surface.notify = on_xwayland_new_surface;
     compositor->on_xwayland_ready.notify = on_xwayland_ready;
