@@ -1327,6 +1327,11 @@ compositor_window_set_top(struct window *window) {
 }
 
 void
+compositor_window_set_visible(struct window *window, bool visible) {
+    wlr_scene_node_set_enabled(&window->scene_tree->node, visible);
+}
+
+void
 compositor_hview_set_dest(struct headless_view *view, struct wlr_box box) {
     wlr_scene_node_set_position(&view->tree->node, box.x, box.y);
     wlr_scene_buffer_set_dest_size(view->surface->buffer, box.width, box.height);

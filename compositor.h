@@ -137,6 +137,9 @@ void compositor_window_set_opacity(struct window *, float);
 // Moves the given window to the top of the stack
 void compositor_window_set_top(struct window *);
 
+// Sets the visibility of the given window.
+void compositor_window_set_visible(struct window *, bool);
+
 /*
  *  HEADLESS VIEWS
  */

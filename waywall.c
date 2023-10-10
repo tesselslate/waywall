@@ -445,6 +445,7 @@ instance_play(struct instance *instance) {
     ww_assert(instance->alive);
     ww_assert(instance_get_id(instance) != active_instance);
 
+    // Focus and fullscreen the instance.
     compositor_window_focus(compositor, instance->window);
     compositor_window_configure(instance->window, screen_width, screen_height);
     struct wlr_box box = {
@@ -455,6 +456,7 @@ instance_play(struct instance *instance) {
     };
     compositor_window_set_dest(instance->window, box);
 
+    // Unpause the instance, disable the lock indicator, and hide the other instances.
     static const struct compositor_key unpause_keys[] = {
         {KEY_ESC, true},
         {KEY_ESC, false},
@@ -469,6 +471,11 @@ instance_play(struct instance *instance) {
         ww_assert(instance->lock_indicator);
         compositor_rect_toggle(instance->lock_indicator, false);
         instance->locked = false;
+    }
+    for (int i = 0; i < max_instance_id; i++) {
+        if (instances[i].alive) {
+            compositor_window_set_visible(instances[i].window, i == active_instance ? true : false);
+        }
     }
 
     // We attempt to reread the instance's options file here for any changes. Using inotify to read
@@ -604,6 +611,11 @@ wall_focus() {
 
     compositor_window_focus(compositor, NULL);
     active_instance = WALL;
+    for (int i = 0; i < max_instance_id; i++) {
+        if (instances[i].alive) {
+            compositor_window_set_visible(instances[i].window, true);
+        }
+    }
 }
 
 static void
