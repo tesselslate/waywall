@@ -16,7 +16,7 @@ bool
 instance_get_mods(struct instance *instance) {
     // Open the instance's mods directory.
     char buf[PATH_MAX];
-    strncpy(buf, instance->dir, PATH_MAX);
+    strncpy(buf, instance->dir, PATH_MAX - 1);
     static const char mods[] = "/mods/";
     ssize_t limit = PATH_MAX - strlen(buf) - 1;
     if (limit < (ssize_t)STRING_LEN(mods)) {
@@ -103,7 +103,7 @@ bool
 instance_get_options(struct instance *instance) {
     // Check for the user's Atum and WorldPreview hotkeys.
     char buf[PATH_MAX];
-    strncpy(buf, instance->dir, PATH_MAX);
+    strncpy(buf, instance->dir, PATH_MAX - 1);
     const char options[] = "/options.txt";
     ssize_t limit = PATH_MAX - strlen(buf) - 1;
     if (limit < (ssize_t)STRING_LEN(options)) {
