@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
+#include "cpu.h"
 
 struct state {
     enum {
@@ -29,6 +30,7 @@ struct instance {
     int state_wd, state_fd;
     struct state state;
     struct timespec last_preview;
+    enum cpu_group last_group;
 
     bool alive, locked;
     bool has_stateout, has_wp;

@@ -19,21 +19,7 @@ static const char *group_names[] = {
     [CPU_HIGH] = "high", [CPU_ACTIVE] = "active",
 };
 
-static struct {
-    pid_t pid;
-    enum cpu_group group;
-} pid_groups[MAX_INSTANCE_COUNT];
 static bool any_active;
-
-static int
-find_pid(pid_t pid) {
-    for (int i = 0; i < MAX_INSTANCE_COUNT; i++) {
-        if (pid_groups[i].pid == pid || pid_groups[i].pid == 0) {
-            return i;
-        }
-    }
-    ww_unreachable();
-}
 
 static const char *
 strgroup(enum cpu_group group) {
@@ -106,25 +92,23 @@ cpu_init() {
 
 void
 cpu_move_to_group(pid_t pid, enum cpu_group group) {
+    static pid_t last_active;
+
     static_assert(sizeof(int) >= sizeof(pid_t), "sizeof(int) < sizeof(pid_t)");
     ww_assert(group != CPU_NONE);
-
-    int i = find_pid(pid);
-    if (pid_groups[i].group == group) {
-        return;
-    }
 
     // There should only be one active instance at any point.
     if (group == CPU_ACTIVE) {
         ww_assert(!any_active);
     }
 
-    if (pid_groups[i].group == CPU_ACTIVE) {
+    if (last_active == pid) {
         any_active = false;
+        last_active = 0;
     } else if (group == CPU_ACTIVE) {
         any_active = true;
+        last_active = pid;
     }
-    pid_groups[i].group = group;
 
     char buf[PATH_MAX];
     ww_assert(STRING_LEN(cgroup_dir) + strlen(strgroup(group)) + STRING_LEN("/cgroup.procs") + 1 <

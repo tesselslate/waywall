@@ -170,6 +170,10 @@ cpu_update_instance(struct instance *instance, enum cpu_group override) {
             ww_unreachable();
         }
     }
+    if (group == instance->last_group) {
+        return;
+    }
+    instance->last_group = group;
     cpu_move_to_group(compositor_window_get_pid(instance->window), group);
 }
 
@@ -1000,6 +1004,7 @@ handle_window(struct window *window, bool map) {
                 wlr_log(WLR_ERROR, "instance %d died", i);
                 instances[i].alive = false;
                 instances[i].window = NULL;
+                instances[i].last_group = CPU_NONE;
                 return;
             }
         }
