@@ -502,6 +502,9 @@ config_read() {
             CHECK_MIN_MAX(performance, active_cpu, 1, 10000);
             CHECK_MIN_MAX(performance, preview_threshold, 0, 100);
         }
+        PARSE_STRING_OR(performance, sleepbg_lock) {
+            config->sleepbg_lock = NULL;
+        }
     }
 
     // keybinds
@@ -639,6 +642,9 @@ config_destroy(struct config *config) {
     }
     if (config->resets_file) {
         free(config->resets_file);
+    }
+    if (config->sleepbg_lock) {
+        free(config->sleepbg_lock);
     }
     free(config);
 }

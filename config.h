@@ -93,6 +93,7 @@ struct config {
     int high_cpu;
     int active_cpu;
     int preview_threshold;
+    char *sleepbg_lock;
 
     // keybinds
     struct keybind binds[MAX_BINDS];

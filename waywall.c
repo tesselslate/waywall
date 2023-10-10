@@ -14,7 +14,6 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/util/log.h>
 
-// TODO: sleepbg.lock
 // TODO: better benchmarking (config options?)
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
@@ -71,6 +70,7 @@ static void ninb_reposition(int16_t, int16_t);
 static void ninb_set_visible(bool);
 static bool prepare_reset_counter();
 static void write_reset_count();
+static void sleepbg_lock_toggle(bool);
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
 static struct wlr_box instance_get_wall_box(struct instance *);
@@ -349,6 +349,27 @@ write_reset_count() {
     }
 }
 
+static void
+sleepbg_lock_toggle(bool state) {
+    static bool sleepbg_state;
+    if (!config->sleepbg_lock || sleepbg_state == state) {
+        return;
+    }
+
+    sleepbg_state = state;
+    if (state) {
+        int ret = creat(config->sleepbg_lock, 0644);
+        if (ret == -1) {
+            wlr_log_errno(WLR_ERROR, "failed to create sleepbg.lock");
+        }
+    } else {
+        int ret = remove(config->sleepbg_lock);
+        if (ret == -1) {
+            wlr_log_errno(WLR_ERROR, "failed to delete sleepbg.lock");
+        }
+    }
+}
+
 static struct instance *
 instance_get_hovered() {
     if (active_instance != WALL) {
@@ -477,6 +498,9 @@ instance_play(struct instance *instance) {
             compositor_window_set_visible(instances[i].window, i == active_instance ? true : false);
         }
     }
+
+    // Enable sleepbg.lock.
+    sleepbg_lock_toggle(true);
 
     // We attempt to reread the instance's options file here for any changes. Using inotify to read
     // it when it is updated is unfortunately a bit cumbersome as the game seems to write the file
@@ -610,6 +634,7 @@ wall_focus() {
     ww_assert(active_instance != WALL);
 
     compositor_window_focus(compositor, NULL);
+    sleepbg_lock_toggle(false);
     active_instance = WALL;
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
