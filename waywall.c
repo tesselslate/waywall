@@ -1,6 +1,6 @@
-#include "cfs.h"
 #include "compositor.h"
 #include "config.h"
+#include "cpu.h"
 #include "instance.h"
 #include "util.h"
 #include <fcntl.h>
@@ -52,7 +52,7 @@ static struct {
 static uint64_t reset_count;
 static int reset_count_fd = INT_MIN;
 
-static void cfs_update_instance(struct instance *, enum cfs_group);
+static void cpu_update_instance(struct instance *, enum cpu_group);
 static void config_update();
 static struct wlr_box compute_alt_res();
 static struct compositor_config create_compositor_config();
@@ -83,36 +83,36 @@ static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
 
 static void
-cfs_update_instance(struct instance *instance, enum cfs_group override) {
+cpu_update_instance(struct instance *instance, enum cpu_group override) {
     if (!config->has_cpu) {
         return;
     }
-    enum cfs_group group;
-    if (override != CFS_NONE) {
+    enum cpu_group group;
+    if (override != CPU_NONE) {
         group = override;
     } else {
         switch (instance->state.screen) {
         case TITLE:
-            group = CFS_HIGH;
+            group = CPU_HIGH;
             break;
         case GENERATING:
-            group = CFS_HIGH;
+            group = CPU_HIGH;
             break;
         case WAITING:
-            group = CFS_HIGH;
+            group = CPU_HIGH;
             break;
         case PREVIEWING:
             if (instance->state.data.percent > config->preview_threshold) {
-                group = CFS_LOW;
+                group = CPU_LOW;
             } else {
-                group = CFS_HIGH;
+                group = CPU_HIGH;
             }
             break;
         case INWORLD:
             if (active_instance == instance_get_id(instance)) {
-                group = CFS_ACTIVE;
+                group = CPU_ACTIVE;
             } else {
-                group = CFS_IDLE;
+                group = CPU_IDLE;
             }
             break;
         default:
@@ -120,7 +120,7 @@ cfs_update_instance(struct instance *instance, enum cfs_group override) {
             __builtin_unreachable();
         }
     }
-    cfs_move_to_group(compositor_window_get_pid(instance->window), group);
+    cpu_move_to_group(compositor_window_get_pid(instance->window), group);
 }
 
 static void
@@ -497,7 +497,7 @@ instance_reset(struct instance *instance) {
     compositor_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
 
     // Update the CPU weight for the instance.
-    cfs_update_instance(instance, CFS_HIGH);
+    cpu_update_instance(instance, CPU_HIGH);
 
     reset_count++;
     return true;
@@ -734,7 +734,7 @@ process_state(struct instance *instance) {
             ww_assert(false);
         }
     }
-    cfs_update_instance(instance, CFS_NONE);
+    cpu_update_instance(instance, CPU_NONE);
 }
 
 static bool
@@ -1053,20 +1053,20 @@ main(int argc, char **argv) {
         goto fail_reset_counter;
     }
     if (config->has_cpu) {
-        if (!cfs_init()) {
-            goto fail_cfs_init;
+        if (!cpu_init()) {
+            goto fail_cpu_init;
         }
-        if (!cfs_set_group_weight(CFS_IDLE, config->idle_cpu)) {
-            goto fail_cfs_init;
+        if (!cpu_set_group_weight(CPU_IDLE, config->idle_cpu)) {
+            goto fail_cpu_init;
         }
-        if (!cfs_set_group_weight(CFS_LOW, config->low_cpu)) {
-            goto fail_cfs_init;
+        if (!cpu_set_group_weight(CPU_LOW, config->low_cpu)) {
+            goto fail_cpu_init;
         }
-        if (!cfs_set_group_weight(CFS_HIGH, config->high_cpu)) {
-            goto fail_cfs_init;
+        if (!cpu_set_group_weight(CPU_HIGH, config->high_cpu)) {
+            goto fail_cpu_init;
         }
-        if (!cfs_set_group_weight(CFS_ACTIVE, config->active_cpu)) {
-            goto fail_cfs_init;
+        if (!cpu_set_group_weight(CPU_ACTIVE, config->active_cpu)) {
+            goto fail_cpu_init;
         }
     }
 
@@ -1135,7 +1135,7 @@ fail_config_dir:
     close(inotify_fd);
 
 fail_inotify_init:
-fail_cfs_init:
+fail_cpu_init:
     if (reset_count_fd > 0) {
         close(reset_count_fd);
     }

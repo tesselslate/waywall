@@ -69,7 +69,7 @@ endforeach
 
 executable('waywall',
   wl_proto_src, wl_proto_header,
-  'cfs.c', 'cfs.h',
+  'cpu.c', 'cpu.h',
   'compositor.c', 'compositor.h',
   'config.c', 'config.h',
   'instance.c', 'instance.h',
