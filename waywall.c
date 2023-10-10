@@ -15,6 +15,7 @@
 #include <wlr/util/log.h>
 
 // TODO: sleepbg.lock
+// TODO: better benchmarking (config options?)
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
 // TODO: free dir paths in instances
@@ -22,6 +23,7 @@
 // TODO: make config reloading reliable (reads file before written sometimes? also might not handle
 // some editors correctly)
 
+#define BENCHMARK_RESET_COUNT 2000
 #define WALL -1
 #define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
 
@@ -52,6 +54,15 @@ static struct {
 static uint64_t reset_count;
 static int reset_count_fd = INT_MIN;
 
+static struct {
+    bool running;
+    int resets;
+    struct timespec start;
+} benchmark;
+
+static void benchmark_finish();
+static void benchmark_toggle();
+static void benchmark_start();
 static void cpu_update_instance(struct instance *, enum cpu_group);
 static void config_update();
 static struct wlr_box compute_alt_res();
@@ -67,6 +78,7 @@ static void instance_lock(struct instance *);
 static void instance_pause(struct instance *);
 static void instance_play(struct instance *);
 static bool instance_reset(struct instance *);
+static void instance_send_reset_keys(struct instance *);
 static void instance_update_verification(struct instance *);
 static void wall_focus();
 static void wall_resize_instance(struct instance *);
@@ -81,6 +93,45 @@ static void handle_resize(int32_t, int32_t);
 static void handle_window(struct window *, bool);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
+
+static void
+benchmark_finish() {
+    ww_assert(benchmark.running);
+
+    struct timespec end;
+    clock_gettime(CLOCK_MONOTONIC, &end);
+    uint64_t start_nsec = benchmark.start.tv_sec * 1000000000 + benchmark.start.tv_nsec;
+    uint64_t end_nsec = end.tv_sec * 1000000000 + end.tv_nsec;
+    uint64_t ms_diff = (end_nsec - start_nsec) / 1000000;
+    wlr_log(WLR_INFO, "benchmark finished with %d resets in %.2lf sec", benchmark.resets,
+            (double)ms_diff / 1000.0);
+    benchmark.running = false;
+}
+
+static void
+benchmark_toggle() {
+    if (benchmark.running) {
+        benchmark_finish();
+    } else {
+        benchmark_start();
+    }
+}
+
+static void
+benchmark_start() {
+    ww_assert(!benchmark.running);
+
+    wlr_log(WLR_INFO, "started benchmark");
+    benchmark.resets = 0;
+    clock_gettime(CLOCK_MONOTONIC, &benchmark.start);
+    benchmark.running = true;
+
+    for (int i = 0; i < max_instance_id; i++) {
+        if (instances[i].alive && !instances[i].locked) {
+            instance_reset(&instances[i]);
+        }
+    }
+}
 
 static void
 cpu_update_instance(struct instance *instance, enum cpu_group override) {
@@ -481,6 +532,17 @@ instance_reset(struct instance *instance) {
     }
 
     // Press the appropriate reset hotkey.
+    instance_send_reset_keys(instance);
+
+    // Update the CPU weight for the instance.
+    cpu_update_instance(instance, CPU_HIGH);
+
+    reset_count++;
+    return true;
+}
+
+static void
+instance_send_reset_keys(struct instance *instance) {
     uint32_t keycode;
     if (instance->state.screen == PREVIEWING) {
         keycode = instance->options.preview_hotkey;
@@ -492,12 +554,6 @@ instance_reset(struct instance *instance) {
         {keycode, false},
     };
     compositor_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
-
-    // Update the CPU weight for the instance.
-    cpu_update_instance(instance, CPU_HIGH);
-
-    reset_count++;
-    return true;
 }
 
 static void
@@ -700,8 +756,17 @@ process_state(struct instance *instance) {
             instance->state.data.percent = atoi(b);
         } else if (strcmp(a, "previewing") == 0) {
             if (last_state.screen != PREVIEWING) {
-                clock_gettime(CLOCK_MONOTONIC, &instance->last_preview);
-                instance_pause(instance);
+                if (benchmark.running) {
+                    // Benchmarking
+                    instance_send_reset_keys(instance);
+                    if (++benchmark.resets >= BENCHMARK_RESET_COUNT) {
+                        benchmark_finish();
+                    }
+                } else {
+                    // Not benchmarking
+                    clock_gettime(CLOCK_MONOTONIC, &instance->last_preview);
+                    instance_pause(instance);
+                }
             }
             instance->state.screen = PREVIEWING;
             instance->state.data.percent = atoi(b);
@@ -965,6 +1030,9 @@ handle_signal(int signal_number, void *data) {
             wlr_log(WLR_INFO, "recreated wayland output");
         }
         break;
+    case SIGUSR2:
+        benchmark_toggle();
+        break;
     default:
         wlr_log(WLR_INFO, "received signal %d; stopping", signal_number);
         compositor_stop(compositor);
@@ -1104,6 +1172,8 @@ main(int argc, char **argv) {
         wl_event_loop_add_signal(event_loop, SIGTERM, handle_signal, NULL);
     struct wl_event_source *event_sigusr =
         wl_event_loop_add_signal(event_loop, SIGUSR1, handle_signal, NULL);
+    struct wl_event_source *event_sigusr2 =
+        wl_event_loop_add_signal(event_loop, SIGUSR2, handle_signal, NULL);
     struct wl_event_source *event_inotify =
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
@@ -1117,6 +1187,7 @@ main(int argc, char **argv) {
     wl_event_source_remove(event_sigint);
     wl_event_source_remove(event_sigterm);
     wl_event_source_remove(event_sigusr);
+    wl_event_source_remove(event_sigusr2);
     wl_event_source_remove(event_inotify);
     compositor_destroy(compositor);
     config_destroy(config);
