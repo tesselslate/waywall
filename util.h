@@ -15,6 +15,10 @@ void __ww_assert(const char *file, const int line, const char *expr, bool value)
     __builtin_trap()
 #endif
 
+#define ww_unreachable()                                                                           \
+    ww_assert(!"unreachable");                                                                     \
+    __builtin_unreachable()
+
 #define ARRAY_LEN(x) (sizeof((x)) / sizeof((x)[0]))
 #define STRING_LEN(x) (ARRAY_LEN((x)) - 1)
 #define STR(x) #x

@@ -32,8 +32,7 @@ find_pid(pid_t pid) {
             return i;
         }
     }
-    ww_assert(!"unreachable");
-    __builtin_unreachable();
+    ww_unreachable();
 }
 
 static const char *

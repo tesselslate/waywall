@@ -116,8 +116,7 @@ cpu_update_instance(struct instance *instance, enum cpu_group override) {
             }
             break;
         default:
-            ww_assert(!"unreachable");
-            __builtin_unreachable();
+            ww_unreachable();
         }
     }
     cpu_move_to_group(compositor_window_get_pid(instance->window), group);
@@ -223,8 +222,7 @@ ninb_reposition(int16_t w, int16_t h) {
     } else if (loc == TOP) {
         x = (screen_width - size.width) / 2;
     } else {
-        ww_assert(!"unreachable");
-        __builtin_unreachable();
+        ww_unreachable();
     }
     if (loc == TOP_LEFT || loc == TOP || loc == TOP_RIGHT) {
         y = 0;
@@ -233,8 +231,7 @@ ninb_reposition(int16_t w, int16_t h) {
     } else if (loc == BOTTOM_LEFT || loc == BOTTOM_RIGHT) {
         y = screen_height - size.height;
     } else {
-        ww_assert(!"unreachable");
-        __builtin_unreachable();
+        ww_unreachable();
     }
     compositor_window_set_dest(ninb_window, (struct wlr_box){x, y, size.width, size.height});
 }
