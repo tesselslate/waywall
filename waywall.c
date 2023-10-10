@@ -1,3 +1,4 @@
+#include "cfs.h"
 #include "compositor.h"
 #include "config.h"
 #include "instance.h"
@@ -13,6 +14,7 @@
 #include <wlr/types/wlr_keyboard.h>
 #include <wlr/util/log.h>
 
+// TODO: sleepbg.lock
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
 // TODO: free dir paths in instances
@@ -30,7 +32,7 @@ static struct wl_event_loop *event_loop;
 static int inotify_fd;
 static int config_wd;
 
-static struct instance instances[128];
+static struct instance instances[MAX_INSTANCE_COUNT];
 static int max_instance_id;
 static int active_instance = WALL;
 static int32_t screen_width, screen_height;
@@ -1002,23 +1004,40 @@ main(int argc, char **argv) {
         return 1;
     }
     if (!prepare_reset_counter()) {
-        return 1;
+        goto fail_reset_counter;
+    }
+    if (config->has_cpu) {
+        if (!cfs_init()) {
+            goto fail_cfs_init;
+        }
+        if (!cfs_set_group_weight(CFS_IDLE, config->idle_cpu)) {
+            goto fail_cfs_init;
+        }
+        if (!cfs_set_group_weight(CFS_LOW, config->low_cpu)) {
+            goto fail_cfs_init;
+        }
+        if (!cfs_set_group_weight(CFS_HIGH, config->high_cpu)) {
+            goto fail_cfs_init;
+        }
+        if (!cfs_set_group_weight(CFS_ACTIVE, config->active_cpu)) {
+            goto fail_cfs_init;
+        }
     }
 
     inotify_fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (inotify_fd == -1) {
         wlr_log_errno(WLR_ERROR, "failed to create inotify instance");
-        return 1;
+        goto fail_inotify_init;
     }
     config_path = config_get_dir();
     if (!config_path) {
         wlr_log(WLR_ERROR, "failed to get config path");
-        return 1;
+        goto fail_config_dir;
     }
     config_wd = inotify_add_watch(inotify_fd, config_path, IN_CREATE);
     if (config_wd == -1) {
         wlr_log_errno(WLR_ERROR, "failed to watch config directory");
-        return 1;
+        goto fail_add_watch;
     }
     free(config_path);
 
@@ -1045,7 +1064,7 @@ main(int argc, char **argv) {
     struct wl_event_source *event_inotify =
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
-    compositor_run(compositor, display_file_fd);
+    bool success = compositor_run(compositor, display_file_fd);
 
     if (reset_count_fd > 0) {
         write_reset_count();
@@ -1057,8 +1076,25 @@ main(int argc, char **argv) {
     wl_event_source_remove(event_sigusr);
     wl_event_source_remove(event_inotify);
     compositor_destroy(compositor);
+    config_destroy(config);
     close(inotify_fd);
     close(display_file_fd);
     remove(WAYWALL_DISPLAY_PATH);
-    return 0;
+    return success ? 0 : 1;
+
+fail_add_watch:
+    free(config_path);
+
+fail_config_dir:
+    close(inotify_fd);
+
+fail_inotify_init:
+fail_cfs_init:
+    if (reset_count_fd > 0) {
+        close(reset_count_fd);
+    }
+
+fail_reset_counter:
+    config_destroy(config);
+    return 1;
 }

@@ -87,12 +87,19 @@ struct config {
     bool wall_bypass;
     int grace_period;
 
+    // performance
+    int idle_cpu;
+    int low_cpu;
+    int high_cpu;
+    int active_cpu;
+
     // keybinds
     struct keybind binds[MAX_BINDS];
     int bind_count;
 
     // not part of config file
     bool has_alt_res;
+    bool has_cpu;
 };
 
 static struct {

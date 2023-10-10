@@ -478,6 +478,30 @@ config_read() {
     PARSE_INT(reset, grace_period);
     CHECK_MIN_MAX(reset, grace_period, 0, 60000);
 
+    // performance
+    toml_table_t *performance = toml_table_in(conf, "performance");
+    if (performance) {
+        config->has_cpu = true;
+        PARSE_INT_OR(performance, idle_cpu) {
+            config->has_cpu = false;
+        }
+        PARSE_INT_OR(performance, low_cpu) {
+            config->has_cpu = false;
+        }
+        PARSE_INT_OR(performance, high_cpu) {
+            config->has_cpu = false;
+        }
+        PARSE_INT_OR(performance, active_cpu) {
+            config->has_cpu = false;
+        }
+        if (config->has_cpu) {
+            CHECK_MIN_MAX(performance, idle_cpu, 1, 10000);
+            CHECK_MIN_MAX(performance, low_cpu, 1, 10000);
+            CHECK_MIN_MAX(performance, high_cpu, 1, 10000);
+            CHECK_MIN_MAX(performance, active_cpu, 1, 10000);
+        }
+    }
+
     // keybinds
     toml_table_t *keybinds = toml_table_in(conf, "keybinds");
     if (!keybinds) {

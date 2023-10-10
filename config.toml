@@ -31,6 +31,14 @@ resets_file = "/home/user/resets.txt"
 wall_bypass = false
 grace_period = 100
 
+# CPU weight for each instance group. Can be [1, 10000]. Delete any or all of these values to
+# disable this.
+[performance]
+idle_cpu = 5
+low_cpu = 20
+high_cpu = 100
+active_cpu = 500
+
 [keybinds]
 "Ctrl-Shift-D"      = ["wall_reset_all", "ingame_reset"]
 "LMB"               = ["wall_reset"]
