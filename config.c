@@ -599,7 +599,7 @@ config_read() {
 
 fail_read:
     toml_free(conf);
-    free(config);
+    config_destroy(config);
 
 fail_parse:
 fail_file:
