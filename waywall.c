@@ -501,6 +501,9 @@ instance_play(struct instance *instance) {
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
             compositor_window_set_visible(instances[i].window, i == active_instance ? true : false);
+            if (instances[i].lock_indicator) {
+                compositor_rect_toggle(instances[i].lock_indicator, false);
+            }
         }
     }
 
@@ -639,6 +642,9 @@ wall_focus() {
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
             compositor_window_set_visible(instances[i].window, true);
+            if (instances[i].lock_indicator && instances[i].locked) {
+                compositor_rect_toggle(instances[i].lock_indicator, true);
+            }
         }
     }
 }
