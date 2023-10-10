@@ -52,6 +52,7 @@ static struct {
 static uint64_t reset_count;
 static int reset_count_fd = INT_MIN;
 
+static void cfs_update_instance(struct instance *, enum cfs_group);
 static void config_update();
 static struct wlr_box compute_alt_res();
 static struct compositor_config create_compositor_config();
@@ -80,6 +81,47 @@ static void handle_resize(int32_t, int32_t);
 static void handle_window(struct window *, bool);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
+
+static void
+cfs_update_instance(struct instance *instance, enum cfs_group override) {
+    if (!config->has_cpu) {
+        return;
+    }
+    enum cfs_group group;
+    if (override != CFS_NONE) {
+        group = override;
+    } else {
+        switch (instance->state.screen) {
+        case TITLE:
+            group = CFS_HIGH;
+            break;
+        case GENERATING:
+            group = CFS_HIGH;
+            break;
+        case WAITING:
+            group = CFS_HIGH;
+            break;
+        case PREVIEWING:
+            if (instance->state.data.percent > config->preview_threshold) {
+                group = CFS_LOW;
+            } else {
+                group = CFS_HIGH;
+            }
+            break;
+        case INWORLD:
+            if (active_instance == instance_get_id(instance)) {
+                group = CFS_ACTIVE;
+            } else {
+                group = CFS_IDLE;
+            }
+            break;
+        default:
+            ww_assert(!"unreachable");
+            __builtin_unreachable();
+        }
+    }
+    cfs_move_to_group(compositor_window_get_pid(instance->window), group);
+}
 
 static void
 config_update() {
@@ -454,6 +496,9 @@ instance_reset(struct instance *instance) {
     };
     compositor_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
 
+    // Update the CPU weight for the instance.
+    cfs_update_instance(instance, CFS_HIGH);
+
     reset_count++;
     return true;
 }
@@ -689,6 +734,7 @@ process_state(struct instance *instance) {
             ww_assert(false);
         }
     }
+    cfs_update_instance(instance, CFS_NONE);
 }
 
 static bool

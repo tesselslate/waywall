@@ -38,6 +38,7 @@ idle_cpu = 5
 low_cpu = 20
 high_cpu = 100
 active_cpu = 500
+preview_threshold = 30
 
 [keybinds]
 "Ctrl-Shift-D"      = ["wall_reset_all", "ingame_reset"]

@@ -495,10 +495,12 @@ config_read() {
             config->has_cpu = false;
         }
         if (config->has_cpu) {
+            PARSE_INT(performance, preview_threshold);
             CHECK_MIN_MAX(performance, idle_cpu, 1, 10000);
             CHECK_MIN_MAX(performance, low_cpu, 1, 10000);
             CHECK_MIN_MAX(performance, high_cpu, 1, 10000);
             CHECK_MIN_MAX(performance, active_cpu, 1, 10000);
+            CHECK_MIN_MAX(performance, preview_threshold, 0, 100);
         }
     }
 

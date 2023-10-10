@@ -92,6 +92,7 @@ struct config {
     int low_cpu;
     int high_cpu;
     int active_cpu;
+    int preview_threshold;
 
     // keybinds
     struct keybind binds[MAX_BINDS];

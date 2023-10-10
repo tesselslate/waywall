@@ -110,15 +110,14 @@ cfs_move_to_group(pid_t pid, enum cfs_group group) {
     static_assert(sizeof(int) >= sizeof(pid_t), "sizeof(int) < sizeof(pid_t)");
     ww_assert(group != CFS_NONE);
 
+    int i = find_pid(pid);
+    if (pid_groups[i].group == group) {
+        return;
+    }
+
     // There should only be one active instance at any point.
     if (group == CFS_ACTIVE) {
         ww_assert(!any_active);
-    }
-
-    int i = find_pid(pid);
-    if (pid_groups[i].group == group) {
-        wlr_log(WLR_DEBUG, "attempted to reassign pid %d to group %s", (int)pid, strgroup(group));
-        return;
     }
 
     if (pid_groups[i].group == CFS_ACTIVE) {
