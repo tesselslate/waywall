@@ -21,6 +21,7 @@
 
 // TODO: make config reloading reliable (reads file before written sometimes? also might not handle
 // some editors correctly)
+// TODO: reread instance options on update reliably
 
 #define BENCHMARK_RESET_COUNT 2000
 #define WALL -1
@@ -505,11 +506,6 @@ instance_play(struct instance *instance) {
 
     // Enable sleepbg.lock.
     sleepbg_lock_toggle(true);
-
-    // We attempt to reread the instance's options file here for any changes. Using inotify to read
-    // it when it is updated is unfortunately a bit cumbersome as the game seems to write the file
-    // in 512 byte chunks.
-    instance_get_options(instance);
 }
 
 static bool
