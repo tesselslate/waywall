@@ -153,10 +153,10 @@ cpu_update_instance(struct instance *instance, enum cpu_group override) {
             group = CPU_HIGH;
             break;
         case PREVIEWING:
-            if (instance->state.data.percent > config->preview_threshold) {
-                group = CPU_LOW;
-            } else {
+            if (instance->locked || instance->state.data.percent < config->preview_threshold) {
                 group = CPU_HIGH;
+            } else {
+                group = CPU_LOW;
             }
             break;
         case INWORLD:
