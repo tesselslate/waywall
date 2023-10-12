@@ -1234,6 +1234,10 @@ compositor_window_focus(struct compositor *compositor, struct window *window) {
 
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
     wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
+    if (compositor->wl_output) {
+        wlr_cursor_warp(compositor->cursor, NULL, compositor->wl_output->wlr_output->width / 2,
+                        compositor->wl_output->wlr_output->height / 2);
+    }
 
     if (window) {
         wlr_xwayland_set_seat(compositor->xwayland, compositor->seat);
