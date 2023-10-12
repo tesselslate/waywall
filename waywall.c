@@ -363,10 +363,11 @@ sleepbg_lock_toggle(bool state) {
 
     sleepbg_state = state;
     if (state) {
-        int ret = creat(config->sleepbg_lock, 0644);
-        if (ret == -1) {
+        int fd = creat(config->sleepbg_lock, 0644);
+        if (fd == -1) {
             wlr_log_errno(WLR_ERROR, "failed to create sleepbg.lock");
         }
+        close(fd);
     } else {
         int ret = remove(config->sleepbg_lock);
         if (ret == -1) {
