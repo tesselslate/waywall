@@ -33,7 +33,7 @@
 
 /*
  *  TODO: Figure out if the lack of linux dmabuf feedback matters. It's handled by
- *  scene_bufer_send_dmabuf_feedback in wlroots.
+ *  scene_buffer_send_dmabuf_feedback in wlroots.
  */
 
 // Taken from types/scene/wlr_scene.c
