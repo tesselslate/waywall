@@ -156,3 +156,8 @@ cpu_set_group_weight(enum cpu_group group, int weight) {
     close(fd);
     return true;
 }
+
+void
+cpu_unset_active() {
+    any_active = false;
+}

@@ -17,7 +17,6 @@
 // TODO: better benchmarking (config options?)
 // TODO: improve string handling in options/mod gathering
 // TODO: improve error handling (prevent fd leaks, etc) in instance creation
-// TODO: free dir paths in instances
 
 // TODO: make config reloading reliable (reads file before written sometimes? also might not handle
 // some editors correctly)
@@ -75,6 +74,7 @@ static void sleepbg_lock_toggle(bool);
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
 static struct wlr_box instance_get_wall_box(struct instance *);
+static void instance_handle_death(struct instance *);
 static void instance_lock(struct instance *);
 static void instance_pause(struct instance *);
 static void instance_play(struct instance *);
@@ -419,17 +419,21 @@ instance_get_wall_box(struct instance *instance) {
 }
 
 static void
-instance_pause(struct instance *instance) {
-    ww_assert(instance);
-    ww_assert(instance->alive);
-
-    static const struct compositor_key keys[] = {
-        {KEY_F3, true},
-        {KEY_ESC, true},
-        {KEY_ESC, false},
-        {KEY_F3, false},
-    };
-    compositor_send_keys(instance->window, keys, ARRAY_LEN(keys));
+instance_handle_death(struct instance *instance) {
+    wlr_log(WLR_ERROR, "instance %d died", instance_get_id(instance));
+    instance->alive = false;
+    instance->window = NULL;
+    instance->last_group = CPU_NONE;
+    free(instance->dir);
+    instance->dir = NULL;
+    inotify_rm_watch(inotify_fd, instance->state_wd);
+    close(instance->state_fd);
+    if (instance_get_id(instance) == active_instance) {
+        cpu_unset_active();
+        compositor_set_mouse_sensitivity(compositor, config->main_sens);
+        instance->alt_res = false;
+        wall_focus();
+    }
 }
 
 static void
@@ -464,6 +468,20 @@ instance_lock(struct instance *instance) {
             break;
         }
     }
+}
+
+static void
+instance_pause(struct instance *instance) {
+    ww_assert(instance);
+    ww_assert(instance->alive);
+
+    static const struct compositor_key keys[] = {
+        {KEY_F3, true},
+        {KEY_ESC, true},
+        {KEY_ESC, false},
+        {KEY_F3, false},
+    };
+    compositor_send_keys(instance->window, keys, ARRAY_LEN(keys));
 }
 
 static void
@@ -1004,10 +1022,7 @@ handle_window(struct window *window, bool map) {
         }
         for (int i = 0; i < max_instance_id; i++) {
             if (instances[i].window == window) {
-                wlr_log(WLR_ERROR, "instance %d died", i);
-                instances[i].alive = false;
-                instances[i].window = NULL;
-                instances[i].last_group = CPU_NONE;
+                instance_handle_death(&instances[i]);
                 return;
             }
         }
@@ -1227,6 +1242,11 @@ main(int argc, char **argv) {
     if (reset_count_fd > 0) {
         write_reset_count();
         wlr_log(WLR_INFO, "finished with reset count of %" PRIu64, reset_count);
+    }
+    for (int i = 0; i < max_instance_id; i++) {
+        if (instances[i].dir) {
+            free(instances[i].dir);
+        }
     }
 
     wl_event_source_remove(event_sigint);

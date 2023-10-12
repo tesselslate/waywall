@@ -1,10 +1,10 @@
 #ifndef __INSTANCE_H
 #define __INSTANCE_H
 
+#include "cpu.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
-#include "cpu.h"
 
 struct state {
     enum {
@@ -26,7 +26,7 @@ struct state {
 
 struct instance {
     struct window *window;
-    const char *dir;
+    char *dir;
     int state_wd, state_fd;
     struct state state;
     struct timespec last_preview;
