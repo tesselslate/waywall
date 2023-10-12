@@ -73,6 +73,7 @@ executable('waywall',
   'config.c', 'config.h',
   'cpu.c', 'cpu.h',
   'instance.c', 'instance.h',
+  'scene_window.c', 'scene_window.h',
   'util.c', 'util.h',
   'waywall.c',
 

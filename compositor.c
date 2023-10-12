@@ -1,6 +1,7 @@
 #include "compositor.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "relative-pointer-unstable-v1-protocol.h"
+#include "scene_window.h"
 #include "util.h"
 #include <fcntl.h>
 #include <linux/input-event-codes.h>
@@ -141,11 +142,11 @@ struct window {
     struct compositor *compositor;
     struct wlr_xwayland_surface *surface;
     struct wlr_scene_tree *scene_tree;
-    struct wlr_scene_surface *scene_surface;
+    struct scene_window *scene_window;
 
     struct headless_view {
         struct wlr_scene_tree *tree;
-        struct wlr_scene_surface *surface;
+        struct scene_window *scene_window;
     } headless_views[4];
     struct wlr_scene_tree *headless_tree;
     int headless_view_count;
@@ -659,7 +660,7 @@ on_window_map(struct wl_listener *listener, void *data) {
 
     window->scene_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
     wlr_scene_node_set_enabled(&window->scene_tree->node, true);
-    window->scene_surface = wlr_scene_surface_create(window->scene_tree, window->surface->surface);
+    window->scene_window = scene_window_create(window->scene_tree, window->surface->surface);
     wlr_scene_node_set_position(&window->scene_tree->node, WL_X, WL_Y);
 
     window->compositor->vtable.window(window, true);
@@ -1307,8 +1308,8 @@ compositor_window_make_headless_view(struct window *window) {
     struct headless_view *view = &window->headless_views[window->headless_view_count++];
     view->tree = wlr_scene_tree_create(window->headless_tree);
     ww_assert(view->tree);
-    view->surface = wlr_scene_surface_create(view->tree, window->surface->surface);
-    ww_assert(view->surface);
+    view->scene_window = scene_window_create(view->tree, window->surface->surface);
+    ww_assert(view->scene_window);
     wlr_scene_node_set_enabled(&view->tree->node, true);
 
     return view;
@@ -1317,12 +1318,12 @@ compositor_window_make_headless_view(struct window *window) {
 void
 compositor_window_set_dest(struct window *window, struct wlr_box box) {
     wlr_scene_node_set_position(&window->scene_tree->node, WL_X + box.x, WL_Y + box.y);
-    wlr_scene_buffer_set_dest_size(window->scene_surface->buffer, box.width, box.height);
+    scene_window_set_dest_size(window->scene_window, box.width, box.height);
 }
 
 void
 compositor_window_set_opacity(struct window *window, float opacity) {
-    wlr_scene_buffer_set_opacity(window->scene_surface->buffer, opacity);
+    wlr_scene_buffer_set_opacity(window->scene_window->buffer, opacity);
 }
 
 void
@@ -1338,7 +1339,7 @@ compositor_window_set_visible(struct window *window, bool visible) {
 void
 compositor_hview_set_dest(struct headless_view *view, struct wlr_box box) {
     wlr_scene_node_set_position(&view->tree->node, box.x, box.y);
-    wlr_scene_buffer_set_dest_size(view->surface->buffer, box.width, box.height);
+    scene_window_set_dest_size(view->scene_window, box.width, box.height);
 }
 
 void
@@ -1349,7 +1350,7 @@ compositor_hview_set_src(struct headless_view *view, struct wlr_box box) {
         .width = box.width,
         .height = box.height,
     };
-    wlr_scene_buffer_set_source_box(view->surface->buffer, &fbox);
+    scene_window_set_src(view->scene_window, fbox);
 }
 
 void
