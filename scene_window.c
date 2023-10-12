@@ -1,9 +1,9 @@
 #include "scene_window.h"
 #include "util.h"
 #include <stdlib.h>
+#include <wlr/types/wlr_compositor.h>
 #include <wlr/types/wlr_fractional_scale_v1.h>
 #include <wlr/types/wlr_presentation_time.h>
-#include <wlr/types/wlr_compositor.h>
 
 /*
  *  This implementation is largely lifted from wlroots' code, with a few tweaks.
