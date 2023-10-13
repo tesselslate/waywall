@@ -106,12 +106,12 @@ void compositor_send_keys(struct window *, const struct compositor_key *, int);
 // Sets the mouse sensitivity.
 void compositor_set_mouse_sensitivity(struct compositor *, double);
 
+// Notify the compositor if the user is on the wall.
+void compositor_set_on_wall(struct compositor *, bool);
+
 /*
  *  WINDOWS
  */
-
-// Toggles whether or not the user should be allowed to click on an instance to focus it.
-void compositor_allow_instance_focus(struct compositor *, bool);
 
 // Requests the client owning the given window to close it.
 void compositor_window_close(struct window *);

@@ -85,7 +85,7 @@ struct compositor {
     struct window *focused_window;
     struct window *grabbed_window;
     double grab_x, grab_y;
-    bool allow_instance_click_focus;
+    bool on_wall;
     struct wl_listener on_xwayland_new_surface;
     struct wl_listener on_xwayland_ready;
 
@@ -169,6 +169,7 @@ struct window {
     struct wl_listener on_request_activate;
     struct wl_listener on_request_configure;
     struct wl_listener on_request_fullscreen;
+    struct wl_listener on_request_minimize;
 };
 
 static void
@@ -217,7 +218,7 @@ handle_cursor_motion(struct compositor *compositor, uint32_t time_msec) {
         double x = compositor->cursor->x - compositor->grab_x;
         double y = compositor->cursor->y - compositor->grab_y;
         wlr_scene_node_set_position(&compositor->grabbed_window->scene_tree->node, x, y);
-        wlr_xwayland_surface_configure(compositor->grabbed_window->surface, x, y,
+        wlr_xwayland_surface_configure(compositor->grabbed_window->surface, 0, 0,
                                        compositor->grabbed_window->surface->width,
                                        compositor->grabbed_window->surface->height);
         return;
@@ -228,6 +229,12 @@ handle_cursor_motion(struct compositor *compositor, uint32_t time_msec) {
         &compositor->scene->tree.node, compositor->cursor->x, compositor->cursor->y, &x, &y);
     if (node && node->type == WLR_SCENE_NODE_BUFFER) {
         struct window *window = node->data;
+
+        // Do not give pointer focus to instances when the user hovers over them on the wall.
+        if (window->type == INSTANCE && compositor->on_wall) {
+            return;
+        }
+
         wlr_seat_pointer_notify_enter(compositor->seat, window->surface->surface, x, y);
         wlr_seat_pointer_notify_motion(compositor->seat, time_msec, x, y);
     } else {
@@ -328,13 +335,13 @@ on_cursor_button(struct wl_listener *listener, void *data) {
             } else {
                 // Process window focus. If we are on the wall, only consider floating windows. If
                 // we are in an instance, consider both the instance and floating windows.
-                struct wlr_scene_node *node = wlr_scene_node_at(
-                    compositor->allow_instance_click_focus ? &compositor->scene->tree.node
-                                                           : &compositor->scene_floating->node,
-                    compositor->cursor->x, compositor->cursor->y, NULL, NULL);
+                struct wlr_scene_node *node =
+                    wlr_scene_node_at(compositor->on_wall ? &compositor->scene_floating->node
+                                                          : &compositor->scene->tree.node,
+                                      compositor->cursor->x, compositor->cursor->y, NULL, NULL);
                 if (node && node->type == WLR_SCENE_NODE_BUFFER) {
                     compositor_window_focus(compositor, node->data);
-                } else if (!compositor->allow_instance_click_focus) {
+                } else if (compositor->on_wall) {
                     // If we are on the wall, let the user click off to unfocus any floating
                     // windows.
                     compositor_window_focus(compositor, NULL);
@@ -349,11 +356,12 @@ on_cursor_button(struct wl_listener *listener, void *data) {
         }
     }
 
-    // handle_button needs to know when buttons have been released after the user enters an
-    // instance.
-    if (!event.state || !compositor->focused_window) {
+    // Ensure that handle_button is called whenever a button was released (regardless of focused
+    // window) or when a mouse click was done on a wall instance.
+    if ((compositor->on_wall && !compositor->focused_window) || !event.state) {
         compositor->vtable.button(event);
-    } else {
+    }
+    if (compositor->focused_window) {
         wlr_seat_pointer_notify_button(compositor->seat, wlr_event->time_msec, wlr_event->button,
                                        wlr_event->state);
     }
@@ -730,6 +738,9 @@ on_window_map(struct wl_listener *listener, void *data) {
     window->scene_tree->node.data = window;
     window->scene_window = scene_window_create(window->scene_tree, window->surface->surface);
     window->scene_window->buffer->node.data = window;
+    if (window->surface->minimized) {
+        wlr_xwayland_surface_set_minimized(window->surface, false);
+    }
 
     window->compositor->vtable.window(window, true);
 }
@@ -741,11 +752,9 @@ on_window_unmap(struct wl_listener *listener, void *data) {
     wlr_scene_node_destroy(&window->scene_tree->node);
     compositor_window_destroy_headless_views(window);
 
+    // handle_window should focus another window if needed.
     window->compositor->vtable.window(window, false);
-    if (window == window->compositor->focused_window) {
-        wlr_log(WLR_DEBUG, "focused window was unmapped");
-        compositor_window_focus(window->compositor, NULL);
-    }
+    ww_assert(window != window->compositor->focused_window);
 }
 
 static void
@@ -777,8 +786,7 @@ on_window_request_configure(struct wl_listener *listener, void *data) {
     wlr_log(WLR_DEBUG, "window %d requested configuration", window->surface->window_id);
     struct wlr_xwayland_surface_configure_event *event = data;
     if (window->compositor->vtable.allow_configure(window, event->width, event->height)) {
-        wlr_xwayland_surface_configure(window->surface, event->x, event->y, event->width,
-                                       event->height);
+        wlr_xwayland_surface_configure(window->surface, 0, 0, event->width, event->height);
     }
 }
 
@@ -786,6 +794,13 @@ static void
 on_window_request_fullscreen(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_request_fullscreen);
     wlr_log(WLR_DEBUG, "window %d requested fullscreen", window->surface->window_id);
+}
+
+static void
+on_window_request_minimize(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_request_minimize);
+    struct wlr_xwayland_minimize_event *event = data;
+    wlr_xwayland_surface_set_minimized(window->surface, event->minimize);
 }
 
 static void
@@ -812,12 +827,14 @@ on_xwayland_new_surface(struct wl_listener *listener, void *data) {
     window->on_request_activate.notify = on_window_request_activate;
     window->on_request_configure.notify = on_window_request_configure;
     window->on_request_fullscreen.notify = on_window_request_fullscreen;
+    window->on_request_minimize.notify = on_window_request_minimize;
     wl_signal_add(&surface->events.associate, &window->on_associate);
     wl_signal_add(&surface->events.dissociate, &window->on_dissociate);
     wl_signal_add(&surface->events.destroy, &window->on_destroy);
     wl_signal_add(&surface->events.request_activate, &window->on_request_activate);
     wl_signal_add(&surface->events.request_configure, &window->on_request_configure);
     wl_signal_add(&surface->events.request_fullscreen, &window->on_request_fullscreen);
+    wl_signal_add(&surface->events.request_minimize, &window->on_request_minimize);
 }
 
 static void
@@ -1318,8 +1335,8 @@ compositor_set_mouse_sensitivity(struct compositor *compositor, double multiplie
 }
 
 void
-compositor_allow_instance_focus(struct compositor *compositor, bool state) {
-    compositor->allow_instance_click_focus = state;
+compositor_set_on_wall(struct compositor *compositor, bool state) {
+    compositor->on_wall = state;
 }
 
 void
@@ -1331,8 +1348,7 @@ void
 compositor_window_configure(struct window *window, int16_t w, int16_t h) {
     ww_assert(window);
 
-    wlr_xwayland_surface_configure(window->surface, window->scene_tree->node.x,
-                                   window->scene_tree->node.y, w, h);
+    wlr_xwayland_surface_configure(window->surface, 0, 0, w, h);
 }
 
 void
@@ -1347,6 +1363,10 @@ void
 compositor_window_focus(struct compositor *compositor, struct window *window) {
     ww_assert(compositor);
 
+    if (window == compositor->focused_window) {
+        return;
+    }
+
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
     compositor->grabbed_window = NULL;
 
@@ -1359,8 +1379,14 @@ compositor_window_focus(struct compositor *compositor, struct window *window) {
     if (window) {
         wlr_xwayland_set_seat(compositor->xwayland, compositor->seat);
         wlr_xwayland_surface_activate(window->surface, true);
-        wlr_xwayland_surface_restack(window->surface, NULL, XCB_STACK_MODE_ABOVE);
         wlr_scene_node_raise_to_top(&window->scene_tree->node);
+
+        if (window->type == FLOATING) {
+            wlr_xwayland_surface_restack(window->surface, NULL, XCB_STACK_MODE_ABOVE);
+            if (window->surface->minimized) {
+                wlr_xwayland_surface_set_minimized(window->surface, false);
+            }
+        }
 
         if (keyboard) {
             wlr_seat_keyboard_notify_enter(compositor->seat, window->surface->surface,

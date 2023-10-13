@@ -523,7 +523,7 @@ instance_play(struct instance *instance) {
         }
     }
     compositor_toggle_rectangles(compositor, false);
-    compositor_allow_instance_focus(compositor, true);
+    compositor_set_on_wall(compositor, false);
 
     // Enable sleepbg.lock.
     sleepbg_lock_toggle(true);
@@ -661,7 +661,7 @@ wall_focus() {
         }
     }
     compositor_toggle_rectangles(compositor, true);
-    compositor_allow_instance_focus(compositor, false);
+    compositor_set_on_wall(compositor, true);
 }
 
 static void
@@ -1238,6 +1238,7 @@ main(int argc, char **argv) {
     struct wl_event_source *event_inotify =
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
+    compositor_set_on_wall(compositor, true);
     bool success = compositor_run(compositor, display_file_fd);
 
     if (reset_count_fd > 0) {
