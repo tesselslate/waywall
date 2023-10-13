@@ -83,6 +83,8 @@ struct compositor {
     struct xcb_connection_t *xcb;
     struct wl_list windows;
     struct window *focused_window;
+    struct window *grabbed_window;
+    double grab_x, grab_y;
     struct wl_listener on_xwayland_new_surface;
     struct wl_listener on_xwayland_ready;
 
@@ -214,6 +216,12 @@ handle_cursor_motion(struct compositor *compositor, uint32_t time_msec) {
         wlr_seat_pointer_clear_focus(compositor->seat);
         return;
     }
+    if (compositor->grabbed_window) {
+        wlr_scene_node_set_position(&compositor->grabbed_window->scene_tree->node,
+                                    compositor->cursor->x - compositor->grab_x,
+                                    compositor->cursor->y - compositor->grab_y);
+        return;
+    }
     double x, y;
     global_to_surface(compositor, &compositor->focused_window->scene_tree->node,
                       compositor->cursor->x, compositor->cursor->y, &x, &y);
@@ -291,6 +299,22 @@ on_cursor_button(struct wl_listener *listener, void *data) {
         .time_msec = wlr_event->time_msec,
         .state = wlr_event->state == WLR_BUTTON_PRESSED,
     };
+    if (!compositor->remote_locked_pointer) {
+        ww_assert(compositor->seat->keyboard_state.keyboard);
+        if (wlr_event->state == WLR_BUTTON_PRESSED &&
+            compositor->seat->keyboard_state.keyboard->modifiers.depressed & WLR_MODIFIER_SHIFT) {
+            struct wlr_scene_node *node =
+                wlr_scene_node_at(&compositor->scene_floating->node, compositor->cursor->x,
+                                  compositor->cursor->y, &compositor->grab_x, &compositor->grab_y);
+            if (node) {
+                compositor->grabbed_window = node->data;
+                return;
+            }
+        } else if (compositor->grabbed_window && wlr_event->state == WLR_BUTTON_RELEASED) {
+            compositor->grabbed_window = NULL;
+            return;
+        }
+    }
     if (!compositor->vtable.button(event)) {
         wlr_seat_pointer_notify_button(compositor->seat, wlr_event->time_msec, wlr_event->button,
                                        wlr_event->state);
@@ -665,8 +689,9 @@ on_window_map(struct wl_listener *listener, void *data) {
     wl_list_insert(&window->compositor->windows, &window->link);
 
     window->scene_tree = wlr_scene_tree_create(window->compositor->scene_unknown);
-    wlr_scene_node_set_enabled(&window->scene_tree->node, true);
+    window->scene_tree->node.data = window;
     window->scene_window = scene_window_create(window->scene_tree, window->surface->surface);
+    window->scene_window->buffer->node.data = window;
 
     window->compositor->vtable.window(window, true);
 }
@@ -897,22 +922,18 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
 
     compositor->scene_floating = wlr_scene_tree_create(&compositor->scene->tree);
     ww_assert(compositor->scene_floating);
-    wlr_scene_node_set_enabled(&compositor->scene_floating->node, true);
     wlr_scene_node_set_position(&compositor->scene_floating->node, WL_X, WL_Y);
 
     compositor->scene_indicators = wlr_scene_tree_create(&compositor->scene->tree);
     ww_assert(compositor->scene_indicators);
-    wlr_scene_node_set_enabled(&compositor->scene_indicators->node, true);
     wlr_scene_node_set_position(&compositor->scene_indicators->node, WL_X, WL_Y);
 
     compositor->scene_instances = wlr_scene_tree_create(&compositor->scene->tree);
     ww_assert(compositor->scene_instances);
-    wlr_scene_node_set_enabled(&compositor->scene_instances->node, true);
     wlr_scene_node_set_position(&compositor->scene_instances->node, WL_X, WL_Y);
 
     compositor->scene_headless = wlr_scene_tree_create(&compositor->scene->tree);
     ww_assert(compositor->scene_headless);
-    wlr_scene_node_set_enabled(&compositor->scene_headless->node, true);
     wlr_scene_node_set_position(&compositor->scene_headless->node, HEADLESS_X, HEADLESS_Y);
 
     compositor->scene_unknown = wlr_scene_tree_create(&compositor->scene->tree);
@@ -1274,6 +1295,7 @@ compositor_window_focus(struct compositor *compositor, struct window *window) {
 
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
     wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
+    compositor->grabbed_window = NULL;
 
     if (window) {
         wlr_xwayland_set_seat(compositor->xwayland, compositor->seat);
@@ -1336,7 +1358,6 @@ compositor_window_make_headless_view(struct window *window) {
     if (!window->headless_tree) {
         window->headless_tree = wlr_scene_tree_create(window->compositor->scene_headless);
         ww_assert(window->headless_tree);
-        wlr_scene_node_set_enabled(&window->headless_tree->node, true);
     }
 
     struct headless_view *view = &window->headless_views[window->headless_view_count++];
@@ -1344,7 +1365,6 @@ compositor_window_make_headless_view(struct window *window) {
     ww_assert(view->tree);
     view->scene_window = scene_window_create(view->tree, window->surface->surface);
     ww_assert(view->scene_window);
-    wlr_scene_node_set_enabled(&view->tree->node, true);
 
     return view;
 }
