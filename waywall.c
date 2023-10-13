@@ -844,7 +844,7 @@ process_state(struct instance *instance) {
             } else if (strcmp(b, "paused") == 0) {
                 instance->state.data.world = PAUSED;
             } else if (strcmp(b, "gamescreenopen") == 0) {
-                instance->state.data.world = INVENTORY;
+                instance->state.data.world = MENU;
             } else {
                 ww_assert(false);
             }
@@ -913,9 +913,13 @@ handle_key(struct compositor_key_event event) {
         if (config->binds[i].modifiers != held_modifiers) {
             continue;
         }
-        if (!config->binds[i].allow_in_menu && active_instance != WALL) {
+
+        if (active_instance != WALL && instances[active_instance].state.screen == INWORLD) {
             struct state state = instances[active_instance].state;
-            if (state.screen == INWORLD && state.data.world != UNPAUSED) {
+            if (state.data.world == PAUSED && !config->binds[i].allow_in_pause) {
+                return false;
+            }
+            if (state.data.world == MENU && !config->binds[i].allow_in_menu) {
                 return false;
             }
         }

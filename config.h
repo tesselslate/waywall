@@ -56,6 +56,7 @@ struct keybind {
     enum action actions[MAX_ACTIONS];
     int action_count;
     bool allow_in_menu;
+    bool allow_in_pause;
 };
 
 struct config {

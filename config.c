@@ -88,11 +88,13 @@ parse_bind_table(toml_table_t *table, struct keybind *keybind, const char *key) 
         return false;
     }
     toml_datum_t allow_in_menu = toml_bool_in(table, "allow_in_menu");
-    if (!allow_in_menu.ok) {
-        wlr_log(WLR_ERROR, "config: keybind '%s' has no 'allow_in_menu' boolean", key);
-        return false;
+    if (allow_in_menu.ok) {
+        keybind->allow_in_menu = allow_in_menu.u.b;
     }
-    keybind->allow_in_menu = allow_in_menu.u.b;
+    toml_datum_t allow_in_pause = toml_bool_in(table, "allow_in_pause");
+    if (allow_in_pause.ok) {
+        keybind->allow_in_pause = allow_in_pause.u.b;
+    }
     return true;
 }
 

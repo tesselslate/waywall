@@ -19,7 +19,7 @@ struct state {
         enum {
             UNPAUSED,
             PAUSED,
-            INVENTORY,
+            MENU,
         } world;
     } data;
 };
