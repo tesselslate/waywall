@@ -1,5 +1,5 @@
-#ifndef __INSTANCE_H
-#define __INSTANCE_H
+#ifndef WAYWALL_INSTANCE_H
+#define WAYWALL_INSTANCE_H
 
 #include "cpu.h"
 #include <stdbool.h>

@@ -1,14 +1,14 @@
-#ifndef __UTIL_H
-#define __UTIL_H
+#ifndef WAYWALL_UTIL_H
+#define WAYWALL_UTIL_H
 
 #include <stdbool.h>
 
-void __ww_assert(const char *file, const int line, const char *expr, bool value);
+void _ww_assert(const char *file, const int line, const char *expr, bool value);
 
 #define static_assert(x, y) _Static_assert(x, y)
 
 #ifndef WW_TRAP_ASSERT
-#define ww_assert(expr) __ww_assert(__FILE__, __LINE__, #expr, expr)
+#define ww_assert(expr) _ww_assert(__FILE__, __LINE__, #expr, expr)
 #else
 #define ww_assert(expr)                                                                            \
     if (expr)                                                                                      \

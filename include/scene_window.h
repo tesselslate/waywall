@@ -1,5 +1,5 @@
-#ifndef __SCENE_WINDOW_H
-#define __SCENE_WINDOW_H
+#ifndef WAYWALL_SCENE_WINDOW_H
+#define WAYWALL_SCENE_WINDOW_H
 
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_scene.h>

@@ -1,5 +1,5 @@
-#ifndef __CONFIG_H
-#define __CONFIG_H
+#ifndef WAYWALL_CONFIG_H
+#define WAYWALL_CONFIG_H
 
 #include "util.h"
 #include <linux/input-event-codes.h>

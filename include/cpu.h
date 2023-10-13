@@ -1,5 +1,5 @@
-#ifndef __CPU_H
-#define __CPU_H
+#ifndef WAYWALL_CPU_H
+#define WAYWALL_CPU_H
 
 #include <stdbool.h>
 #include <unistd.h>

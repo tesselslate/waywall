@@ -1,5 +1,5 @@
-#ifndef __COMPOSITOR_H
-#define __COMPOSITOR_H
+#ifndef WAYWALL_COMPOSITOR_H
+#define WAYWALL_COMPOSITOR_H
 
 #include <stdbool.h>
 #include <stdint.h>
