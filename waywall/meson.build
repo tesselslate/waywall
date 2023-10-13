@@ -1,7 +1,7 @@
 executable('waywall',
   protocol_sources, protocol_headers,
 
-  'compositor.c',
+  'compositor/compositor.c',
   'config.c',
   'cpu.c',
   'instance.c',

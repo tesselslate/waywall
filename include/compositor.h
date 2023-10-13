@@ -2,8 +2,9 @@
 #define WAYWALL_COMPOSITOR_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <wayland-server-core.h>
+#include <wlr/types/wlr_scene.h>
 #include <wlr/util/box.h>
 #include <xkbcommon/xkbcommon.h>
 
@@ -12,7 +13,6 @@
 
 struct compositor;
 struct window;
-struct wlr_scene_rect;
 
 struct compositor_button_event {
     uint32_t button;
@@ -38,7 +38,8 @@ struct compositor_key {
     bool state;
 };
 
-typedef bool (*compositor_allow_configure_func_t)(struct window *window, int16_t width, int16_t height);
+typedef bool (*compositor_allow_configure_func_t)(struct window *window, int16_t width,
+                                                  int16_t height);
 typedef void (*compositor_button_func_t)(struct compositor_button_event event);
 typedef bool (*compositor_key_func_t)(struct compositor_key_event event);
 typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
@@ -73,7 +74,8 @@ enum compositor_wintype {
 };
 
 // Attempts to create a new compositor. Returns NULL on failure.
-struct compositor *compositor_create(struct compositor_vtable vtable, struct compositor_config config);
+struct compositor *compositor_create(struct compositor_vtable vtable,
+                                     struct compositor_config config);
 
 // Releases resources associated with `compositor`.
 void compositor_destroy(struct compositor *compositor);
@@ -180,7 +182,8 @@ void compositor_hview_set_top(struct headless_view *view);
 void compositor_rect_configure(struct wlr_scene_rect *rect, struct wlr_box box);
 
 // Creates a rectangle on the compositor scene.
-struct wlr_scene_rect *compositor_rect_create(struct compositor *compositor, struct wlr_box box, float color[4]);
+struct wlr_scene_rect *compositor_rect_create(struct compositor *compositor, struct wlr_box box,
+                                              float color[4]);
 
 // Sets the color of a rectangle on the compositor scene.
 void compositor_rect_set_color(struct wlr_scene_rect *rect, float color[4]);
