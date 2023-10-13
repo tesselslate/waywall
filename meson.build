@@ -43,32 +43,12 @@ zip = dependency('libzip')
 
 cc = meson.get_compiler('c')
 
-wl_scanner = find_program(wayland_scanner.get_variable('wayland_scanner'), native : true)
-wl_proto_dir = wayland_protocols.get_variable('pkgdatadir')
-wl_proto_xml = [
-  'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
-  'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
-]
-
-wl_proto_header = []
-wl_proto_src = []
-foreach proto : wl_proto_xml
-  wl_proto_header += custom_target(
-    proto.underscorify() + '-header',
-    input : wl_proto_dir + '/' + proto,
-    output : '@BASENAME@-protocol.h',
-    command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
-  )
-  wl_proto_src += custom_target(
-    proto.underscorify() + '-src',
-    input : wl_proto_dir + '/' + proto,
-    output : '@BASENAME@.c',
-    command : [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
-  )
-endforeach
+protocol_sources = []
+protocol_headers = []
+subdir('protocol')
 
 executable('waywall',
-  wl_proto_src, wl_proto_header,
+  protocol_sources, protocol_headers,
   'compositor.c', 'compositor.h',
   'config.c', 'config.h',
   'cpu.c', 'cpu.h',
@@ -90,22 +70,9 @@ executable('waywall',
 
 executable('waywall-launch', 'waywall-launch.c')
 
-dmabuf_export_header = custom_target(
-  'dmabuf-export-header',
-  input : 'wlr-export-dmabuf-unstable-v1.xml',
-  output : 'wlr-export-dmabuf-unstable-v1-protocol.h',
-  command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
-)
-dmabuf_export_src = custom_target(
-  'dmabuf-export-src',
-  input : 'wlr-export-dmabuf-unstable-v1.xml',
-  output : 'wlr-export-dmabuf-unstable-v1-protocol.c',
-  command : [wl_scanner, 'private-code', '@INPUT@', '@OUTPUT@'],
-)
-
 shared_library('waywall-obs',
+  protocol_sources, protocol_headers,
   'waywall-obs.c',
-  dmabuf_export_src, dmabuf_export_header,
   dependencies : [
     obs,
     wayland_client,
