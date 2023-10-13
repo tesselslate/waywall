@@ -213,10 +213,6 @@ send_event(xcb_connection_t *xcb, xcb_window_t window, uint32_t mask, const char
 
 static void
 handle_cursor_motion(struct compositor *compositor, uint32_t time_msec) {
-    if (!compositor->focused_window) {
-        wlr_seat_pointer_clear_focus(compositor->seat);
-        return;
-    }
     if (compositor->grabbed_window) {
         double x = compositor->cursor->x - compositor->grab_x;
         double y = compositor->cursor->y - compositor->grab_y;
@@ -234,6 +230,10 @@ handle_cursor_motion(struct compositor *compositor, uint32_t time_msec) {
         struct window *window = node->data;
         wlr_seat_pointer_notify_enter(compositor->seat, window->surface->surface, x, y);
         wlr_seat_pointer_notify_motion(compositor->seat, time_msec, x, y);
+    } else {
+        if (!compositor->focused_window) {
+            wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
+        }
     }
 }
 
@@ -349,7 +349,9 @@ on_cursor_button(struct wl_listener *listener, void *data) {
         }
     }
 
-    if (!compositor->focused_window) {
+    // handle_button needs to know when buttons have been released after the user enters an
+    // instance.
+    if (!event.state || !compositor->focused_window) {
         compositor->vtable.button(event);
     } else {
         wlr_seat_pointer_notify_button(compositor->seat, wlr_event->time_msec, wlr_event->button,
@@ -1346,6 +1348,12 @@ compositor_window_focus(struct compositor *compositor, struct window *window) {
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
     compositor->grabbed_window = NULL;
 
+    if (compositor->wl_output) {
+        int32_t width = compositor->wl_output->wlr_output->width;
+        int32_t height = compositor->wl_output->wlr_output->height;
+        wlr_cursor_warp(compositor->cursor, NULL, width / 2, height / 2);
+    }
+
     if (window) {
         wlr_xwayland_set_seat(compositor->xwayland, compositor->seat);
         wlr_xwayland_surface_activate(window->surface, true);
@@ -1371,6 +1379,7 @@ compositor_window_focus(struct compositor *compositor, struct window *window) {
             return;
         }
         handle_constraint(compositor, NULL);
+        wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
         wlr_xwayland_surface_activate(compositor->focused_window->surface, false);
         wlr_seat_keyboard_notify_clear_focus(compositor->seat);
         wlr_seat_pointer_notify_clear_focus(compositor->seat);
