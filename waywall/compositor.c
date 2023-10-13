@@ -1345,10 +1345,10 @@ compositor_window_close(struct window *window) {
 }
 
 void
-compositor_window_configure(struct window *window, int16_t w, int16_t h) {
+compositor_window_configure(struct window *window, int16_t width, int16_t height) {
     ww_assert(window);
 
-    wlr_xwayland_surface_configure(window->surface, 0, 0, w, h);
+    wlr_xwayland_surface_configure(window->surface, 0, 0, width, height);
 }
 
 void
@@ -1430,11 +1430,11 @@ compositor_window_get_name(struct window *window) {
 }
 
 void
-compositor_window_get_size(struct window *window, int16_t *w, int16_t *h) {
+compositor_window_get_size(struct window *window, int16_t *width, int16_t *height) {
     ww_assert(window);
 
-    *w = window->surface->width;
-    *h = window->surface->height;
+    *width = window->surface->width;
+    *height = window->surface->height;
 }
 
 bool

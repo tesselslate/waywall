@@ -45,8 +45,8 @@ struct instance {
     struct headless_view *hview_inst, *hview_wp;
 };
 
-bool instance_get_mods(struct instance *);
-bool instance_get_options(struct instance *);
-bool instance_try_from(struct window *, struct instance *, int);
+bool instance_get_mods(struct instance *instance);
+bool instance_get_options(struct instance *instance);
+bool instance_try_from(struct window *window, struct instance *instance, int inotify_fd);
 
 #endif
