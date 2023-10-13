@@ -65,6 +65,12 @@ struct compositor_vtable {
     compositor_window_func_t window;
 };
 
+enum compositor_wintype {
+    UNKNOWN,
+    INSTANCE,
+    FLOATING,
+};
+
 // Attempts to create a new compositor. Returns NULL on failure.
 struct compositor *compositor_create(struct compositor_vtable, struct compositor_config);
 
@@ -134,8 +140,8 @@ void compositor_window_set_dest(struct window *, struct wlr_box);
 // Sets the opacity of the window.
 void compositor_window_set_opacity(struct window *, float);
 
-// Moves the given window to the top of the stack
-void compositor_window_set_top(struct window *);
+// Sets the type of the given window.
+void compositor_window_set_type(struct window *, enum compositor_wintype);
 
 // Sets the visibility of the given window.
 void compositor_window_set_visible(struct window *, bool);
@@ -168,5 +174,8 @@ void compositor_rect_set_color(struct wlr_scene_rect *, float[4]);
 
 // Toggles the visibility of a rectangle on the compositor scene.
 void compositor_rect_toggle(struct wlr_scene_rect *, bool);
+
+// Disables or enables all rectangles.
+void compositor_toggle_rectangles(struct compositor *, bool);
 
 #endif

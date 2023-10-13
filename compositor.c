@@ -50,8 +50,13 @@ struct compositor {
     struct wlr_export_dmabuf_manager_v1 *dmabuf_export;
 
     struct wlr_scene *scene;
-    struct wlr_scene_output_layout *scene_layout;
+    struct wlr_scene_tree *scene_floating;
+    struct wlr_scene_tree *scene_indicators;
+    struct wlr_scene_tree *scene_instances;
+    struct wlr_scene_tree *scene_headless;
+    struct wlr_scene_tree *scene_unknown;
     struct wlr_scene_rect *background;
+    struct wlr_scene_output_layout *scene_layout;
 
     struct wlr_cursor *cursor;
     struct wlr_xcursor_manager *cursor_manager;
@@ -143,6 +148,7 @@ struct window {
     struct wlr_xwayland_surface *surface;
     struct wlr_scene_tree *scene_tree;
     struct scene_window *scene_window;
+    enum compositor_wintype type;
 
     struct headless_view {
         struct wlr_scene_tree *tree;
@@ -658,10 +664,9 @@ on_window_map(struct wl_listener *listener, void *data) {
     struct window *window = wl_container_of(listener, window, on_map);
     wl_list_insert(&window->compositor->windows, &window->link);
 
-    window->scene_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
+    window->scene_tree = wlr_scene_tree_create(window->compositor->scene_unknown);
     wlr_scene_node_set_enabled(&window->scene_tree->node, true);
     window->scene_window = scene_window_create(window->scene_tree, window->surface->surface);
-    wlr_scene_node_set_position(&window->scene_tree->node, WL_X, WL_Y);
 
     window->compositor->vtable.window(window, true);
 }
@@ -889,6 +894,40 @@ compositor_create(struct compositor_vtable vtable, struct compositor_config conf
 
     compositor->scene = wlr_scene_create();
     ww_assert(compositor->scene);
+
+    compositor->scene_floating = wlr_scene_tree_create(&compositor->scene->tree);
+    ww_assert(compositor->scene_floating);
+    wlr_scene_node_set_enabled(&compositor->scene_floating->node, true);
+    wlr_scene_node_set_position(&compositor->scene_floating->node, WL_X, WL_Y);
+
+    compositor->scene_indicators = wlr_scene_tree_create(&compositor->scene->tree);
+    ww_assert(compositor->scene_indicators);
+    wlr_scene_node_set_enabled(&compositor->scene_indicators->node, true);
+    wlr_scene_node_set_position(&compositor->scene_indicators->node, WL_X, WL_Y);
+
+    compositor->scene_instances = wlr_scene_tree_create(&compositor->scene->tree);
+    ww_assert(compositor->scene_instances);
+    wlr_scene_node_set_enabled(&compositor->scene_instances->node, true);
+    wlr_scene_node_set_position(&compositor->scene_instances->node, WL_X, WL_Y);
+
+    compositor->scene_headless = wlr_scene_tree_create(&compositor->scene->tree);
+    ww_assert(compositor->scene_headless);
+    wlr_scene_node_set_enabled(&compositor->scene_headless->node, true);
+    wlr_scene_node_set_position(&compositor->scene_headless->node, HEADLESS_X, HEADLESS_Y);
+
+    compositor->scene_unknown = wlr_scene_tree_create(&compositor->scene->tree);
+    ww_assert(compositor->scene_unknown);
+    wlr_scene_node_set_enabled(&compositor->scene_unknown->node, false);
+
+    wlr_scene_node_raise_to_top(&compositor->scene_floating->node);
+    wlr_scene_node_place_below(&compositor->scene_indicators->node,
+                               &compositor->scene_floating->node);
+    wlr_scene_node_place_below(&compositor->scene_instances->node,
+                               &compositor->scene_indicators->node);
+    wlr_scene_node_place_below(&compositor->scene_headless->node,
+                               &compositor->scene_instances->node);
+    wlr_scene_node_lower_to_bottom(&compositor->scene_unknown->node);
+
     compositor->scene_layout =
         wlr_scene_attach_output_layout(compositor->scene, compositor->output_layout);
     ww_assert(compositor->scene_layout);
@@ -1235,10 +1274,6 @@ compositor_window_focus(struct compositor *compositor, struct window *window) {
 
     struct wlr_keyboard *keyboard = wlr_seat_get_keyboard(compositor->seat);
     wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
-    if (compositor->wl_output) {
-        wlr_cursor_warp(compositor->cursor, NULL, compositor->wl_output->wlr_output->width / 2,
-                        compositor->wl_output->wlr_output->height / 2);
-    }
 
     if (window) {
         wlr_xwayland_set_seat(compositor->xwayland, compositor->seat);
@@ -1299,10 +1334,9 @@ compositor_window_make_headless_view(struct window *window) {
     ww_assert(window->headless_view_count < (int)ARRAY_LEN(window->headless_views));
 
     if (!window->headless_tree) {
-        window->headless_tree = wlr_scene_tree_create(&window->compositor->scene->tree);
+        window->headless_tree = wlr_scene_tree_create(window->compositor->scene_headless);
         ww_assert(window->headless_tree);
         wlr_scene_node_set_enabled(&window->headless_tree->node, true);
-        wlr_scene_node_set_position(&window->headless_tree->node, HEADLESS_X, HEADLESS_Y);
     }
 
     struct headless_view *view = &window->headless_views[window->headless_view_count++];
@@ -1317,7 +1351,7 @@ compositor_window_make_headless_view(struct window *window) {
 
 void
 compositor_window_set_dest(struct window *window, struct wlr_box box) {
-    wlr_scene_node_set_position(&window->scene_tree->node, WL_X + box.x, WL_Y + box.y);
+    wlr_scene_node_set_position(&window->scene_tree->node, box.x, box.y);
     scene_window_set_dest_size(window->scene_window, box.width, box.height);
 }
 
@@ -1327,8 +1361,24 @@ compositor_window_set_opacity(struct window *window, float opacity) {
 }
 
 void
-compositor_window_set_top(struct window *window) {
-    wlr_scene_node_raise_to_top(&window->scene_tree->node);
+compositor_window_set_type(struct window *window, enum compositor_wintype type) {
+    ww_assert(window);
+    ww_assert(type == INSTANCE || type == FLOATING);
+
+    if (window->type == type) {
+        return;
+    }
+    window->type = type;
+    switch (type) {
+    case INSTANCE:
+        wlr_scene_node_reparent(&window->scene_tree->node, window->compositor->scene_instances);
+        break;
+    case FLOATING:
+        wlr_scene_node_reparent(&window->scene_tree->node, window->compositor->scene_floating);
+        break;
+    default:
+        ww_unreachable();
+    }
 }
 
 void
@@ -1360,15 +1410,15 @@ compositor_hview_set_top(struct headless_view *view) {
 
 void
 compositor_rect_configure(struct wlr_scene_rect *rect, struct wlr_box box) {
-    wlr_scene_node_set_position(&rect->node, WL_X + box.x, WL_Y + box.y);
+    wlr_scene_node_set_position(&rect->node, box.x, box.y);
     wlr_scene_rect_set_size(rect, box.width, box.height);
 }
 
 struct wlr_scene_rect *
 compositor_rect_create(struct compositor *compositor, struct wlr_box box, float color[4]) {
     struct wlr_scene_rect *rect =
-        wlr_scene_rect_create(&compositor->scene->tree, box.width, box.height, color);
-    wlr_scene_node_set_position(&rect->node, WL_X + box.x, WL_Y + box.y);
+        wlr_scene_rect_create(compositor->scene_indicators, box.width, box.height, color);
+    wlr_scene_node_set_position(&rect->node, box.x, box.y);
     ww_assert(rect);
     return rect;
 }
@@ -1380,10 +1430,10 @@ compositor_rect_set_color(struct wlr_scene_rect *rect, float color[4]) {
 
 void
 compositor_rect_toggle(struct wlr_scene_rect *rect, bool state) {
-    if (state) {
-        wlr_scene_node_set_enabled(&rect->node, true);
-        wlr_scene_node_raise_to_top(&rect->node);
-    } else {
-        wlr_scene_node_set_enabled(&rect->node, false);
-    }
+    wlr_scene_node_set_enabled(&rect->node, state);
+}
+
+void
+compositor_toggle_rectangles(struct compositor *compositor, bool state) {
+    wlr_scene_node_set_enabled(&compositor->scene_indicators->node, state);
 }

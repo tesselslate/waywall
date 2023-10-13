@@ -299,7 +299,6 @@ ninb_set_visible(bool visible) {
     ninb_shown = visible;
     ninb_reposition(0, 0);
     compositor_window_set_opacity(ninb_window, visible ? config->ninb_opacity : 0.0f);
-    compositor_window_set_top(ninb_window);
 }
 
 static bool
@@ -501,7 +500,7 @@ instance_play(struct instance *instance) {
     };
     compositor_window_set_dest(instance->window, box);
 
-    // Unpause the instance, disable the lock indicator, and hide the other instances.
+    // Unpause the instance and hide all of the other scene elements.
     static const struct compositor_key unpause_keys[] = {
         {KEY_ESC, true},
         {KEY_ESC, false},
@@ -520,11 +519,9 @@ instance_play(struct instance *instance) {
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
             compositor_window_set_visible(instances[i].window, i == active_instance ? true : false);
-            if (instances[i].lock_indicator) {
-                compositor_rect_toggle(instances[i].lock_indicator, false);
-            }
         }
     }
+    compositor_toggle_rectangles(compositor, false);
 
     // Enable sleepbg.lock.
     sleepbg_lock_toggle(true);
@@ -661,11 +658,9 @@ wall_focus() {
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
             compositor_window_set_visible(instances[i].window, true);
-            if (instances[i].lock_indicator && instances[i].locked) {
-                compositor_rect_toggle(instances[i].lock_indicator, true);
-            }
         }
     }
+    compositor_toggle_rectangles(compositor, true);
 }
 
 static void
@@ -1018,6 +1013,7 @@ handle_window(struct window *window, bool map) {
     // Instance death needs to be handled elegantly.
     if (!map) {
         if (window == ninb_window) {
+            // TODO: If the ninb window is focused then we need to go back to the instance
             ninb_window = NULL;
         }
         for (int i = 0; i < max_instance_id; i++) {
@@ -1050,6 +1046,7 @@ handle_window(struct window *window, bool map) {
         if (id >= config->wall_width * config->wall_height) {
             wlr_log(WLR_INFO, "more instances than spots on wall - some are invisible");
         }
+        compositor_window_set_type(window, INSTANCE);
         return;
     } else if (strstr(name, "Ninjabrain Bot")) {
         if (ninb_window) {
@@ -1059,10 +1056,9 @@ handle_window(struct window *window, bool map) {
         }
         ninb_window = window;
         ninb_set_visible(ninb_shown);
+        compositor_window_set_type(window, FLOATING);
         return;
     } else {
-        compositor_window_set_opacity(window, 0.0f);
-
         char procbuf[PATH_MAX], linkbuf[PATH_MAX];
         snprintf(procbuf, ARRAY_LEN(procbuf), "/proc/%d/exe", compositor_window_get_pid(window));
         ssize_t len = readlink(procbuf, linkbuf, ARRAY_LEN(linkbuf) - 1);
