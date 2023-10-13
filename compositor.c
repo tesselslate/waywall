@@ -1263,7 +1263,9 @@ compositor_load_config(struct compositor *compositor, struct compositor_config c
         }
         wlr_xcursor_manager_destroy(compositor->cursor_manager);
         compositor->cursor_manager = cursor_manager;
-        wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
+        if (!compositor->remote_locked_pointer) {
+            wlr_cursor_set_xcursor(compositor->cursor, compositor->cursor_manager, "default");
+        }
         set_xwayland_cursor(compositor);
     fail_cursor_manager:;
     }
