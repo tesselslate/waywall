@@ -39,7 +39,7 @@ struct compositor_key {
 };
 
 typedef bool (*compositor_allow_configure_func_t)(struct window *, int16_t, int16_t);
-typedef bool (*compositor_button_func_t)(struct compositor_button_event event);
+typedef void (*compositor_button_func_t)(struct compositor_button_event event);
 typedef bool (*compositor_key_func_t)(struct compositor_key_event event);
 typedef void (*compositor_modifiers_func_t)(uint32_t modifiers);
 typedef void (*compositor_motion_func_t)(struct compositor_motion_event event);
@@ -48,6 +48,7 @@ typedef void (*compositor_window_func_t)(struct window *window, bool map);
 
 struct compositor_config {
     int repeat_rate, repeat_delay;
+    float floating_opacity;
     float background_color[4];
     bool confine_pointer;
     const char *cursor_theme;
@@ -109,6 +110,9 @@ void compositor_set_mouse_sensitivity(struct compositor *, double);
  *  WINDOWS
  */
 
+// Toggles whether or not the user should be allowed to click on an instance to focus it.
+void compositor_allow_instance_focus(struct compositor *, bool);
+
 // Requests the client owning the given window to close it.
 void compositor_window_close(struct window *);
 
@@ -131,6 +135,12 @@ const char *compositor_window_get_name(struct window *);
 // Gets the size of the given `window`.
 void compositor_window_get_size(struct window *, int16_t *, int16_t *);
 
+// Returns whether or not the given window is focused.
+bool compositor_window_is_focused(struct window *);
+
+// Returns whether or not the given window is floating.
+bool compositor_window_is_floating(struct window *);
+
 // Creates a new headless view for the given window.
 struct headless_view *compositor_window_make_headless_view(struct window *);
 
@@ -145,6 +155,9 @@ void compositor_window_set_type(struct window *, enum compositor_wintype);
 
 // Sets the visibility of the given window.
 void compositor_window_set_visible(struct window *, bool);
+
+// Toggles the visibility of floating windows.
+void compositor_toggle_floating(struct compositor *, bool);
 
 /*
  *  HEADLESS VIEWS

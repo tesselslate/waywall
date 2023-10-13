@@ -12,10 +12,12 @@
 #define MAX_ACTIONS 8
 #define MAX_BINDS 32
 #define IS_INGAME_ACTION(x) ((x) >= ACTION_INGAME_RESET)
+#define IS_UNIVERSAL_ACTION(x) ((x) <= ACTION_ANY_TOGGLE_NINB)
 
 extern const char config_filename[];
 
 enum action {
+    ACTION_ANY_TOGGLE_NINB,
     ACTION_WALL_RESET_ALL,
     ACTION_WALL_RESET_ONE,
     ACTION_WALL_PLAY,
@@ -23,7 +25,6 @@ enum action {
     ACTION_WALL_FOCUS_RESET,
     ACTION_INGAME_RESET,
     ACTION_INGAME_ALT_RES,
-    ACTION_INGAME_TOGGLE_NINB,
 };
 
 enum unlock_behavior {

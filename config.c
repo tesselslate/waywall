@@ -21,7 +21,7 @@ static const struct mapping actions[] = {
     {"wall_focus_reset", ACTION_WALL_FOCUS_RESET},
     {"ingame_reset", ACTION_INGAME_RESET},
     {"alt_res", ACTION_INGAME_ALT_RES},
-    {"toggle_ninb", ACTION_INGAME_TOGGLE_NINB},
+    {"toggle_ninb", ACTION_ANY_TOGGLE_NINB},
 };
 
 static const struct mapping buttons[] = {

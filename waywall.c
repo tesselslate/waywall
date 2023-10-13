@@ -86,7 +86,7 @@ static void wall_resize_instance(struct instance *);
 static void process_bind(struct keybind *, bool);
 static void process_state(struct instance *);
 static bool handle_allow_configure(struct window *, int16_t, int16_t);
-static bool handle_button(struct compositor_button_event);
+static void handle_button(struct compositor_button_event);
 static bool handle_key(struct compositor_key_event);
 static void handle_modifiers(uint32_t);
 static void handle_motion(struct compositor_motion_event);
@@ -251,6 +251,7 @@ create_compositor_config() {
     struct compositor_config compositor_config = {
         .repeat_rate = config->repeat_rate,
         .repeat_delay = config->repeat_delay,
+        .floating_opacity = config->ninb_opacity,
         .confine_pointer = config->confine_pointer,
         .cursor_theme = config->cursor_theme,
         .cursor_size = config->cursor_size,
@@ -294,11 +295,11 @@ ninb_reposition(int16_t w, int16_t h) {
 
 static void
 ninb_set_visible(bool visible) {
-    ww_assert(ninb_window);
-
     ninb_shown = visible;
-    ninb_reposition(0, 0);
-    compositor_window_set_opacity(ninb_window, visible ? config->ninb_opacity : 0.0f);
+    if (ninb_window) {
+        ninb_reposition(0, 0);
+    }
+    compositor_toggle_floating(compositor, visible);
 }
 
 static bool
@@ -522,6 +523,7 @@ instance_play(struct instance *instance) {
         }
     }
     compositor_toggle_rectangles(compositor, false);
+    compositor_allow_instance_focus(compositor, true);
 
     // Enable sleepbg.lock.
     sleepbg_lock_toggle(true);
@@ -576,9 +578,7 @@ instance_reset(struct instance *instance) {
         compositor_set_mouse_sensitivity(compositor, config->main_sens);
         instance->alt_res = false;
         wall_resize_instance(instance);
-        if (ninb_window) {
-            ninb_set_visible(false);
-        }
+        ninb_set_visible(false);
     }
 
     // Press the appropriate reset hotkey.
@@ -661,6 +661,7 @@ wall_focus() {
         }
     }
     compositor_toggle_rectangles(compositor, true);
+    compositor_allow_instance_focus(compositor, false);
 }
 
 static void
@@ -681,7 +682,7 @@ process_bind(struct keybind *keybind, bool held) {
     for (int i = 0; i < keybind->action_count; i++) {
         enum action action = keybind->actions[i];
         bool action_ingame = IS_INGAME_ACTION(action), user_ingame = active_instance != WALL;
-        if (action_ingame != user_ingame) {
+        if (!IS_UNIVERSAL_ACTION(action) && action_ingame != user_ingame) {
             continue;
         }
         struct instance *hovered = instance_get_hovered();
@@ -691,6 +692,9 @@ process_bind(struct keybind *keybind, bool held) {
         }
 
         switch (action) {
+        case ACTION_ANY_TOGGLE_NINB:
+            ninb_set_visible(!ninb_shown);
+            break;
         case ACTION_WALL_RESET_ALL:
             for (int i = 0; i < max_instance_id; i++) {
                 if (instances[i].alive && !instances[i].locked) {
@@ -763,11 +767,6 @@ process_bind(struct keybind *keybind, bool held) {
                 compositor_set_mouse_sensitivity(compositor, config->alt_sens);
             }
             instance->alt_res = !instance->alt_res;
-            break;
-        case ACTION_INGAME_TOGGLE_NINB:
-            if (ninb_window) {
-                ninb_set_visible(!ninb_shown);
-            }
             break;
         }
     }
@@ -858,21 +857,20 @@ process_state(struct instance *instance) {
 
 static bool
 handle_allow_configure(struct window *window, int16_t w, int16_t h) {
-    if (window != ninb_window) {
-        return false;
+    if (window == ninb_window) {
+        ninb_reposition(w, h);
+        return true;
     }
-
-    ninb_reposition(w, h);
-    return true;
+    return compositor_window_is_floating(window);
 }
 
-static bool
+static void
 handle_button(struct compositor_button_event event) {
     // Ensure the received button is in bounds (a mouse button.)
     int button = event.button - BTN_MOUSE;
     if (button < 0 || button >= (int)ARRAY_LEN(held_buttons)) {
         wlr_log(WLR_INFO, "received button press with unknown button %d", event.button);
-        return false;
+        return;
     }
 
     // Keep track of how many buttons are held as an optimization detail for handle_motion.
@@ -881,9 +879,9 @@ handle_button(struct compositor_button_event event) {
     }
     held_buttons[button] = event.state;
 
-    // Do not process mouse clicks while ingame and do not process button releases.
-    if (active_instance != WALL || !event.state) {
-        return false;
+    // Do not process button releases.
+    if (!event.state) {
+        return;
     }
 
     for (int i = 0; i < config->bind_count; i++) {
@@ -899,7 +897,7 @@ handle_button(struct compositor_button_event event) {
         process_bind(&config->binds[i], false);
         break;
     }
-    return true;
+    return;
 }
 
 static bool
@@ -1012,15 +1010,25 @@ static void
 handle_window(struct window *window, bool map) {
     // Instance death needs to be handled elegantly.
     if (!map) {
-        if (window == ninb_window) {
-            // TODO: If the ninb window is focused then we need to go back to the instance
-            ninb_window = NULL;
-        }
+        // If an instance died, handle it. If the instance was focused, instance_handle_death sends
+        // the user back to the wall.
         for (int i = 0; i < max_instance_id; i++) {
             if (instances[i].window == window) {
                 instance_handle_death(&instances[i]);
                 return;
             }
+        }
+
+        // If a floating window was focused and died, refocus the appropriate window.
+        if (compositor_window_is_focused(window)) {
+            if (active_instance == WALL) {
+                compositor_window_focus(compositor, NULL);
+            } else {
+                compositor_window_focus(compositor, instances[active_instance].window);
+            }
+        }
+        if (window == ninb_window) {
+            ninb_window = NULL;
         }
         return;
     }
@@ -1059,21 +1067,14 @@ handle_window(struct window *window, bool map) {
         compositor_window_set_type(window, FLOATING);
         return;
     } else {
-        char procbuf[PATH_MAX], linkbuf[PATH_MAX];
-        snprintf(procbuf, ARRAY_LEN(procbuf), "/proc/%d/exe", compositor_window_get_pid(window));
-        ssize_t len = readlink(procbuf, linkbuf, ARRAY_LEN(linkbuf) - 1);
-        if (len == -1) {
-            wlr_log_errno(WLR_ERROR, "failed to read executable of process");
-            compositor_window_close(window);
+        if (ninb_window &&
+            compositor_window_get_pid(window) == compositor_window_get_pid(ninb_window)) {
+            compositor_window_set_type(window, FLOATING);
             return;
         }
-        linkbuf[len] = '\0';
-        char *name = strrchr(linkbuf, '/');
-        if (!name || strncmp(name, "/java", STRING_LEN("/java")) != 0) {
-            wlr_log(WLR_INFO, "closing unknown window '%s' (exe: '%s')", name ? name : "unnamed",
-                    linkbuf);
-            compositor_window_close(window);
-        }
+
+        wlr_log(WLR_INFO, "unknown window opened (pid %d, name '%s')",
+                compositor_window_get_pid(window), name ? name : "unnamed");
         return;
     }
 }
