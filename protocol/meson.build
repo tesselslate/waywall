@@ -1,3 +1,6 @@
+protocol_sources = []
+protocol_headers = []
+
 wl_scanner = find_program(wayland_scanner.get_variable('wayland_scanner'), native : true)
 protocol_dir = wayland_protocols.get_variable('pkgdatadir') + '/'
 

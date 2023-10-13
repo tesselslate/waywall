@@ -43,30 +43,10 @@ zip = dependency('libzip')
 
 cc = meson.get_compiler('c')
 
-protocol_sources = []
-protocol_headers = []
+includes = include_directories('include')
+
 subdir('protocol')
-
-executable('waywall',
-  protocol_sources, protocol_headers,
-  'compositor.c', 'compositor.h',
-  'config.c', 'config.h',
-  'cpu.c', 'cpu.h',
-  'instance.c', 'instance.h',
-  'scene_window.c', 'scene_window.h',
-  'util.c', 'util.h',
-  'waywall.c',
-
-  dependencies : [
-    toml,
-    wlroots,
-    wayland_client,
-    wayland_server,
-    xcb,
-    xkbcommon,
-    zip,
-  ],
-)
+subdir('waywall')
 
 executable('waywall-launch', 'waywall-launch.c')
 
