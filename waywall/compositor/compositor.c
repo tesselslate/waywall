@@ -1,7 +1,8 @@
 #include "compositor/compositor_p.h"
+#include "compositor/scene_window.h"
+
 #include "pointer-constraints-unstable-v1-protocol.h"
 #include "relative-pointer-unstable-v1-protocol.h"
-#include "scene_window.h"
 #include "util.h"
 #include <fcntl.h>
 #include <linux/input-event-codes.h>

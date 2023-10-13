@@ -1,4 +1,4 @@
-#include "scene_window.h"
+#include "compositor/scene_window.h"
 #include "util.h"
 #include <stdlib.h>
 #include <wlr/types/wlr_compositor.h>

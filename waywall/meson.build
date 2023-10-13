@@ -2,11 +2,12 @@ executable('waywall',
   protocol_sources, protocol_headers,
 
   'compositor/compositor.c',
+  'compositor/scene_window.c',
+
   'config.c',
   'cpu.c',
   'instance.c',
   'reset_counter.c',
-  'scene_window.c',
   'util.c',
   'waywall.c',
 
