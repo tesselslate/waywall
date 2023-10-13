@@ -2,6 +2,7 @@
 #include "config.h"
 #include "cpu.h"
 #include "instance.h"
+#include "reset_counter.h"
 #include "util.h"
 #include <fcntl.h>
 #include <limits.h>
@@ -50,8 +51,7 @@ static struct {
     struct keybind *bind;
 } last_held;
 
-static uint64_t reset_count;
-static int reset_count_fd = INT_MIN;
+static struct reset_counter *reset_counter;
 
 static struct {
     bool running;
@@ -68,8 +68,6 @@ static struct wlr_box compute_alt_res();
 static struct compositor_config create_compositor_config();
 static void ninb_reposition(int16_t, int16_t);
 static void ninb_set_visible(bool);
-static bool prepare_reset_counter();
-static void write_reset_count();
 static void sleepbg_lock_toggle(bool);
 static struct instance *instance_get_hovered();
 static inline int instance_get_id(struct instance *);
@@ -189,22 +187,22 @@ config_update() {
     if (new_config->count_resets) {
         ww_assert(new_config->resets_file);
 
-        // TODO: Try handling this? Even though it's annoying
-        if (!config->resets_file || strcmp(config->resets_file, new_config->resets_file) != 0) {
-            wlr_log(
-                WLR_ERROR,
-                "updating the reset counter file will not take effect until waywall is restarted");
-        }
-        if (!config->count_resets) {
-            wlr_log(WLR_ERROR,
-                    "enabling the reset counter will not take effect until waywall is restarted");
+        if (reset_counter) {
+            if (!reset_counter_change_file(reset_counter, new_config->resets_file)) {
+                wlr_log(WLR_ERROR, "failed to change reset count file");
+            }
+        } else {
+            reset_counter = reset_counter_from_file(new_config->resets_file);
+            if (!reset_counter) {
+                wlr_log(WLR_ERROR, "failed to create reset counter");
+            }
         }
     } else {
-        if (reset_count_fd >= 0) {
-            wlr_log(WLR_INFO, "disabling reset counting (stopping at %" PRIu64 " resets)",
-                    reset_count);
-            close(reset_count_fd);
-            reset_count_fd = INT_MIN;
+        if (reset_counter) {
+            int count = reset_counter_get_count(reset_counter);
+            wlr_log(WLR_INFO, "disabling reset counting (stopping at %d resets)", count);
+            reset_counter_destroy(reset_counter);
+            reset_counter = NULL;
         }
     }
 
@@ -300,58 +298,6 @@ ninb_set_visible(bool visible) {
         ninb_reposition(0, 0);
     }
     compositor_toggle_floating(compositor, visible);
-}
-
-static bool
-prepare_reset_counter() {
-    if (!config->count_resets) {
-        return true;
-    }
-
-    ww_assert(config->resets_file);
-    reset_count_fd = open(config->resets_file, O_CREAT | O_RDWR, 0644);
-    if (reset_count_fd == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to open reset counter");
-        return false;
-    }
-    char buf[64];
-    ssize_t len = read(reset_count_fd, buf, STRING_LEN(buf));
-    if (len == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to read reset counter");
-        return false;
-    }
-    if (len == 0) {
-        reset_count = 0;
-        return true;
-    }
-    buf[len] = '\0';
-    char *endptr;
-    int64_t count = strtoll(buf, &endptr, 10);
-    if (endptr == buf) {
-        wlr_log(WLR_ERROR, "failed to parse existing reset count ('%s')", buf);
-        return false;
-    }
-    wlr_log(WLR_INFO, "read reset count of %" PRIi64, count);
-    reset_count = count;
-    return true;
-}
-
-static void
-write_reset_count() {
-    if (reset_count_fd < 0) {
-        return;
-    }
-
-    if (lseek(reset_count_fd, 0, SEEK_SET) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to seek reset count");
-        return;
-    }
-    char buf[64];
-    int written = snprintf(buf, ARRAY_LEN(buf), "%" PRIu64 "\n", reset_count);
-    ssize_t n = write(reset_count_fd, buf, written);
-    if (n != written) {
-        wlr_log_errno(WLR_ERROR, "failed to write reset count");
-    }
 }
 
 static void
@@ -587,7 +533,9 @@ instance_reset(struct instance *instance) {
     // Update the CPU weight for the instance.
     cpu_update_instance(instance, CPU_HIGH);
 
-    reset_count++;
+    if (reset_counter) {
+        reset_counter_increment(reset_counter);
+    }
     return true;
 }
 
@@ -696,18 +644,21 @@ process_bind(struct keybind *keybind, bool held) {
             ninb_set_visible(!ninb_shown);
             break;
         case ACTION_WALL_RESET_ALL:
+            if (reset_counter) {
+                reset_counter_queue_writes(reset_counter);
+            }
             for (int i = 0; i < max_instance_id; i++) {
                 if (instances[i].alive && !instances[i].locked) {
                     instance_reset(&instances[i]);
                 }
             }
-            write_reset_count();
+            if (reset_counter) {
+                reset_counter_commit_writes(reset_counter);
+            }
             break;
         case ACTION_WALL_RESET_ONE:
             if (hovered && !hovered->locked) {
-                if (instance_reset(hovered)) {
-                    write_reset_count();
-                }
+                instance_reset(hovered);
             }
             break;
         case ACTION_WALL_PLAY:
@@ -723,13 +674,18 @@ process_bind(struct keybind *keybind, bool held) {
         case ACTION_WALL_FOCUS_RESET:
             if (hovered && (hovered->state.screen == INWORLD)) {
                 bool hovered_id = instance_get_id(hovered);
+                if (reset_counter) {
+                    reset_counter_queue_writes(reset_counter);
+                }
                 for (int i = 0; i < max_instance_id; i++) {
                     if (i != hovered_id && instances[i].alive && !instances[i].locked) {
                         instance_reset(&instances[i]);
                     }
                 }
                 instance_play(hovered);
-                write_reset_count();
+                if (reset_counter) {
+                    reset_counter_commit_writes(reset_counter);
+                }
             }
             break;
         case ACTION_INGAME_RESET:
@@ -742,13 +698,11 @@ process_bind(struct keybind *keybind, bool held) {
                     struct instance *inst = &instances[i];
                     if (inst->alive && inst->locked && inst->state.screen == INWORLD) {
                         instance_play(inst);
-                        write_reset_count();
                         return;
                     }
                 }
             }
             wall_focus();
-            write_reset_count();
             break;
         case ACTION_INGAME_ALT_RES:
             if (!config->has_alt_res) {
@@ -1175,8 +1129,11 @@ main(int argc, char **argv) {
     if (!config) {
         return 1;
     }
-    if (!prepare_reset_counter()) {
-        goto fail_reset_counter;
+    if (config->count_resets) {
+        reset_counter = reset_counter_from_file(config->resets_file);
+        if (!reset_counter) {
+            goto fail_reset_counter;
+        }
     }
     if (config->has_cpu) {
         if (!cpu_init()) {
@@ -1241,9 +1198,10 @@ main(int argc, char **argv) {
     compositor_set_on_wall(compositor, true);
     bool success = compositor_run(compositor, display_file_fd);
 
-    if (reset_count_fd > 0) {
-        write_reset_count();
-        wlr_log(WLR_INFO, "finished with reset count of %" PRIu64, reset_count);
+    if (reset_counter) {
+        int count = reset_counter_get_count(reset_counter);
+        reset_counter_destroy(reset_counter);
+        wlr_log(WLR_INFO, "finished with reset count of %d", count);
     }
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].dir) {
@@ -1271,8 +1229,8 @@ fail_config_dir:
 
 fail_inotify_init:
 fail_cpu_init:
-    if (reset_count_fd > 0) {
-        close(reset_count_fd);
+    if (reset_counter) {
+        reset_counter_destroy(reset_counter);
     }
 
 fail_reset_counter:

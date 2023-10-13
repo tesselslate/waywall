@@ -7,7 +7,7 @@ clean:
 	ninja -C build clean
 
 run: build
-	build/waywall
+	build/waywall/waywall
 
 setup:
 	meson setup build
