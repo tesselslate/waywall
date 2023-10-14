@@ -26,7 +26,6 @@
  *  Keyboard events
  */
 
-// TODO: Confine pointer on boot if needed
 // TODO: Fix cursor appearing in wrong spot (or not appearing immediately)
 
 static uint32_t
@@ -479,23 +478,15 @@ on_wl_output_create(struct wl_listener *listener, void *data) {
     ww_assert(!wl_output->remote.locked_pointer);
     ww_assert(wl_output->remote.surface);
 
-    if (!input->active_constraint) {
-        return;
-    }
-
-    // If there is an active constraint, we need to set up the necessary constraints on the remote
-    // window.
-    switch (input->active_constraint->type) {
-    case WLR_POINTER_CONSTRAINT_V1_LOCKED:
+    if (input->active_constraint) {
         lock_pointer(input);
-        break;
-    case WLR_POINTER_CONSTRAINT_V1_CONFINED:
-        confine_pointer(input);
-        break;
-    default:
-        ww_unreachable();
+    } else {
+        if (input->compositor->config.confine_pointer) {
+            confine_pointer(input);
+        } else {
+            derestrict_pointer(input);
+        }
     }
-    return;
 }
 
 static void
@@ -640,6 +631,7 @@ input_create(struct compositor *compositor) {
     wl_signal_add(&input->cursor->events.frame, &input->on_cursor_frame);
 
     // Pointer constraints
+    ww_assert(compositor->remote.constraints);
     input->pointer_constraints = wlr_pointer_constraints_v1_create(compositor->display);
     ww_assert(input->pointer_constraints);
 
@@ -654,8 +646,6 @@ input_create(struct compositor *compositor) {
 
     input->on_wl_output_destroy.notify = on_wl_output_destroy;
     wl_signal_add(&compositor->render->events.wl_output_destroy, &input->on_wl_output_destroy);
-
-    ww_assert(compositor->remote.constraints);
 
     // Relative pointer
     input->relative_pointer = wlr_relative_pointer_manager_v1_create(compositor->display);
