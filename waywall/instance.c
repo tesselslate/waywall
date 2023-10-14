@@ -188,7 +188,7 @@ instance_get_options(struct instance *instance) {
 bool
 instance_try_from(struct window *window, struct instance *instance, int inotify_fd) {
     // Find the instance's directory.
-    pid_t pid = compositor_window_get_pid(window);
+    pid_t pid = window_get_pid(window);
     char buf[PATH_MAX], dir_path[PATH_MAX];
     if (snprintf(buf, PATH_MAX, "/proc/%d/cwd", (int)pid) >= PATH_MAX) {
         wlr_log(WLR_ERROR, "tried to readlink of path longer than 512 bytes");
@@ -261,8 +261,8 @@ instance_try_from(struct window *window, struct instance *instance, int inotify_
     instance->state.screen = TITLE;
 
     // Create the headless views for this instance's verification recording.
-    instance->hview_inst = compositor_window_make_headless_view(instance->window);
-    instance->hview_wp = compositor_window_make_headless_view(instance->window);
+    instance->hview_inst = hview_create(instance->window);
+    instance->hview_wp = hview_create(instance->window);
 
     return true;
 

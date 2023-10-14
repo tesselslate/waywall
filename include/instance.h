@@ -1,6 +1,7 @@
 #ifndef WAYWALL_INSTANCE_H
 #define WAYWALL_INSTANCE_H
 
+#include "compositor.h"
 #include "cpu.h"
 #include <stdbool.h>
 #include <stdint.h>
@@ -41,8 +42,8 @@ struct instance {
     } options;
     bool alt_res;
 
-    struct wlr_scene_rect *lock_indicator;
-    struct headless_view *hview_inst, *hview_wp;
+    render_rect_t *lock_indicator;
+    struct hview *hview_inst, *hview_wp;
 };
 
 bool instance_get_mods(struct instance *instance);

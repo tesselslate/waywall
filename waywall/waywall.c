@@ -66,7 +66,7 @@ static void cpu_update_instance(struct instance *, enum cpu_group);
 static void config_update();
 static struct wlr_box compute_alt_res();
 static struct compositor_config create_compositor_config();
-static void ninb_reposition(int16_t, int16_t);
+static void ninb_reposition(int, int);
 static void ninb_set_visible(bool);
 static void sleepbg_lock_toggle(bool);
 static struct instance *instance_get_hovered();
@@ -83,13 +83,7 @@ static void wall_focus();
 static void wall_resize_instance(struct instance *);
 static void process_bind(struct keybind *, bool);
 static void process_state(struct instance *);
-static bool handle_allow_configure(struct window *, int16_t, int16_t);
-static void handle_button(struct compositor_button_event);
-static bool handle_key(struct compositor_key_event);
-static void handle_modifiers(uint32_t);
-static void handle_motion(struct compositor_motion_event);
-static void handle_resize(int32_t, int32_t);
-static void handle_window(struct window *, bool);
+static void process_resize(int32_t, int32_t);
 static int handle_signal(int, void *);
 static int handle_inotify(int, uint32_t, void *);
 
@@ -173,7 +167,7 @@ cpu_update_instance(struct instance *instance, enum cpu_group override) {
         return;
     }
     instance->last_group = group;
-    cpu_move_to_group(compositor_window_get_pid(instance->window), group);
+    cpu_move_to_group(window_get_pid(instance->window), group);
 }
 
 static void
@@ -213,17 +207,17 @@ config_update() {
     compositor_load_config(compositor, create_compositor_config());
     for (unsigned long i = 0; i < ARRAY_LEN(instances); i++) {
         if (instances[i].lock_indicator) {
-            compositor_rect_set_color(instances[i].lock_indicator, config->lock_color);
+            render_rect_set_color(instances[i].lock_indicator, config->lock_color);
         }
         if (instances[i].alive) {
             instance_update_verification(&instances[i]);
         }
     }
-    handle_resize(screen_width, screen_height);
+    process_resize(screen_width, screen_height);
     if (active_instance != WALL && instances[active_instance].alt_res) {
-        compositor_set_mouse_sensitivity(compositor, config->alt_sens);
+        input_set_sensitivity(compositor->input, config->alt_sens);
     } else {
-        compositor_set_mouse_sensitivity(compositor, config->main_sens);
+        input_set_sensitivity(compositor->input, config->main_sens);
     }
     if (ninb_window) {
         ninb_reposition(0, 0);
@@ -260,11 +254,11 @@ create_compositor_config() {
 }
 
 static void
-ninb_reposition(int16_t w, int16_t h) {
+ninb_reposition(int w, int h) {
     ww_assert(ninb_window);
 
     if (w <= 0 || h <= 0) {
-        compositor_window_get_size(ninb_window, &w, &h);
+        render_window_get_size(ninb_window, &w, &h);
     }
     struct wlr_box size = {0, 0, w, h};
 
@@ -288,7 +282,7 @@ ninb_reposition(int16_t w, int16_t h) {
     } else {
         ww_unreachable();
     }
-    compositor_window_set_dest(ninb_window, (struct wlr_box){x, y, size.width, size.height});
+    render_window_set_pos(ninb_window, x, y);
 }
 
 static void
@@ -297,7 +291,7 @@ ninb_set_visible(bool visible) {
     if (ninb_window) {
         ninb_reposition(0, 0);
     }
-    compositor_toggle_floating(compositor, visible);
+    render_layer_set_enabled(compositor->render, LAYER_FLOATING, visible);
 }
 
 static void
@@ -376,7 +370,7 @@ instance_handle_death(struct instance *instance) {
     close(instance->state_fd);
     if (instance_get_id(instance) == active_instance) {
         cpu_unset_active();
-        compositor_set_mouse_sensitivity(compositor, config->main_sens);
+        input_set_sensitivity(compositor->input, config->main_sens);
         instance->alt_res = false;
         wall_focus();
     }
@@ -393,9 +387,10 @@ instance_lock(struct instance *instance) {
         instance->locked = true;
         if (!instance->lock_indicator) {
             struct wlr_box box = instance_get_wall_box(instance);
-            instance->lock_indicator = compositor_rect_create(compositor, box, config->lock_color);
+            instance->lock_indicator =
+                render_rect_create(compositor->render, box, config->lock_color);
         }
-        compositor_rect_toggle(instance->lock_indicator, instance->locked);
+        render_rect_set_enabled(instance->lock_indicator, instance->locked);
     } else {
         // Unlock the instance.
         ww_assert(instance->lock_indicator);
@@ -403,13 +398,13 @@ instance_lock(struct instance *instance) {
         switch (config->unlock_behavior) {
         case UNLOCK_ACCEPT:
             instance->locked = false;
-            compositor_rect_toggle(instance->lock_indicator, false);
+            render_rect_set_enabled(instance->lock_indicator, false);
             break;
         case UNLOCK_IGNORE:
             break;
         case UNLOCK_RESET:
             instance->locked = false;
-            compositor_rect_toggle(instance->lock_indicator, false);
+            render_rect_set_enabled(instance->lock_indicator, false);
             instance_reset(instance);
             break;
         }
@@ -421,13 +416,13 @@ instance_pause(struct instance *instance) {
     ww_assert(instance);
     ww_assert(instance->alive);
 
-    static const struct compositor_key keys[] = {
+    static const struct synthetic_key keys[] = {
         {KEY_F3, true},
         {KEY_ESC, true},
         {KEY_ESC, false},
         {KEY_F3, false},
     };
-    compositor_send_keys(instance->window, keys, ARRAY_LEN(keys));
+    input_send_keys(instance->window, keys, ARRAY_LEN(keys));
 }
 
 static void
@@ -437,39 +432,33 @@ instance_play(struct instance *instance) {
     ww_assert(instance_get_id(instance) != active_instance);
 
     // Focus and fullscreen the instance.
-    compositor_window_focus(compositor, instance->window);
-    compositor_window_configure(instance->window, screen_width, screen_height);
-    struct wlr_box box = {
-        .x = 0,
-        .y = 0,
-        .width = screen_width,
-        .height = screen_height,
-    };
-    compositor_window_set_dest(instance->window, box);
+    input_set_on_wall(compositor->input, false);
+    input_focus_window(compositor->input, instance->window);
+    render_window_configure(instance->window, 0, 0, screen_width, screen_height);
+    render_window_set_dest_size(instance->window, screen_width, screen_height);
 
     // Unpause the instance and hide all of the other scene elements.
-    static const struct compositor_key unpause_keys[] = {
+    static const struct synthetic_key unpause_keys[] = {
         {KEY_ESC, true},
         {KEY_ESC, false},
         {KEY_F1, true},
         {KEY_F1, false},
     };
-    compositor_send_keys(instance->window, unpause_keys,
-                         config->use_f1 ? ARRAY_LEN(unpause_keys) : ARRAY_LEN(unpause_keys) - 2);
+    input_send_keys(instance->window, unpause_keys,
+                    config->use_f1 ? ARRAY_LEN(unpause_keys) : ARRAY_LEN(unpause_keys) - 2);
 
     active_instance = instance_get_id(instance);
     if (instance->locked) {
         ww_assert(instance->lock_indicator);
-        compositor_rect_toggle(instance->lock_indicator, false);
+        render_rect_set_enabled(instance->lock_indicator, false);
         instance->locked = false;
     }
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
-            compositor_window_set_visible(instances[i].window, i == active_instance ? true : false);
+            render_window_set_enabled(instances[i].window, i == active_instance ? true : false);
         }
     }
-    compositor_toggle_rectangles(compositor, false);
-    compositor_set_on_wall(compositor, false);
+    render_layer_set_enabled(compositor->render, LAYER_LOCKS, false);
 
     // Enable sleepbg.lock.
     sleepbg_lock_toggle(true);
@@ -501,27 +490,26 @@ instance_reset(struct instance *instance) {
     // If the instance is still on the title screen, send a fake mouse click. This is necessary
     // because Atum refuses to reset until the window has been clicked once for some reason.
     if (instance->state.screen == TITLE) {
-        compositor_click(instance->window);
+        input_click(instance->window);
     }
 
     // If the instance is currently being played, try to fix ghost pie.
     if (instance_get_id(instance) == active_instance && instance->state.screen == INWORLD) {
-        static const struct compositor_key ghost_pie_keys[] = {
+        static const struct synthetic_key ghost_pie_keys[] = {
             {KEY_ESC, true}, {KEY_ESC, false}, {KEY_LEFTSHIFT, false},
             {KEY_F3, true},  {KEY_F3, false},
         };
 
         if (instance->state.data.world == UNPAUSED) {
-            compositor_send_keys(instance->window, ghost_pie_keys + 2,
-                                 ARRAY_LEN(ghost_pie_keys) - 2);
+            input_send_keys(instance->window, ghost_pie_keys + 2, ARRAY_LEN(ghost_pie_keys) - 2);
         } else {
-            compositor_send_keys(instance->window, ghost_pie_keys, ARRAY_LEN(ghost_pie_keys));
+            input_send_keys(instance->window, ghost_pie_keys, ARRAY_LEN(ghost_pie_keys));
         }
     }
 
     // Adjust the instance's resolution as needed.
     if (instance_get_id(instance) == active_instance) {
-        compositor_set_mouse_sensitivity(compositor, config->main_sens);
+        input_set_sensitivity(compositor->input, config->main_sens);
         instance->alt_res = false;
         wall_resize_instance(instance);
         ninb_set_visible(false);
@@ -547,11 +535,11 @@ instance_send_reset_keys(struct instance *instance) {
     } else {
         keycode = instance->options.atum_hotkey;
     }
-    const struct compositor_key reset_keys[] = {
+    const struct synthetic_key reset_keys[] = {
         {keycode, true},
         {keycode, false},
     };
-    compositor_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
+    input_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
 }
 
 static void
@@ -581,35 +569,33 @@ instance_update_verification(struct instance *instance) {
     int x = (id % config->wall_width) * w, y = (id / config->wall_width) * h;
 
     // Whole instance capture
-    compositor_hview_set_dest(instance->hview_inst, (struct wlr_box){x, y, w, h});
+    hview_set_dest(instance->hview_inst, (struct wlr_box){x, y, w, h});
 
     // Loading square capture
-    compositor_hview_set_src(
-        instance->hview_wp,
-        (struct wlr_box){.x = 0,
-                         .y = config->stretch_height - (square_size + extra_height),
-                         .width = square_size,
-                         .height = square_size + extra_height});
-    compositor_hview_set_dest(instance->hview_wp,
-                              (struct wlr_box){x, y + h - (square_size + extra_height), square_size,
-                                               square_size + extra_height});
-    compositor_hview_set_top(instance->hview_wp);
+    hview_set_src(instance->hview_wp,
+                  (struct wlr_box){.x = 0,
+                                   .y = config->stretch_height - (square_size + extra_height),
+                                   .width = square_size,
+                                   .height = square_size + extra_height});
+    hview_set_dest(instance->hview_wp, (struct wlr_box){x, y + h - (square_size + extra_height),
+                                                        square_size, square_size + extra_height});
+    hview_raise(instance->hview_wp);
 }
 
 static void
 wall_focus() {
     ww_assert(active_instance != WALL);
 
-    compositor_window_focus(compositor, NULL);
+    input_focus_window(compositor->input, NULL);
     sleepbg_lock_toggle(false);
     active_instance = WALL;
     for (int i = 0; i < max_instance_id; i++) {
         if (instances[i].alive) {
-            compositor_window_set_visible(instances[i].window, true);
+            render_window_set_enabled(instances[i].window, true);
         }
     }
-    compositor_toggle_rectangles(compositor, true);
-    compositor_set_on_wall(compositor, true);
+    render_layer_set_enabled(compositor->render, LAYER_LOCKS, true);
+    input_set_on_wall(compositor->input, true);
 }
 
 static void
@@ -618,10 +604,11 @@ wall_resize_instance(struct instance *instance) {
     ww_assert(instance->alive);
 
     struct wlr_box box = instance_get_wall_box(instance);
-    compositor_window_configure(instance->window, config->stretch_width, config->stretch_height);
-    compositor_window_set_dest(instance->window, box);
+    render_window_configure(instance->window, box.x, box.y, config->stretch_width,
+                            config->stretch_height);
+    render_window_set_dest_size(instance->window, box.width, box.height);
     if (instance->lock_indicator) {
-        compositor_rect_configure(instance->lock_indicator, box);
+        render_rect_configure(instance->lock_indicator, box);
     }
 }
 
@@ -710,15 +697,14 @@ process_bind(struct keybind *keybind, bool held) {
             }
             struct instance *instance = &instances[active_instance];
             if (instance->alt_res) {
-                compositor_window_configure(instance->window, screen_width, screen_height);
-                compositor_window_set_dest(instance->window,
-                                           (struct wlr_box){0, 0, screen_width, screen_height});
-                compositor_set_mouse_sensitivity(compositor, config->main_sens);
+                render_window_configure(instance->window, 0, 0, screen_width, screen_height);
+                render_window_set_dest_size(instance->window, screen_width, screen_height);
+                input_set_sensitivity(compositor->input, config->main_sens);
             } else {
-                compositor_window_configure(instance->window, config->alt_width,
-                                            config->alt_height);
-                compositor_window_set_dest(instance->window, compute_alt_res());
-                compositor_set_mouse_sensitivity(compositor, config->alt_sens);
+                struct wlr_box box = compute_alt_res();
+                render_window_configure(instance->window, box.x, box.y, box.width, box.height);
+                render_window_set_dest_size(instance->window, box.width, box.height);
+                input_set_sensitivity(compositor->input, config->alt_sens);
             }
             instance->alt_res = !instance->alt_res;
             break;
@@ -787,11 +773,11 @@ process_state(struct instance *instance) {
                     if (instance_get_id(instance) != active_instance) {
                         instance_pause(instance);
                     } else if (config->use_f1) {
-                        static const struct compositor_key f1_keys[] = {
+                        static const struct synthetic_key f1_keys[] = {
                             {KEY_F1, true},
                             {KEY_F1, false},
                         };
-                        compositor_send_keys(instance->window, f1_keys, ARRAY_LEN(f1_keys));
+                        input_send_keys(instance->window, f1_keys, ARRAY_LEN(f1_keys));
                     }
                 }
                 instance->state.data.world = UNPAUSED;
@@ -809,32 +795,25 @@ process_state(struct instance *instance) {
     cpu_update_instance(instance, CPU_NONE);
 }
 
-static bool
-handle_allow_configure(struct window *window, int16_t w, int16_t h) {
-    if (window == ninb_window) {
-        ninb_reposition(w, h);
-        return true;
-    }
-    return compositor_window_is_floating(window);
-}
-
 static void
-handle_button(struct compositor_button_event event) {
+handle_button(struct wl_listener *listener, void *data) {
+    struct compositor_button_event *event = data;
+
     // Ensure the received button is in bounds (a mouse button.)
-    int button = event.button - BTN_MOUSE;
+    int button = event->button - BTN_MOUSE;
     if (button < 0 || button >= (int)ARRAY_LEN(held_buttons)) {
-        wlr_log(WLR_INFO, "received button press with unknown button %d", event.button);
+        wlr_log(WLR_INFO, "received button press with unknown button %d", event->button);
         return;
     }
 
     // Keep track of how many buttons are held as an optimization detail for handle_motion.
-    if (event.state != held_buttons[button]) {
-        held_buttons_count += event.state ? 1 : -1;
+    if (event->state != held_buttons[button]) {
+        held_buttons_count += event->state ? 1 : -1;
     }
-    held_buttons[button] = event.state;
+    held_buttons[button] = event->state;
 
     // Do not process button releases.
-    if (!event.state) {
+    if (!event->state) {
         return;
     }
 
@@ -845,7 +824,7 @@ handle_button(struct compositor_button_event event) {
         if (config->binds[i].modifiers != held_modifiers) {
             continue;
         }
-        if (event.button != config->binds[i].input.button) {
+        if (event->button != config->binds[i].input.button) {
             continue;
         }
         process_bind(&config->binds[i], false);
@@ -889,14 +868,17 @@ handle_key(struct compositor_key_event event) {
 }
 
 static void
-handle_modifiers(uint32_t modifiers) {
-    held_modifiers = modifiers;
+handle_modifiers(struct wl_listener *listener, void *data) {
+    xkb_mod_mask_t *modmask = data;
+    held_modifiers = *modmask;
 }
 
 static void
-handle_motion(struct compositor_motion_event event) {
-    cursor_x = event.x;
-    cursor_y = event.y;
+handle_motion(struct wl_listener *listener, void *data) {
+    struct compositor_motion_event *event = data;
+
+    cursor_x = event->x;
+    cursor_y = event->y;
 
     // Do not process mouse motion while ingame.
     if (active_instance != WALL) {
@@ -934,14 +916,23 @@ handle_motion(struct compositor_motion_event event) {
 }
 
 static void
-handle_resize(int32_t width, int32_t height) {
+handle_resize(struct wl_listener *listener, void *data) {
+    struct output *output = data;
+    int w, h;
+    render_output_get_size(output, &w, &h);
+    process_resize(w, h);
+}
+
+static void
+process_resize(int32_t width, int32_t height) {
     wlr_log(WLR_INFO, "handling screen resize of %" PRIi32 " x %" PRIi32, width, height);
     screen_width = width, screen_height = height;
     if (active_instance != WALL) {
         if (instances[active_instance].alt_res && config->has_alt_res) {
-            compositor_window_configure(instances[active_instance].window, config->alt_width,
-                                        config->alt_height);
-            compositor_window_set_dest(instances[active_instance].window, compute_alt_res());
+            struct wlr_box box = compute_alt_res();
+            render_window_configure(instances[active_instance].window, box.x, box.y, box.width,
+                                    box.height);
+            render_window_set_dest_size(instances[active_instance].window, box.width, box.height);
         } else {
             struct wlr_box box = {
                 .x = 0,
@@ -949,8 +940,9 @@ handle_resize(int32_t width, int32_t height) {
                 .width = width,
                 .height = height,
             };
-            compositor_window_configure(instances[active_instance].window, width, height);
-            compositor_window_set_dest(instances[active_instance].window, box);
+            render_window_configure(instances[active_instance].window, box.x, box.y, box.width,
+                                    box.height);
+            render_window_set_dest_size(instances[active_instance].window, box.width, box.height);
         }
         if (ninb_window) {
             ninb_reposition(0, 0);
@@ -965,34 +957,30 @@ handle_resize(int32_t width, int32_t height) {
 }
 
 static void
-handle_window(struct window *window, bool map) {
-    // Instance death needs to be handled elegantly.
-    if (!map) {
-        // If an instance died, handle it. If the instance was focused, instance_handle_death sends
-        // the user back to the wall.
-        for (int i = 0; i < max_instance_id; i++) {
-            if (instances[i].window == window) {
-                instance_handle_death(&instances[i]);
-                return;
-            }
-        }
+handle_window_unmap(struct wl_listener *listener, void *data) {
+    struct window *window = data;
 
-        // If a floating window was focused and died, refocus the appropriate window.
-        if (compositor_window_is_focused(window)) {
-            if (active_instance == WALL) {
-                compositor_window_focus(compositor, NULL);
-            } else {
-                compositor_window_focus(compositor, instances[active_instance].window);
-            }
+    // Instance death needs to be handled elegantly.
+    // If an instance died, handle it. If the instance was focused, instance_handle_death sends
+    // the user back to the wall.
+    for (int i = 0; i < max_instance_id; i++) {
+        if (instances[i].window == window) {
+            instance_handle_death(&instances[i]);
         }
-        if (window == ninb_window) {
-            ninb_window = NULL;
-        }
-        return;
     }
 
+    if (window == ninb_window) {
+        ninb_window = NULL;
+    }
+    return;
+}
+
+static void
+handle_window_map(struct wl_listener *listener, void *data) {
+    struct window *window = data;
+
     struct instance instance = {0};
-    const char *name = compositor_window_get_name(window);
+    const char *name = window_get_name(window);
     if (instance_try_from(window, &instance, inotify_fd)) {
         int id = -1;
         for (int i = 0; i < max_instance_id; i++) {
@@ -1012,27 +1000,29 @@ handle_window(struct window *window, bool map) {
         if (id >= config->wall_width * config->wall_height) {
             wlr_log(WLR_INFO, "more instances than spots on wall - some are invisible");
         }
-        compositor_window_set_type(window, INSTANCE);
+        render_window_set_layer(window, LAYER_INSTANCE);
+        render_window_set_enabled(window, true);
         return;
     } else if (strstr(name, "Ninjabrain Bot")) {
         if (ninb_window) {
             wlr_log(WLR_INFO, "duplicate ninjabrain bot window opened - closing");
-            compositor_window_close(window);
+            window_close(window);
             return;
         }
         ninb_window = window;
         ninb_set_visible(ninb_shown);
-        compositor_window_set_type(window, FLOATING);
+        render_window_set_layer(window, LAYER_FLOATING);
+        render_window_set_enabled(window, true);
         return;
     } else {
-        if (ninb_window &&
-            compositor_window_get_pid(window) == compositor_window_get_pid(ninb_window)) {
-            compositor_window_set_type(window, FLOATING);
+        if (ninb_window && window_get_pid(window) == window_get_pid(ninb_window)) {
+            render_window_set_layer(window, LAYER_FLOATING);
+            render_window_set_enabled(window, true);
             return;
         }
 
-        wlr_log(WLR_INFO, "unknown window opened (pid %d, name '%s')",
-                compositor_window_get_pid(window), name ? name : "unnamed");
+        wlr_log(WLR_INFO, "unknown window opened (pid %d, name '%s')", window_get_pid(window),
+                name ? name : "unnamed");
         return;
     }
 }
@@ -1041,9 +1031,8 @@ static int
 handle_signal(int signal_number, void *data) {
     switch (signal_number) {
     case SIGUSR1:
-        if (compositor_recreate_output(compositor)) {
-            wlr_log(WLR_INFO, "recreated wayland output");
-        }
+        render_recreate_output(compositor->render);
+        wlr_log(WLR_INFO, "recreated wayland output");
         break;
     case SIGUSR2:
         benchmark_toggle();
@@ -1170,19 +1159,30 @@ main(int argc, char **argv) {
     }
     free(config_path);
 
-    struct compositor_vtable vtable = {
-        .allow_configure = handle_allow_configure,
-        .button = handle_button,
-        .key = handle_key,
-        .modifiers = handle_modifiers,
-        .motion = handle_motion,
-        .resize = handle_resize,
-        .window = handle_window,
-    };
-    compositor = compositor_create(vtable, create_compositor_config());
+    compositor = compositor_create(create_compositor_config());
     ww_assert(compositor);
     event_loop = compositor_get_loop(compositor);
-    compositor_set_mouse_sensitivity(compositor, config->main_sens);
+    input_set_sensitivity(compositor->input, config->main_sens);
+
+    struct wl_listener on_button, on_modifiers, on_motion, on_resize, on_window_map,
+        on_window_unmap;
+    on_button.notify = handle_button;
+    wl_signal_add(&compositor->input->events.button, &on_button);
+
+    on_modifiers.notify = handle_modifiers;
+    wl_signal_add(&compositor->input->events.modifiers, &on_modifiers);
+
+    on_motion.notify = handle_motion;
+    wl_signal_add(&compositor->input->events.motion, &on_motion);
+
+    on_resize.notify = handle_resize;
+    wl_signal_add(&compositor->render->events.wl_output_resize, &on_resize);
+
+    on_window_map.notify = handle_window_map;
+    wl_signal_add(&compositor->render->events.window_map, &on_window_map);
+
+    on_window_unmap.notify = handle_window_unmap;
+    wl_signal_add(&compositor->render->events.window_unmap, &on_window_unmap);
 
     struct wl_event_source *event_sigint =
         wl_event_loop_add_signal(event_loop, SIGINT, handle_signal, NULL);
@@ -1195,7 +1195,8 @@ main(int argc, char **argv) {
     struct wl_event_source *event_inotify =
         wl_event_loop_add_fd(event_loop, inotify_fd, WL_EVENT_READABLE, handle_inotify, NULL);
 
-    compositor_set_on_wall(compositor, true);
+    input_set_on_wall(compositor->input, true);
+    compositor->input->key_callback = handle_key;
     bool success = compositor_run(compositor, display_file_fd);
 
     if (reset_counter) {

@@ -1,3 +1,11 @@
+/*
+ *  The implementation of wlr_scene_surface does not lend itself nicely to some of the things we
+ *  want to do (cropping, stretching). So reimplementing it with the necessary tweaks is better
+ *  than patching wlroots.
+ */
+
+#define WAYWALL_COMPOSITOR_IMPL
+
 #include "compositor/scene_window.h"
 #include "util.h"
 #include <stdlib.h>
@@ -29,11 +37,6 @@
  *  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  *  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  *  SOFTWARE.
- */
-
-/*
- *  TODO: Figure out if the lack of linux dmabuf feedback matters. It's handled by
- *  scene_buffer_send_dmabuf_feedback in wlroots.
  */
 
 // Taken from types/scene/wlr_scene.c

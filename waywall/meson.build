@@ -2,7 +2,12 @@ executable('waywall',
   protocol_sources, protocol_headers,
 
   'compositor/compositor.c',
+  'compositor/hview.c',
+  'compositor/input.c',
+  'compositor/render.c',
   'compositor/scene_window.c',
+  'compositor/xwayland.c',
+  'compositor/window_util.c',
 
   'config.c',
   'cpu.c',
