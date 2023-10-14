@@ -262,7 +262,15 @@ compositor_get_loop(struct compositor *compositor) {
 
 void
 compositor_load_config(struct compositor *compositor, struct compositor_config config) {
-    // TODO
+    render_load_config(compositor->render, config);
+    input_load_config(compositor->input, config);
+
+    if (config.stop_on_close && !compositor->render->wl) {
+        wlr_log(WLR_INFO, "stop on close enabled with new configuration - stopping");
+        wl_display_terminate(compositor->display);
+    }
+
+    compositor->config = config;
 }
 
 bool

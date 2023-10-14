@@ -324,6 +324,18 @@ render_destroy(struct comp_render *render) {
     free(render);
 }
 
+void
+render_load_config(struct comp_render *render, struct compositor_config config) {
+    wlr_scene_rect_set_color(render->background, config.background_color);
+
+    struct window *window;
+    wl_list_for_each (window, &render->windows, link) {
+        if (window->tree->node.parent == render->tree_floating) {
+            wlr_scene_buffer_set_opacity(window->scene_window->buffer, config.floating_opacity);
+        }
+    }
+}
+
 /*
  *  Public API
  */
@@ -456,6 +468,9 @@ render_window_set_layer(struct window *window, enum window_layer layer) {
         ww_unreachable();
     }
 
+    wlr_scene_buffer_set_opacity(
+        window->scene_window->buffer,
+        layer == LAYER_FLOATING ? window->render->compositor->config.floating_opacity : 1.0f);
     window->xwl_window->floating = layer == LAYER_FLOATING;
 }
 

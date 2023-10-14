@@ -97,4 +97,9 @@ struct comp_input *input_create(struct compositor *compositor);
  */
 void input_destroy(struct comp_input *input);
 
+/*
+ *  Applies a new configuration.
+ */
+void input_load_config(struct comp_input *input, struct compositor_config config);
+
 #endif

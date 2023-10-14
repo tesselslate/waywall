@@ -99,4 +99,9 @@ struct comp_render *render_create(struct compositor *compositor);
  */
 void render_destroy(struct comp_render *render);
 
+/*
+ *  Applies a new configuration.
+ */
+void render_load_config(struct comp_render *render, struct compositor_config config);
+
 #endif

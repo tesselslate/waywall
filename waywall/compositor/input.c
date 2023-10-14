@@ -26,7 +26,6 @@
  *  Keyboard events
  */
 
-// TODO: Remove/apply pointer constraint with config updates
 // TODO: Confine pointer on boot if needed
 // TODO: Fix cursor appearing in wrong spot (or not appearing immediately)
 
@@ -698,6 +697,40 @@ input_destroy(struct comp_input *input) {
     wlr_xcursor_manager_destroy(input->cursor_manager);
     wlr_cursor_destroy(input->cursor);
     free(input);
+}
+
+void
+input_load_config(struct comp_input *input, struct compositor_config config) {
+    struct keyboard *keyboard;
+    wl_list_for_each (keyboard, &input->keyboards, link) {
+        wlr_keyboard_set_repeat_info(keyboard->wlr, config.repeat_rate, config.repeat_delay);
+    }
+
+    // Confine or unrestrict the pointer as needed.
+    bool diff_confine = config.confine_pointer != input->compositor->config.confine_pointer;
+    if (diff_confine && !input->active_constraint) {
+        if (config.confine_pointer) {
+            confine_pointer(input);
+        } else {
+            derestrict_pointer(input);
+        }
+    }
+
+    struct wlr_xcursor_manager *cursor_manager =
+        wlr_xcursor_manager_create(config.cursor_theme, config.cursor_size);
+    if (!cursor_manager) {
+        wlr_log(WLR_ERROR, "failed to create new cursor manager");
+    } else {
+        wlr_xcursor_manager_destroy(input->cursor_manager);
+        input->cursor_manager = cursor_manager;
+        xwl_update_cursor(input->compositor->xwl);
+
+        // Update the cursor image if needed. This isn't fully correct (the user may be hovering
+        // over Ninjabrain Bot) but it's close enough for now. TODO: Improve.
+        if (!input->active_constraint) {
+            wlr_cursor_set_xcursor(input->cursor, input->cursor_manager, "default");
+        }
+    }
 }
 
 /*
