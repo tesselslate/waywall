@@ -249,6 +249,7 @@ compositor_destroy(struct compositor *compositor) {
     if (compositor->input) {
         input_destroy(compositor->input);
     }
+    wl_display_destroy_clients(compositor->display);
     if (compositor->display) {
         wl_display_destroy(compositor->display);
     }

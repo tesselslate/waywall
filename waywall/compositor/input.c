@@ -26,7 +26,8 @@
  *  Keyboard events
  */
 
-// TODO: Fix cursor appearing in wrong spot (or not appearing immediately)
+// TODO: Fix cursor image changing during window moving (weird Ninjabrain Bot behavior, most likely
+//       need to report accurate cursor position)
 
 static uint32_t
 get_layer_mask(struct comp_input *input) {
