@@ -341,6 +341,11 @@ derestrict_pointer(struct comp_input *input) {
         zwp_locked_pointer_v1_destroy(wl->remote.locked_pointer);
         wl->remote.locked_pointer = NULL;
     }
+
+    // If the user's compositor respects the unlock hint, their cursor will be put at these
+    // coordinates. However, we don't receive a motion event for it, so we need to warp the cursor
+    // image to the center ourselves.
+    wlr_cursor_warp(input->cursor, NULL, wl->wlr_output->width / 2, wl->wlr_output->height / 2);
 }
 
 static void
@@ -765,6 +770,10 @@ input_focus_window(struct comp_input *input, struct window *window) {
         wlr_seat_keyboard_notify_clear_focus(input->seat);
         wlr_seat_pointer_notify_clear_focus(input->seat);
         xwl_window_deactivate(input->focused_window->xwl_window);
+
+        // The cursor image will not be updated automatically until the user moves their mouse, so
+        // we update it again here.
+        wlr_cursor_set_xcursor(input->cursor, input->cursor_manager, "default");
     }
 
     input->focused_window = window;
