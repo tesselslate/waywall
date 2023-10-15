@@ -686,6 +686,7 @@ void
 input_destroy(struct comp_input *input) {
     wlr_xcursor_manager_destroy(input->cursor_manager);
     wlr_cursor_destroy(input->cursor);
+    wlr_seat_destroy(input->seat);
     free(input);
 }
 

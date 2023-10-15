@@ -164,6 +164,11 @@ on_output_destroy(struct wl_listener *listener, void *data) {
         output->render->wl = NULL;
         wlr_log(WLR_INFO, "wayland output destroyed");
 
+        if (output->render->compositor->config.stop_on_close ||
+            wl_list_length(&output->render->windows) == 0) {
+            compositor_stop(output->render->compositor);
+        }
+
         wl_signal_emit_mutable(&output->render->events.wl_output_destroy, output);
     }
 

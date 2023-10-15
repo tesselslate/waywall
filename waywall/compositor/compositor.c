@@ -206,9 +206,6 @@ cleanup:
 
 void
 compositor_destroy(struct compositor *compositor) {
-    if (compositor->input) {
-        input_destroy(compositor->input);
-    }
     if (compositor->render) {
         render_destroy(compositor->render);
     }
@@ -248,6 +245,9 @@ compositor_destroy(struct compositor *compositor) {
         if (compositor->backend_wl) {
             wlr_backend_destroy(compositor->backend_wl);
         }
+    }
+    if (compositor->input) {
+        input_destroy(compositor->input);
     }
     if (compositor->display) {
         wl_display_destroy(compositor->display);
