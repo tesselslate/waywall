@@ -52,15 +52,43 @@ window_at_layer(struct comp_render *render, enum window_layer layer, double x, d
     return NULL;
 }
 
-static struct window *
-window_from_xwl(struct comp_render *render, struct xwl_window *xwl_window) {
-    struct window *window;
-    wl_list_for_each (window, &render->windows, link) {
-        if (window->xwl_window == xwl_window) {
-            return window;
-        }
-    }
-    return NULL;
+static void
+on_xwl_window_unmap(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_unmap);
+
+    wlr_scene_node_set_enabled(&window->tree->node, false);
+    wl_signal_emit_mutable(&window->render->events.window_unmap, window);
+
+    wl_list_remove(&window->on_unmap.link);
+    wl_list_remove(&window->on_configure.link);
+    wl_list_remove(&window->on_minimize.link);
+    wl_list_remove(&window->link);
+
+    wlr_scene_node_destroy(&window->tree->node);
+    free(window);
+}
+
+static void
+on_xwl_window_configure(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_configure);
+    struct wlr_xwayland_surface_configure_event *wlr_event = data;
+
+    struct window_configure_event event = {
+        .window = window,
+        .box = (struct wlr_box){wlr_event->x, wlr_event->y, wlr_event->width, wlr_event->height},
+    };
+
+    wl_signal_emit_mutable(&window->render->events.window_configure, &event);
+}
+
+static void
+on_xwl_window_minimize(struct wl_listener *listener, void *data) {
+    struct window *window = wl_container_of(listener, window, on_minimize);
+    struct wlr_xwayland_minimize_event *wlr_event = data;
+
+    struct window_minimize_event event = {.window = window, .minimized = wlr_event->minimize};
+
+    wl_signal_emit_mutable(&window->render->events.window_minimize, &event);
 }
 
 static void
@@ -68,64 +96,39 @@ on_xwl_window_map(struct wl_listener *listener, void *data) {
     struct comp_render *render = wl_container_of(listener, render, on_xwl_window_map);
     struct xwl_window *xwl_window = data;
 
-    struct window *window = window_from_xwl(render, xwl_window);
-    if (!window) {
-        window = calloc(1, sizeof(struct window));
-        ww_assert(window);
-        window->render = render;
-        window->xwl_window = xwl_window;
-        window->xwl_window->floating = true; // floating until taken off of tree_unknown
+    struct window *window = calloc(1, sizeof(struct window));
+    ww_assert(window);
+    window->render = render;
+    window->xwl_window = xwl_window;
+    window->xwl_window->floating = true; // floating until taken off of tree_unknown
 
-        wl_list_insert(&render->windows, &window->link);
+    wl_list_insert(&render->windows, &window->link);
 
-        window->tree = wlr_scene_tree_create(render->tree_unknown);
-        ww_assert(window->tree);
-        window->scene_window = scene_window_create(window->tree, xwl_window->surface->surface);
-        ww_assert(window->scene_window);
-        window->scene_window->buffer->node.data = window;
-    }
+    window->tree = wlr_scene_tree_create(render->tree_unknown);
+    ww_assert(window->tree);
+    wlr_scene_node_set_enabled(&window->tree->node, false);
 
-    if (window->tree->node.parent == render->tree_unknown) {
-        wlr_scene_node_set_enabled(&window->tree->node, false);
-    } else {
-        wlr_scene_node_set_enabled(&window->tree->node, true);
-    }
+    window->scene_window = scene_window_create(window->tree, xwl_window->surface->surface);
+    ww_assert(window->scene_window);
+    window->scene_window->buffer->node.data = window;
+
+    window->on_unmap.notify = on_xwl_window_unmap;
+    wl_signal_add(&xwl_window->events.unmap, &window->on_unmap);
+
+    window->on_configure.notify = on_xwl_window_configure;
+    wl_signal_add(&xwl_window->events.configure, &window->on_configure);
+
+    window->on_minimize.notify = on_xwl_window_minimize;
+    wl_signal_add(&xwl_window->events.minimize, &window->on_minimize);
 
     wl_signal_emit_mutable(&render->events.window_map, window);
 }
 
 static void
-on_xwl_window_unmap(struct wl_listener *listener, void *data) {
-    struct comp_render *render = wl_container_of(listener, render, on_xwl_window_unmap);
-    struct xwl_window *xwl_window = data;
-
-    struct window *window = window_from_xwl(render, xwl_window);
-    if (!window) {
-        wlr_log(WLR_DEBUG, "on_xwl_window_unmap: no matching window (xwl: %p)", xwl_window);
-        return;
-    }
-
-    wlr_scene_node_set_enabled(&window->tree->node, false);
-
-    wl_signal_emit_mutable(&render->events.window_unmap, window);
-}
-
-static void
 on_xwl_window_destroy(struct wl_listener *listener, void *data) {
     struct comp_render *render = wl_container_of(listener, render, on_xwl_window_destroy);
-    struct xwl_window *xwl_window = data;
 
-    struct window *window = window_from_xwl(render, xwl_window);
-    if (!window) {
-        wlr_log(WLR_DEBUG, "on_xwl_window_destroy: no matching window (xwl: %p)", xwl_window);
-        return;
-    }
-
-    wl_signal_emit_mutable(&render->events.window_destroy, window);
-
-    wl_list_remove(&window->link);
-    wlr_scene_node_destroy(&window->tree->node);
-    free(window);
+    wl_signal_emit_mutable(&render->events.window_destroy, NULL);
 }
 
 static void
@@ -249,9 +252,6 @@ render_create(struct compositor *compositor) {
     render->on_xwl_window_map.notify = on_xwl_window_map;
     wl_signal_add(&render->xwl->events.window_map, &render->on_xwl_window_map);
 
-    render->on_xwl_window_unmap.notify = on_xwl_window_unmap;
-    wl_signal_add(&render->xwl->events.window_unmap, &render->on_xwl_window_unmap);
-
     render->on_xwl_window_destroy.notify = on_xwl_window_destroy;
     wl_signal_add(&render->xwl->events.window_destroy, &render->on_xwl_window_destroy);
 
@@ -307,6 +307,8 @@ render_create(struct compositor *compositor) {
     wl_signal_init(&render->events.wl_output_destroy);
     wl_signal_init(&render->events.window_map);
     wl_signal_init(&render->events.window_unmap);
+    wl_signal_init(&render->events.window_configure);
+    wl_signal_init(&render->events.window_minimize);
     wl_signal_init(&render->events.window_destroy);
 
     return render;
@@ -321,7 +323,6 @@ render_destroy(struct comp_render *render) {
     wlr_output_layout_destroy(render->layout);
 
     wl_list_remove(&render->on_xwl_window_map.link);
-    wl_list_remove(&render->on_xwl_window_unmap.link);
     wl_list_remove(&render->on_xwl_window_destroy.link);
     wl_list_remove(&render->on_new_output.link);
 
@@ -355,6 +356,17 @@ render_layer_set_enabled(struct comp_render *render, enum window_layer layer, bo
     switch (layer) {
     case LAYER_FLOATING:
         wlr_scene_node_set_enabled(&render->tree_floating->node, enabled);
+
+        // Mark all floating windows as unmimized, because AWT is jank.
+        if (enabled) {
+            struct window *window;
+            wl_list_for_each (window, &render->windows, link) {
+                if (window->tree->node.parent == render->tree_floating) {
+                    wlr_xwayland_surface_set_minimized(window->xwl_window->surface, false);
+                }
+            }
+        }
+
         break;
     case LAYER_INSTANCE:
         wlr_scene_node_set_enabled(&render->tree_instances->node, enabled);

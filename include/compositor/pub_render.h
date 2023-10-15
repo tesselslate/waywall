@@ -25,9 +25,11 @@ struct comp_render {
         struct wl_signal wl_output_resize;  // data: comp_render.wl
         struct wl_signal wl_output_destroy; // data: comp_render.wl (partially destroyed)
 
-        struct wl_signal window_map;     // data: window
-        struct wl_signal window_unmap;   // data: window
-        struct wl_signal window_destroy; // data: window
+        struct wl_signal window_map;       // data: window
+        struct wl_signal window_unmap;     // data: window
+        struct wl_signal window_configure; // data: window_configure_event (stack allocated)
+        struct wl_signal window_minimize;  // data: window_minimize_event (stack allocated)
+        struct wl_signal window_destroy;   // data: window
     } events;
 };
 
@@ -35,6 +37,16 @@ struct comp_render {
 
 struct output;
 struct window;
+
+struct window_configure_event {
+    struct window *window;
+    struct wlr_box box;
+};
+
+struct window_minimize_event {
+    struct window *window;
+    bool minimized;
+};
 
 /*
  *  Updates the given window's appearance to make it appear focused.

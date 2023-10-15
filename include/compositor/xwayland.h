@@ -49,9 +49,11 @@ struct xwl_window {
     struct wl_listener on_request_minimize;
 
     struct {
-        struct wl_signal map;     // data: xwl_window
-        struct wl_signal unmap;   // data: xwl_window
-        struct wl_signal destroy; // data: xwl_window
+        struct wl_signal map;       // data: xwl_window
+        struct wl_signal unmap;     // data: xwl_window
+        struct wl_signal configure; // data: wlr_xwayland_surface_configure_event
+        struct wl_signal minimize;  // data: wlr_xwayland_minimize_event
+        struct wl_signal destroy;   // data: xwl_window
     } events;
 };
 

@@ -46,7 +46,6 @@ struct comp_input {
 
     struct window *focused_window;
     struct window *grabbed_window;
-    struct wl_listener on_grabbed_window_unmap;
     double grab_x, grab_y;
 
     struct wlr_pointer_constraints_v1 *pointer_constraints;

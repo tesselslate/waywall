@@ -21,9 +21,11 @@ struct comp_render {
         struct wl_signal wl_output_resize;  // data: comp_render.wl
         struct wl_signal wl_output_destroy; // data: comp_render.wl (partially destroyed)
 
-        struct wl_signal window_map;     // data: window
-        struct wl_signal window_unmap;   // data: window
-        struct wl_signal window_destroy; // data: window
+        struct wl_signal window_map;       // data: window
+        struct wl_signal window_unmap;     // data: window
+        struct wl_signal window_configure; // data: window_configure_event (stack allocated)
+        struct wl_signal window_minimize;  // data: window_minimize_event (stack allocated)
+        struct wl_signal window_destroy;   // data: NULL
     } events;
 
     // Private state
@@ -31,7 +33,6 @@ struct comp_render {
     struct comp_xwayland *xwl;
 
     struct wl_listener on_xwl_window_map;
-    struct wl_listener on_xwl_window_unmap;
     struct wl_listener on_xwl_window_destroy;
 
     struct wl_list outputs; // output.link
@@ -87,6 +88,10 @@ struct window {
 
     struct scene_window *scene_window;
     struct wlr_scene_tree *tree;
+
+    struct wl_listener on_unmap;
+    struct wl_listener on_configure;
+    struct wl_listener on_minimize;
 };
 
 /*

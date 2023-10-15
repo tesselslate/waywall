@@ -171,13 +171,6 @@ handle_cursor_motion(struct comp_input *input, uint32_t time_msec) {
 }
 
 static void
-on_grabbed_window_unmap(struct wl_listener *listener, void *data) {
-    struct comp_input *input = wl_container_of(listener, input, on_grabbed_window_unmap);
-    input->grabbed_window = NULL;
-    wl_list_remove(&input->on_grabbed_window_unmap.link);
-}
-
-static void
 on_cursor_motion(struct wl_listener *listener, void *data) {
     struct comp_input *input = wl_container_of(listener, input, on_cursor_motion);
     struct wlr_pointer_motion_event *event = data;
@@ -234,7 +227,6 @@ on_cursor_button(struct wl_listener *listener, void *data) {
         // move.
         if (input->grabbed_window && event->button == BTN_LEFT) {
             input->grabbed_window = NULL;
-            wl_list_remove(&input->on_grabbed_window_unmap.link);
             return;
         }
 
@@ -267,10 +259,6 @@ on_cursor_button(struct wl_listener *listener, void *data) {
             input_focus_window(input, window);
             input->grabbed_window = window;
 
-            // If the grabbed window gets unmapped, we need to not reference it anymore.
-            input->on_grabbed_window_unmap.notify = on_grabbed_window_unmap;
-            wl_signal_add(&input->grabbed_window->xwl_window->events.unmap,
-                          &input->on_grabbed_window_unmap);
             return;
         }
     }
@@ -567,10 +555,14 @@ on_new_input(struct wl_listener *listener, void *data) {
 static void
 on_window_unmap(struct wl_listener *listener, void *data) {
     struct comp_input *input = wl_container_of(listener, input, on_window_unmap);
-    struct xwl_window *xwl_window = data;
+    struct window *window = data;
+
+    if (input->grabbed_window == window) {
+        input->grabbed_window = NULL;
+    }
 
     // If the focused window was unmapped, we need to refocus the appropriate window.
-    if (!input->focused_window || input->focused_window->xwl_window != xwl_window) {
+    if (input->focused_window != window) {
         return;
     }
 
@@ -604,7 +596,7 @@ input_create(struct compositor *compositor) {
     input->render = compositor->render;
 
     input->on_window_unmap.notify = on_window_unmap;
-    wl_signal_add(&compositor->xwl->events.window_unmap, &input->on_window_unmap);
+    wl_signal_add(&compositor->render->events.window_unmap, &input->on_window_unmap);
 
     // Cursor (pointer)
     input->cursor_manager =

@@ -139,6 +139,7 @@ handle_surface_request_configure(struct wl_listener *listener, void *data) {
     if (!window->mapped || window->floating) {
         wlr_xwayland_surface_configure(window->surface, event->x, event->y, event->width,
                                        event->height);
+        wl_signal_emit_mutable(&window->events.configure, event);
         return;
     }
 }
@@ -159,6 +160,7 @@ handle_surface_request_minimize(struct wl_listener *listener, void *data) {
     wlr_log(WLR_DEBUG, "window %" PRIu32 " requested minimization (%d)", window->surface->window_id,
             event->minimize);
     wlr_xwayland_surface_set_minimized(window->surface, event->minimize);
+    wl_signal_emit_mutable(&window->events.minimize, event);
 }
 
 static void
@@ -202,6 +204,8 @@ handle_new_surface(struct wl_listener *listener, void *data) {
 
     wl_signal_init(&window->events.map);
     wl_signal_init(&window->events.unmap);
+    wl_signal_init(&window->events.configure);
+    wl_signal_init(&window->events.minimize);
     wl_signal_init(&window->events.destroy);
 }
 

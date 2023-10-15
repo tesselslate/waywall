@@ -833,6 +833,23 @@ handle_button(struct wl_listener *listener, void *data) {
     return;
 }
 
+static void
+handle_configure(struct wl_listener *listener, void *data) {
+    struct window_configure_event *event = data;
+
+    if (event->window == ninb_window) {
+        ninb_reposition(event->box.width, event->box.height);
+    }
+}
+
+static void
+handle_minimize(struct wl_listener *listener, void *data) {
+    struct window_minimize_event *event = data;
+    if (event->minimized) {
+        ninb_set_visible(false);
+    }
+}
+
 static bool
 handle_key(struct compositor_key_event event) {
     if (!event.state) {
@@ -1164,10 +1181,16 @@ main(int argc, char **argv) {
     event_loop = compositor_get_loop(compositor);
     input_set_sensitivity(compositor->input, config->main_sens);
 
-    struct wl_listener on_button, on_modifiers, on_motion, on_resize, on_window_map,
-        on_window_unmap;
+    struct wl_listener on_button, on_configure, on_minimize, on_modifiers, on_motion, on_resize,
+        on_window_map, on_window_unmap;
     on_button.notify = handle_button;
     wl_signal_add(&compositor->input->events.button, &on_button);
+
+    on_configure.notify = handle_configure;
+    wl_signal_add(&compositor->render->events.window_configure, &on_configure);
+
+    on_minimize.notify = handle_minimize;
+    wl_signal_add(&compositor->render->events.window_minimize, &on_minimize);
 
     on_modifiers.notify = handle_modifiers;
     wl_signal_add(&compositor->input->events.modifiers, &on_modifiers);
