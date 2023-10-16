@@ -611,7 +611,7 @@ config_read() {
             if (!parse_bind_array(array, keybind, key)) {
                 goto fail_read;
             }
-            keybind->allow_in_menu = true;
+            keybind->allow_in_menu = keybind->allow_in_pause = true;
         } else {
             toml_table_t *table = toml_table_in(keybinds, key);
             if (!table) {
