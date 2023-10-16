@@ -12,6 +12,7 @@
 #include "util.h"
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
+#include <time.h>
 #include <wlr/backend.h>
 #include <wlr/types/wlr_cursor.h>
 #include <wlr/types/wlr_data_device.h>
@@ -351,12 +352,17 @@ derestrict_pointer(struct comp_input *input) {
     if (wl->remote.locked_pointer) {
         zwp_locked_pointer_v1_destroy(wl->remote.locked_pointer);
         wl->remote.locked_pointer = NULL;
-    }
 
-    // If the user's compositor respects the unlock hint, their cursor will be put at these
-    // coordinates. However, we don't receive a motion event for it, so we need to warp the cursor
-    // image to the center ourselves.
-    wlr_cursor_warp(input->cursor, NULL, wl->wlr_output->width / 2, wl->wlr_output->height / 2);
+        // If the user's compositor respects the unlock hint, their cursor will be put at these
+        // coordinates. However, we don't receive a motion event for it, so we need to warp the
+        // cursor image to the center ourselves.
+        wlr_cursor_warp(input->cursor, NULL, wl->wlr_output->width / 2, wl->wlr_output->height / 2);
+
+        struct timespec now;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+        handle_cursor_motion(input, ms);
+    }
 }
 
 static void
