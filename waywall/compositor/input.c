@@ -312,10 +312,21 @@ on_relative_motion(void *data, struct zwp_relative_pointer_v1 *relative_pointer,
 
     uint64_t time = (uint64_t)utime_hi * 0xFFFFFFFF + (uint64_t)utime_lo;
 
-    // Multiply the unaccelerated movement by the user's sensitivity.
-    wlr_relative_pointer_manager_v1_send_relative_motion(
-        input->relative_pointer, input->seat, time, wl_fixed_to_double(dx), wl_fixed_to_double(dy),
-        wl_fixed_to_double(dx_unaccel * input->sens), wl_fixed_to_double(dy_unaccel * input->sens));
+    // Boat eye relies on very precise cursor positioning ingame, and non-integer cursor motion
+    // causes problems with that. Hence, we want to accumulate any cursor motion and only notify
+    // Xwayland of cursor motion in roughly whole pixel increments.
+    input->acc_x += wl_fixed_to_double(dx_unaccel) * input->sens;
+    input->acc_y += wl_fixed_to_double(dy_unaccel) * input->sens;
+
+    double x = trunc(input->acc_x);
+    input->acc_x -= x;
+
+    double y = trunc(input->acc_y);
+    input->acc_y -= y;
+
+    wlr_relative_pointer_manager_v1_send_relative_motion(input->relative_pointer, input->seat, time,
+                                                         wl_fixed_to_double(dx),
+                                                         wl_fixed_to_double(dy), x, y);
 }
 
 static const struct zwp_relative_pointer_v1_listener relative_pointer_listener = {

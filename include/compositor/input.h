@@ -56,6 +56,7 @@ struct comp_input {
     struct wl_listener on_wl_output_destroy;
 
     struct wlr_relative_pointer_manager_v1 *relative_pointer;
+    double acc_x, acc_y;
 };
 
 /*
