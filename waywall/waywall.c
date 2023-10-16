@@ -23,6 +23,8 @@
 // some editors correctly)
 // TODO: reread instance options on update reliably
 
+// TODO: free instance dirs, verification hviews
+
 #define BENCHMARK_RESET_COUNT 2000
 #define WALL -1
 #define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
@@ -364,8 +366,6 @@ instance_handle_death(struct instance *instance) {
     instance->alive = false;
     instance->window = NULL;
     instance->last_group = CPU_NONE;
-    free(instance->dir);
-    instance->dir = NULL;
     inotify_rm_watch(inotify_fd, instance->state_wd);
     close(instance->state_fd);
     if (instance_get_id(instance) == active_instance) {
