@@ -358,10 +358,8 @@ derestrict_pointer(struct comp_input *input) {
         // cursor image to the center ourselves.
         wlr_cursor_warp(input->cursor, NULL, wl->wlr_output->width / 2, wl->wlr_output->height / 2);
 
-        struct timespec now;
-        clock_gettime(CLOCK_MONOTONIC, &now);
-        uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
-        handle_cursor_motion(input, ms);
+        // TODO: Sending a fake handle motion event here to update the cursor position tracked in
+        // the wall module doesn't work. This will need to be improved.
     }
 }
 
