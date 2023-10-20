@@ -482,7 +482,7 @@ instance_reset(struct instance *instance) {
 
             uint64_t preview_msec =
                 instance->last_preview.tv_sec * 1000 + instance->last_preview.tv_nsec / 1000000;
-            uint64_t now_msec = now.tv_sec * 1000 + instance->last_preview.tv_nsec / 1000000;
+            uint64_t now_msec = now.tv_sec * 1000 + now.tv_nsec / 1000000;
             if (now_msec - preview_msec < (uint64_t)config->grace_period) {
                 return false;
             }

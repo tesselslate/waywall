@@ -500,7 +500,6 @@ on_wl_output_create(struct wl_listener *listener, void *data) {
 
 static void
 on_wl_output_resize(struct wl_listener *listener, void *data) {
-    struct comp_input *input = wl_container_of(listener, input, on_wl_output_resize);
     struct output *wl_output = data;
 
     // We need to update the cursor position hint to reflect the new output size, so that the cursor
