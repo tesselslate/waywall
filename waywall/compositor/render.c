@@ -413,6 +413,11 @@ render_rect_create(struct comp_render *render, struct wlr_box box, float color[4
 }
 
 void
+render_rect_destroy(render_rect_t *rect) {
+    wlr_scene_node_destroy(&rect->node);
+}
+
+void
 render_rect_set_color(render_rect_t *rect, float color[4]) {
     wlr_scene_rect_set_color(rect, color);
 }

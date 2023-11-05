@@ -79,6 +79,11 @@ void render_rect_configure(render_rect_t *rect, struct wlr_box box);
 render_rect_t *render_rect_create(struct comp_render *render, struct wlr_box box, float color[4]);
 
 /*
+ *  Destroys the given rectangle.
+ */
+void render_rect_destroy(render_rect_t *rect);
+
+/*
  *  Sets the color of the given rectangle.
  */
 void render_rect_set_color(render_rect_t *rect, float color[4]);
