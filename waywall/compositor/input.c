@@ -64,11 +64,12 @@ on_keyboard_key(struct wl_listener *listener, void *data) {
         .modifiers = wlr_keyboard_get_modifiers(keyboard->wlr),
         .state = event->state == WL_KEYBOARD_KEY_STATE_PRESSED,
         .time_msec = event->time_msec,
+        .consumed = false,
     };
 
     // If the wall module does not eat the keyboard input, we can send it along.
-    ww_assert(keyboard->input->key_callback);
-    if (!keyboard->input->key_callback(comp_event)) {
+    wl_signal_emit_mutable(&keyboard->input->events.key, &comp_event);
+    if (!comp_event.consumed) {
         wlr_seat_set_keyboard(keyboard->input->seat, keyboard->wlr);
         wlr_seat_keyboard_notify_key(keyboard->input->seat, event->time_msec, event->keycode,
                                      event->state);
@@ -688,6 +689,7 @@ input_create(struct compositor *compositor) {
 
     // Events
     wl_signal_init(&input->events.button);
+    wl_signal_init(&input->events.key);
     wl_signal_init(&input->events.modifiers);
     wl_signal_init(&input->events.motion);
 

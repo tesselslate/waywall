@@ -10,11 +10,10 @@ struct comp_input;
 struct comp_input {
     struct {
         struct wl_signal button;    // data: compositor_button_event (stack allocated)
+        struct wl_signal key;       // data: compositor_key_event (stack allocated)
         struct wl_signal modifiers; // data: xkb_mod_mask_t (stack allocated)
         struct wl_signal motion;    // data: compositor_motion_event (stack allocated)
     } events;
-
-    bool (*key_callback)(struct compositor_key_event event);
 };
 
 #endif
