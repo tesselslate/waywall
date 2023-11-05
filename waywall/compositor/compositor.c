@@ -286,8 +286,6 @@ compositor_run(struct compositor *compositor, int display_file_fd) {
         wlr_backend_destroy(compositor->backend);
         return false;
     }
-    setenv("WAYLAND_DISPLAY", socket, true);
-    setenv("DISPLAY", compositor->xwl->xwayland->display_name, true);
     char buf[256];
     ssize_t len =
         snprintf(buf, ARRAY_LEN(buf), "%s\n%s", socket, compositor->xwl->xwayland->display_name);

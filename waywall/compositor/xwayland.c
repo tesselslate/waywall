@@ -51,7 +51,7 @@ send_event(struct xwl_window *window, uint32_t mask, const char *event) {
     xcb_generic_error_t *err = xcb_request_check(window->xwl->xcb, cookie);
     if (err) {
         int opcode = (int)(event[0]);
-        wlr_log(WLR_ERROR, "failed to send event (opcode: %d): %d", opcode, err->error_code);
+        wlr_log(WLR_ERROR, "failed to send event (opcode: %d, window: %d): %d", opcode, window->surface->window_id, err->error_code);
         free(err);
     }
     return err == NULL;
@@ -213,7 +213,7 @@ static void
 handle_ready(struct wl_listener *listener, void *data) {
     struct comp_xwayland *xwl = wl_container_of(listener, xwl, on_ready);
 
-    xwl->xcb = xcb_connect(NULL, NULL);
+    xwl->xcb = xcb_connect(xwl->xwayland->display_name, NULL);
     int err = xcb_connection_has_error(xwl->xcb);
     if (err) {
         wlr_log(WLR_ERROR, "failed to connect to xwayland server: %d", err);
