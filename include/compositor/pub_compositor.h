@@ -24,30 +24,6 @@ struct compositor {
 
 #endif
 
-struct compositor_button_event {
-    uint32_t button;
-    uint32_t time_msec;
-    bool state;
-};
-
-struct compositor_key_event {
-    const xkb_keysym_t *syms;
-    int nsyms;
-    uint32_t modifiers;
-    uint32_t time_msec;
-    bool state;
-};
-
-struct compositor_motion_event {
-    double x, y;
-    uint32_t time_msec;
-};
-
-struct synthetic_key {
-    uint8_t keycode;
-    bool state;
-};
-
 struct compositor_config {
     int repeat_rate, repeat_delay;
     float floating_opacity;
