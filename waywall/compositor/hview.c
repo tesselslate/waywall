@@ -108,6 +108,8 @@ hview_create(struct window *window) {
 
 void
 hview_destroy(struct hview *hview) {
+    ww_assert(hview);
+
     if (hview->scene_window) {
         wlr_scene_node_destroy(&hview->scene_window->buffer->node);
     }
@@ -121,11 +123,15 @@ hview_destroy(struct hview *hview) {
 
 void
 hview_raise(struct hview *hview) {
+    ww_assert(hview);
+
     wlr_scene_node_raise_to_top(&hview->scene_window->buffer->node);
 }
 
 void
 hview_set_dest(struct hview *hview, struct wlr_box box) {
+    ww_assert(hview);
+
     hview->dest = box;
     if (hview->scene_window) {
         configure_hview(hview);
@@ -134,6 +140,8 @@ hview_set_dest(struct hview *hview, struct wlr_box box) {
 
 void
 hview_set_enabled(struct hview *hview, bool enabled) {
+    ww_assert(hview);
+
     hview->enabled = enabled;
     if (hview->scene_window) {
         configure_hview(hview);
@@ -142,6 +150,8 @@ hview_set_enabled(struct hview *hview, bool enabled) {
 
 void
 hview_set_src(struct hview *hview, struct wlr_box box) {
+    ww_assert(hview);
+
     hview->src = box;
     if (hview->scene_window) {
         configure_hview(hview);
