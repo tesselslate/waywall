@@ -97,6 +97,12 @@ struct comp_input *input_create(struct compositor *compositor);
 void input_destroy(struct comp_input *input);
 
 /*
+ *  Notifies the input module of when a layer's visiblity has been toggled. Used to handle some
+ *  annoying edge cases with pointer behavior.
+ */
+void input_layer_toggled(struct comp_input *input);
+
+/*
  *  Applies a new configuration.
  */
 void input_load_config(struct comp_input *input, struct compositor_config config);

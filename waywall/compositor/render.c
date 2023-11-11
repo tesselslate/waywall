@@ -14,6 +14,7 @@
 #define WAYWALL_COMPOSITOR_IMPL
 
 #include "compositor/render.h"
+#include "compositor/input.h"
 #include "compositor/xwayland.h"
 #include "util.h"
 #include <stdlib.h>
@@ -365,6 +366,12 @@ render_layer_set_enabled(struct comp_render *render, enum window_layer layer, bo
                     wlr_xwayland_surface_set_minimized(window->xwl_window->surface, false);
                 }
             }
+        }
+
+        // XXX: Having a circular dependency sucks. Might be best to move this function to the
+        // compositor.
+        if (render->compositor->input) {
+            input_layer_toggled(render->compositor->input);
         }
 
         break;

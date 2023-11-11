@@ -703,6 +703,21 @@ input_destroy(struct comp_input *input) {
 }
 
 void
+input_layer_toggled(struct comp_input *input) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+
+    // If the floating layer was disabled, any active window grabs should end.
+    if (input->grabbed_window && !input->grabbed_window->tree->node.parent->node.enabled) {
+        input->grabbed_window = NULL;
+    }
+
+    // Update pointer focus (and subsequently things like the cursor image.)
+    handle_cursor_motion(input, (uint32_t)ms);
+}
+
+void
 input_load_config(struct comp_input *input, struct compositor_config config) {
     struct keyboard *keyboard;
     wl_list_for_each (keyboard, &input->keyboards, link) {
@@ -728,10 +743,12 @@ input_load_config(struct comp_input *input, struct compositor_config config) {
         input->cursor_manager = cursor_manager;
         xwl_update_cursor(input->compositor->xwl);
 
-        // Update the cursor image if needed. This isn't fully correct (the user may be hovering
-        // over Ninjabrain Bot) but it's close enough for now. TODO: Improve.
+        // Update the cursor image if needed.
         if (!input->active_constraint) {
-            wlr_cursor_set_xcursor(input->cursor, input->cursor_manager, "default");
+            if (!render_window_at(input->render, LAYER_FLOATING, input->cursor->x, input->cursor->y,
+                                  NULL, NULL)) {
+                wlr_cursor_set_xcursor(input->cursor, input->cursor_manager, "default");
+            }
         }
     }
 }
