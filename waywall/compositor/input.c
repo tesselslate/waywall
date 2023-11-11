@@ -27,9 +27,6 @@
  *  Keyboard events
  */
 
-// TODO: Fix cursor image changing during window moving (weird Ninjabrain Bot behavior, most likely
-//       need to report accurate cursor position)
-
 static uint32_t
 get_layer_mask(struct comp_input *input) {
     if (input->on_wall) {
@@ -535,7 +532,7 @@ on_request_set_cursor(struct wl_listener *listener, void *data) {
 
     // Only allow clients with pointer focus to change the curosr image.
     struct wlr_seat_client *focused_client = input->seat->pointer_state.focused_client;
-    if (focused_client == event->seat_client) {
+    if (!input->grabbed_window && focused_client == event->seat_client) {
         wlr_cursor_set_surface(input->cursor, event->surface, event->hotspot_x, event->hotspot_y);
     }
 }
