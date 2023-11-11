@@ -418,7 +418,7 @@ render_rect_destroy(render_rect_t *rect) {
 }
 
 void
-render_rect_set_color(render_rect_t *rect, float color[4]) {
+render_rect_set_color(render_rect_t *rect, const float color[4]) {
     wlr_scene_rect_set_color(rect, color);
 }
 

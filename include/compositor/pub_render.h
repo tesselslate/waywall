@@ -86,7 +86,7 @@ void render_rect_destroy(render_rect_t *rect);
 /*
  *  Sets the color of the given rectangle.
  */
-void render_rect_set_color(render_rect_t *rect, float color[4]);
+void render_rect_set_color(render_rect_t *rect, const float color[4]);
 
 /*
  *  Enables or disables the given rectangle.
