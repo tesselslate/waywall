@@ -11,13 +11,14 @@
 #include <unistd.h>
 #include <wlr/util/log.h>
 
-// TODO: simple optimizations (e.g. keep cgroup.procs open)
-
 static const char cgroup_dir[] = "/sys/fs/cgroup/waywall/";
 static const char *group_names[] = {
     [CPU_NONE] = "none", [CPU_IDLE] = "idle",     [CPU_LOW] = "low",
     [CPU_HIGH] = "high", [CPU_ACTIVE] = "active",
 };
+static int fds[5] = {-1, -1, -1, -1, -1};
+
+static_assert(ARRAY_LEN(fds) == ARRAY_LEN(group_names), "equal number of group names and fds");
 
 static bool any_active;
 
@@ -66,6 +67,15 @@ check_file(const char *filename) {
     return true;
 }
 
+void
+cpu_fini() {
+    for (size_t i = 0; i < ARRAY_LEN(fds); i++) {
+        if (fds[i] >= 0) {
+            close(fds[i]);
+        }
+    }
+}
+
 bool
 cpu_init() {
     if (!check_dir(cgroup_dir)) {
@@ -110,26 +120,32 @@ cpu_move_to_group(pid_t pid, enum cpu_group group) {
         last_active = pid;
     }
 
+    // Only open the file descriptor for a given cgroup once. Keep it open for the duration of the
+    // program.
     char buf[PATH_MAX];
-    ww_assert(STRING_LEN(cgroup_dir) + strlen(strgroup(group)) + STRING_LEN("/cgroup.procs") + 1 <
-              ARRAY_LEN(buf));
-    strcpy(buf, cgroup_dir);
-    strcat(buf, strgroup(group));
-    strcat(buf, "/cgroup.procs");
+    if (fds[group] < 0) {
+        ww_assert(STRING_LEN(cgroup_dir) + strlen(strgroup(group)) + STRING_LEN("/cgroup.procs") +
+                      1 <
+                  ARRAY_LEN(buf));
+        strcpy(buf, cgroup_dir);
+        strcat(buf, strgroup(group));
+        strcat(buf, "/cgroup.procs");
 
-    int fd = open(buf, O_WRONLY);
-    if (fd == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to open cgroup.procs of group %s for pid %d",
-                      strgroup(group), (int)pid);
-        return;
+        int fd = open(buf, O_WRONLY);
+        if (fd == -1) {
+            wlr_log_errno(WLR_ERROR, "failed to open cgroup.procs of group %s for pid %d",
+                          strgroup(group), (int)pid);
+            return;
+        }
+        fds[group] = fd;
     }
+
     size_t n = snprintf(buf, ARRAY_LEN(buf), "%d", (int)pid);
     ww_assert(n < ARRAY_LEN(buf) - 1);
-    if (write(fd, buf, n) == -1) {
+    if (write(fds[group], buf, n) == -1) {
         wlr_log_errno(WLR_ERROR, "failed to write cgroup.procs of group %s for pid %d",
                       strgroup(group), (int)pid);
     }
-    close(fd);
 }
 
 bool

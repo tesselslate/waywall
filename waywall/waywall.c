@@ -192,6 +192,7 @@ main(int argc, char **argv) {
     close(g_inotify);
     close(display_file_fd);
     remove(WAYWALL_DISPLAY_PATH);
+
     wlr_log(WLR_INFO, "done");
     return success ? 0 : 1;
 }

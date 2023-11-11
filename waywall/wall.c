@@ -715,6 +715,7 @@ wall_destroy(struct wall *wall) {
                 reset_counter_get_count(wall->reset_counter));
         reset_counter_destroy(wall->reset_counter);
     }
+    cpu_fini();
 }
 
 bool
