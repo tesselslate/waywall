@@ -8,6 +8,8 @@
 #include <sys/inotify.h>
 #include <time.h>
 
+#define MIN_CHUNKMAP_VERSION 14
+
 /*
  *  state contains information about the current state of an instance, such as whether it is on the
  *  title screen or in a world.

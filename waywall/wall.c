@@ -190,7 +190,7 @@ verif_update_instance(struct wall *wall, size_t id) {
     }
 
     struct wall_instance_data *data = &wall->instance_data[id];
-    ww_assert(data->hview_chunkmap && data->hview_instance);
+    ww_assert(data->hview_instance);
 
     int w = HEADLESS_WIDTH / g_config->wall_width, h = HEADLESS_HEIGHT / g_config->wall_height;
     int x = (id % g_config->wall_width) * w, y = (id / g_config->wall_width) * h;
@@ -200,21 +200,24 @@ verif_update_instance(struct wall *wall, size_t id) {
     // TODO: take into account whether the user has worldpreview for corner chunkmap
     // TODO: support really weird configurations where the chunkmap is bigger than the instance
     // capture
-    // TODO: older versions dont have chunkmaps
 
-    // Calculate the size of the chunkmap capture and configure it accordingly.
-    int chunkmap_size = i * 90;
-    int progress_height = i * 19;
-    int total_height = chunkmap_size + progress_height;
-    struct wlr_box chunkmap_src = {
-        .x = 0,
-        .y = g_config->stretch_height - total_height,
-        .width = chunkmap_size,
-        .height = total_height,
-    };
-    hview_set_dest(data->hview_chunkmap,
-                   (struct wlr_box){x, y + h - total_height, chunkmap_size, total_height});
-    hview_set_src(data->hview_chunkmap, chunkmap_src);
+    if (instance->version >= MIN_CHUNKMAP_VERSION) {
+        ww_assert(data->hview_chunkmap);
+
+        // Calculate the size of the chunkmap capture and configure it accordingly.
+        int chunkmap_size = i * 90;
+        int progress_height = i * 19;
+        int total_height = chunkmap_size + progress_height;
+        struct wlr_box chunkmap_src = {
+            .x = 0,
+            .y = g_config->stretch_height - total_height,
+            .width = chunkmap_size,
+            .height = total_height,
+        };
+        hview_set_dest(data->hview_chunkmap,
+                       (struct wlr_box){x, y + h - total_height, chunkmap_size, total_height});
+        hview_set_src(data->hview_chunkmap, chunkmap_src);
+    }
 }
 
 // TODO: call this when options.txt update checking is implemented (for GUI scale changes)
@@ -604,7 +607,9 @@ on_window_map(struct wl_listener *listener, void *data) {
     size_t id = inst_arr_push(wall, instance);
 
     // Perform setup for the instance.
-    wall->instance_data[id].hview_chunkmap = hview_create(instance.window);
+    if (instance.version >= MIN_CHUNKMAP_VERSION) {
+        wall->instance_data[id].hview_chunkmap = hview_create(instance.window);
+    }
     wall->instance_data[id].hview_instance = hview_create(instance.window);
     wall->instance_data[id].lock_indicator =
         render_rect_create(g_compositor->render, get_wall_box(wall, id), g_config->lock_color);
@@ -629,7 +634,9 @@ on_window_unmap(struct wl_listener *listener, void *data) {
             }
 
             instance_destroy(&wall->instances[i]);
-            hview_destroy(wall->instance_data[i].hview_chunkmap);
+            if (wall->instance_data[i].hview_chunkmap) {
+                hview_destroy(wall->instance_data[i].hview_chunkmap);
+            }
             hview_destroy(wall->instance_data[i].hview_instance);
             render_rect_destroy(wall->instance_data[i].lock_indicator);
 
