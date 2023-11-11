@@ -91,12 +91,6 @@ handle_inotify(int fd, uint32_t mask, void *data) {
 static int
 handle_signal(int signal_number, void *data) {
     switch (signal_number) {
-    case SIGUSR1:
-        wlr_log(WLR_INFO, "received SIGUSR1");
-        break;
-    case SIGUSR2:
-        wlr_log(WLR_INFO, "received SIGUSR2");
-        break;
     case SIGINT:
         wlr_log(WLR_INFO, "received SIGINT; stopping");
         compositor_stop(g_compositor);
@@ -180,10 +174,6 @@ main(int argc, char **argv) {
         wl_event_loop_add_signal(loop, SIGINT, handle_signal, NULL);
     struct wl_event_source *evt_sigterm =
         wl_event_loop_add_signal(loop, SIGTERM, handle_signal, NULL);
-    struct wl_event_source *evt_sigusr1 =
-        wl_event_loop_add_signal(loop, SIGUSR1, handle_signal, NULL);
-    struct wl_event_source *evt_sigusr2 =
-        wl_event_loop_add_signal(loop, SIGUSR2, handle_signal, NULL);
 
     ninb_init();
     g_wall = wall_create();
@@ -196,8 +186,6 @@ main(int argc, char **argv) {
     wl_event_source_remove(inotify);
     wl_event_source_remove(evt_sigint);
     wl_event_source_remove(evt_sigterm);
-    wl_event_source_remove(evt_sigusr1);
-    wl_event_source_remove(evt_sigusr2);
     wall_destroy(g_wall);
     compositor_destroy(g_compositor);
     config_destroy(g_config);

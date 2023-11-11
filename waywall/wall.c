@@ -197,9 +197,10 @@ verif_update_instance(struct wall *wall, size_t id) {
 
     hview_set_dest(data->hview_instance, (struct wlr_box){x, y, w, h});
 
-    // TODO: take into account whether the user has worldpreview for corner chunkmap
     // TODO: support really weird configurations where the chunkmap is bigger than the instance
     // capture
+    // TODO: handle non-worldpreview (centered chunkmap), and warn when the chunkmap is in 2 spots
+    //       (worldpreview < 3.0)
 
     if (instance->version >= MIN_CHUNKMAP_VERSION) {
         ww_assert(data->hview_chunkmap);
@@ -599,8 +600,6 @@ on_window_map(struct wl_listener *listener, void *data) {
                                MAX_INSTANCES) " exceeded)");
         return;
     }
-
-    // TODO: Sort instances. Also allow specifying instance sorting IDs
 
     // Add the instance to the instances array. Zero out the storage in case it was previously in
     // use by another instance.
