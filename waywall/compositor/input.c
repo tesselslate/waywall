@@ -624,6 +624,7 @@ input_create(struct compositor *compositor) {
     input->cursor = wlr_cursor_create();
     ww_assert(input->cursor);
     wlr_cursor_attach_output_layout(input->cursor, input->render->layout);
+    wlr_cursor_set_xcursor(input->cursor, input->cursor_manager, "default");
 
     input->on_cursor_motion.notify = on_cursor_motion;
     wl_signal_add(&input->cursor->events.motion, &input->on_cursor_motion);
