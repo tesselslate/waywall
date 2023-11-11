@@ -23,3 +23,8 @@ int
 window_get_pid(struct window *window) {
     return window->xwl_window->surface->pid;
 }
+
+void
+window_kill(struct window *window) {
+    xcb_kill_client(window->xwl_window->xwl->xcb, window->xwl_window->surface->window_id);
+}

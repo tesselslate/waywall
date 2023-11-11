@@ -3,6 +3,7 @@
 #include "config.h"
 #include "cpu.h"
 #include "instance.h"
+#include "ninb.h"
 #include "reset_counter.h"
 #include "util.h"
 #include "waywall.h"
@@ -349,7 +350,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
 
         switch (action) {
         case ACTION_ANY_TOGGLE_NINB:
-            // TODO:
+            ninb_toggle();
             break;
         case ACTION_WALL_RESET_ALL:
             if (wall->reset_counter) {
@@ -582,6 +583,12 @@ on_window_map(struct wl_listener *listener, void *data) {
     bool err = false;
     struct instance instance = instance_try_from(window, &err);
     if (err) {
+        if (!ninb_try_window(window)) {
+            const char *name = window_get_name(window);
+            wlr_log(WLR_INFO, "unknown window opened (pid %d, name '%s') - killing",
+                    window_get_pid(window), name ? name : "unnamed");
+            window_kill(window);
+        }
         return;
     }
     if (wall->instance_count == MAX_INSTANCES) {
@@ -697,7 +704,11 @@ wall_create() {
 
 void
 wall_destroy(struct wall *wall) {
-    // TODO
+    if (wall->reset_counter) {
+        wlr_log(WLR_INFO, "finished counting resets (%d)",
+                reset_counter_get_count(wall->reset_counter));
+        reset_counter_destroy(wall->reset_counter);
+    }
 }
 
 bool

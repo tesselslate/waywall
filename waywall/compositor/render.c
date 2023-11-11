@@ -499,10 +499,4 @@ render_window_set_layer(struct window *window, enum window_layer layer) {
 void
 render_window_set_pos(struct window *window, int x, int y) {
     wlr_scene_node_set_position(&window->tree->node, x, y);
-    xwl_window_configure(window->xwl_window, (struct wlr_box){
-                                                 .x = x,
-                                                 .y = y,
-                                                 .width = window->xwl_window->surface->width,
-                                                 .height = window->xwl_window->surface->height,
-                                             });
 }

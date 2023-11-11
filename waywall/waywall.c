@@ -1,4 +1,5 @@
 #include "waywall.h"
+#include "ninb.h"
 #include "compositor.h"
 #include "config.h"
 #include "wall.h"
@@ -54,6 +55,7 @@ process_config_inotify(const struct inotify_event *event) {
         return;
     }
     compositor_load_config(g_compositor, create_compositor_config());
+    ninb_update_config();
     config_destroy(old);
     wlr_log(WLR_INFO, "new config applied");
 }
@@ -183,6 +185,7 @@ main(int argc, char **argv) {
     struct wl_event_source *evt_sigusr2 =
         wl_event_loop_add_signal(loop, SIGUSR2, handle_signal, NULL);
 
+    ninb_init();
     g_wall = wall_create();
     if (!g_wall) {
         return 1;

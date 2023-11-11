@@ -18,4 +18,9 @@ const char *window_get_name(struct window *window);
  */
 int window_get_pid(struct window *window);
 
+/*
+ *  Kills the client owning the given window.
+ */
+void window_kill(struct window *window);
+
 #endif
