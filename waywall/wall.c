@@ -141,7 +141,7 @@ resize_active_instance(struct wall *wall) {
 }
 
 static void
-relayout_instance(struct wall *wall, size_t id) {
+relayout_wall_instance(struct wall *wall, size_t id) {
     ww_assert(id < wall->instance_count);
 
     struct wlr_box box = get_wall_box(wall, id);
@@ -155,7 +155,7 @@ relayout_instance(struct wall *wall, size_t id) {
 static void
 relayout_wall(struct wall *wall) {
     for (size_t i = 0; i < wall->instance_count; i++) {
-        relayout_instance(wall, i);
+        relayout_wall_instance(wall, i);
     }
 }
 
@@ -216,7 +216,6 @@ verif_update_instance(struct wall *wall, size_t id) {
     hview_set_src(data->hview_chunkmap, chunkmap_src);
 }
 
-// TODO: call this from config update (in case instance sizes changed)
 // TODO: call this when options.txt update checking is implemented (for GUI scale changes)
 static void
 verif_update(struct wall *wall) {
@@ -397,7 +396,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
             break;
         case ACTION_INGAME_RESET:
             reset_instance(wall, wall->active_instance);
-            relayout_instance(wall, wall->active_instance);
+            relayout_wall_instance(wall, wall->active_instance);
 
             if (g_config->wall_bypass) {
                 for (size_t id = 0; id < wall->instance_count; id++) {
@@ -603,7 +602,7 @@ on_window_map(struct wl_listener *listener, void *data) {
     wall->instance_data[id].lock_indicator =
         render_rect_create(g_compositor->render, get_wall_box(wall, id), g_config->lock_color);
     render_rect_set_enabled(wall->instance_data[id].lock_indicator, false);
-    relayout_instance(wall, id);
+    relayout_wall_instance(wall, id);
     verif_update_instance(wall, id);
 
     render_window_set_layer(instance.window, LAYER_INSTANCE);
@@ -712,7 +711,46 @@ wall_process_inotify(struct wall *wall, const struct inotify_event *event) {
     return false;
 }
 
-void
+bool
 wall_update_config(struct wall *wall) {
-    // TODO
+    if (g_config->count_resets) {
+        ww_assert(g_config->resets_file);
+        if (wall->reset_counter) {
+            if (!reset_counter_change_file(wall->reset_counter, g_config->resets_file)) {
+                wlr_log(WLR_ERROR, "failed to change reset count file");
+                return false;
+            }
+        } else {
+            wall->reset_counter = reset_counter_from_file(g_config->resets_file);
+            if (!wall->reset_counter) {
+                wlr_log(WLR_ERROR, "failed to create reset counter");
+                return false;
+            }
+        }
+    } else {
+        if (wall->reset_counter) {
+            int count = reset_counter_get_count(wall->reset_counter);
+            wlr_log(WLR_INFO, "disabling reset counting (stopping at %d resets)", count);
+            reset_counter_destroy(wall->reset_counter);
+            wall->reset_counter = NULL;
+        }
+    }
+
+    for (size_t id = 0; id < wall->instance_count; id++) {
+        render_rect_set_color(wall->instance_data[id].lock_indicator, g_config->lock_color);
+    }
+    relayout_wall(wall);
+    verif_update(wall);
+
+    if (wall->active_instance != -1) {
+        resize_active_instance(wall);
+    }
+
+    if (wall->active_instance != -1 && wall->alt_res) {
+        input_set_sensitivity(g_compositor->input, g_config->alt_sens);
+    } else {
+        input_set_sensitivity(g_compositor->input, g_config->main_sens);
+    }
+
+    return true;
 }

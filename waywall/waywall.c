@@ -15,6 +15,8 @@ struct config *g_config;
 int g_inotify;
 struct wall *g_wall;
 
+static int config_wd;
+
 #define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
 
 static struct compositor_config
@@ -30,6 +32,30 @@ create_compositor_config() {
     };
     memcpy(compositor_config.background_color, g_config->background_color, sizeof(float) * 4);
     return compositor_config;
+}
+
+static void
+process_config_inotify(const struct inotify_event *event) {
+    if (strcmp(event->name, config_filename) != 0) {
+        return;
+    }
+
+    struct config *new = config_read();
+    if (!new) {
+        return;
+    }
+
+    struct config *old = g_config;
+    g_config = new;
+    if (!wall_update_config(g_wall)) {
+        wlr_log(WLR_ERROR, "new config not applied");
+        free(new);
+        g_config = old;
+        return;
+    }
+    compositor_load_config(g_compositor, create_compositor_config());
+    config_destroy(old);
+    wlr_log(WLR_INFO, "new config applied");
 }
 
 static int
@@ -49,7 +75,13 @@ handle_inotify(int fd, uint32_t mask, void *data) {
 
         for (char *ptr = buf; ptr < buf + n; ptr += sizeof(struct inotify_event) + event->len) {
             event = (const struct inotify_event *)ptr;
-            wall_process_inotify(g_wall, event);
+            if (event->wd == config_wd) {
+                process_config_inotify(event);
+                continue;
+            }
+            if (wall_process_inotify(g_wall, event)) {
+                continue;
+            }
         }
     }
 }
@@ -122,7 +154,16 @@ main(int argc, char **argv) {
         return 1;
     }
 
-    // TODO: config autoreload
+    char *config_path = config_get_dir();
+    if (!config_path) {
+        return 1;
+    }
+    config_wd = inotify_add_watch(g_inotify, config_path, IN_CLOSE_WRITE);
+    if (config_wd == -1) {
+        wlr_log_errno(WLR_ERROR, "failed to watch config directory");
+        return 1;
+    }
+    free(config_path);
 
     g_compositor = compositor_create(create_compositor_config());
     if (!g_compositor) {
@@ -160,5 +201,6 @@ main(int argc, char **argv) {
     close(g_inotify);
     close(display_file_fd);
     remove(WAYWALL_DISPLAY_PATH);
+    wlr_log(WLR_INFO, "done");
     return success ? 0 : 1;
 }

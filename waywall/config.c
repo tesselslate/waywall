@@ -110,7 +110,7 @@ config_get_dir() {
         strcat(confdir, xdg_config_dir);
         return confdir;
     }
-    wlr_log(WLR_ERROR, "could not find config directory");
+    wlr_log(WLR_ERROR, "could not find config directory (no $XDG_CONFIG_HOME or $HOME)");
     return NULL;
 }
 

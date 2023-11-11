@@ -25,6 +25,9 @@
 #include <unistd.h>
 #include <wayland-client.h>
 
+// TODO: (compositor) try to create a new protocol that allows for exporting a DMABUF of the active
+//                    instance window for a smoother recording with some refresh rates
+
 OBS_DECLARE_MODULE()
 OBS_MODULE_USE_DEFAULT_LOCALE("waywall", "en-US")
 

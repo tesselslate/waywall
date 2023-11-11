@@ -2,6 +2,7 @@
 #define WAYWALL_WALL_H
 
 #include "compositor.h"
+#include "config.h"
 #include "instance.h"
 #include <stdbool.h>
 #include <stddef.h>
@@ -73,8 +74,8 @@ void wall_destroy(struct wall *wall);
 bool wall_process_inotify(struct wall *wall, const struct inotify_event *event);
 
 /*
- *  Processes any changes made to the global config struct.
+ *  Attempts to load a new configuration.
  */
-void wall_update_config(struct wall *wall);
+bool wall_update_config(struct wall *wall);
 
 #endif
