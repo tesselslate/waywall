@@ -21,6 +21,7 @@ struct wall {
         struct hview *hview_chunkmap, *hview_instance;
         render_rect_t *lock_indicator;
 
+        enum cpu_group last_group;
         bool locked;
     } instance_data[MAX_INSTANCES];
     size_t instance_count;

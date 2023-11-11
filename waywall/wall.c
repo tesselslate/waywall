@@ -41,6 +41,47 @@ inst_arr_remove(struct wall *wall, size_t id) {
     wall->instance_count--;
 }
 
+static void
+update_cpu(struct wall *wall, size_t id, enum cpu_group group) {
+    if (!g_config->has_cpu) {
+        return;
+    }
+
+    if (group == CPU_NONE) {
+        switch (wall->instances[id].state.screen) {
+        case TITLE:
+        case GENERATING:
+        case WAITING:
+            group = CPU_HIGH;
+            break;
+        case PREVIEWING:
+            if (wall->instance_data[id].locked) {
+                group = CPU_HIGH;
+            } else if (wall->instances[id].state.data.percent < g_config->preview_threshold) {
+                group = CPU_HIGH;
+            } else {
+                group = CPU_LOW;
+            }
+            break;
+        case INWORLD:
+            if (wall->active_instance == (int)id) {
+                group = CPU_ACTIVE;
+            } else {
+                group = CPU_IDLE;
+            }
+            break;
+        default:
+            ww_unreachable();
+        }
+    }
+
+    if (group == wall->instance_data[id].last_group) {
+        return;
+    }
+    wall->instance_data[id].last_group = group;
+    cpu_move_to_group(window_get_pid(wall->instances[id].window), group);
+}
+
 static struct wlr_box
 compute_alt_res(struct wall *wall) {
     ww_assert(g_config->has_alt_res);
@@ -254,6 +295,16 @@ play_instance(struct wall *wall, int id) {
 }
 
 static void
+reset_instance(struct wall *wall, int id) {
+    if (instance_reset(&wall->instances[id])) {
+        if (wall->reset_counter) {
+            reset_counter_increment(wall->reset_counter);
+        }
+        update_cpu(wall, (size_t)id, CPU_HIGH);
+    }
+}
+
+static void
 toggle_locked(struct wall *wall, int id) {
     if (!wall->instance_data[id].locked) {
         wall->instance_data[id].locked = true;
@@ -269,14 +320,11 @@ toggle_locked(struct wall *wall, int id) {
             wall->instance_data[id].locked = false;
             render_rect_set_enabled(wall->instance_data[id].lock_indicator, false);
 
-            if (instance_reset(&wall->instances[id])) {
-                if (wall->reset_counter) {
-                    reset_counter_increment(wall->reset_counter);
-                }
-            }
+            reset_instance(wall, id);
             break;
         }
     }
+    update_cpu(wall, id, CPU_NONE);
 }
 
 static void
@@ -310,8 +358,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
             }
             for (size_t id = 0; id < wall->instance_count; id++) {
                 if (!wall->instance_data[id].locked) {
-                    instance_reset(&wall->instances[id]);
-                    reset_counter_increment(wall->reset_counter);
+                    reset_instance(wall, id);
                 }
             }
             if (wall->reset_counter) {
@@ -320,11 +367,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
             break;
         case ACTION_WALL_RESET_ONE:
             if (hovered != -1 && !wall->instance_data[hovered].locked) {
-                if (instance_reset(&wall->instances[hovered])) {
-                    if (wall->reset_counter) {
-                        reset_counter_increment(wall->reset_counter);
-                    }
-                }
+                reset_instance(wall, hovered);
             }
             break;
         case ACTION_WALL_PLAY:
@@ -344,11 +387,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
                 }
                 for (size_t id = 0; id < wall->instance_count; id++) {
                     if ((int)id != hovered && !wall->instance_data[id].locked) {
-                        if (instance_reset(&wall->instances[id])) {
-                            if (wall->reset_counter) {
-                                reset_counter_increment(wall->reset_counter);
-                            }
-                        }
+                        reset_instance(wall, id);
                     }
                 }
                 if (wall->reset_counter) {
@@ -357,11 +396,8 @@ process_bind(struct wall *wall, struct keybind *bind) {
             }
             break;
         case ACTION_INGAME_RESET:
-            instance_reset(&wall->instances[wall->active_instance]);
+            reset_instance(wall, wall->active_instance);
             relayout_instance(wall, wall->active_instance);
-            if (wall->reset_counter) {
-                reset_counter_increment(wall->reset_counter);
-            }
 
             if (g_config->wall_bypass) {
                 for (size_t id = 0; id < wall->instance_count; id++) {
@@ -615,12 +651,23 @@ wall_create() {
         if (!cpu_init()) {
             return NULL;
         }
+        if (!cpu_set_group_weight(CPU_IDLE, g_config->idle_cpu)) {
+            return NULL;
+        }
+        if (!cpu_set_group_weight(CPU_LOW, g_config->low_cpu)) {
+            return NULL;
+        }
+        if (!cpu_set_group_weight(CPU_HIGH, g_config->high_cpu)) {
+            return NULL;
+        }
+        if (!cpu_set_group_weight(CPU_ACTIVE, g_config->active_cpu)) {
+            return NULL;
+        }
     }
 
     if (g_config->count_resets) {
         wall->reset_counter = reset_counter_from_file(g_config->resets_file);
         if (!wall->reset_counter) {
-            free(wall);
             return NULL;
         }
     }
@@ -658,6 +705,7 @@ bool
 wall_process_inotify(struct wall *wall, const struct inotify_event *event) {
     for (size_t i = 0; i < wall->instance_count; i++) {
         if (instance_process_inotify(&wall->instances[i], event)) {
+            update_cpu(wall, i, CPU_NONE);
             return true;
         }
     }
