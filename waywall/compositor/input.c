@@ -355,9 +355,6 @@ derestrict_pointer(struct comp_input *input) {
         // coordinates. However, we don't receive a motion event for it, so we need to warp the
         // cursor image to the center ourselves.
         wlr_cursor_warp(input->cursor, NULL, wl->wlr_output->width / 2, wl->wlr_output->height / 2);
-
-        // TODO: Sending a fake handle motion event here to update the cursor position tracked in
-        // the wall module doesn't work. This will need to be improved.
     }
 }
 

@@ -266,6 +266,11 @@ focus_wall(struct wall *wall) {
         render_window_set_enabled(wall->instances[i].window, true);
     }
     render_layer_set_enabled(g_compositor->render, LAYER_LOCKS, true);
+
+    // We will not necessarily receive any motion events when the pointer is unlocked (hopefully)
+    // warped to the center of the window.
+    wall->input.cx = wall->screen_width / 2;
+    wall->input.cy = wall->screen_height / 2;
 }
 
 static bool
