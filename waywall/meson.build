@@ -14,6 +14,7 @@ executable('waywall',
   'instance.c',
   'reset_counter.c',
   'util.c',
+  'wall.c',
   'waywall.c',
 
   dependencies : [

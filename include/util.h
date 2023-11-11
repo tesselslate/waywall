@@ -23,6 +23,4 @@ void _ww_assert(const char *file, const int line, const char *expr, bool value);
 #define STRING_LEN(x) (ARRAY_LEN((x)) - 1)
 #define STR(x) #x
 
-#define MAX_INSTANCE_COUNT 128
-
 #endif
