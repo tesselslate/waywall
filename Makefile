@@ -14,8 +14,10 @@ setup:
 
 # configuration
 
-conf_san:
+conf_debug:
 	meson configure -Db_sanitize=address,undefined build
+	meson configure -Dbuildtype=debug build
 
-conf_nosan:
+conf_release:
 	meson configure -Db_sanitize=none build
+	meson configure -Dbuildtype=release build
