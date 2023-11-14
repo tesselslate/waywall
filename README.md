@@ -35,6 +35,3 @@ you like.
 
 Run `waywall` to start the compositor. Launch your instances with the
 `waywall-launch` wrapper program to spawn them inside of the compositor.
-
-If you use the `remain_in_background` configuration option, the waywall window
-can be reopened by sending SIGUSR1 to the waywall process.
