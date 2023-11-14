@@ -69,18 +69,20 @@ struct config {
 
     // appearance
     float background_color[4];
-    float lock_color[4];
     char *cursor_theme;
     int cursor_size;
     double ninb_opacity;
     enum ninb_location ninb_location;
 
     // wall
-    int wall_width, wall_height;
     int stretch_width, stretch_height;
     int alt_width, alt_height;
     bool use_f1;
     bool remain_in_background;
+
+    // layout
+    char *generator_name;
+    struct toml_table_t *generator_options;
 
     // reset options
     enum unlock_behavior unlock_behavior;
@@ -96,6 +98,7 @@ struct config {
     int active_cpu;
     int preview_threshold;
     char *sleepbg_lock;
+    bool force_jit;
 
     // keybinds
     struct keybind binds[MAX_BINDS];
@@ -104,6 +107,7 @@ struct config {
     // not part of config file
     bool has_alt_res;
     bool has_cpu;
+    struct toml_table_t *toml;
 };
 
 void config_destroy(struct config *config);

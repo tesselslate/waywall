@@ -4,6 +4,7 @@
 #include "compositor.h"
 #include "config.h"
 #include "instance.h"
+#include "layout.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -20,7 +21,6 @@ struct wall {
     struct instance instances[MAX_INSTANCES];
     struct wall_instance_data {
         struct hview *hview_chunkmap, *hview_instance;
-        render_rect_t *lock_indicator;
 
         enum cpu_group last_group;
         bool locked;
@@ -30,6 +30,11 @@ struct wall {
 
     // Miscellaneous components
     struct reset_counter *reset_counter;
+
+    // Layout
+    struct layout layout;
+    render_rect_t **rectangles;
+    size_t rectangle_count;
     int screen_width, screen_height;
 
     // Input handling

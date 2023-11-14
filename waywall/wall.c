@@ -3,6 +3,7 @@
 #include "config.h"
 #include "cpu.h"
 #include "instance.h"
+#include "layout.h"
 #include "ninb.h"
 #include "reset_counter.h"
 #include "util.h"
@@ -106,27 +107,60 @@ get_hovered_instance(struct wall *wall) {
         return -1;
     }
 
-    int x = wall->input.cx / (wall->screen_width / g_config->wall_width);
-    int y = wall->input.cy / (wall->screen_height / g_config->wall_height);
-    size_t id = x + y * g_config->wall_width;
-    return id >= wall->instance_count ? -1 : (int)id;
+    for (size_t i = 0; i < wall->layout.entry_count; i++) {
+        struct layout_entry *entry = &wall->layout.entries[i];
+        if (entry->type != INSTANCE) {
+            continue;
+        }
+        if (wall->input.cx >= entry->x && wall->input.cx <= entry->x + entry->w) {
+            if (wall->input.cy >= entry->y && wall->input.cy <= entry->y + entry->h) {
+                return entry->data.instance;
+            }
+        }
+    }
+    return -1;
 }
 
-static struct wlr_box
-get_wall_box(struct wall *wall, size_t id) {
-    ww_assert(id < wall->instance_count);
+static void
+relayout_wall(struct wall *wall) {
+    ww_assert(wall->active_instance == -1);
+    struct layout layout = layout_request_new();
 
-    int disp_width = wall->screen_width / g_config->wall_width;
-    int disp_height = wall->screen_height / g_config->wall_height;
+    // Destroy the old layout.
+    for (size_t i = 0; i < wall->rectangle_count; i++) {
+        render_rect_destroy(wall->rectangles[i]);
+    }
+    for (size_t i = 0; i < wall->instance_count; i++) {
+        render_window_set_enabled(wall->instances[i].window, false);
+        render_window_set_layer(wall->instances[i].window, LAYER_WALL);
+    }
+    wall->rectangle_count = 0;
+    layout_destroy(wall->layout);
 
-    struct wlr_box box = {
-        .x = disp_width * (id % g_config->wall_width),
-        .y = disp_height * (id / g_config->wall_width),
-        .width = disp_width,
-        .height = disp_height,
-    };
+    // TODO: Does z-ordering happen as intended? Might need to manually reorder things
 
-    return box;
+    // Apply the new layout.
+    for (size_t i = 0; i < layout.entry_count; i++) {
+        struct layout_entry *entry = &layout.entries[i];
+        if (entry->type == RECTANGLE) {
+            wall->rectangles =
+                realloc(wall->rectangles, sizeof(render_rect_t) * (wall->rectangle_count + 1));
+            ww_assert(wall->rectangles);
+            wall->rectangles[wall->rectangle_count++] = render_rect_create(
+                g_compositor->render, (struct wlr_box){entry->x, entry->y, entry->w, entry->h},
+                entry->data.color);
+        } else if (entry->type == INSTANCE) {
+            ww_assert(entry->data.instance >= 0 &&
+                      entry->data.instance < (int)wall->instance_count);
+            render_window_set_enabled(wall->instances[entry->data.instance].window, true);
+            render_window_set_pos(wall->instances[entry->data.instance].window, entry->x, entry->y);
+            render_window_set_dest_size(wall->instances[entry->data.instance].window, entry->w,
+                                        entry->h);
+        } else {
+            ww_unreachable();
+        }
+    }
+    wall->layout = layout;
 }
 
 static void
@@ -139,25 +173,6 @@ resize_active_instance(struct wall *wall) {
                              : (struct wlr_box){0, 0, wall->screen_width, wall->screen_height};
     render_window_configure(window, box.x, box.y, box.width, box.height);
     render_window_set_dest_size(window, box.width, box.height);
-}
-
-static void
-relayout_wall_instance(struct wall *wall, size_t id) {
-    ww_assert(id < wall->instance_count);
-
-    struct wlr_box box = get_wall_box(wall, id);
-    render_window_configure(wall->instances[id].window, box.x, box.y, g_config->stretch_width,
-                            g_config->stretch_height);
-    render_window_set_dest_size(wall->instances[id].window, box.width, box.height);
-
-    render_rect_configure(wall->instance_data[id].lock_indicator, box);
-}
-
-static void
-relayout_wall(struct wall *wall) {
-    for (size_t i = 0; i < wall->instance_count; i++) {
-        relayout_wall_instance(wall, i);
-    }
 }
 
 static void
@@ -192,8 +207,9 @@ verif_update_instance(struct wall *wall, size_t id) {
     struct wall_instance_data *data = &wall->instance_data[id];
     ww_assert(data->hview_instance);
 
-    int w = HEADLESS_WIDTH / g_config->wall_width, h = HEADLESS_HEIGHT / g_config->wall_height;
-    int x = (id % g_config->wall_width) * w, y = (id / g_config->wall_width) * h;
+    // TODO: make headless size configurable (pub_compositor.h)
+    int w = HEADLESS_WIDTH / 3, h = HEADLESS_HEIGHT / 5;
+    int x = (id % 3) * w, y = (id / 5) * h;
 
     hview_set_dest(data->hview_instance, (struct wlr_box){x, y, w, h});
 
@@ -265,12 +281,13 @@ focus_wall(struct wall *wall) {
     for (size_t i = 0; i < wall->instance_count; i++) {
         render_window_set_enabled(wall->instances[i].window, true);
     }
-    render_layer_set_enabled(g_compositor->render, LAYER_LOCKS, true);
 
     // We will not necessarily receive any motion events when the pointer is unlocked (hopefully)
     // warped to the center of the window.
     wall->input.cx = wall->screen_width / 2;
     wall->input.cy = wall->screen_height / 2;
+
+    relayout_wall(wall);
 }
 
 static bool
@@ -286,17 +303,17 @@ play_instance(struct wall *wall, int id) {
                             wall->screen_height);
     render_window_set_dest_size(wall->instances[id].window, wall->screen_width,
                                 wall->screen_height);
+    render_window_set_enabled(wall->instances[id].window, true);
+    render_window_set_layer(wall->instances[id].window, LAYER_INSTANCE);
 
     if (wall->instance_data[id].locked) {
         wall->instance_data[id].locked = false;
-        render_rect_set_enabled(wall->instance_data[id].lock_indicator, false);
     }
 
     for (size_t i = 0; i < wall->instance_count; i++) {
         render_window_set_enabled(wall->instances[i].window,
                                   (int)i == wall->active_instance ? true : false);
     }
-    render_layer_set_enabled(g_compositor->render, LAYER_LOCKS, false);
 
     sleepbg_lock_toggle(true);
 
@@ -317,19 +334,18 @@ static void
 toggle_locked(struct wall *wall, int id) {
     if (!wall->instance_data[id].locked) {
         wall->instance_data[id].locked = true;
-        render_rect_set_enabled(wall->instance_data[id].lock_indicator, true);
+        relayout_wall(wall);
     } else {
         switch (g_config->unlock_behavior) {
         case UNLOCK_ACCEPT:
             wall->instance_data[id].locked = false;
-            render_rect_set_enabled(wall->instance_data[id].lock_indicator, false);
+            relayout_wall(wall);
         case UNLOCK_IGNORE:
             break;
         case UNLOCK_RESET:
             wall->instance_data[id].locked = false;
-            render_rect_set_enabled(wall->instance_data[id].lock_indicator, false);
-
             reset_instance(wall, id);
+            relayout_wall(wall);
             break;
         }
     }
@@ -405,8 +421,9 @@ process_bind(struct wall *wall, struct keybind *bind) {
             }
             break;
         case ACTION_INGAME_RESET:
+            render_window_configure(wall->instances[wall->active_instance].window, 0, 0,
+                                    g_config->stretch_width, g_config->stretch_height);
             reset_instance(wall, wall->active_instance);
-            relayout_wall_instance(wall, wall->active_instance);
 
             if (g_config->wall_bypass) {
                 for (size_t id = 0; id < wall->instance_count; id++) {
@@ -578,9 +595,10 @@ on_output_resize(struct wl_listener *listener, void *data) {
     struct output *output = data;
 
     render_output_get_size(output, &wall->screen_width, &wall->screen_height);
-    relayout_wall(wall);
     if (wall->active_instance != -1) {
         resize_active_instance(wall);
+    } else {
+        relayout_wall(wall);
     }
 }
 
@@ -615,14 +633,10 @@ on_window_map(struct wl_listener *listener, void *data) {
         wall->instance_data[id].hview_chunkmap = hview_create(instance.window);
     }
     wall->instance_data[id].hview_instance = hview_create(instance.window);
-    wall->instance_data[id].lock_indicator =
-        render_rect_create(g_compositor->render, get_wall_box(wall, id), g_config->lock_color);
-    render_rect_set_enabled(wall->instance_data[id].lock_indicator, false);
-    relayout_wall_instance(wall, id);
+    if (wall->active_instance == -1) {
+        relayout_wall(wall);
+    }
     verif_update_instance(wall, id);
-
-    render_window_set_layer(instance.window, LAYER_INSTANCE);
-    render_window_set_enabled(instance.window, true);
 }
 
 static void
@@ -642,10 +656,11 @@ on_window_unmap(struct wl_listener *listener, void *data) {
                 hview_destroy(wall->instance_data[i].hview_chunkmap);
             }
             hview_destroy(wall->instance_data[i].hview_instance);
-            render_rect_destroy(wall->instance_data[i].lock_indicator);
 
             inst_arr_remove(wall, i);
-            relayout_wall(wall);
+            if (wall->active_instance == -1) {
+                relayout_wall(wall);
+            }
             verif_update(wall);
             return;
         }
@@ -661,31 +676,35 @@ wall_create() {
     struct wall *wall = calloc(1, sizeof(struct wall));
     ww_assert(wall);
 
+    if (!layout_init()) {
+        goto fail_layout;
+    }
+
     wall->active_instance = -1;
     input_set_on_wall(g_compositor->input, true);
 
     if (g_config->has_cpu) {
         if (!cpu_init()) {
-            return NULL;
+            goto fail_cpu;
         }
         if (!cpu_set_group_weight(CPU_IDLE, g_config->idle_cpu)) {
-            return NULL;
+            goto fail_cpu;
         }
         if (!cpu_set_group_weight(CPU_LOW, g_config->low_cpu)) {
-            return NULL;
+            goto fail_cpu;
         }
         if (!cpu_set_group_weight(CPU_HIGH, g_config->high_cpu)) {
-            return NULL;
+            goto fail_cpu;
         }
         if (!cpu_set_group_weight(CPU_ACTIVE, g_config->active_cpu)) {
-            return NULL;
+            goto fail_cpu;
         }
     }
 
     if (g_config->count_resets) {
         wall->reset_counter = reset_counter_from_file(g_config->resets_file);
         if (!wall->reset_counter) {
-            return NULL;
+            goto fail_reset_counter;
         }
     }
 
@@ -711,6 +730,16 @@ wall_create() {
     wl_signal_add(&g_compositor->render->events.window_unmap, &wall->on_window_unmap);
 
     return wall;
+
+fail_reset_counter:
+    cpu_fini();
+
+fail_cpu:
+    layout_fini();
+
+fail_layout:
+    free(wall);
+    return NULL;
 }
 
 void
@@ -728,6 +757,9 @@ wall_process_inotify(struct wall *wall, const struct inotify_event *event) {
     for (size_t i = 0; i < wall->instance_count; i++) {
         if (instance_process_inotify(&wall->instances[i], event)) {
             update_cpu(wall, i, CPU_NONE);
+            if (wall->active_instance == -1) {
+                relayout_wall(wall);
+            }
             return true;
         }
     }
@@ -736,6 +768,10 @@ wall_process_inotify(struct wall *wall, const struct inotify_event *event) {
 
 bool
 wall_update_config(struct wall *wall) {
+    if (!layout_reinit()) {
+        return false;
+    }
+
     if (g_config->count_resets) {
         ww_assert(g_config->resets_file);
         if (wall->reset_counter) {
@@ -759,10 +795,9 @@ wall_update_config(struct wall *wall) {
         }
     }
 
-    for (size_t id = 0; id < wall->instance_count; id++) {
-        render_rect_set_color(wall->instance_data[id].lock_indicator, g_config->lock_color);
+    if (wall->active_instance == -1) {
+        relayout_wall(wall);
     }
-    relayout_wall(wall);
     verif_update(wall);
 
     if (wall->active_instance != -1) {

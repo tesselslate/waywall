@@ -27,19 +27,6 @@
  *  Keyboard events
  */
 
-static uint32_t
-get_layer_mask(struct comp_input *input) {
-    if (input->on_wall) {
-        return LAYER_FLOATING;
-    }
-
-    uint32_t mask = LAYER_INSTANCE;
-    if (!input->active_constraint) {
-        mask |= LAYER_FLOATING;
-    }
-    return mask;
-}
-
 static void
 on_keyboard_key(struct wl_listener *listener, void *data) {
     struct keyboard *keyboard = wl_container_of(listener, keyboard, on_key);
@@ -149,8 +136,8 @@ handle_cursor_motion(struct comp_input *input, uint32_t time_msec) {
     // Figure out which window to give pointer focus to. Pointer focus can change based on where
     // the cursor moves.
     double dx, dy;
-    struct window *window = render_window_at(input->render, get_layer_mask(input), input->cursor->x,
-                                             input->cursor->y, &dx, &dy);
+    struct window *window = render_window_at(input->render, LAYER_FLOATING | LAYER_INSTANCE,
+                                             input->cursor->x, input->cursor->y, &dx, &dy);
 
     if (window) {
         wlr_seat_pointer_notify_enter(input->seat, window->xwl_window->surface->surface, dx, dy);
@@ -264,7 +251,7 @@ on_cursor_button(struct wl_listener *listener, void *data) {
     }
 
     // Update the focused window.
-    struct window *window = render_window_at(input->render, get_layer_mask(input), input->cursor->x,
+    struct window *window = render_window_at(input->render, LAYER_FLOATING | LAYER_INSTANCE, input->cursor->x,
                                              input->cursor->y, NULL, NULL);
 
     if (window) {

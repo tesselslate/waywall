@@ -1,5 +1,7 @@
 #include "config.h"
+#include "str.h"
 #include "util.h"
+#include <limits.h>
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,7 +41,7 @@ static const struct mapping modifiers[] = {
 };
 
 const char config_filename[] = "waywall.toml";
-static const char xdg_config_dir[] = "/.config";
+static const char waywall_dir[] = "/waywall/";
 
 static bool
 parse_bind_array(toml_array_t *array, struct keybind *keybind, const char *key) {
@@ -100,48 +102,37 @@ parse_bind_table(toml_table_t *table, struct keybind *keybind, const char *key) 
 
 char *
 config_get_dir() {
-    const char *dir;
+    char buf[PATH_MAX];
+    struct str path = str_new(buf, PATH_MAX);
+    char *dir;
     if ((dir = getenv("XDG_CONFIG_HOME"))) {
-        return strdup(dir);
+        path = str_copy(path, str_from(dir));
+    } else {
+        dir = getenv("HOME");
+        if (!dir) {
+            wlr_log(WLR_ERROR, "could not find config directory (no $XDG_CONFIG_HOME or $HOME)");
+            return NULL;
+        }
+        path = str_copy(path, str_from(dir));
+        path = str_appendl(path, "./config");
     }
-    if ((dir = getenv("HOME"))) {
-        char *confdir = malloc(strlen(dir) + strlen(xdg_config_dir));
-        memcpy(confdir, dir, strlen(dir) + 1);
-        strcat(confdir, xdg_config_dir);
-        return confdir;
-    }
-    wlr_log(WLR_ERROR, "could not find config directory (no $XDG_CONFIG_HOME or $HOME)");
-    return NULL;
+    path = str_appendl(path, waywall_dir);
+    return strdup(buf);
 }
 
 char *
 config_get_path() {
-    char *path = NULL;
-    const char *xdg_config_home = getenv("XDG_CONFIG_HOME");
-    if (xdg_config_home) {
-        size_t len = strlen(xdg_config_home);
-        path = malloc(len + strlen(config_filename) + 2);
-        ww_assert(path);
-        strcpy(path, xdg_config_home);
-        strcat(path, "/");
-        strcat(path, config_filename);
-        return path;
+    char *dir = config_get_dir();
+    if (!dir) {
+        wlr_log(WLR_ERROR, "no suitable directory found for config file");
+        return NULL;
     }
-
-    const char *home = getenv("HOME");
-    if (home) {
-        size_t len = strlen(home);
-        path = malloc(len + strlen(xdg_config_dir) + strlen(config_filename) + 2);
-        ww_assert(path);
-        strcpy(path, home);
-        strcat(path, xdg_config_dir);
-        strcat(path, "/");
-        strcat(path, config_filename);
-        return path;
-    }
-
-    wlr_log(WLR_ERROR, "no suitable directory found for config file");
-    return NULL;
+    char buf[PATH_MAX];
+    struct str path = str_new(buf, PATH_MAX);
+    path = str_copy(path, str_from(dir));
+    free(dir);
+    path = str_appendl(path, config_filename);
+    return strdup(buf);
 }
 
 static bool
@@ -169,39 +160,10 @@ parse_color(float value[4], toml_table_t *table, const char *value_name, const c
         return false;
     }
     char *color = datum.u.s;
-    size_t len = strlen(color);
-    bool maybe_valid_rgb = len == 6 || (len == 7 && color[0] == '#');
-    bool maybe_valid_rgba = len == 8 || (len == 9 && color[0] == '#');
-    if (!maybe_valid_rgb && !maybe_valid_rgba) {
+    if (!ww_util_parse_color(value, color)) {
         wlr_log(WLR_ERROR, "config: invalid value ('%s') for color value '%s'", color, full_name);
         free(color);
         return false;
-    }
-    int r, g, b, a;
-    if (maybe_valid_rgb) {
-        int n = sscanf(color[0] == '#' ? color + 1 : color, "%02x%02x%02x", &r, &g, &b);
-        if (n != 3) {
-            wlr_log(WLR_ERROR, "config: invalid value ('%s') for color value '%s'", color,
-                    full_name);
-            free(color);
-            return false;
-        }
-        value[0] = r / 255.0;
-        value[1] = g / 255.0;
-        value[2] = b / 255.0;
-        value[3] = 1.0;
-    } else {
-        int n = sscanf(color[0] == '#' ? color + 1 : color, "%02x%02x%02x%02x", &r, &g, &b, &a);
-        if (n != 4) {
-            wlr_log(WLR_ERROR, "config: invalud value ('%s') for color value '%s'", color,
-                    full_name);
-            free(color);
-            return false;
-        }
-        value[0] = r / 255.0;
-        value[1] = g / 255.0;
-        value[2] = b / 255.0;
-        value[3] = a / 255.0;
     }
     free(color);
     return true;
@@ -285,6 +247,9 @@ parse_enum(bool *ok, toml_table_t *table, const char *value_name, const char *fu
             goto fail_read;                                                                        \
         }                                                                                          \
     } while (0)
+
+#define PARSE_BOOL_OR(table, name)                                                                 \
+    if (!parse_bool(&config->name, table, STR(name), STR(table) "." STR(name), false))
 
 #define PARSE_COLOR(table, name)                                                                   \
     do {                                                                                           \
@@ -383,6 +348,7 @@ config_read() {
 
     struct config *config = calloc(1, sizeof(struct config));
     ww_assert(config);
+    config->toml = conf;
 
     // input
     toml_table_t *input = toml_table_in(conf, "input");
@@ -408,7 +374,6 @@ config_read() {
         goto fail_read;
     }
     PARSE_COLOR(appearance, background_color);
-    PARSE_COLOR(appearance, lock_color);
     PARSE_STRING_OR(appearance, cursor_theme) {
         config->cursor_theme = NULL;
     }
@@ -435,10 +400,6 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'wall'");
         goto fail_read;
     }
-    PARSE_INT(wall, wall_width);
-    CHECK_MIN_MAX(wall, wall_width, 1, 10);
-    PARSE_INT(wall, wall_height);
-    CHECK_MIN_MAX(wall, wall_height, 1, 10);
     PARSE_INT(wall, stretch_width);
     CHECK_MIN_MAX(wall, stretch_width, 1, 4096);
     PARSE_INT(wall, stretch_height);
@@ -459,6 +420,15 @@ config_read() {
         CHECK_MIN_MAX(wall, alt_width, 1, 16384);
         CHECK_MIN_MAX(wall, alt_height, 1, 16384);
     }
+
+    // layout
+    toml_table_t *layout = toml_table_in(conf, "layout");
+    if (!layout) {
+        wlr_log(WLR_ERROR, "config: missing section 'layout'");
+        goto fail_read;
+    }
+    PARSE_STRING(layout, generator_name);
+    config->generator_options = layout;
 
     // reset
     toml_table_t *reset = toml_table_in(conf, "reset");
@@ -506,6 +476,9 @@ config_read() {
         }
         PARSE_STRING_OR(performance, sleepbg_lock) {
             config->sleepbg_lock = NULL;
+        }
+        PARSE_BOOL_OR(performance, force_jit) {
+            config->force_jit = false;
         }
     }
 
@@ -625,11 +598,9 @@ config_read() {
         config->bind_count++;
     }
 
-    toml_free(conf);
     return config;
 
 fail_read:
-    toml_free(conf);
     config_destroy(config);
 
 fail_parse:
@@ -645,8 +616,12 @@ config_destroy(struct config *config) {
     if (config->resets_file) {
         free(config->resets_file);
     }
+    if (config->generator_name) {
+        free(config->generator_name);
+    }
     if (config->sleepbg_lock) {
         free(config->sleepbg_lock);
     }
+    toml_free(config->toml);
     free(config);
 }

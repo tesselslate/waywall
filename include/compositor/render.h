@@ -44,8 +44,8 @@ struct comp_render {
 
     struct wlr_scene *scene;
     struct wlr_scene_tree *tree_floating;
-    struct wlr_scene_tree *tree_locks;
-    struct wlr_scene_tree *tree_instances;
+    struct wlr_scene_tree *tree_instance;
+    struct wlr_scene_tree *tree_wall;
     struct wlr_scene_tree *tree_headless;
     struct wlr_scene_tree *tree_unknown;
     struct wlr_scene_rect *background;

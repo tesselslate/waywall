@@ -12,7 +12,7 @@ enum window_layer : uint32_t {
     LAYER_UNKNOWN = 0,
     LAYER_INSTANCE = 1 << 0,
     LAYER_FLOATING = 1 << 1,
-    LAYER_LOCKS = 1 << 2,
+    LAYER_WALL = 1 << 2,
 };
 
 struct comp_render;

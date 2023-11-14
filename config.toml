@@ -8,21 +8,24 @@ alt_sens = 1.0
 
 [appearance]
 background_color = '#000000'
-lock_color = '#00000099'
 cursor_theme = "" # can be left empty / deleted
 cursor_size = 24 # can be deleted
 ninb_opacity = 0.8
 ninb_location = "right" # topleft, top, topright, left, right, bottomleft, bottomright
 
 [wall]
-wall_width = 2
-wall_height = 3
 stretch_width = 960
 stretch_height = 360
 alt_width = 1920
 alt_height = 16384
 use_f1 = false
 remain_in_background = true
+
+[layout]
+generator_name = "builtin_wall"
+wall_width = 3
+wall_width = 5
+lock_color = "#00000099"
 
 [reset]
 unlock_behavior = "reset" # unlock, remain_locked, reset
@@ -40,6 +43,7 @@ high_cpu = 100
 active_cpu = 500
 preview_threshold = 30
 sleepbg_lock = ""
+force_jit = false
 
 [keybinds]
 "Ctrl-Shift-D"      = ["wall_reset_all", "ingame_reset"]

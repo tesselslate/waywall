@@ -40,7 +40,7 @@ window_at_layer(struct comp_render *render, enum window_layer layer, double x, d
         root = &render->tree_floating->node;
         break;
     case LAYER_INSTANCE:
-        root = &render->tree_instances->node;
+        root = &render->tree_instance->node;
         break;
     default:
         ww_unreachable();
@@ -272,13 +272,13 @@ render_create(struct compositor *compositor) {
     ww_assert(render->tree_floating);
     wlr_scene_node_set_position(&render->tree_floating->node, OUTPUT_WL_X, OUTPUT_WL_Y);
 
-    render->tree_locks = wlr_scene_tree_create(&render->scene->tree);
-    ww_assert(render->tree_locks);
-    wlr_scene_node_set_position(&render->tree_locks->node, OUTPUT_WL_X, OUTPUT_WL_Y);
+    render->tree_instance = wlr_scene_tree_create(&render->scene->tree);
+    ww_assert(render->tree_instance);
+    wlr_scene_node_set_position(&render->tree_instance->node, OUTPUT_WL_X, OUTPUT_WL_Y);
 
-    render->tree_instances = wlr_scene_tree_create(&render->scene->tree);
-    ww_assert(render->tree_instances);
-    wlr_scene_node_set_position(&render->tree_instances->node, OUTPUT_WL_X, OUTPUT_WL_Y);
+    render->tree_wall = wlr_scene_tree_create(&render->scene->tree);
+    ww_assert(render->tree_wall);
+    wlr_scene_node_set_position(&render->tree_wall->node, OUTPUT_WL_X, OUTPUT_WL_Y);
 
     render->tree_headless = wlr_scene_tree_create(&render->scene->tree);
     ww_assert(render->tree_headless);
@@ -289,9 +289,9 @@ render_create(struct compositor *compositor) {
     wlr_scene_node_set_enabled(&render->tree_unknown->node, false);
 
     wlr_scene_node_raise_to_top(&render->tree_floating->node);
-    wlr_scene_node_place_below(&render->tree_locks->node, &render->tree_floating->node);
-    wlr_scene_node_place_below(&render->tree_instances->node, &render->tree_locks->node);
-    wlr_scene_node_place_below(&render->tree_headless->node, &render->tree_instances->node);
+    wlr_scene_node_place_below(&render->tree_instance->node, &render->tree_floating->node);
+    wlr_scene_node_place_below(&render->tree_wall->node, &render->tree_instance->node);
+    wlr_scene_node_place_below(&render->tree_headless->node, &render->tree_wall->node);
     wlr_scene_node_lower_to_bottom(&render->tree_unknown->node);
 
     render->background =
@@ -376,10 +376,7 @@ render_layer_set_enabled(struct comp_render *render, enum window_layer layer, bo
 
         break;
     case LAYER_INSTANCE:
-        wlr_scene_node_set_enabled(&render->tree_instances->node, enabled);
-        break;
-    case LAYER_LOCKS:
-        wlr_scene_node_set_enabled(&render->tree_locks->node, enabled);
+        wlr_scene_node_set_enabled(&render->tree_instance->node, enabled);
         break;
     default:
         ww_unreachable();
@@ -412,7 +409,7 @@ render_rect_configure(render_rect_t *rect, struct wlr_box box) {
 
 render_rect_t *
 render_rect_create(struct comp_render *render, struct wlr_box box, float color[4]) {
-    render_rect_t *rect = wlr_scene_rect_create(render->tree_locks, box.width, box.height, color);
+    render_rect_t *rect = wlr_scene_rect_create(render->tree_wall, box.width, box.height, color);
     ww_assert(rect);
 
     wlr_scene_node_set_position(&rect->node, box.x, box.y);
@@ -491,7 +488,10 @@ render_window_set_layer(struct window *window, enum window_layer layer) {
         wlr_scene_node_reparent(&window->tree->node, window->render->tree_floating);
         break;
     case LAYER_INSTANCE:
-        wlr_scene_node_reparent(&window->tree->node, window->render->tree_instances);
+        wlr_scene_node_reparent(&window->tree->node, window->render->tree_instance);
+        break;
+    case LAYER_WALL:
+        wlr_scene_node_reparent(&window->tree->node, window->render->tree_wall);
         break;
     default:
         ww_unreachable();

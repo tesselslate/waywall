@@ -30,6 +30,9 @@ if not wlroots_subproject.get_variable('features').get('xwayland')
   error('wlroots xwayland is required')
 endif
 
+luajit_program = find_program('luajit')
+
+luajit = dependency('luajit')
 obs = dependency('libobs')
 toml = subproject('tomlc99').get_variable('toml')
 wayland_client = dependency('wayland-client')
