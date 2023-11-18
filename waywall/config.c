@@ -367,6 +367,26 @@ config_read() {
         config->alt_sens = config->main_sens;
     }
 
+    // keyboard
+    toml_table_t *keyboard = toml_table_in(conf, "keyboard");
+    if (keyboard) {
+        PARSE_STRING_OR(keyboard, layout) {
+            config->layout = NULL;
+        }
+        PARSE_STRING_OR(keyboard, rules) {
+            config->rules = NULL;
+        }
+        PARSE_STRING_OR(keyboard, model) {
+            config->model = NULL;
+        }
+        PARSE_STRING_OR(keyboard, variant) {
+            config->variant = NULL;
+        }
+        PARSE_STRING_OR(keyboard, options) {
+            config->options = NULL;
+        }
+    }
+
     // appearance
     toml_table_t *appearance = toml_table_in(conf, "appearance");
     if (!appearance) {
@@ -621,6 +641,21 @@ config_destroy(struct config *config) {
     }
     if (config->sleepbg_lock) {
         free(config->sleepbg_lock);
+    }
+    if (config->layout) {
+        free(config->layout);
+    }
+    if (config->rules) {
+        free(config->rules);
+    }
+    if (config->model) {
+        free(config->model);
+    }
+    if (config->variant) {
+        free(config->variant);
+    }
+    if (config->options) {
+        free(config->options);
     }
     toml_free(config->toml);
     free(config);

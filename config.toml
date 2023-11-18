@@ -4,7 +4,14 @@ repeat_rate = 40
 confine_pointer = false
 main_sens = 1.0
 alt_sens = 1.0
-# TODO: language
+
+# XKB options - can be deleted
+[keyboard]
+layout = ""
+rules = ""
+model = ""
+variant = ""
+options = ""
 
 [appearance]
 background_color = '#000000'

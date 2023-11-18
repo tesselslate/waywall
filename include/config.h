@@ -65,7 +65,10 @@ struct config {
     int repeat_rate;
     bool confine_pointer;
     double main_sens, alt_sens;
-    // TODO: alternative languages
+
+    // keyboard
+    char *layout;
+    char *rules, *model, *variant, *options;
 
     // appearance
     float background_color[4];

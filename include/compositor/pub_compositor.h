@@ -32,6 +32,7 @@ struct compositor_config {
     const char *cursor_theme;
     int cursor_size;
     bool stop_on_close;
+    const char *layout, *model, *rules, *variant, *options;
 };
 
 struct compositor *compositor_create(struct compositor_config config);

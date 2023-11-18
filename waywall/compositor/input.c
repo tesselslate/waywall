@@ -91,8 +91,17 @@ handle_new_keyboard(struct comp_input *input, struct wlr_input_device *device) {
     keyboard->input = input;
     keyboard->wlr = wlr_keyboard;
 
+    struct xkb_rule_names rule_names = {
+        .layout = input->compositor->config.layout,
+        .model = input->compositor->config.model,
+        .rules = input->compositor->config.rules,
+        .variant = input->compositor->config.variant,
+        .options = input->compositor->config.options,
+    };
+
     struct xkb_context *ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-    struct xkb_keymap *keymap = xkb_keymap_new_from_names(ctx, NULL, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    struct xkb_keymap *keymap =
+        xkb_keymap_new_from_names(ctx, &rule_names, XKB_KEYMAP_COMPILE_NO_FLAGS);
     wlr_keyboard_set_keymap(wlr_keyboard, keymap);
     xkb_keymap_unref(keymap);
     xkb_context_unref(ctx);
@@ -251,8 +260,8 @@ on_cursor_button(struct wl_listener *listener, void *data) {
     }
 
     // Update the focused window.
-    struct window *window = render_window_at(input->render, LAYER_FLOATING | LAYER_INSTANCE, input->cursor->x,
-                                             input->cursor->y, NULL, NULL);
+    struct window *window = render_window_at(input->render, LAYER_FLOATING | LAYER_INSTANCE,
+                                             input->cursor->x, input->cursor->y, NULL, NULL);
 
     if (window) {
         input_focus_window(input, window);

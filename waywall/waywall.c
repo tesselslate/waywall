@@ -1,7 +1,7 @@
 #include "waywall.h"
-#include "ninb.h"
 #include "compositor.h"
 #include "config.h"
+#include "ninb.h"
 #include "wall.h"
 #include <fcntl.h>
 #include <signal.h>
@@ -30,6 +30,11 @@ create_compositor_config() {
         .cursor_theme = g_config->cursor_theme,
         .cursor_size = g_config->cursor_size,
         .stop_on_close = !g_config->remain_in_background,
+        .layout = g_config->layout,
+        .rules = g_config->rules,
+        .model = g_config->model,
+        .variant = g_config->variant,
+        .options = g_config->options,
     };
     memcpy(compositor_config.background_color, g_config->background_color, sizeof(float) * 4);
     return compositor_config;
@@ -37,6 +42,7 @@ create_compositor_config() {
 
 static void
 process_config_inotify(const struct inotify_event *event) {
+    // TODO: warn if keyboard options have changed since xwayland doesnt care
     if (strcmp(event->name, config_filename) != 0) {
         return;
     }
@@ -56,6 +62,7 @@ process_config_inotify(const struct inotify_event *event) {
     }
     compositor_load_config(g_compositor, create_compositor_config());
     ninb_update_config();
+
     config_destroy(old);
     wlr_log(WLR_INFO, "new config applied");
 }
