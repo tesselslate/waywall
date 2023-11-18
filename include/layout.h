@@ -1,8 +1,10 @@
 #ifndef WAYWALL_LAYOUT_H
 #define WAYWALL_LAYOUT_H
 
+#include "util.h"
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 /*
  *  layout contains a list of items to display to the user, such as instances and rectangles.
@@ -10,7 +12,11 @@
 struct layout {
     struct layout_entry *entries;
     size_t entry_count;
+
+    uint64_t reset_all_ids[INSTANCE_BITFIELD_WIDTH / sizeof(uint64_t)];
 };
+
+static_assert(INSTANCE_BITFIELD_WIDTH / sizeof(uint64_t) == 2, "bitfield width size is 2");
 
 /*
  *  layout_entry contains a single item to be displayed to the user.

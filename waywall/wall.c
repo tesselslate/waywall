@@ -382,7 +382,9 @@ process_bind(struct wall *wall, struct keybind *bind) {
                 reset_counter_queue_writes(wall->reset_counter);
             }
             for (size_t id = 0; id < wall->instance_count; id++) {
-                if (!wall->instance_data[id].locked) {
+                bool in_reset_all_list =
+                    (wall->layout.reset_all_ids[id / 64] & (1 << (id % 64))) != 0;
+                if (!wall->instance_data[id].locked && in_reset_all_list) {
                     reset_instance(wall, id);
                 }
             }

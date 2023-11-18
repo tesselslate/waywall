@@ -78,18 +78,25 @@ end
 
     width and height contain the current dimensions of the waywall window.
 
-    The return value of this function will tell waywall what to display to the user. It consists
+    The 1st return value of this function will tell waywall what to display to the user. It consists
     of an array of "entries", each of which can either be an instance or colored rectangle.
+
+    The 2nd return value of this function, if provided, should contain a list of instance IDs that
+    should be reset if the user presses the reset all hotkey. Any locked instances in the list will
+    be ignored.
 ]]--
 M.request = function(instances, screen_width, screen_height)
     local instance_width = math.floor(screen_width / wall_width)
     local instance_height = math.floor(screen_height / wall_height)
 
     local scene = {}
+    local reset_all = {}
 
     for _, instance in ipairs(instances) do
         local x = instance.id % wall_width
         local y = math.floor(instance.id / wall_width)
+
+        table.insert(reset_all, instance.id)
 
         local scene_instance = {
             "instance",
@@ -114,7 +121,7 @@ M.request = function(instances, screen_width, screen_height)
         end
     end
 
-    return scene
+    return scene, reset_all
 end
 
 return M

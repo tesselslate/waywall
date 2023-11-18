@@ -5,12 +5,11 @@
 #include "config.h"
 #include "instance.h"
 #include "layout.h"
+#include "util.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
-
-#define MAX_INSTANCES 128
 
 /*
  *  wall contains state for the user-facing "wall."

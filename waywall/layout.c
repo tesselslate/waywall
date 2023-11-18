@@ -411,13 +411,53 @@ layout_request_new() {
     create_state_table(current_vm);
     lua_pushinteger(current_vm, g_wall->screen_width);
     lua_pushinteger(current_vm, g_wall->screen_height);
-    if (lua_pcall(current_vm, 3, 1, 0) != 0) {
+    if (lua_pcall(current_vm, 3, 2, 0) != 0) {
         wlr_log(WLR_ERROR, "failed to request layout: %s", lua_tostring(current_vm, -1));
         goto fail;
     }
 
-    // Unmarshal the table from the layout generator.
+    // Get the list of instance IDs for the reset all keybind.
     size_t n = lua_objlen(current_vm, -1);
+    if (n == 0) {
+        goto unmarshal_scene;
+    }
+    int i = 0;
+    lua_pushnil(current_vm);
+    while (lua_next(current_vm, -2)) {
+        if (lua_isnumber(current_vm, -2)) {
+            int j = lua_tointeger(current_vm, -2);
+            if (j != i + 1) {
+                wlr_log(
+                    WLR_ERROR,
+                    "layout generator did not return a sequential array of instance IDs (%d -> %d)",
+                    i, j);
+                goto fail;
+            }
+            i = j;
+
+            if (!lua_isnumber(current_vm, -1)) {
+                wlr_log(WLR_ERROR,
+                        "layout generator returned a non-number instance ID in the reset all list");
+                goto fail;
+            }
+            int id = lua_tointeger(current_vm, -1);
+            if (id < 0 || (size_t)id > g_wall->instance_count) {
+                wlr_log(WLR_ERROR,
+                        "layout generator returned an invalid instance ID in the reset all list");
+                goto fail;
+            }
+            layout.reset_all_ids[id / 64] |= (1 << (id % 64));
+        } else {
+            wlr_log(WLR_ERROR, "layout generator did not return an array of instance IDs");
+            goto fail;
+        }
+        lua_pop(current_vm, 1);
+    }
+    lua_pop(current_vm, 1);
+
+unmarshal_scene:
+    // Unmarshal the table from the layout generator.
+    n = lua_objlen(current_vm, -1);
     if (n == 0) {
         lua_settop(current_vm, 0);
         lua_gc(current_vm, LUA_GCCOLLECT, 0);
@@ -426,19 +466,20 @@ layout_request_new() {
     layout.entry_count = n;
     layout.entries = calloc(n, sizeof(struct layout_entry));
 
-    int i = 0;
+    i = 0;
     lua_pushnil(current_vm);
     while (lua_next(current_vm, -2)) {
         if (lua_isnumber(current_vm, -2)) {
             int j = lua_tointeger(current_vm, -2);
             if (j != i + 1) {
-                wlr_log(WLR_ERROR, "layout generator did not return a sequential array (%d -> %d)",
+                wlr_log(WLR_ERROR,
+                        "layout generator did not return a sequential array of objects (%d -> %d)",
                         i, j);
                 goto fail;
             }
             i = j;
         } else {
-            wlr_log(WLR_ERROR, "layout generator did not return an array");
+            wlr_log(WLR_ERROR, "layout generator did not return an array of objects");
             goto fail;
         }
 

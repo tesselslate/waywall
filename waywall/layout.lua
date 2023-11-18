@@ -35,16 +35,19 @@ _G.__waywall_request = function(state, width, height)
         end, "", 1000000)
     end
 
-    local ret = generator.request(state, width, height)
-    if not ret or type(ret) ~= "table" then
-        error("invalid return from layout generator: " .. tostring(ret))
+    local objects, reset_all = generator.request(state, width, height)
+    if not objects or type(objects) ~= "table" then
+        error("layout generator returned invalid objects table")
+    end
+    if not reset_all or type(reset_all) ~= "table" then
+        reset_all = {}
     end
 
     if not force_jit then
         debug.sethook(nil, "")
     end
 
-    return ret
+    return objects, reset_all
 end
 
 --[[
