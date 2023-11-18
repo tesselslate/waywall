@@ -3,8 +3,6 @@
  *  as well as other related functionality like pointer constraints.
  */
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include "compositor/input.h"
 #include "compositor/render.h"
 #include "compositor/xwayland.h"

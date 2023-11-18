@@ -1,8 +1,6 @@
 #ifndef WAYWALL_COMPOSITOR_SCENE_WINDOW_H
 #define WAYWALL_COMPOSITOR_SCENE_WINDOW_H
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include <wayland-server-core.h>
 #include <wlr/types/wlr_scene.h>
 #include <wlr/util/addon.h>

@@ -1,7 +1,7 @@
 #ifndef WAYWALL_WALL_H
 #define WAYWALL_WALL_H
 
-#include "compositor.h"
+#include "compositor/render.h"
 #include "config.h"
 #include "instance.h"
 #include "layout.h"

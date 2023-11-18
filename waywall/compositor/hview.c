@@ -7,9 +7,7 @@
  *  died.
  */
 
-#define WAYWALL_COMPOSITOR_IMPL
-
-#include "compositor/pub_hview.h"
+#include "compositor/hview.h"
 #include "compositor/render.h"
 #include "compositor/scene_window.h"
 #include "compositor/xwayland.h"

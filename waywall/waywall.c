@@ -1,5 +1,6 @@
 #include "waywall.h"
-#include "compositor.h"
+#include "compositor/render.h"
+#include "compositor/input.h"
 #include "config.h"
 #include "ninb.h"
 #include "wall.h"

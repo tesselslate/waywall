@@ -25,7 +25,6 @@ executable('waywall',
   'compositor/render.c',
   'compositor/scene_window.c',
   'compositor/xwayland.c',
-  'compositor/window_util.c',
 
   'config.c',
   'cpu.c',

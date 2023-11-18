@@ -1,8 +1,10 @@
-#include "compositor.h"
+#include "compositor/render.h"
+#include "compositor/xwayland.h"
 #include "config.h"
 #include "waywall.h"
 #include <stdbool.h>
 #include <wayland-server-core.h>
+#include <wlr/xwayland.h>
 
 static struct wl_listener unmap_listener;
 static struct wl_listener configure_listener;
@@ -120,12 +122,12 @@ ninb_toggle() {
 
 bool
 ninb_try_window(struct window *window) {
-    const char *name = window_get_name(window);
+    const char *name = window->xwl_window->surface->title;
 
     // The loading window has the title "Java".
     if (strcmp(name, "Java") == 0) {
         if (main_window) {
-            window_kill(window);
+            xcb_kill_client(window->xwl_window->xwl->xcb, window->xwl_window->surface->window_id);
             return true;
         }
         render_window_set_layer(window, LAYER_FLOATING);
@@ -136,7 +138,7 @@ ninb_try_window(struct window *window) {
     // The main window will have "Ninjabrain Bot" in the title.
     if (strstr(name, "Ninjabrain Bot")) {
         if (main_window) {
-            window_kill(window);
+            xcb_kill_client(window->xwl_window->xwl->xcb, window->xwl_window->surface->window_id);
             return true;
         }
         main_window = window;
@@ -147,7 +149,7 @@ ninb_try_window(struct window *window) {
     }
 
     // The settings and calibration windows will be owned by the same process.
-    if (main_window && window_get_pid(main_window) == window_get_pid(window)) {
+    if (main_window && main_window->xwl_window->surface->pid == window->xwl_window->surface->pid) {
         render_window_set_layer(window, LAYER_FLOATING);
         render_window_set_enabled(window, true);
         return true;

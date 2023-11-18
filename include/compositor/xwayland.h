@@ -1,8 +1,6 @@
 #ifndef WAYWALL_COMPOSITOR_XWAYLAND_H
 #define WAYWALL_COMPOSITOR_XWAYLAND_H
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include "compositor/compositor.h"
 #include "compositor/input.h"
 #include <wlr/util/box.h>

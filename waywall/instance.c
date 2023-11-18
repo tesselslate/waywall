@@ -1,5 +1,5 @@
 #include "instance.h"
-#include "compositor.h"
+#include "compositor/xwayland.h"
 #include "config.h"
 #include "str.h"
 #include "util.h"
@@ -14,6 +14,7 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <wlr/util/log.h>
+#include <wlr/xwayland.h>
 #include <zip.h>
 
 // TODO: only use state file for wpstateout, keep log file open anyway for other things
@@ -176,7 +177,7 @@ get_mods(struct instance *instance) {
 static bool
 get_version(struct instance *instance) {
     // TODO: Make more robust. Maybe support snapshots, Sodium version hiding?
-    const char *title = window_get_name(instance->window);
+    const char *title = instance->window->xwl_window->surface->title;
     int version[3] = {0};
 
     int n = sscanf(title, "Minecraft %2d.%2d.%2d", &version[0], &version[1], &version[2]);
@@ -610,7 +611,7 @@ instance_try_from(struct window *window, bool *err) {
 
     struct instance instance = {0};
 
-    pid_t pid = window_get_pid(window);
+    pid_t pid = window->xwl_window->surface->pid;
     char buf[PATH_MAX], dir[PATH_MAX];
 
     ssize_t n = snprintf(buf, PATH_MAX, "/proc/%d/cwd", (int)pid);

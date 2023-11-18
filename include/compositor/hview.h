@@ -1,7 +1,7 @@
 #ifndef WAYWALL_COMPOSITOR_PUB_HVIEW_H
 #define WAYWALL_COMPOSITOR_PUB_HVIEW_H
 
-#include "compositor/pub_render.h"
+#include "compositor/render.h"
 #include <stdbool.h>
 #include <wlr/util/box.h>
 

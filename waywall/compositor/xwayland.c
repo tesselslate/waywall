@@ -4,8 +4,6 @@
  *  and hview) through the use of signals.
  */
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include "compositor/xwayland.h"
 #include "compositor/input.h"
 #include "util.h"

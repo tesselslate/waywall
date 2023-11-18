@@ -4,8 +4,6 @@
  *  than patching wlroots.
  */
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include "compositor/scene_window.h"
 #include "util.h"
 #include <stdlib.h>

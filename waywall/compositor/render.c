@@ -11,10 +11,9 @@
  *  The headless tree is used for the headless output, and the unknown tree is invisible.
  */
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include "compositor/render.h"
 #include "compositor/input.h"
+#include "compositor/scene_window.h"
 #include "compositor/xwayland.h"
 #include "util.h"
 #include <stdlib.h>
@@ -22,6 +21,7 @@
 #include <wlr/backend/headless.h>
 #include <wlr/backend/wayland.h>
 #include <wlr/types/wlr_compositor.h>
+#include <wlr/types/wlr_output_layout.h>
 #include <wlr/types/wlr_xcursor_manager.h>
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>

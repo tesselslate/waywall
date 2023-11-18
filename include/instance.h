@@ -1,7 +1,7 @@
 #ifndef WAYWALL_INSTANCE_H
 #define WAYWALL_INSTANCE_H
 
-#include "compositor.h"
+#include "compositor/render.h"
 #include "cpu.h"
 #include <stdbool.h>
 #include <stdint.h>

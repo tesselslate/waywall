@@ -1,7 +1,7 @@
 #ifndef WAYWALL_NINB_H
 #define WAYWALL_NINB_H
 
-#include "compositor.h"
+#include "compositor/render.h"
 #include <stdbool.h>
 
 /*

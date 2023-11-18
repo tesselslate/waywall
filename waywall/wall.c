@@ -1,5 +1,7 @@
 #include "wall.h"
-#include "compositor.h"
+#include "compositor/hview.h"
+#include "compositor/render.h"
+#include "compositor/xwayland.h"
 #include "config.h"
 #include "cpu.h"
 #include "instance.h"
@@ -11,6 +13,7 @@
 #include <fcntl.h>
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
+#include <wlr/xwayland.h>
 
 // TODO: reimpl benchmark
 // TODO: overhaul keybind matching to be less specific
@@ -81,7 +84,7 @@ update_cpu(struct wall *wall, size_t id, enum cpu_group group) {
         return;
     }
     wall->instance_data[id].last_group = group;
-    cpu_move_to_group(window_get_pid(wall->instances[id].window), group);
+    cpu_move_to_group(wall->instances[id].window->xwl_window->surface->pid, group);
 }
 
 static struct wlr_box
@@ -613,10 +616,10 @@ on_window_map(struct wl_listener *listener, void *data) {
     struct instance instance = instance_try_from(window, &err);
     if (err) {
         if (!ninb_try_window(window)) {
-            const char *name = window_get_name(window);
+            const char *name = window->xwl_window->surface->title;
             wlr_log(WLR_INFO, "unknown window opened (pid %d, name '%s') - killing",
-                    window_get_pid(window), name ? name : "unnamed");
-            window_kill(window);
+                    window->xwl_window->surface->pid, name ? name : "unnamed");
+            xcb_kill_client(window->xwl_window->xwl->xcb, window->xwl_window->surface->window_id);
         }
         return;
     }

@@ -3,11 +3,8 @@
  *  for the wall modules to use.
  */
 
-#define WAYWALL_COMPOSITOR_IMPL
-
 #include "compositor/compositor.h"
 #include "compositor/input.h"
-#include "compositor/pub_window_util.h"
 #include "compositor/render.h"
 #include "compositor/xwayland.h"
 #include "pointer-constraints-unstable-v1-protocol.h"
@@ -322,6 +319,6 @@ compositor_stop(struct compositor *compositor) {
 
     struct window *window;
     wl_list_for_each (window, &compositor->render->windows, link) {
-        window_close(window);
+        wlr_xwayland_surface_close(window->xwl_window->surface);
     }
 }
