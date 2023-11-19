@@ -1,5 +1,6 @@
 lua = [
   'boot.lua',
+  'builtin_moving.lua',
   'builtin_wall.lua',
 ]
 
