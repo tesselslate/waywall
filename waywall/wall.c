@@ -366,8 +366,10 @@ toggle_locked(struct wall *wall, int id) {
     update_cpu(wall, id, CPU_NONE);
 }
 
-static void
+static bool
 process_bind(struct wall *wall, struct keybind *bind) {
+    bool any_actions = false;
+
     for (int i = 0; i < bind->action_count; i++) {
         enum action action = bind->actions[i];
 
@@ -387,6 +389,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
             wall->input.last_bind.instance = hovered;
         }
 
+        any_actions = true;
         switch (action) {
         case ACTION_ANY_TOGGLE_NINB:
             ninb_toggle();
@@ -419,6 +422,15 @@ process_bind(struct wall *wall, struct keybind *bind) {
         case ACTION_WALL_PLAY:
             if (hovered != -1) {
                 play_instance(wall, hovered);
+            }
+            break;
+        case ACTION_WALL_PLAY_FIRST_LOCKED:;
+            struct instance_list list = layout_get_locked(wall);
+            for (size_t j = 0; j < list.id_count; j++) {
+                if (wall->instances[list.ids[j]].state.screen == INWORLD) {
+                    play_instance(wall, list.ids[j]);
+                    break;
+                }
             }
             break;
         case ACTION_WALL_LOCK:
@@ -484,6 +496,8 @@ process_bind(struct wall *wall, struct keybind *bind) {
             break;
         }
     }
+
+    return any_actions;
 }
 
 static void
@@ -555,9 +569,10 @@ on_key(struct wl_listener *listener, void *data) {
         // Check for any matching keysyms.
         for (int j = 0; j < event->nsyms; j++) {
             if (event->syms[j] == g_config->binds[i].input.sym) {
-                process_bind(wall, &bind);
-                event->consumed = true;
-                return;
+                if (process_bind(wall, &bind)) {
+                    event->consumed = true;
+                    return;
+                }
             }
         }
     }

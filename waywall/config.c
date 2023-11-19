@@ -19,6 +19,7 @@ static const struct mapping actions[] = {
     {"wall_reset_all", ACTION_WALL_RESET_ALL},
     {"wall_reset", ACTION_WALL_RESET_ONE},
     {"wall_play", ACTION_WALL_PLAY},
+    {"wall_play_locked", ACTION_WALL_PLAY_FIRST_LOCKED},
     {"wall_lock", ACTION_WALL_LOCK},
     {"wall_focus_reset", ACTION_WALL_FOCUS_RESET},
     {"ingame_reset", ACTION_INGAME_RESET},
