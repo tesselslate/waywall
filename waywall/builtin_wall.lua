@@ -91,6 +91,11 @@ M.instance_die = function(id)
     return generate_layout()
 end
 
+M.reset_ingame = function(id)
+    locked[id] = nil
+    return generate_layout()
+end
+
 M.lock = function(id)
     locked[id] = true
     return generate_layout()
