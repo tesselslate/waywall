@@ -521,15 +521,18 @@ on_key(struct wl_listener *listener, void *data) {
         }
 
         // If needed, do not process the keybind on menus or while paused.
-        bool check_inworld = wall->active_instance != -1 &&
-                             wall->instances[wall->active_instance].state.screen == INWORLD;
-        if (check_inworld) {
+        if (wall->active_instance != -1) {
             struct state state = wall->instances[wall->active_instance].state;
-            if (!bind.allow_in_pause && state.data.inworld == PAUSED) {
+            if (!bind.allow_in_pause && state.screen == INWORLD && state.data.inworld == PAUSED) {
                 return;
             }
-            if (!bind.allow_in_menu && state.data.inworld == MENU) {
-                return;
+            if (!bind.allow_in_menu) {
+                if (state.screen == TITLE) {
+                    return;
+                }
+                if (state.screen == INWORLD && state.data.inworld == MENU) {
+                    return;
+                }
             }
         }
 
