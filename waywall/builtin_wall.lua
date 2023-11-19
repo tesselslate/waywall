@@ -1,19 +1,47 @@
---[[
-    This file implements the built-in "wall" layout generator, which creates the classic wall
-    layout. Instances are displayed in a grid with colored rectangles overlaid on top of locked
-    instances.
-
-    This is also intended to serve as an example layout generator, and is thoroughly commented.
-]]--
-
 local wall_width, wall_height, lock_color
+
+local locked = {}
+local instance_count = 0
+
 local M = {}
 
---[[
-    The init function is called once whenever the layout generator is initialized. Whenever the
-    user changes their configuration, the layout generator (Lua VM) is destroyed and remade.
-]]--
-M.init = function(config)
+local function generate_layout()
+    local screen_width, screen_height = waywall.get_screen_size()
+    local instance_width = math.floor(screen_width / wall_width)
+    local instance_height = math.floor(screen_height / wall_height)
+
+    local scene = {}
+
+    for i = 0, instance_count - 1 do
+        local x = i % wall_width
+        local y = math.floor(i / wall_width)
+
+        local scene_instance = {
+            "instance", i,
+            x = x * instance_width,
+            y = y * instance_height,
+            w = instance_width,
+            h = instance_height,
+        }
+        table.insert(scene, scene_instance)
+
+        if locked[i] and lock_color then
+            local scene_lock = {
+                "rectangle",
+                x = x * instance_width,
+                y = y * instance_height,
+                w = instance_width,
+                h = instance_height,
+                color = lock_color,
+            }
+            table.insert(scene, scene_lock)
+        end
+    end
+
+    return scene
+end
+
+M.init = function(config, instances)
     if not config or type(config) ~= "table" then
         error("no config")
     end
@@ -27,7 +55,6 @@ M.init = function(config)
         lock_color = config.lock_color
     end
 
-    local math = require("math")
     wall_width = math.floor(config.wall_width)
     wall_height = math.floor(config.wall_height)
 
@@ -37,91 +64,50 @@ M.init = function(config)
     if wall_height < 1 or wall_height > 10 then
         error("invalid wall height")
     end
+
+    instance_count = #instances
+    return generate_layout()
 end
 
---[[
-    The request function is called every time waywall wants a new wall layout as a result of some
-    event (e.g. instance state changed, instance booted up, instance died, etc.) Layout requests
-    are only ever made when the wall is visible (the user is not playing an instance).
+M.instance_spawn = function(id)
+    instance_count = instance_count + 1
+    return generate_layout()
+end
 
-    instances is a table containing the state of all instances. Here is an example of its format:
-    {
-        {
-            id = 0
-            locked = false,
-            screen = "title",
-        },
-        {
-            id = 1,
-            locked = false,
-            screen = "inworld",
-        },
-        {
-            id = 2,
-            locked = false,
-            screen = "generating",
-            percent = 10,
-        },
-        {
-            id = 3,
-            locked = true,
-            screen = "previewing",
-            percent = 40,
-            preview_start = 2438102,
-        }
-    }
+M.instance_die = function(id)
+    instance_count = instance_count - 1
+    return generate_layout()
+end
 
-    - The `id`, `locked`, and `screen` fields are always included.
-    - `percent` is included when the instance is in worldgen (`generating` or `previewing`.)
-    - `preview_start` contains the time at which the world preview started in milliseconds from
-      an arbitrary epoch (it uses CLOCK_MONOTONIC.)
+M.lock = function(id)
+    locked[id] = true
+    return generate_layout()
+end
 
-    width and height contain the current dimensions of the waywall window.
+M.unlock = function(id)
+    locked[id] = nil
+    return generate_layout()
+end
 
-    The 1st return value of this function will tell waywall what to display to the user. It consists
-    of an array of "entries", each of which can either be an instance or colored rectangle.
+M.resize = function(_, _)
+    return generate_layout()
+end
 
-    The 2nd return value of this function, if provided, should contain a list of instance IDs that
-    should be reset if the user presses the reset all hotkey. Any locked instances in the list will
-    be ignored.
-]]--
-M.request = function(instances, screen_width, screen_height)
-    local instance_width = math.floor(screen_width / wall_width)
-    local instance_height = math.floor(screen_height / wall_height)
-
-    local scene = {}
-    local reset_all = {}
-
-    for _, instance in ipairs(instances) do
-        local x = instance.id % wall_width
-        local y = math.floor(instance.id / wall_width)
-
-        table.insert(reset_all, instance.id)
-
-        local scene_instance = {
-            "instance",
-            instance.id,
-            x = x * instance_width,
-            y = y * instance_height,
-            w = instance_width,
-            h = instance_height,
-        }
-        table.insert(scene, scene_instance)
-
-        if instance.locked and lock_color then
-            local scene_lock = {
-                "rectangle",
-                x = x * instance_width,
-                y = y * instance_height,
-                w = instance_width,
-                h = instance_height,
-                color = lock_color,
-            }
-            table.insert(scene, scene_lock)
-        end
+M.get_locked = function()
+    local ids = {}
+    for id, _ in pairs(locked) do
+        table.insert(ids, id)
     end
+    table.sort(ids)
+    return ids
+end
 
-    return scene, reset_all
+M.get_reset_all = function()
+    local reset_all = {}
+    for i = 0, instance_count - 1 do
+        table.insert(reset_all, i)
+    end
+    return reset_all
 end
 
 return M

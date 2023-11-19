@@ -29,7 +29,6 @@ void _ww_assert(const char *file, const int line, const char *expr, bool value);
 #define STR(x) #x
 
 #define MAX_INSTANCES 128
-#define INSTANCE_BITFIELD_WIDTH (MAX_INSTANCES / 8)
 
 static inline bool
 ww_util_parse_color(float value[4], const char *in) {

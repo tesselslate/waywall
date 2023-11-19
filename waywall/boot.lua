@@ -11,44 +11,16 @@
     JIT'd methods will not trigger hooks.
 ]]--
 
+local waywall = _G.waywall
+
 if __c_waywall_force_jit then
-    __c_waywall_log("JIT has been enabled - broken layout generators may cause waywall to hang")
+    waywall.__c_waywall_log("JIT has been enabled - broken layout generators may cause waywall to hang")
 else
     jit.off()
     _G.jit = nil
 end
 
 local force_jit = __c_waywall_force_jit
-
---[[
-    Layout generator code
-]]--
-
-local generator = nil
-
-_G.__waywall_request = function(state, width, height)
-    -- 1000000 is a fairly arbitrary upper limit on the number of instructions, but I don't think any
-    -- reasonable layout generator should need to run that many.
-    if not force_jit then
-        debug.sethook(function()
-            error("layout generator ran for too long")
-        end, "", 1000000)
-    end
-
-    local objects, reset_all = generator.request(state, width, height)
-    if not objects or type(objects) ~= "table" then
-        error("layout generator returned invalid objects table")
-    end
-    if not reset_all or type(reset_all) ~= "table" then
-        reset_all = {}
-    end
-
-    if not force_jit then
-        debug.sethook(nil, "")
-    end
-
-    return objects, reset_all
-end
 
 --[[
     Initialization
@@ -64,7 +36,7 @@ _G.print = function(...)
             str = tostring(v)
         end
     end
-    __c_waywall_log(str)
+    waywall.__c_waywall_log(str)
 end
 
 -- Update the package path to include the configuration folder (for layout generators.)
@@ -86,12 +58,16 @@ generator = require(__c_waywall_generator_name)
 if not generator or type(generator) ~= "table" then
     error("layout generator did not provide any table")
 end
-if not generator.init or type(generator.init) ~= "function" then
-    error("layout generator did not provide init function")
-end
-if not generator.request or type(generator.request) ~= "function" then
-    error("layout generator did not provide request function")
-end
 
-__c_waywall_config.generator_name = nil
-generator.init(__c_waywall_config)
+_G.__generator_init = generator.init
+_G.__generator_instance_spawn = generator.instance_spawn
+_G.__generator_instance_die = generator.instance_die
+_G.__generator_preview_start = generator.preview_start
+_G.__generator_lock = generator.lock
+_G.__generator_unlock = generator.unlock
+_G.__generator_reset = generator.reset
+_G.__generator_reset_all = generator.reset_all
+_G.__generator_reset_ingame = generator.reset_ingame
+_G.__generator_resize = generator.resize
+_G.__generator_get_locked = generator.get_locked
+_G.__generator_get_reset_all = generator.get_reset_all

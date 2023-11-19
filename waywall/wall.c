@@ -125,10 +125,7 @@ get_hovered_instance(struct wall *wall) {
 }
 
 static void
-relayout_wall(struct wall *wall) {
-    ww_assert(wall->active_instance == -1);
-    struct layout layout = layout_request_new(wall);
-
+apply_layout(struct wall *wall, struct layout layout) {
     // Destroy the old layout.
     for (size_t i = 0; i < wall->rectangle_count; i++) {
         render_rect_destroy(wall->rectangles[i]);
@@ -164,6 +161,17 @@ relayout_wall(struct wall *wall) {
         }
     }
     wall->layout = layout;
+}
+
+static void
+relayout_wall(struct wall *wall, struct layout_reason reason) {
+    ww_assert(wall->active_instance == -1);
+    struct layout layout = {0};
+    bool ok = layout_request_new(wall, reason, &layout);
+    if (!ok) {
+        return;
+    }
+    apply_layout(wall, layout);
 }
 
 static void
@@ -279,18 +287,15 @@ focus_wall(struct wall *wall) {
     input_focus_window(g_compositor->input, NULL);
     input_set_on_wall(g_compositor->input, true);
     sleepbg_lock_toggle(false);
-    wall->active_instance = -1;
-
-    for (size_t i = 0; i < wall->instance_count; i++) {
-        render_window_set_enabled(wall->instances[i].window, true);
-    }
 
     // We will not necessarily receive any motion events when the pointer is unlocked (hopefully)
     // warped to the center of the window.
     wall->input.cx = wall->screen_width / 2;
     wall->input.cy = wall->screen_height / 2;
 
-    relayout_wall(wall);
+    struct layout_reason reason = {REASON_RESET_INGAME, {.instance_id = wall->active_instance}};
+    wall->active_instance = -1;
+    relayout_wall(wall, reason);
 }
 
 static bool
@@ -337,18 +342,24 @@ static void
 toggle_locked(struct wall *wall, int id) {
     if (!wall->instance_data[id].locked) {
         wall->instance_data[id].locked = true;
-        relayout_wall(wall);
+
+        struct layout_reason reason = {REASON_LOCK, {.instance_id = id}};
+        relayout_wall(wall, reason);
     } else {
+        struct layout_reason reason = {REASON_UNLOCK, {.instance_id = id}};
+
         switch (g_config->unlock_behavior) {
         case UNLOCK_ACCEPT:
             wall->instance_data[id].locked = false;
-            relayout_wall(wall);
+
+            relayout_wall(wall, reason);
+            break;
         case UNLOCK_IGNORE:
             break;
         case UNLOCK_RESET:
             wall->instance_data[id].locked = false;
             reset_instance(wall, id);
-            relayout_wall(wall);
+            relayout_wall(wall, reason);
             break;
         }
     }
@@ -384,20 +395,25 @@ process_bind(struct wall *wall, struct keybind *bind) {
             if (wall->reset_counter) {
                 reset_counter_queue_writes(wall->reset_counter);
             }
+            struct instance_bitfield reset_all = layout_get_reset_all(wall);
             for (size_t id = 0; id < wall->instance_count; id++) {
-                bool in_reset_all_list =
-                    (wall->layout.reset_all_ids[id / 64] & (1 << (id % 64))) != 0;
-                if (!wall->instance_data[id].locked && in_reset_all_list) {
+                if (!wall->instance_data[id].locked && instance_bitfield_has(reset_all, id)) {
                     reset_instance(wall, id);
                 }
             }
             if (wall->reset_counter) {
                 reset_counter_commit_writes(wall->reset_counter);
             }
+
+            struct layout_reason reason = {.cause = REASON_RESET_ALL};
+            relayout_wall(wall, reason);
             break;
         case ACTION_WALL_RESET_ONE:
             if (hovered != -1 && !wall->instance_data[hovered].locked) {
                 reset_instance(wall, hovered);
+
+                struct layout_reason reason = {REASON_RESET, {.instance_id = hovered}};
+                relayout_wall(wall, reason);
             }
             break;
         case ACTION_WALL_PLAY:
@@ -606,7 +622,9 @@ on_output_resize(struct wl_listener *listener, void *data) {
     if (wall->active_instance != -1) {
         resize_active_instance(wall);
     } else {
-        relayout_wall(wall);
+        struct layout_reason reason = {REASON_RESIZE,
+                                       {.screen_size = {wall->screen_width, wall->screen_height}}};
+        relayout_wall(wall, reason);
     }
 }
 
@@ -642,7 +660,8 @@ on_window_map(struct wl_listener *listener, void *data) {
     }
     wall->instance_data[id].hview_instance = hview_create(instance.window);
     if (wall->active_instance == -1) {
-        relayout_wall(wall);
+        struct layout_reason reason = {REASON_INSTANCE_ADD, {.instance_id = id}};
+        relayout_wall(wall, reason);
     }
     verif_update_instance(wall, id);
 }
@@ -667,7 +686,8 @@ on_window_unmap(struct wl_listener *listener, void *data) {
 
             inst_arr_remove(wall, i);
             if (wall->active_instance == -1) {
-                relayout_wall(wall);
+                struct layout_reason reason = {REASON_INSTANCE_DIE, {.instance_id = i}};
+                relayout_wall(wall, reason);
             }
             verif_update(wall);
             return;
@@ -684,12 +704,14 @@ wall_create() {
     struct wall *wall = calloc(1, sizeof(struct wall));
     ww_assert(wall);
 
-    if (!layout_init()) {
-        goto fail_layout;
-    }
-
     wall->active_instance = -1;
     input_set_on_wall(g_compositor->input, true);
+
+    struct layout layout;
+    if (!layout_init(wall, &layout)) {
+        goto fail_layout;
+    }
+    apply_layout(wall, layout);
 
     if (g_config->has_cpu) {
         if (!cpu_init()) {
@@ -763,11 +785,17 @@ wall_destroy(struct wall *wall) {
 bool
 wall_process_inotify(struct wall *wall, const struct inotify_event *event) {
     for (size_t i = 0; i < wall->instance_count; i++) {
+        bool was_preview = wall->instances[i].state.screen == PREVIEWING;
+
         if (instance_process_inotify(&wall->instances[i], event)) {
             update_cpu(wall, i, CPU_NONE);
-            if (wall->active_instance == -1) {
-                relayout_wall(wall);
+
+            bool is_preview = wall->instances[i].state.screen == PREVIEWING;
+            if (wall->active_instance == -1 && !was_preview && is_preview) {
+                struct layout_reason reason = {REASON_PREVIEW_START, {.instance_id = i}};
+                relayout_wall(wall, reason);
             }
+
             return true;
         }
     }
@@ -776,9 +804,11 @@ wall_process_inotify(struct wall *wall, const struct inotify_event *event) {
 
 bool
 wall_update_config(struct wall *wall) {
-    if (!layout_reinit()) {
+    struct layout layout;
+    if (!layout_reinit(wall, &layout)) {
         return false;
     }
+    apply_layout(wall, layout);
 
     if (g_config->count_resets) {
         ww_assert(g_config->resets_file);
@@ -803,9 +833,6 @@ wall_update_config(struct wall *wall) {
         }
     }
 
-    if (wall->active_instance == -1) {
-        relayout_wall(wall);
-    }
     verif_update(wall);
 
     if (wall->active_instance != -1) {
