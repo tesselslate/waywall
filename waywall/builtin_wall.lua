@@ -66,6 +66,11 @@ M.init = function(config, instances)
     end
 
     instance_count = #instances
+    for _, instance in ipairs(instances) do
+        if instance.locked then
+            locked[instance.id] = true
+        end
+    end
     return generate_layout()
 end
 
@@ -76,6 +81,13 @@ end
 
 M.instance_die = function(id)
     instance_count = instance_count - 1
+    locked[id] = nil
+    for k, _ in pairs(locked) do
+        if k > id then
+            locked[k] = nil
+            locked[k - 1] = true
+        end
+    end
     return generate_layout()
 end
 
