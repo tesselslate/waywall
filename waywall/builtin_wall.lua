@@ -42,9 +42,6 @@ local function generate_layout()
 end
 
 M.init = function(config, instances)
-    if not config or type(config) ~= "table" then
-        error("no config")
-    end
     if not config.wall_width or type(config.wall_width) ~= "number" then
         error("no wall width")
     end

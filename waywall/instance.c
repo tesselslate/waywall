@@ -268,12 +268,17 @@ process_state_update(struct instance *instance) {
         *split = '\0';
 
         char *a = buf, *b = split + 1;
+
+        // Ignore any extra state updates while waiting for a reset to take effect.
+        if (instance->reset_wait && strcmp(a, "waiting") != 0 && strcmp(a, "generating") != 0) {
+            return;
+        }
+
         if (strcmp(a, "generating") == 0) {
             instance->reset_wait = false;
             instance->state.screen = GENERATING;
             instance->state.data.percent = atoi(b);
         } else if (strcmp(a, "previewing") == 0) {
-            instance->reset_wait = false;
             instance->state.screen = PREVIEWING;
             instance->state.data.percent = atoi(b);
 
@@ -596,6 +601,8 @@ instance_reset(struct instance *instance) {
     input_send_keys(instance->window, reset_keys, ARRAY_LEN(reset_keys));
 
     instance->reset_wait = true;
+    instance->state.screen = WAITING;
+    instance->state.data.percent = 0;
 
     return true;
 }

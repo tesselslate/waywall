@@ -165,13 +165,19 @@ apply_layout(struct wall *wall, struct layout layout) {
 
 static void
 relayout_wall(struct wall *wall, struct layout_reason reason) {
-    ww_assert(wall->active_instance == -1);
     struct layout layout = {0};
     bool ok = layout_request_new(wall, reason, &layout);
     if (!ok) {
         return;
     }
-    apply_layout(wall, layout);
+
+    // This isn't ideal, but we need some way to tell layout generators that instances have either
+    // spawned or died, even if the user is currently playing an instance.
+    if (wall->active_instance == -1) {
+        apply_layout(wall, layout);
+    } else {
+        layout_destroy(layout);
+    }
 }
 
 static void
@@ -674,10 +680,8 @@ on_window_map(struct wl_listener *listener, void *data) {
         wall->instance_data[id].hview_chunkmap = hview_create(instance.window);
     }
     wall->instance_data[id].hview_instance = hview_create(instance.window);
-    if (wall->active_instance == -1) {
-        struct layout_reason reason = {REASON_INSTANCE_ADD, {.instance_id = id}};
-        relayout_wall(wall, reason);
-    }
+    struct layout_reason reason = {REASON_INSTANCE_ADD, {.instance_id = id}};
+    relayout_wall(wall, reason);
     verif_update_instance(wall, id);
 }
 
@@ -700,10 +704,8 @@ on_window_unmap(struct wl_listener *listener, void *data) {
             hview_destroy(wall->instance_data[i].hview_instance);
 
             inst_arr_remove(wall, i);
-            if (wall->active_instance == -1) {
-                struct layout_reason reason = {REASON_INSTANCE_DIE, {.instance_id = i}};
-                relayout_wall(wall, reason);
-            }
+            struct layout_reason reason = {REASON_INSTANCE_DIE, {.instance_id = i}};
+            relayout_wall(wall, reason);
             verif_update(wall);
             return;
         }

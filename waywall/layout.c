@@ -668,7 +668,7 @@ layout_request_new(struct wall *wall, struct layout_reason reason, struct layout
     lua_settop(current_vm, 0);
     lua_gc(current_vm, LUA_GCCOLLECT, 0);
 
-    return true;
+    return new_layout;
 
 fail:
     lua_close(current_vm);
