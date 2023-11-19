@@ -55,7 +55,6 @@ struct instance {
 
     struct instance_mods {
         bool atum : 1;
-        bool ranked : 1;
         bool standard_settings : 1;
         bool state_output : 1;
         bool world_preview : 1;

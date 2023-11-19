@@ -125,7 +125,6 @@ get_mods(struct instance *instance) {
             }
 
             static const char atum[] = "me/voidxwalker/autoreset/";
-            static const char ranked[] = "com/mcsr/projectelo/";
             static const char standard_settings[] = "com/kingcontaria/standardsettings/";
             static const char state_output[] = "xyz/tildejustin/stateoutput/";
             static const char world_preview[] = "me/voidxwalker/worldpreview/";
@@ -134,10 +133,6 @@ get_mods(struct instance *instance) {
 
             if (strcmp(stat.name, atum) == 0) {
                 instance->mods.atum = true;
-                break;
-            }
-            if (strcmp(stat.name, ranked) == 0) {
-                instance->mods.ranked = true;
                 break;
             }
             if (strcmp(stat.name, standard_settings) == 0) {
