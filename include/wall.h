@@ -43,7 +43,7 @@ struct wall {
         bool buttons[16]; // BTN_JOYSTICK - BTN_MOUSE
 
         struct {
-            int instance; // TODO: this will need to be changed once dynamic wall is implemented
+            int x, y;
             struct keybind *bind;
         } last_bind;
     } input;

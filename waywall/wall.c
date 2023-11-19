@@ -100,13 +100,13 @@ compute_alt_res(struct wall *wall) {
 }
 
 static int
-get_hovered_instance(struct wall *wall) {
+get_instance_at(struct wall *wall, int x, int y) {
     ww_assert(wall->active_instance == -1);
 
-    if (wall->input.cx < 0 || wall->input.cy < 0) {
+    if (x < 0 || y < 0) {
         return -1;
     }
-    if (wall->input.cx >= wall->screen_width || wall->input.cy >= wall->screen_height) {
+    if (x >= wall->screen_width || y >= wall->screen_height) {
         return -1;
     }
 
@@ -115,8 +115,8 @@ get_hovered_instance(struct wall *wall) {
         if (entry->type != INSTANCE) {
             continue;
         }
-        if (wall->input.cx >= entry->x && wall->input.cx <= entry->x + entry->w) {
-            if (wall->input.cy >= entry->y && wall->input.cy <= entry->y + entry->h) {
+        if (x >= entry->x && x <= entry->x + entry->w) {
+            if (y >= entry->y && y <= entry->y + entry->h) {
                 return entry->data.instance;
             }
         }
@@ -390,9 +390,7 @@ process_bind(struct wall *wall, struct keybind *bind) {
 
         int hovered = -1;
         if (is_wall) {
-            hovered = get_hovered_instance(wall);
-            wall->input.last_bind.bind = bind;
-            wall->input.last_bind.instance = hovered;
+            hovered = get_instance_at(wall, wall->input.cx, wall->input.cy);
         }
 
         any_actions = true;
@@ -533,6 +531,9 @@ on_button(struct wl_listener *listener, void *data) {
         if (bind.input.button != event->button) {
             continue;
         }
+        wall->input.last_bind.bind = &g_config->binds[i];
+        wall->input.last_bind.x = wall->input.cx;
+        wall->input.last_bind.y = wall->input.cy;
         process_bind(wall, &bind);
         return;
     }
@@ -605,7 +606,7 @@ on_motion(struct wl_listener *listener, void *data) {
     wall->input.cx = event->x;
     wall->input.cy = event->y;
 
-    int id = get_hovered_instance(wall);
+    int id = get_instance_at(wall, wall->input.cx, wall->input.cy);
     if (id == -1) {
         return;
     }
@@ -623,12 +624,16 @@ on_motion(struct wl_listener *listener, void *data) {
         }
 
         // Allow the user to drag the cursor over several instances without spamming actions.
-        bool same_last_instance = wall->input.last_bind.instance == id;
+        bool same_hitbox =
+            id == get_instance_at(wall, wall->input.last_bind.x, wall->input.last_bind.y);
         bool same_last_bind = wall->input.last_bind.bind == &g_config->binds[i];
-        if (same_last_instance && same_last_bind) {
+        if (same_hitbox && same_last_bind) {
             continue;
         }
 
+        wall->input.last_bind.bind = &g_config->binds[i];
+        wall->input.last_bind.x = wall->input.cx;
+        wall->input.last_bind.y = wall->input.cy;
         process_bind(wall, bind);
         return;
     }
