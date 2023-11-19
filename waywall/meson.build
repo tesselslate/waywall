@@ -1,6 +1,6 @@
 lua = [
+  'boot.lua',
   'builtin_wall.lua',
-  'layout.lua',
 ]
 
 lua_targets = []

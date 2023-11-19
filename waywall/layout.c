@@ -464,7 +464,7 @@ vm_create() {
         lua_setglobal(L, GLOBAL_FORCE_JIT);
     }
 
-    if (luaL_dostring(L, "require('layout')")) {
+    if (luaL_dostring(L, "require('boot')")) {
         wlr_log(WLR_ERROR, "failed to create layout VM: %s", lua_tostring(L, -1));
         luaL_traceback(L, L, NULL, 0);
         lua_pop(L, 1);
