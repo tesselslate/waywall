@@ -48,10 +48,12 @@ void layout_fini();
  */
 bool layout_init();
 
+struct wall;
+
 /*
  *  Requests a new layout with the current state of each instance.
  */
-struct layout layout_request_new();
+struct layout layout_request_new(struct wall *wall);
 
 /*
  *  Attempts to reinitialize the layout generator.

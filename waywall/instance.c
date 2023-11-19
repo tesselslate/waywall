@@ -19,6 +19,7 @@
 
 // TODO: only use state file for wpstateout, keep log file open anyway for other things
 // TODO: get rid of str.h because it's silly and is basically only used for nicer string appending
+// TODO: fix the active instance checks to be correct even when ninb is focused
 
 static struct {
     const char *name;
@@ -287,7 +288,7 @@ process_state_update(struct instance *instance) {
                 instance->state.data.inworld = UNPAUSED;
 
                 if (prev.screen == PREVIEWING) {
-                    if (g_wall->active_instance == instance->id) {
+                    if (g_compositor->input->focused_window == instance->window) {
                         if (g_config->use_f1) {
                             static const struct synthetic_key f1_keys[] = {
                                 {KEY_F1, true},
@@ -542,7 +543,7 @@ fail:
 
 bool
 instance_reset(struct instance *instance) {
-    if (g_wall->active_instance != instance->id) {
+    if (g_compositor->input->focused_window != instance->window) {
         // Do not allow resetting on the dirt screen. This can cause an immediate reset as soon as
         // the dirt screen ends.
         if (instance->state.screen == GENERATING || instance->state.screen == WAITING) {
@@ -570,7 +571,8 @@ instance_reset(struct instance *instance) {
     }
 
     // Attempt to fix ghost pie.
-    if (g_wall->active_instance == instance->id && instance->state.screen == INWORLD) {
+    if (g_compositor->input->focused_window == instance->window &&
+        instance->state.screen == INWORLD) {
         static const struct synthetic_key pie_keys[] = {
             {KEY_ESC, true},         {KEY_ESC, false}, {KEY_LEFTSHIFT, false},
             {KEY_RIGHTSHIFT, false}, {KEY_F3, true},   {KEY_F3, false},

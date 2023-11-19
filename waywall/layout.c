@@ -154,11 +154,11 @@ create_conf_table(lua_State *L) {
 }
 
 static void
-create_state_table(lua_State *L) {
-    lua_createtable(L, g_wall->instance_count, 0);
+create_state_table(lua_State *L, struct wall *wall) {
+    lua_createtable(L, wall->instance_count, 0);
 
-    for (size_t i = 0; i < g_wall->instance_count; i++) {
-        struct state *state = &g_wall->instances[i].state;
+    for (size_t i = 0; i < wall->instance_count; i++) {
+        struct state *state = &wall->instances[i].state;
         lua_newtable(L);
 
         lua_pushinteger(L, i);
@@ -193,13 +193,13 @@ create_state_table(lua_State *L) {
         }
 
         if (state->screen == PREVIEWING) {
-            struct timespec last_preview = g_wall->instances[i].last_preview;
+            struct timespec last_preview = wall->instances[i].last_preview;
             uint64_t ms = last_preview.tv_sec * 1000 + last_preview.tv_nsec / 1000000;
             lua_pushinteger(L, ms);
             lua_setfield(L, -2, "preview_start");
         }
 
-        lua_pushboolean(L, g_wall->instance_data[i].locked);
+        lua_pushboolean(L, wall->instance_data[i].locked);
         lua_setfield(L, -2, "locked");
 
         lua_rawseti(L, -2, i + 1);
@@ -401,16 +401,16 @@ layout_reinit() {
 }
 
 struct layout
-layout_request_new() {
+layout_request_new(struct wall *wall) {
     struct layout layout = {0};
     if (!current_vm) {
         return layout;
     }
 
     lua_getglobal(current_vm, GLOBAL_REQUEST_FUNC);
-    create_state_table(current_vm);
-    lua_pushinteger(current_vm, g_wall->screen_width);
-    lua_pushinteger(current_vm, g_wall->screen_height);
+    create_state_table(current_vm, wall);
+    lua_pushinteger(current_vm, wall->screen_width);
+    lua_pushinteger(current_vm, wall->screen_height);
     if (lua_pcall(current_vm, 3, 2, 0) != 0) {
         wlr_log(WLR_ERROR, "failed to request layout: %s", lua_tostring(current_vm, -1));
         goto fail;
@@ -441,7 +441,7 @@ layout_request_new() {
                 goto fail;
             }
             int id = lua_tointeger(current_vm, -1);
-            if (id < 0 || (size_t)id > g_wall->instance_count) {
+            if (id < 0 || (size_t)id > wall->instance_count) {
                 wlr_log(WLR_ERROR,
                         "layout generator returned an invalid instance ID in the reset all list");
                 goto fail;

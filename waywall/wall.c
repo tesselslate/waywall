@@ -127,7 +127,7 @@ get_hovered_instance(struct wall *wall) {
 static void
 relayout_wall(struct wall *wall) {
     ww_assert(wall->active_instance == -1);
-    struct layout layout = layout_request_new();
+    struct layout layout = layout_request_new(wall);
 
     // Destroy the old layout.
     for (size_t i = 0; i < wall->rectangle_count; i++) {
