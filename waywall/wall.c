@@ -522,13 +522,13 @@ on_button(struct wl_listener *listener, void *data) {
     }
     for (int i = 0; i < g_config->bind_count; i++) {
         struct keybind bind = g_config->binds[i];
-        if (bind.type != BIND_MOUSE) {
+        if (bind.input.type != BIND_MOUSE) {
             continue;
         }
-        if (bind.modifiers != wall->input.modifiers) {
+        if (bind.input.modifiers != wall->input.modifiers) {
             continue;
         }
-        if (bind.input.button != event->button) {
+        if (bind.input.phys.button != event->button) {
             continue;
         }
         wall->input.last_bind.bind = &g_config->binds[i];
@@ -550,10 +550,10 @@ on_key(struct wl_listener *listener, void *data) {
     }
     for (int i = 0; i < g_config->bind_count; i++) {
         struct keybind bind = g_config->binds[i];
-        if (bind.type != BIND_KEY) {
+        if (bind.input.type != BIND_KEY) {
             continue;
         }
-        if (bind.modifiers != event->modifiers) {
+        if (bind.input.modifiers != event->modifiers) {
             continue;
         }
 
@@ -575,7 +575,7 @@ on_key(struct wl_listener *listener, void *data) {
 
         // Check for any matching keysyms.
         for (int j = 0; j < event->nsyms; j++) {
-            if (event->syms[j] == g_config->binds[i].input.sym) {
+            if (event->syms[j] == g_config->binds[i].input.phys.sym) {
                 if (process_bind(wall, &bind)) {
                     event->consumed = true;
                     return;
@@ -613,13 +613,13 @@ on_motion(struct wl_listener *listener, void *data) {
 
     for (int i = 0; i < g_config->bind_count; i++) {
         struct keybind *bind = &g_config->binds[i];
-        if (bind->type != BIND_MOUSE) {
+        if (bind->input.type != BIND_MOUSE) {
             continue;
         }
-        if (bind->modifiers != wall->input.modifiers) {
+        if (bind->input.modifiers != wall->input.modifiers) {
             continue;
         }
-        if (!wall->input.buttons[bind->input.button - BTN_MOUSE]) {
+        if (!wall->input.buttons[bind->input.phys.button - BTN_MOUSE]) {
             continue;
         }
 

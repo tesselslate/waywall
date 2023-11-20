@@ -44,18 +44,24 @@ enum ninb_location {
     BOTTOM_RIGHT,
 };
 
-struct keybind {
+struct bind_input {
     union {
         xkb_keysym_t sym;
         uint32_t button;
-    } input;
+    } phys;
     enum {
         BIND_KEY,
         BIND_MOUSE,
     } type;
     uint32_t modifiers;
+};
+
+struct keybind {
+    struct bind_input input;
+
     enum action actions[MAX_ACTIONS];
     int action_count;
+
     bool allow_in_menu;
     bool allow_in_pause;
 };

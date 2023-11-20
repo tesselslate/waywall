@@ -16,14 +16,10 @@ struct mapping {
 };
 
 static const struct mapping actions[] = {
-    {"wall_reset_all", ACTION_WALL_RESET_ALL},
-    {"wall_reset", ACTION_WALL_RESET_ONE},
-    {"wall_play", ACTION_WALL_PLAY},
-    {"wall_play_locked", ACTION_WALL_PLAY_FIRST_LOCKED},
-    {"wall_lock", ACTION_WALL_LOCK},
-    {"wall_focus_reset", ACTION_WALL_FOCUS_RESET},
-    {"ingame_reset", ACTION_INGAME_RESET},
-    {"alt_res", ACTION_INGAME_ALT_RES},
+    {"wall_reset_all", ACTION_WALL_RESET_ALL}, {"wall_reset", ACTION_WALL_RESET_ONE},
+    {"wall_play", ACTION_WALL_PLAY},           {"wall_play_locked", ACTION_WALL_PLAY_FIRST_LOCKED},
+    {"wall_lock", ACTION_WALL_LOCK},           {"wall_focus_reset", ACTION_WALL_FOCUS_RESET},
+    {"ingame_reset", ACTION_INGAME_RESET},     {"alt_res", ACTION_INGAME_ALT_RES},
     {"toggle_ninb", ACTION_ANY_TOGGLE_NINB},
 };
 
@@ -78,6 +74,78 @@ parse_bind_array(toml_array_t *array, struct keybind *keybind, const char *key) 
         free(action.u.s);
     }
     return true;
+}
+
+static bool
+parse_bind_input(const char *str, struct bind_input *input) {
+    char *input_string = strdup(str);
+    int num_buttons = 0;
+    int num_keys = 0;
+
+    char *elem = NULL;
+    char *needle = input_string;
+    bool eof = false;
+    for (;;) {
+        if (eof) {
+            break;
+        }
+
+        // Find the next delimiter and replace it with a null character. Break at the
+        // end of the string. Store the null-terminated substring in `elem`.
+        elem = needle;
+        while (*needle && *needle != '-') {
+            needle++;
+        }
+        if (!*needle) {
+            eof = true;
+        }
+        *needle = '\0';
+        needle++;
+
+        for (size_t i = 0; i < ARRAY_LEN(modifiers); i++) {
+            if (strcasecmp(elem, modifiers[i].name) == 0) {
+                if (input->modifiers & modifiers[i].val) {
+                    wlr_log(WLR_ERROR, "config: duplicate modifier '%s' in keybind '%s'", elem,
+                            str);
+                    goto fail;
+                }
+                input->modifiers |= modifiers[i].val;
+                goto next;
+            }
+        }
+
+        for (size_t i = 0; i < ARRAY_LEN(buttons); i++) {
+            if (strcasecmp(elem, buttons[i].name) == 0) {
+                num_buttons++;
+                input->phys.button = buttons[i].val;
+                input->type = BIND_MOUSE;
+                goto next;
+            }
+        }
+
+        xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
+        if (sym == XKB_KEY_NoSymbol) {
+            wlr_log(WLR_ERROR, "config: unknown keybind element '%s'", elem);
+            goto fail;
+        }
+        num_keys++;
+        input->phys.sym = sym;
+        input->type = BIND_KEY;
+
+    next:;
+    }
+
+    if (num_buttons + num_keys != 1) {
+        wlr_log(WLR_ERROR, "config: invalid keybind '%s'", str);
+        goto fail;
+    }
+
+    free(input_string);
+    return true;
+
+fail:
+    free(input_string);
+    return false;
 }
 
 static bool
@@ -509,10 +577,8 @@ config_read() {
         wlr_log(WLR_ERROR, "config: missing section 'keybinds'");
         goto fail_read;
     }
-    if (toml_table_nkval(keybinds) > MAX_BINDS) {
-        wlr_log(WLR_ERROR, "config: too many keybinds");
-        goto fail_read;
-    }
+
+    // TODO: max bind check
     for (int i = 0;; i++) {
         const char *key = toml_key_in(keybinds, i);
         if (!key) {
@@ -520,85 +586,9 @@ config_read() {
         }
         struct keybind *keybind = &config->binds[config->bind_count];
 
-        char *inputs[8] = {0};
-        char *keyname = strdup(key);
-        for (char **input = inputs, *ptr = keyname;; ptr++) {
-            if (input - inputs == 8) {
-                wlr_log(WLR_ERROR, "config: too many inputs in keybind '%s'", key);
-                free(keyname);
-                goto fail_read;
-            }
-
-            bool exit_after = false;
-            char *start = ptr;
-            while (*ptr && *ptr != '-') {
-                ptr++;
-            }
-            if (*ptr == '\0') {
-                exit_after = true;
-            }
-
-            *(ptr) = '\0';
-            *(input++) = start;
-            if (exit_after) {
-                break;
-            }
-        }
-        bool found_button = false, found_key = false;
-        for (int j = 0; j < 8; j++) {
-            char *input = inputs[j];
-            if (!input) {
-                break;
-            }
-            for (unsigned long k = 0; k < ARRAY_LEN(modifiers); k++) {
-                if (strcasecmp(input, modifiers[k].name) == 0) {
-                    if (keybind->modifiers & modifiers[k].val) {
-                        wlr_log(WLR_ERROR, "config: duplicate modifier '%s' in keybind '%s'", input,
-                                key);
-                        goto fail_input;
-                    }
-                    keybind->modifiers |= modifiers[k].val;
-                    goto next_input;
-                }
-            }
-            for (unsigned long k = 0; k < ARRAY_LEN(buttons); k++) {
-                if (strcasecmp(input, buttons[k].name) == 0) {
-                    if (found_button) {
-                        wlr_log(WLR_ERROR, "config: more than one button in keybind '%s'", key);
-                        goto fail_input;
-                    } else if (found_key) {
-                        wlr_log(WLR_ERROR, "config: both button and key in keybind '%s'", key);
-                        goto fail_input;
-                    }
-                    found_button = true;
-                    keybind->input.button = buttons[k].val;
-                    keybind->type = BIND_MOUSE;
-                    goto next_input;
-                }
-            }
-            xkb_keysym_t sym = xkb_keysym_from_name(input, XKB_KEYSYM_CASE_INSENSITIVE);
-            if (sym != XKB_KEY_NoSymbol) {
-                if (found_key) {
-                    wlr_log(WLR_ERROR, "config: more than one key in keybind '%s'", key);
-                    goto fail_input;
-                } else if (found_button) {
-                    wlr_log(WLR_ERROR, "config: both button and key in keybind '%s'", key);
-                    goto fail_input;
-                }
-                found_key = true;
-                keybind->input.sym = sym;
-                keybind->type = BIND_KEY;
-                goto next_input;
-            }
-
-            wlr_log(WLR_ERROR, "config: unknown input '%s' in keybind '%s'", input, key);
-
-        fail_input:
-            free(keyname);
+        if (!parse_bind_input(key, &keybind->input)) {
             goto fail_read;
-        next_input:;
         }
-        free(keyname);
 
         toml_array_t *array = toml_array_in(keybinds, key);
         if (array) {
@@ -606,17 +596,21 @@ config_read() {
                 goto fail_read;
             }
             keybind->allow_in_menu = keybind->allow_in_pause = true;
-        } else {
-            toml_table_t *table = toml_table_in(keybinds, key);
-            if (!table) {
-                wlr_log(WLR_ERROR, "config: invalid type for keybind '%s'", key);
-                goto fail_read;
-            }
+            config->bind_count++;
+            continue;
+        }
+
+        toml_table_t *table = toml_table_in(keybinds, key);
+        if (table) {
             if (!parse_bind_table(table, keybind, key)) {
                 goto fail_read;
             }
+            config->bind_count++;
+            continue;
         }
-        config->bind_count++;
+
+        wlr_log(WLR_ERROR, "config: invalid type for keybind '%s'", key);
+        goto fail_read;
     }
 
     return config;
