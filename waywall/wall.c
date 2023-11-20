@@ -291,7 +291,7 @@ focus_wall(struct wall *wall) {
     ww_assert(wall->active_instance != -1);
 
     input_focus_window(g_compositor->input, NULL);
-    g_compositor->input->on_wall = true;
+    g_compositor->input->active_instance = NULL;
     sleepbg_lock_toggle(false);
 
     // We will not necessarily receive any motion events when the pointer is unlocked (hopefully)
@@ -312,7 +312,7 @@ play_instance(struct wall *wall, int id) {
 
     wall->active_instance = id;
 
-    g_compositor->input->on_wall = false;
+    g_compositor->input->active_instance = &wall->instances[id];
     render_window_configure(wall->instances[id].window, 0, 0, wall->screen_width,
                             wall->screen_height);
     render_window_set_dest_size(wall->instances[id].window, wall->screen_width,
@@ -727,7 +727,7 @@ wall_create() {
     ww_assert(wall);
 
     wall->active_instance = -1;
-    g_compositor->input->on_wall = true;
+    g_compositor->input->active_instance = NULL;
 
     struct layout layout;
     if (!layout_init(wall, &layout)) {

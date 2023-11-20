@@ -6,6 +6,7 @@
 #include "compositor/input.h"
 #include "compositor/render.h"
 #include "compositor/xwayland.h"
+#include "instance.h"
 #include "relative-pointer-unstable-v1-protocol.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
@@ -149,7 +150,7 @@ handle_cursor_motion(struct comp_input *input, uint32_t time_msec) {
     if (window) {
         wlr_seat_pointer_notify_enter(input->seat, window->xwl_window->surface->surface, dx, dy);
         wlr_seat_pointer_notify_motion(input->seat, time_msec, dx, dy);
-    } else if (input->on_wall) {
+    } else if (!input->active_instance) {
         // If there is no window with pointer focus, we want to set the cursor image.
         wlr_cursor_set_xcursor(input->cursor, input->cursor_manager, "default");
         wlr_seat_pointer_notify_clear_focus(input->seat);
@@ -267,7 +268,7 @@ on_cursor_button(struct wl_listener *listener, void *data) {
         // We will only take focus away from *all* windows if on the wall. If we are in an instance,
         // we don't want to let the user click on the background (e.g. during alt res) and unfocus
         // the instance.
-        if (input->on_wall) {
+        if (!input->active_instance) {
             input_focus_window(input, NULL);
         }
     }
@@ -575,19 +576,11 @@ on_window_unmap(struct wl_listener *listener, void *data) {
         return;
     }
 
-    if (input->on_wall) {
+    if (!input->active_instance) {
         input_focus_window(input, NULL);
     } else {
         // Focus the topmost instance.
-        if (!input->render->wl) {
-            input_focus_window(input, NULL);
-            return;
-        }
-
-        struct window *window = render_window_at(
-            input->render, LAYER_INSTANCE, input->render->wl->wlr_output->width / 2,
-            input->render->wl->wlr_output->height / 2, NULL, NULL);
-        input_focus_window(input, window);
+        input_focus_window(input, input->render->wl ? input->active_instance->window : NULL);
     }
 }
 

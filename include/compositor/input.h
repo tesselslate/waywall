@@ -15,7 +15,7 @@ struct comp_input {
     struct wl_listener on_window_unmap;
 
     double sensitivity;
-    bool on_wall;
+    struct instance *active_instance;
 
     struct wlr_xcursor_manager *cursor_manager;
     struct wlr_cursor *cursor;
