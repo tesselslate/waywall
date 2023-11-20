@@ -347,7 +347,8 @@ instance_destroy(struct instance *instance) {
 
 bool
 instance_focus(struct instance *instance) {
-    if (instance->reset_wait || instance->state.screen != INWORLD) {
+    if (instance->reset_wait ||
+        (instance->state.screen != INWORLD && instance->state.screen != TITLE)) {
         return false;
     }
 
