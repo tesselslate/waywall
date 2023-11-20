@@ -212,10 +212,16 @@ handle_scene_window_surface_commit(struct wl_listener *listener, void *data) {
 }
 
 static bool
-scene_buffer_point_accepts_input(struct wlr_scene_buffer *scene_buffer, int sx, int sy) {
+scene_buffer_point_accepts_input(struct wlr_scene_buffer *scene_buffer, double *sx, double *sy) {
     struct scene_window *window = scene_window_try_from_buffer(scene_buffer);
 
-    return wlr_surface_point_accepts_input(window->surface, sx, sy);
+    // This isn't correct but I don't think Xwayland restricts the input region at all (if it does
+    // I don't particularly care.)
+    //
+    // TODO: Maybe this can also be used to overhaul the way input handling is done? The current
+    // mechanism for deciding which surfaces to ignore in the input module is a bit janky.
+
+    return wlr_surface_point_accepts_input(window->surface, *sx, *sy);
 }
 
 static void
