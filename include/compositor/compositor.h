@@ -25,8 +25,6 @@ struct compositor *compositor_create(struct compositor_config config);
 
 void compositor_destroy(struct compositor *compositor);
 
-struct wl_event_loop *compositor_get_loop(struct compositor *compositor);
-
 void compositor_load_config(struct compositor *compositor, struct compositor_config config);
 
 bool compositor_run(struct compositor *compositor, int display_file_fd);

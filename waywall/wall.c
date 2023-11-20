@@ -291,7 +291,7 @@ focus_wall(struct wall *wall) {
     ww_assert(wall->active_instance != -1);
 
     input_focus_window(g_compositor->input, NULL);
-    input_set_on_wall(g_compositor->input, true);
+    g_compositor->input->on_wall = true;
     sleepbg_lock_toggle(false);
 
     // We will not necessarily receive any motion events when the pointer is unlocked (hopefully)
@@ -312,7 +312,7 @@ play_instance(struct wall *wall, int id) {
 
     wall->active_instance = id;
 
-    input_set_on_wall(g_compositor->input, false);
+    g_compositor->input->on_wall = false;
     render_window_configure(wall->instances[id].window, 0, 0, wall->screen_width,
                             wall->screen_height);
     render_window_set_dest_size(wall->instances[id].window, wall->screen_width,
@@ -489,12 +489,12 @@ process_bind(struct wall *wall, struct keybind *bind) {
             if (wall->alt_res) {
                 render_window_configure(window, 0, 0, wall->screen_width, wall->screen_height);
                 render_window_set_dest_size(window, wall->screen_width, wall->screen_height);
-                input_set_sensitivity(g_compositor->input, g_config->main_sens);
+                g_compositor->input->sensitivity = g_config->main_sens;
             } else {
                 struct wlr_box box = compute_alt_res(wall);
                 render_window_configure(window, box.x, box.y, box.width, box.height);
                 render_window_set_dest_size(window, box.width, box.height);
-                input_set_sensitivity(g_compositor->input, g_config->alt_sens);
+                g_compositor->input->sensitivity = g_config->alt_sens;
             }
             wall->alt_res = !wall->alt_res;
             break;
@@ -727,7 +727,7 @@ wall_create() {
     ww_assert(wall);
 
     wall->active_instance = -1;
-    input_set_on_wall(g_compositor->input, true);
+    g_compositor->input->on_wall = true;
 
     struct layout layout;
     if (!layout_init(wall, &layout)) {
@@ -862,9 +862,9 @@ wall_update_config(struct wall *wall) {
     }
 
     if (wall->active_instance != -1 && wall->alt_res) {
-        input_set_sensitivity(g_compositor->input, g_config->alt_sens);
+        g_compositor->input->sensitivity = g_config->alt_sens;
     } else {
-        input_set_sensitivity(g_compositor->input, g_config->main_sens);
+        g_compositor->input->sensitivity = g_config->main_sens;
     }
 
     return true;

@@ -1,6 +1,6 @@
 #include "waywall.h"
-#include "compositor/render.h"
 #include "compositor/input.h"
+#include "compositor/render.h"
 #include "config.h"
 #include "ninb.h"
 #include "wall.h"
@@ -173,9 +173,9 @@ main(int argc, char **argv) {
     if (!g_compositor) {
         return 1;
     }
-    input_set_sensitivity(g_compositor->input, g_config->main_sens);
+    g_compositor->input->sensitivity = g_config->main_sens;
 
-    struct wl_event_loop *loop = compositor_get_loop(g_compositor);
+    struct wl_event_loop *loop = wl_display_get_event_loop(g_compositor->display);
     struct wl_event_source *inotify =
         wl_event_loop_add_fd(loop, g_inotify, WL_EVENT_READABLE, handle_inotify, NULL);
     struct wl_event_source *evt_sigint =

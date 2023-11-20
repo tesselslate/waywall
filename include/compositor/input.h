@@ -14,7 +14,7 @@ struct comp_input {
 
     struct wl_listener on_window_unmap;
 
-    double sens;
+    double sensitivity;
     bool on_wall;
 
     struct wlr_xcursor_manager *cursor_manager;
@@ -143,15 +143,5 @@ void input_load_config(struct comp_input *input, struct compositor_config config
  *  Sends a sequence of synthetic key events to the given window.
  */
 void input_send_keys(struct window *window, const struct synthetic_key *keys, size_t count);
-
-/*
- *  Notify the input subsystem of whether the user is on the wall or not.
- */
-void input_set_on_wall(struct comp_input *input, bool state);
-
-/*
- *  Sets the mouse sensitivity for 3D cursor motion.
- */
-void input_set_sensitivity(struct comp_input *input, double sens);
 
 #endif

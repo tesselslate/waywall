@@ -308,8 +308,8 @@ on_relative_motion(void *data, struct zwp_relative_pointer_v1 *relative_pointer,
     // Boat eye relies on very precise cursor positioning ingame, and non-integer cursor motion
     // causes problems with that. Hence, we want to accumulate any cursor motion and only notify
     // Xwayland of cursor motion in roughly whole pixel increments.
-    input->acc_x += wl_fixed_to_double(dx_unaccel) * input->sens;
-    input->acc_y += wl_fixed_to_double(dy_unaccel) * input->sens;
+    input->acc_x += wl_fixed_to_double(dx_unaccel) * input->sensitivity;
+    input->acc_y += wl_fixed_to_double(dy_unaccel) * input->sensitivity;
 
     double x = trunc(input->acc_x);
     input->acc_x -= x;
@@ -804,14 +804,4 @@ input_focus_window(struct comp_input *input, struct window *window) {
 void
 input_send_keys(struct window *window, const struct synthetic_key *keys, size_t count) {
     xwl_send_keys(window->xwl_window, keys, count);
-}
-
-void
-input_set_on_wall(struct comp_input *input, bool state) {
-    input->on_wall = state;
-}
-
-void
-input_set_sensitivity(struct comp_input *input, double sens) {
-    input->sens = sens;
 }

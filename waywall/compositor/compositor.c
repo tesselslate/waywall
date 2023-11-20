@@ -253,11 +253,6 @@ compositor_destroy(struct compositor *compositor) {
     free(compositor);
 }
 
-struct wl_event_loop *
-compositor_get_loop(struct compositor *compositor) {
-    return wl_display_get_event_loop(compositor->display);
-}
-
 void
 compositor_load_config(struct compositor *compositor, struct compositor_config config) {
     render_load_config(compositor->render, config);
