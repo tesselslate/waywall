@@ -830,7 +830,11 @@ wall_update_config(struct wall *wall) {
     if (!layout_reinit(wall, &layout)) {
         return false;
     }
-    apply_layout(wall, layout);
+    if (wall->active_instance == -1) {
+        apply_layout(wall, layout);
+    } else {
+        layout_destroy(layout);
+    }
 
     if (g_config->count_resets) {
         ww_assert(g_config->resets_file);
