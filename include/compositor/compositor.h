@@ -19,6 +19,8 @@ struct compositor_config {
     int cursor_size;
     bool stop_on_close;
     const char *layout, *model, *rules, *variant, *options;
+    const struct remapping *remap_ingame, *remap_menu;
+    size_t remap_ingame_count, remap_menu_count;
 };
 
 struct compositor *compositor_create(struct compositor_config config);

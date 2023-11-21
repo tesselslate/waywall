@@ -66,6 +66,11 @@ struct keybind {
     bool allow_in_pause;
 };
 
+struct remapping {
+    struct bind_input input;
+    uint8_t keycode;
+};
+
 struct config {
     // input
     int repeat_delay;
@@ -76,6 +81,8 @@ struct config {
     // keyboard
     char *layout;
     char *rules, *model, *variant, *options;
+    struct remapping *remap_ingame, *remap_menu;
+    size_t remap_ingame_count, remap_menu_count;
 
     // appearance
     float background_color[4];

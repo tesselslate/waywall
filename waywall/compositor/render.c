@@ -11,6 +11,10 @@
  *  The headless tree is used for the headless output, and the unknown tree is invisible.
  */
 
+// TODO: UAF from force-closing X windows? Triggered by force closing waywall with double Ctrl+C.
+// I'd like to remove a bunch more of the pointless indirection from the compositor at some point
+// so fixing this will probably just be a nice side effect of that.
+
 #include "compositor/render.h"
 #include "compositor/input.h"
 #include "compositor/scene_window.h"

@@ -24,9 +24,110 @@ static const struct mapping actions[] = {
 };
 
 static const struct mapping buttons[] = {
-    {"lmb", BTN_LEFT},   {"mouse1", BTN_LEFT},   {"leftmouse", BTN_LEFT},
-    {"rmb", BTN_RIGHT},  {"mouse2", BTN_RIGHT},  {"rightmouse", BTN_RIGHT},
-    {"mmb", BTN_MIDDLE}, {"mouse3", BTN_MIDDLE}, {"middlemouse", BTN_MIDDLE},
+    {"lmb", BTN_LEFT},    {"mouse1", BTN_LEFT},   {"leftmouse", BTN_LEFT},
+    {"rmb", BTN_RIGHT},   {"mouse2", BTN_RIGHT},  {"rightmouse", BTN_RIGHT},
+    {"mmb", BTN_MIDDLE},  {"mouse3", BTN_MIDDLE}, {"middlemouse", BTN_MIDDLE},
+    {"mouse4", BTN_SIDE}, {"mb4", BTN_SIDE},      {"mouse5", BTN_EXTRA},
+    {"mb5", BTN_EXTRA},
+};
+
+// TODO: this doesnt contain mappings for all keycode values
+static const struct mapping keys[] = {
+    {"", KEY_RESERVED},
+    {"none", KEY_RESERVED},
+    {"unmap", KEY_RESERVED},
+    {"esc", KEY_ESC},
+    {"escape", KEY_ESC},
+    {"1", KEY_1},
+    {"2", KEY_2},
+    {"3", KEY_3},
+    {"4", KEY_4},
+    {"5", KEY_5},
+    {"6", KEY_6},
+    {"7", KEY_7},
+    {"8", KEY_8},
+    {"9", KEY_9},
+    {"0", KEY_0},
+    {"-", KEY_MINUS},
+    {"=", KEY_EQUAL},
+    {"backspace", KEY_BACKSPACE},
+    {"tab", KEY_TAB},
+    {"q", KEY_Q},
+    {"w", KEY_W},
+    {"e", KEY_E},
+    {"r", KEY_R},
+    {"t", KEY_T},
+    {"y", KEY_Y},
+    {"u", KEY_U},
+    {"i", KEY_I},
+    {"o", KEY_O},
+    {"p", KEY_P},
+    {"{", KEY_LEFTBRACE},
+    {"[", KEY_LEFTBRACE},
+    {"}", KEY_RIGHTBRACE},
+    {"]", KEY_RIGHTBRACE},
+    {"enter", KEY_ENTER},
+    {"return", KEY_ENTER},
+    {"lctrl", KEY_LEFTCTRL},
+    {"leftctrl", KEY_LEFTCTRL},
+    {"lcontrol", KEY_LEFTCTRL},
+    {"leftcontrol", KEY_LEFTCTRL},
+    {"control", KEY_LEFTCTRL},
+    {"a", KEY_A},
+    {"s", KEY_S},
+    {"d", KEY_D},
+    {"f", KEY_F},
+    {"g", KEY_G},
+    {"h", KEY_H},
+    {"j", KEY_J},
+    {"k", KEY_K},
+    {"l", KEY_L},
+    {";", KEY_SEMICOLON},
+    {"'", KEY_APOSTROPHE},
+    {"`", KEY_GRAVE},
+    {"lshift", KEY_LEFTSHIFT},
+    {"leftshift", KEY_LEFTSHIFT},
+    {"shift", KEY_LEFTSHIFT},
+    {"\\", KEY_BACKSLASH},
+    {"z", KEY_Z},
+    {"x", KEY_X},
+    {"c", KEY_C},
+    {"v", KEY_V},
+    {"b", KEY_B},
+    {"n", KEY_N},
+    {"m", KEY_M},
+    {",", KEY_COMMA},
+    {".", KEY_DOT},
+    {"/", KEY_SLASH},
+    {"rshift", KEY_RIGHTSHIFT},
+    {"rightshift", KEY_RIGHTSHIFT},
+    {" ", KEY_SPACE},
+    {"space", KEY_SPACE},
+    {"f1", KEY_F1},
+    {"f2", KEY_F2},
+    {"f3", KEY_F3},
+    {"f4", KEY_F4},
+    {"f5", KEY_F5},
+    {"f6", KEY_F6},
+    {"f7", KEY_F7},
+    {"f8", KEY_F8},
+    {"f9", KEY_F9},
+    {"f10", KEY_F10},
+    {"f11", KEY_F11},
+    {"f12", KEY_F12},
+    {"f13", KEY_F13},
+    {"f14", KEY_F14},
+    {"f15", KEY_F15},
+    {"f16", KEY_F16},
+    {"f17", KEY_F17},
+    {"f18", KEY_F18},
+    {"f19", KEY_F19},
+    {"f20", KEY_F20},
+    {"f21", KEY_F21},
+    {"f22", KEY_F22},
+    {"f23", KEY_F23},
+    {"f24", KEY_F24},
+    {"home", KEY_HOME},
 };
 
 static const struct mapping modifiers[] = {
@@ -77,7 +178,7 @@ parse_bind_array(toml_array_t *array, struct keybind *keybind, const char *key) 
 }
 
 static bool
-parse_bind_input(const char *str, struct bind_input *input) {
+parse_bind_input(const char *str, struct bind_input *input, bool allow_mods) {
     char *input_string = strdup(str);
     int num_buttons = 0;
     int num_keys = 0;
@@ -102,18 +203,6 @@ parse_bind_input(const char *str, struct bind_input *input) {
         *needle = '\0';
         needle++;
 
-        for (size_t i = 0; i < ARRAY_LEN(modifiers); i++) {
-            if (strcasecmp(elem, modifiers[i].name) == 0) {
-                if (input->modifiers & modifiers[i].val) {
-                    wlr_log(WLR_ERROR, "config: duplicate modifier '%s' in keybind '%s'", elem,
-                            str);
-                    goto fail;
-                }
-                input->modifiers |= modifiers[i].val;
-                goto next;
-            }
-        }
-
         for (size_t i = 0; i < ARRAY_LEN(buttons); i++) {
             if (strcasecmp(elem, buttons[i].name) == 0) {
                 num_buttons++;
@@ -124,13 +213,29 @@ parse_bind_input(const char *str, struct bind_input *input) {
         }
 
         xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
-        if (sym == XKB_KEY_NoSymbol) {
-            wlr_log(WLR_ERROR, "config: unknown keybind element '%s'", elem);
-            goto fail;
+        if (sym != XKB_KEY_NoSymbol) {
+            num_keys++;
+            input->phys.sym = sym;
+            input->type = BIND_KEY;
+            goto next;
         }
-        num_keys++;
-        input->phys.sym = sym;
-        input->type = BIND_KEY;
+
+        if (allow_mods) {
+            for (size_t i = 0; i < ARRAY_LEN(modifiers); i++) {
+                if (strcasecmp(elem, modifiers[i].name) == 0) {
+                    if (input->modifiers & modifiers[i].val) {
+                        wlr_log(WLR_ERROR, "config: duplicate modifier '%s' in keybind '%s'", elem,
+                                str);
+                        goto fail;
+                    }
+                    input->modifiers |= modifiers[i].val;
+                    goto next;
+                }
+            }
+        }
+
+        wlr_log(WLR_ERROR, "config: unknown keybind element '%s'", elem);
+        goto fail;
 
     next:;
     }
@@ -167,6 +272,48 @@ parse_bind_table(toml_table_t *table, struct keybind *keybind, const char *key) 
         keybind->allow_in_pause = allow_in_pause.u.b;
     }
     return true;
+}
+
+static bool
+parse_remappings(toml_table_t *table, struct remapping **remappings, size_t *count) {
+    // Parse remappings.
+    for (size_t i = 0;;) {
+        const char *key = toml_key_in(table, i);
+        if (!key) {
+            return true;
+        }
+
+        *count = ++i;
+        *remappings = realloc(*remappings, i * sizeof(struct remapping));
+        ww_assert(*remappings);
+        (*remappings)[i - 1] = (struct remapping){0};
+
+        if (!parse_bind_input(key, &(*remappings)[i - 1].input, false)) {
+            return false;
+        }
+
+        toml_datum_t val = toml_string_in(table, key);
+        if (!val.ok) {
+            wlr_log(WLR_ERROR, "non-string remapping for '%s'", key);
+            return false;
+        }
+
+        bool found = false;
+        for (unsigned long j = 0; j < ARRAY_LEN(keys); j++) {
+            if (strcasecmp(val.u.s, keys[j].name) == 0) {
+                (*remappings)[i - 1].keycode = keys[j].val;
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            wlr_log(WLR_ERROR, "failed to find keycode for key '%s'", val.u.s);
+            free(val.u.s);
+            return false;
+        }
+        free(val.u.s);
+    }
 }
 
 char *
@@ -436,6 +583,23 @@ config_read() {
         config->alt_sens = config->main_sens;
     }
 
+    // input (remapping)
+    toml_table_t *remap_ingame = toml_table_in(input, "remap_ingame");
+    if (remap_ingame) {
+        bool ok =
+            parse_remappings(remap_ingame, &config->remap_ingame, &config->remap_ingame_count);
+        if (!ok) {
+            goto fail_read;
+        }
+    }
+    toml_table_t *remap_menu = toml_table_in(input, "remap_menu");
+    if (remap_menu) {
+        bool ok = parse_remappings(remap_menu, &config->remap_menu, &config->remap_menu_count);
+        if (!ok) {
+            goto fail_read;
+        }
+    }
+
     // keyboard
     toml_table_t *keyboard = toml_table_in(conf, "keyboard");
     if (keyboard) {
@@ -586,7 +750,7 @@ config_read() {
         }
         struct keybind *keybind = &config->binds[config->bind_count];
 
-        if (!parse_bind_input(key, &keybind->input)) {
+        if (!parse_bind_input(key, &keybind->input, true)) {
             goto fail_read;
         }
 
@@ -651,6 +815,12 @@ config_destroy(struct config *config) {
     }
     if (config->options) {
         free(config->options);
+    }
+    if (config->remap_menu) {
+        free(config->remap_menu);
+    }
+    if (config->remap_ingame) {
+        free(config->remap_ingame);
     }
     toml_free(config->toml);
     free(config);

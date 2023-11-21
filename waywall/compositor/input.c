@@ -6,6 +6,7 @@
 #include "compositor/input.h"
 #include "compositor/render.h"
 #include "compositor/xwayland.h"
+#include "config.h"
 #include "instance.h"
 #include "relative-pointer-unstable-v1-protocol.h"
 #include "util.h"
@@ -22,6 +23,44 @@
 #include <wlr/util/log.h>
 #include <wlr/xwayland.h>
 
+static bool
+try_remap_button(struct comp_input *input, const struct compositor_button_event *event,
+                 const struct remapping *remappings, size_t remap_count) {
+    for (size_t i = 0; i < remap_count; i++) {
+        if (remappings[i].input.type != BIND_MOUSE) {
+            continue;
+        }
+
+        if (remappings[i].input.phys.button == event->button) {
+            wlr_seat_keyboard_send_key(input->seat, event->time_msec, remappings[i].keycode,
+                                       event->state);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool
+try_remap_key(struct keyboard *keyboard, const struct compositor_key_event *event,
+              const struct remapping *remappings, size_t remap_count) {
+    for (size_t i = 0; i < remap_count; i++) {
+        if (remappings[i].input.type != BIND_KEY) {
+            continue;
+        }
+
+        for (int j = 0; j < event->nsyms; j++) {
+            if (event->syms[j] == remappings[i].input.phys.sym) {
+                wlr_seat_keyboard_send_key(keyboard->input->seat, event->time_msec,
+                                           remappings[i].keycode, event->state);
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 /*
  *  Keyboard events
  */
@@ -29,6 +68,7 @@
 static void
 on_keyboard_key(struct wl_listener *listener, void *data) {
     struct keyboard *keyboard = wl_container_of(listener, keyboard, on_key);
+    struct comp_input *input = keyboard->input;
     struct wlr_keyboard_key_event *event = data;
 
     // Convert from libinput -> XKB
@@ -49,6 +89,22 @@ on_keyboard_key(struct wl_listener *listener, void *data) {
         .time_msec = event->time_msec,
         .consumed = false,
     };
+
+    // Process any key remappings.
+    if (input->active_instance && input->focused_window == input->active_instance->window) {
+        bool ingame = input->active_instance->state.data.inworld == UNPAUSED;
+        if (ingame) {
+            if (try_remap_key(keyboard, &comp_event, input->compositor->config.remap_ingame,
+                              input->compositor->config.remap_ingame_count)) {
+                return;
+            }
+        } else {
+            if (try_remap_key(keyboard, &comp_event, input->compositor->config.remap_menu,
+                              input->compositor->config.remap_menu_count)) {
+                return;
+            }
+        }
+    }
 
     // If the wall module does not eat the keyboard input, we can send it along.
     wl_signal_emit_mutable(&keyboard->input->events.key, &comp_event);
@@ -201,6 +257,22 @@ on_cursor_button(struct wl_listener *listener, void *data) {
         .time_msec = event->time_msec,
         .state = event->state == WLR_BUTTON_PRESSED,
     };
+
+    // Process any remappings.
+    if (input->active_instance) {
+        bool ingame = input->active_instance->state.data.inworld == UNPAUSED;
+        if (ingame) {
+            if (try_remap_button(input, &comp_event, input->compositor->config.remap_ingame,
+                                 input->compositor->config.remap_ingame_count)) {
+                return;
+            }
+        } else {
+            if (try_remap_button(input, &comp_event, input->compositor->config.remap_menu,
+                                 input->compositor->config.remap_menu_count)) {
+                return;
+            }
+        }
+    }
 
     // If the event is for a button release, notify any interested parties. In particular, the wall
     // module needs to know when buttons are released, even when a window is focused.
@@ -706,6 +778,9 @@ input_load_config(struct comp_input *input, struct compositor_config config) {
     struct keyboard *keyboard;
     wl_list_for_each (keyboard, &input->keyboards, link) {
         wlr_keyboard_set_repeat_info(keyboard->wlr, config.repeat_rate, config.repeat_delay);
+
+        // TODO: Temporarily clear keyboard focus to handle holding remapped keys while the config
+        // is reloaded? Very very niche edge case.
     }
 
     // Confine or unrestrict the pointer as needed.

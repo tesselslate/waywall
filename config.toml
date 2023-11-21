@@ -5,6 +5,13 @@ confine_pointer = false
 main_sens = 1.0
 alt_sens = 1.0
 
+[input.remap_ingame]
+"R" = "0"
+"0" = "none"
+
+[input.remap_menu]
+"T" = "Enter"
+
 # XKB options - can be deleted
 [keyboard]
 layout = ""

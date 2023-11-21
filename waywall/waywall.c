@@ -36,6 +36,10 @@ create_compositor_config() {
         .model = g_config->model,
         .variant = g_config->variant,
         .options = g_config->options,
+        .remap_ingame = g_config->remap_ingame,
+        .remap_ingame_count = g_config->remap_ingame_count,
+        .remap_menu = g_config->remap_menu,
+        .remap_menu_count = g_config->remap_menu_count,
     };
     memcpy(compositor_config.background_color, g_config->background_color, sizeof(float) * 4);
     return compositor_config;
