@@ -7,7 +7,6 @@ protocol_dir = wayland_protocols.get_variable('pkgdatadir') + '/'
 protocol_xmls = [
   protocol_dir + 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
   protocol_dir + 'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
-  'wlr-export-dmabuf-unstable-v1.xml',
 ]
 
 foreach proto : protocol_xmls
