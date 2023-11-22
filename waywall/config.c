@@ -7,8 +7,6 @@
 #include <string.h>
 #include <strings.h>
 #include <toml.h>
-#include <wlr/types/wlr_keyboard.h>
-#include <wlr/util/log.h>
 
 struct mapping {
     const char *name;
@@ -130,6 +128,7 @@ static const struct mapping keys[] = {
     {"home", KEY_HOME},
 };
 
+// TODO: wlroots
 static const struct mapping modifiers[] = {
     {"shift", WLR_MODIFIER_SHIFT},   {"caps", WLR_MODIFIER_CAPS},    {"lock", WLR_MODIFIER_CAPS},
     {"capslock", WLR_MODIFIER_CAPS}, {"control", WLR_MODIFIER_CTRL}, {"ctrl", WLR_MODIFIER_CTRL},
@@ -144,16 +143,16 @@ static const char waywall_dir[] = "/waywall/";
 static bool
 parse_bind_array(toml_array_t *array, struct keybind *keybind, const char *key) {
     if (toml_array_nelem(array) > MAX_ACTIONS) {
-        wlr_log(WLR_ERROR, "config: too many actions assigned to keybind '%s'", key);
+        LOG(LOG_ERROR, "config: too many actions assigned to keybind '%s'", key);
         return false;
     } else if (toml_array_nelem(array) == 0) {
-        wlr_log(WLR_ERROR, "config: no actions assigned to keybind '%s'", key);
+        LOG(LOG_ERROR, "config: no actions assigned to keybind '%s'", key);
         return false;
     }
     for (int j = 0; j < toml_array_nelem(array); j++) {
         toml_datum_t action = toml_string_at(array, j);
         if (!action.ok) {
-            wlr_log(WLR_ERROR, "config: found non-string value for action %d of keybind '%s'", j,
+            LOG(LOG_ERROR, "config: found non-string value for action %d of keybind '%s'", j,
                     key);
             free(action.u.s);
             return false;
@@ -167,7 +166,7 @@ parse_bind_array(toml_array_t *array, struct keybind *keybind, const char *key) 
             }
         }
         if (!found_action) {
-            wlr_log(WLR_ERROR, "config: unknown action '%s' assigned to keybind '%s'", action.u.s,
+            LOG(LOG_ERROR, "config: unknown action '%s' assigned to keybind '%s'", action.u.s,
                     key);
             free(action.u.s);
             return false;
@@ -224,7 +223,7 @@ parse_bind_input(const char *str, struct bind_input *input, bool allow_mods) {
             for (size_t i = 0; i < ARRAY_LEN(modifiers); i++) {
                 if (strcasecmp(elem, modifiers[i].name) == 0) {
                     if (input->modifiers & modifiers[i].val) {
-                        wlr_log(WLR_ERROR, "config: duplicate modifier '%s' in keybind '%s'", elem,
+                        LOG(LOG_ERROR, "config: duplicate modifier '%s' in keybind '%s'", elem,
                                 str);
                         goto fail;
                     }
@@ -234,14 +233,14 @@ parse_bind_input(const char *str, struct bind_input *input, bool allow_mods) {
             }
         }
 
-        wlr_log(WLR_ERROR, "config: unknown keybind element '%s'", elem);
+        LOG(LOG_ERROR, "config: unknown keybind element '%s'", elem);
         goto fail;
 
     next:;
     }
 
     if (num_buttons + num_keys != 1) {
-        wlr_log(WLR_ERROR, "config: invalid keybind '%s'", str);
+        LOG(LOG_ERROR, "config: invalid keybind '%s'", str);
         goto fail;
     }
 
@@ -257,7 +256,7 @@ static bool
 parse_bind_table(toml_table_t *table, struct keybind *keybind, const char *key) {
     toml_array_t *actions = toml_array_in(table, "actions");
     if (!actions) {
-        wlr_log(WLR_ERROR, "config: keybind '%s' has no 'actions' array", key);
+        LOG(LOG_ERROR, "config: keybind '%s' has no 'actions' array", key);
         return false;
     }
     if (!parse_bind_array(actions, keybind, key)) {
@@ -294,7 +293,7 @@ parse_remappings(toml_table_t *table, struct remapping **remappings, size_t *cou
 
         toml_datum_t val = toml_string_in(table, key);
         if (!val.ok) {
-            wlr_log(WLR_ERROR, "non-string remapping for '%s'", key);
+            LOG(LOG_ERROR, "non-string remapping for '%s'", key);
             return false;
         }
 
@@ -308,7 +307,7 @@ parse_remappings(toml_table_t *table, struct remapping **remappings, size_t *cou
         }
 
         if (!found) {
-            wlr_log(WLR_ERROR, "failed to find keycode for key '%s'", val.u.s);
+            LOG(LOG_ERROR, "failed to find keycode for key '%s'", val.u.s);
             free(val.u.s);
             return false;
         }
@@ -326,7 +325,7 @@ config_get_dir() {
     } else {
         dir = getenv("HOME");
         if (!dir) {
-            wlr_log(WLR_ERROR, "could not find config directory (no $XDG_CONFIG_HOME or $HOME)");
+            LOG(LOG_ERROR, "could not find config directory (no $XDG_CONFIG_HOME or $HOME)");
             return NULL;
         }
         path = str_copy(path, str_from(dir));
@@ -340,7 +339,7 @@ char *
 config_get_path() {
     char *dir = config_get_dir();
     if (!dir) {
-        wlr_log(WLR_ERROR, "no suitable directory found for config file");
+        LOG(LOG_ERROR, "no suitable directory found for config file");
         return NULL;
     }
     char buf[PATH_MAX];
@@ -357,7 +356,7 @@ parse_bool(bool *value, toml_table_t *table, const char *value_name, const char 
     toml_datum_t datum = toml_bool_in(table, value_name);
     if (!datum.ok) {
         if (warn) {
-            wlr_log(WLR_ERROR, "config: missing boolean value '%s'", full_name);
+            LOG(LOG_ERROR, "config: missing boolean value '%s'", full_name);
         }
         return false;
     }
@@ -371,13 +370,13 @@ parse_color(float value[4], toml_table_t *table, const char *value_name, const c
     toml_datum_t datum = toml_string_in(table, value_name);
     if (!datum.ok) {
         if (warn) {
-            wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+            LOG(LOG_ERROR, "config: missing string value '%s'", full_name);
         }
         return false;
     }
     char *color = datum.u.s;
     if (!ww_util_parse_color(value, color)) {
-        wlr_log(WLR_ERROR, "config: invalid value ('%s') for color value '%s'", color, full_name);
+        LOG(LOG_ERROR, "config: invalid value ('%s') for color value '%s'", color, full_name);
         free(color);
         return false;
     }
@@ -391,7 +390,7 @@ parse_double(double *value, toml_table_t *table, const char *value_name, const c
     toml_datum_t datum = toml_double_in(table, value_name);
     if (!datum.ok) {
         if (warn) {
-            wlr_log(WLR_ERROR, "config: missing double value '%s'", full_name);
+            LOG(LOG_ERROR, "config: missing double value '%s'", full_name);
         }
         return false;
     }
@@ -405,7 +404,7 @@ parse_int(int *value, toml_table_t *table, const char *value_name, const char *f
     toml_datum_t datum = toml_int_in(table, value_name);
     if (!datum.ok) {
         if (warn) {
-            wlr_log(WLR_ERROR, "config: missing integer value '%s'", full_name);
+            LOG(LOG_ERROR, "config: missing integer value '%s'", full_name);
         }
         return false;
     }
@@ -419,7 +418,7 @@ parse_str(char **value, toml_table_t *table, const char *value_name, const char 
     toml_datum_t datum = toml_string_in(table, value_name);
     if (!datum.ok) {
         if (warn) {
-            wlr_log(WLR_ERROR, "config: missing string value '%s'", full_name);
+            LOG(LOG_ERROR, "config: missing string value '%s'", full_name);
         }
         return false;
     }
@@ -451,7 +450,7 @@ parse_enum(bool *ok, toml_table_t *table, const char *value_name, const char *fu
         ptr += snprintf(ptr, 1024 - (ptr - buf), "'%s'%s", mappings[i].name,
                         (mappings_count - i) == 1 ? "" : ", ");
     }
-    wlr_log(WLR_ERROR, "config: invalid enum value '%s' for '%s' (use one of: %s)", str, full_name,
+    LOG(LOG_ERROR, "config: invalid enum value '%s' for '%s' (use one of: %s)", str, full_name,
             buf);
     free(str);
     return 0;
@@ -518,11 +517,11 @@ parse_enum(bool *ok, toml_table_t *table, const char *value_name, const char *fu
 #define CHECK_MIN_MAX(table, name, min, max)                                                       \
     do {                                                                                           \
         if ((config->name) < min) {                                                                \
-            wlr_log(WLR_ERROR, "config: integer value '%s' below minimum (%d < %s)",               \
+            LOG(LOG_ERROR, "config: integer value '%s' below minimum (%d < %s)",               \
                     STR(table) "." STR(name), (config->name), STR(min));                           \
             goto fail_read;                                                                        \
         } else if ((config->name) > max) {                                                         \
-            wlr_log(WLR_ERROR, "config: integer value '%s' above maximum (%d > %s)",               \
+            LOG(LOG_ERROR, "config: integer value '%s' above maximum (%d > %s)",               \
                     STR(table) "." STR(name), (config->name), STR(max));                           \
             goto fail_read;                                                                        \
         }                                                                                          \
@@ -531,11 +530,11 @@ parse_enum(bool *ok, toml_table_t *table, const char *value_name, const char *fu
 #define CHECK_MIN_MAX_DOUBLE(table, name, min, max)                                                \
     do {                                                                                           \
         if ((config->name) < min) {                                                                \
-            wlr_log(WLR_ERROR, "config: double value '%s' below minimum (%lf < %s)",               \
+            LOG(LOG_ERROR, "config: double value '%s' below minimum (%lf < %s)",               \
                     STR(table) "." STR(name), (config->name), STR(min));                           \
             goto fail_read;                                                                        \
         } else if ((config->name) > max) {                                                         \
-            wlr_log(WLR_ERROR, "config: double value '%s' above maximum (%lf > %s)",               \
+            LOG(LOG_ERROR, "config: double value '%s' above maximum (%lf > %s)",               \
                     STR(table) "." STR(name), (config->name), STR(max));                           \
             goto fail_read;                                                                        \
         }                                                                                          \
@@ -549,7 +548,7 @@ config_read() {
     }
     FILE *file = fopen(path, "r");
     if (!file) {
-        wlr_log_errno(WLR_ERROR, "failed to open config file (%s)", path);
+        LOG_ERRNO(LOG_ERROR, "failed to open config file (%s)", path);
         free(path);
         goto fail_file;
     }
@@ -558,7 +557,7 @@ config_read() {
     toml_table_t *conf = toml_parse_file(file, buf, sizeof(buf));
     fclose(file);
     if (!conf) {
-        wlr_log(WLR_ERROR, "failed to parse config: %s", buf);
+        LOG(LOG_ERROR, "failed to parse config: %s", buf);
         goto fail_parse;
     }
 
@@ -569,7 +568,7 @@ config_read() {
     // input
     toml_table_t *input = toml_table_in(conf, "input");
     if (!input) {
-        wlr_log(WLR_ERROR, "config: missing section 'input'");
+        LOG(LOG_ERROR, "config: missing section 'input'");
         goto fail_read;
     }
     PARSE_INT(input, repeat_delay);
@@ -623,7 +622,7 @@ config_read() {
     // appearance
     toml_table_t *appearance = toml_table_in(conf, "appearance");
     if (!appearance) {
-        wlr_log(WLR_ERROR, "config: missing section 'appearance'");
+        LOG(LOG_ERROR, "config: missing section 'appearance'");
         goto fail_read;
     }
     PARSE_COLOR(appearance, background_color);
@@ -650,7 +649,7 @@ config_read() {
     // wall
     toml_table_t *wall = toml_table_in(conf, "wall");
     if (!wall) {
-        wlr_log(WLR_ERROR, "config: missing section 'wall'");
+        LOG(LOG_ERROR, "config: missing section 'wall'");
         goto fail_read;
     }
     PARSE_INT(wall, stretch_width);
@@ -666,7 +665,7 @@ config_read() {
         config->alt_height = -1;
     }
     if ((config->alt_width < 0) != (config->alt_height < 0)) {
-        wlr_log(WLR_ERROR, "config: only one dimension present in alternate resolution");
+        LOG(LOG_ERROR, "config: only one dimension present in alternate resolution");
         goto fail_read;
     }
     if ((config->has_alt_res = config->alt_width > 0)) {
@@ -677,7 +676,7 @@ config_read() {
     // layout
     toml_table_t *layout = toml_table_in(conf, "layout");
     if (!layout) {
-        wlr_log(WLR_ERROR, "config: missing section 'layout'");
+        LOG(LOG_ERROR, "config: missing section 'layout'");
         goto fail_read;
     }
     PARSE_STRING(layout, generator_name);
@@ -686,7 +685,7 @@ config_read() {
     // reset
     toml_table_t *reset = toml_table_in(conf, "reset");
     if (!reset) {
-        wlr_log(WLR_ERROR, "config: missing section 'reset'");
+        LOG(LOG_ERROR, "config: missing section 'reset'");
         goto fail_read;
     }
     PARSE_ENUM(reset, unlock_behavior,
@@ -738,7 +737,7 @@ config_read() {
     // keybinds
     toml_table_t *keybinds = toml_table_in(conf, "keybinds");
     if (!keybinds) {
-        wlr_log(WLR_ERROR, "config: missing section 'keybinds'");
+        LOG(LOG_ERROR, "config: missing section 'keybinds'");
         goto fail_read;
     }
 
@@ -773,7 +772,7 @@ config_read() {
             continue;
         }
 
-        wlr_log(WLR_ERROR, "config: invalid type for keybind '%s'", key);
+        LOG(LOG_ERROR, "config: invalid type for keybind '%s'", key);
         goto fail_read;
     }
 

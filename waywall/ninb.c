@@ -4,7 +4,6 @@
 #include "waywall.h"
 #include <stdbool.h>
 #include <wayland-server-core.h>
-#include <wlr/xwayland.h>
 
 static struct wl_listener unmap_listener;
 static struct wl_listener configure_listener;

@@ -170,7 +170,7 @@ on_output_destroy(struct wl_listener *listener, void *data) {
         output->render->hl = NULL;
     } else {
         output->render->wl = NULL;
-        wlr_log(WLR_INFO, "wayland output destroyed");
+        LOG(LOG_INFO, "wayland output destroyed");
 
         if (output->render->compositor->config.stop_on_close ||
             wl_list_length(&output->render->windows) == 0) {

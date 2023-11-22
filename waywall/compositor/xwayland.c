@@ -49,7 +49,7 @@ send_event(struct xwl_window *window, uint32_t mask, const char *event) {
     xcb_generic_error_t *err = xcb_request_check(window->xwl->xcb, cookie);
     if (err) {
         int opcode = (int)(event[0]);
-        wlr_log(WLR_ERROR, "failed to send event (opcode: %d, window: %d): %d", opcode, window->surface->window_id, err->error_code);
+        LOG(LOG_ERROR, "failed to send event (opcode: %d, window: %d): %d", opcode, window->surface->window_id, err->error_code);
         free(err);
     }
     return err == NULL;
@@ -59,7 +59,7 @@ static void
 handle_surface_map(struct wl_listener *listener, void *data) {
     struct xwl_window *window = wl_container_of(listener, window, on_map);
 
-    wlr_log(WLR_DEBUG, "window %" PRIu32 " mapped", window->surface->window_id);
+    LOG(WLR_DEBUG, "window %" PRIu32 " mapped", window->surface->window_id);
 
     window->mapped = true;
     wl_list_insert(&window->xwl->windows, &window->link);
@@ -72,7 +72,7 @@ static void
 handle_surface_unmap(struct wl_listener *listener, void *data) {
     struct xwl_window *window = wl_container_of(listener, window, on_unmap);
 
-    wlr_log(WLR_DEBUG, "window %" PRIu32 " unmapped", window->surface->window_id);
+    LOG(WLR_DEBUG, "window %" PRIu32 " unmapped", window->surface->window_id);
 
     window->mapped = false;
     wl_list_remove(&window->link);
@@ -121,7 +121,7 @@ static void
 handle_surface_request_activate(struct wl_listener *listener, void *data) {
     struct xwl_window *window = wl_container_of(listener, window, on_request_activate);
 
-    wlr_log(WLR_DEBUG, "window %" PRIu32 " requested activation", window->surface->window_id);
+    LOG(WLR_DEBUG, "window %" PRIu32 " requested activation", window->surface->window_id);
 }
 
 static void
@@ -129,7 +129,7 @@ handle_surface_request_configure(struct wl_listener *listener, void *data) {
     struct xwl_window *window = wl_container_of(listener, window, on_request_configure);
     struct wlr_xwayland_surface_configure_event *event = data;
 
-    wlr_log(WLR_DEBUG,
+    LOG(WLR_DEBUG,
             "window %" PRIu32 " requested configuration (%" PRIi16 " x %" PRIi16 " + %" PRIu16
             ", %" PRIu16 ")",
             window->surface->window_id, event->x, event->y, event->width, event->height);
@@ -146,7 +146,7 @@ static void
 handle_surface_request_fullscreen(struct wl_listener *listener, void *data) {
     struct xwl_window *window = wl_container_of(listener, window, on_request_fullscreen);
 
-    wlr_log(WLR_DEBUG, "window %" PRIu32 " requested fullscreen (%d)", window->surface->window_id,
+    LOG(WLR_DEBUG, "window %" PRIu32 " requested fullscreen (%d)", window->surface->window_id,
             window->surface->fullscreen);
 }
 
@@ -155,7 +155,7 @@ handle_surface_request_minimize(struct wl_listener *listener, void *data) {
     struct xwl_window *window = wl_container_of(listener, window, on_request_minimize);
     struct wlr_xwayland_minimize_event *event = data;
 
-    wlr_log(WLR_DEBUG, "window %" PRIu32 " requested minimization (%d)", window->surface->window_id,
+    LOG(WLR_DEBUG, "window %" PRIu32 " requested minimization (%d)", window->surface->window_id,
             event->minimize);
     wlr_xwayland_surface_set_minimized(window->surface, event->minimize);
     wl_signal_emit_mutable(&window->events.minimize, event);
@@ -168,7 +168,7 @@ handle_new_surface(struct wl_listener *listener, void *data) {
 
     // waywall is not designed with override redirect clients in mind.
     if (surface->override_redirect) {
-        wlr_log(WLR_INFO, "window %" PRIu32 " wants override redirect", surface->window_id);
+        LOG(LOG_INFO, "window %" PRIu32 " wants override redirect", surface->window_id);
         xcb_kill_client(xwl->xcb, surface->window_id);
         return;
     }
@@ -214,7 +214,7 @@ handle_ready(struct wl_listener *listener, void *data) {
     xwl->xcb = xcb_connect(xwl->xwayland->display_name, NULL);
     int err = xcb_connection_has_error(xwl->xcb);
     if (err) {
-        wlr_log(WLR_ERROR, "failed to connect to xwayland server: %d", err);
+        LOG(LOG_ERROR, "failed to connect to xwayland server: %d", err);
         wl_display_terminate(xwl->compositor->display);
     }
 }
@@ -260,7 +260,7 @@ xwl_create(struct compositor *compositor) {
     xwl->compositor = compositor;
     xwl->xwayland = wlr_xwayland_create(compositor->display, compositor->compositor, false);
     if (!xwl->xwayland) {
-        wlr_log(WLR_ERROR, "xwl_create: failed to create wlr_xwayland");
+        LOG(LOG_ERROR, "xwl_create: failed to create wlr_xwayland");
         goto cleanup;
     }
 
@@ -319,7 +319,7 @@ void
 xwl_update_cursor(struct comp_xwayland *xwl) {
     // The theme should already be loaded. If so, this simply returns it.
     if (!wlr_xcursor_manager_load(xwl->compositor->input->cursor_manager, 1)) {
-        wlr_log(WLR_ERROR, "xwl_update_cursor: failed to load cursor theme");
+        LOG(LOG_ERROR, "xwl_update_cursor: failed to load cursor theme");
         return;
     }
 
@@ -327,7 +327,7 @@ xwl_update_cursor(struct comp_xwayland *xwl) {
         wlr_xcursor_manager_get_xcursor(xwl->compositor->input->cursor_manager, "default", 1);
     ww_assert(cursor);
     if (!cursor->image_count) {
-        wlr_log(WLR_ERROR, "xwl_update_cursor: default cursor has no images");
+        LOG(LOG_ERROR, "xwl_update_cursor: default cursor has no images");
         return;
     }
     struct wlr_xcursor_image *image = cursor->images[0];

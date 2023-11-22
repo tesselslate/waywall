@@ -13,8 +13,6 @@
 #include <strings.h>
 #include <sys/inotify.h>
 #include <unistd.h>
-#include <wlr/util/log.h>
-#include <wlr/xwayland.h>
 #include <zip.h>
 
 // TODO: only use state file for wpstateout, keep log file open anyway for other things
@@ -41,7 +39,7 @@ static inline uint8_t *
 get_mc_keycode(const char *name) {
     static const char key_prefix[] = "key.keyboard.";
     if (strlen(name) <= STRING_LEN(key_prefix)) {
-        wlr_log(WLR_ERROR, "tried reading minecraft keycode with invalid prefix");
+        LOG(LOG_ERROR, "tried reading minecraft keycode with invalid prefix");
         return NULL;
     }
 
@@ -59,7 +57,7 @@ check_instance_dirs(const char *path) {
 
     DIR *dir = opendir(path);
     if (!dir) {
-        wlr_log_errno(WLR_ERROR, "failed to open instance directory ('%s')", path);
+        LOG_ERRNO(LOG_ERROR, "failed to open instance directory ('%s')", path);
         return false;
     }
 
@@ -86,7 +84,7 @@ get_mods(struct instance *instance) {
 
     DIR *dir = opendir(str_into(mods_dir));
     if (!dir) {
-        wlr_log_errno(WLR_ERROR, "failed to open mods directory ('%s')", str_into(mods_dir));
+        LOG_ERRNO(LOG_ERROR, "failed to open mods directory ('%s')", str_into(mods_dir));
         return false;
     }
 
@@ -110,7 +108,7 @@ get_mods(struct instance *instance) {
         if (!zip) {
             zip_error_t error;
             zip_error_init_with_code(&error, err);
-            wlr_log(WLR_ERROR, "failed to open mod zip at '%s': %s", str_into(mod_path),
+            LOG(LOG_ERROR, "failed to open mod zip at '%s': %s", str_into(mod_path),
                     zip_error_strerror(&error));
             zip_error_fini(&error);
             continue;
@@ -120,7 +118,7 @@ get_mods(struct instance *instance) {
             struct zip_stat stat;
             if (zip_stat_index(zip, i, 0, &stat) == -1) {
                 zip_error_t *error = zip_get_error(zip);
-                wlr_log(WLR_ERROR, "failed to stat entry %" PRIi64 " of '%s': %s", i,
+                LOG(LOG_ERROR, "failed to stat entry %" PRIi64 " of '%s': %s", i,
                         str_into(mod_path), zip_error_strerror(error));
                 goto fail_stat;
             }
@@ -165,7 +163,7 @@ get_mods(struct instance *instance) {
 
     closedir(dir);
     if (!instance->mods.atum) {
-        wlr_log(WLR_INFO, "no atum found in '%s'", str_into(mods_dir));
+        LOG(LOG_INFO, "no atum found in '%s'", str_into(mods_dir));
     }
     return true;
 }
@@ -188,7 +186,7 @@ get_version(struct instance *instance) {
         return true;
     }
 
-    wlr_log(WLR_ERROR, "failed to parse Minecraft version: '%s'", title);
+    LOG(LOG_ERROR, "failed to parse Minecraft version: '%s'", title);
     return false;
 }
 
@@ -205,13 +203,13 @@ open_state_file(struct instance *instance) {
 
     instance->state_fd = open(str_into(path), O_RDONLY);
     if (instance->state_fd == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to open state file ('%s')", str_into(path));
+        LOG_ERRNO(LOG_ERROR, "failed to open state file ('%s')", str_into(path));
         return;
     }
     instance->state_wd =
         inotify_add_watch(g_inotify, str_into(path), IN_MODIFY | IN_DELETE_SELF | IN_MOVE_SELF);
     if (instance->state_wd == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to watch state file ('%s')", str_into(path));
+        LOG_ERRNO(LOG_ERROR, "failed to watch state file ('%s')", str_into(path));
         close(instance->state_fd);
         instance->state_fd = -1;
         return;
@@ -241,14 +239,14 @@ process_state_update(struct instance *instance) {
     char buf[128];
 
     if (lseek(instance->state_fd, 0, SEEK_SET) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to seek wpstateout.txt");
+        LOG_ERRNO(LOG_ERROR, "failed to seek wpstateout.txt");
         return;
     }
     ssize_t n = read(instance->state_fd, buf, ARRAY_LEN(buf) - 1);
     if (n == 0) {
         return;
     } else if (n == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to read wpstateout.txt");
+        LOG_ERRNO(LOG_ERROR, "failed to read wpstateout.txt");
         return;
     }
     buf[n] = '\0';
@@ -262,7 +260,7 @@ process_state_update(struct instance *instance) {
     } else {
         char *split = strchr(buf, ',');
         if (!split) {
-            wlr_log(WLR_ERROR, "failed to find comma in wpstateout.txt ('%s')", buf);
+            LOG(LOG_ERROR, "failed to find comma in wpstateout.txt ('%s')", buf);
             return;
         }
         *split = '\0';
@@ -310,11 +308,11 @@ process_state_update(struct instance *instance) {
             } else if (strcmp(b, "gamescreenopen") == 0) {
                 instance->state.data.inworld = MENU;
             } else {
-                wlr_log(WLR_ERROR, "failed to read wpstateout.txt ('%s')", buf);
+                LOG(LOG_ERROR, "failed to read wpstateout.txt ('%s')", buf);
                 return;
             }
         } else {
-            wlr_log(WLR_ERROR, "failed to read wpstateout.txt ('%s')", buf);
+            LOG(LOG_ERROR, "failed to read wpstateout.txt ('%s')", buf);
             return;
         }
     }
@@ -333,13 +331,13 @@ instance_destroy(struct instance *instance) {
     }
     if (instance->state_wd > 0) {
         if (inotify_rm_watch(g_inotify, instance->state_wd) == -1) {
-            wlr_log_errno(WLR_ERROR, "failed to remove state watch for instance %d", instance->id);
+            LOG_ERRNO(LOG_ERROR, "failed to remove state watch for instance %d", instance->id);
         }
         instance->state_wd = -1;
     }
     if (instance->dir_wd > 0) {
         if (inotify_rm_watch(g_inotify, instance->dir_wd) == -1) {
-            wlr_log_errno(WLR_ERROR, "failed to remove dir watch for instance %d", instance->id);
+            LOG_ERRNO(LOG_ERROR, "failed to remove dir watch for instance %d", instance->id);
         }
         instance->dir_wd = -1;
     }
@@ -402,7 +400,7 @@ instance_process_inotify(struct instance *instance, const struct inotify_event *
             }
 
             if (instance->mods.state_output) {
-                wlr_log(WLR_ERROR,
+                LOG(LOG_ERROR,
                         "instance %d uses state output but its wpstateout.txt file was deleted",
                         instance->id);
             }
@@ -422,7 +420,7 @@ instance_read_options(struct instance *instance) {
 
     FILE *file = fopen(str_into(opt_path), "r");
     if (!file) {
-        wlr_log_errno(WLR_ERROR, "failed to open options file ('%s')", str_into(opt_path));
+        LOG_ERRNO(LOG_ERROR, "failed to open options file ('%s')", str_into(opt_path));
         return false;
     }
 
@@ -450,7 +448,7 @@ instance_read_options(struct instance *instance) {
             found.atum_hotkey = true;
             const char *key = line + STRING_LEN(atum_hotkey);
             if (!(keycode = get_mc_keycode(key))) {
-                wlr_log(WLR_INFO, "unknown atum hotkey '%s' in '%s': setting to default of F6", key,
+                LOG(LOG_INFO, "unknown atum hotkey '%s' in '%s': setting to default of F6", key,
                         str_into(opt_path));
             }
             options.hotkeys.atum_reset = keycode ? *keycode : KEY_F6;
@@ -460,7 +458,7 @@ instance_read_options(struct instance *instance) {
             found.fullscreen_hotkey = true;
             const char *key = line + STRING_LEN(fullscreen_hotkey);
             if (!(keycode = get_mc_keycode(key))) {
-                wlr_log(WLR_INFO,
+                LOG(LOG_INFO,
                         "unknown fullscreen hotkey '%s' in '%s': setting to default of F11", key,
                         str_into(opt_path));
             }
@@ -471,7 +469,7 @@ instance_read_options(struct instance *instance) {
             found.wp_hotkey = true;
             const char *key = line + STRING_LEN(wp_hotkey);
             if (!(keycode = get_mc_keycode(key))) {
-                wlr_log(WLR_INFO,
+                LOG(LOG_INFO,
                         "unknown leave preview hotkey '%s' in '%s': setting to default of H", key,
                         str_into(opt_path));
             }
@@ -483,14 +481,14 @@ instance_read_options(struct instance *instance) {
             found.gui_scale = true;
             const char *scale = line + STRING_LEN(gui_scale);
             if (!(*scale)) {
-                wlr_log(WLR_ERROR, "invalid options in '%s': no GUI scale", str_into(opt_path));
+                LOG(LOG_ERROR, "invalid options in '%s': no GUI scale", str_into(opt_path));
                 goto fail;
             }
 
             char *endptr = NULL;
             options.gui_scale = strtol(scale, &endptr, 10);
             if (*endptr) {
-                wlr_log_errno(WLR_ERROR, "failed to parse GUI scale ('%s') in '%s'", scale,
+                LOG_ERRNO(LOG_ERROR, "failed to parse GUI scale ('%s') in '%s'", scale,
                               str_into(opt_path));
                 goto fail;
             }
@@ -507,34 +505,34 @@ instance_read_options(struct instance *instance) {
                 options.unicode = true;
                 continue;
             }
-            wlr_log(WLR_ERROR, "failed to parse forceUnicodeFont ('%s') in '%s'", force_unicode,
+            LOG(LOG_ERROR, "failed to parse forceUnicodeFont ('%s') in '%s'", force_unicode,
                     str_into(opt_path));
             goto fail;
         }
     }
 
     if (instance->mods.atum && !found.atum_hotkey) {
-        wlr_log(WLR_INFO, "no atum hotkey found in '%s': setting to default of F6",
+        LOG(LOG_INFO, "no atum hotkey found in '%s': setting to default of F6",
                 str_into(opt_path));
         options.hotkeys.atum_reset = KEY_F6;
     }
     if (!found.fullscreen_hotkey) {
-        wlr_log(WLR_INFO, "no fullscreen hotkey found in '%s': setting to default of F11",
+        LOG(LOG_INFO, "no fullscreen hotkey found in '%s': setting to default of F11",
                 str_into(opt_path));
         options.hotkeys.fullscreen = KEY_F11;
     }
     if (instance->mods.world_preview && !found.wp_hotkey) {
-        wlr_log(WLR_INFO, "no leave preview hotkey found in '%s': setting to default of H",
+        LOG(LOG_INFO, "no leave preview hotkey found in '%s': setting to default of H",
                 str_into(opt_path));
         options.hotkeys.leave_preview = KEY_H;
     }
     if (!found.gui_scale) {
-        wlr_log(WLR_INFO, "no GUI scale found in '%s': setting to default of auto",
+        LOG(LOG_INFO, "no GUI scale found in '%s': setting to default of auto",
                 str_into(opt_path));
         options.gui_scale = 0;
     }
     if (!found.unicode) {
-        wlr_log(WLR_INFO, "no forceUnicodeFont found in '%s': setting to default of false",
+        LOG(LOG_INFO, "no forceUnicodeFont found in '%s': setting to default of false",
                 str_into(opt_path));
         options.unicode = false;
     }
@@ -624,7 +622,7 @@ instance_try_from(struct window *window, bool *err) {
     n = readlink(buf, dir, PATH_MAX - 1);
     ww_assert(n < PATH_MAX - 1);
     if (n == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to readlink instance directory (pid %d)", (int)pid);
+        LOG_ERRNO(LOG_ERROR, "failed to readlink instance directory (pid %d)", (int)pid);
         *err = true;
         return instance;
     }
@@ -658,7 +656,7 @@ instance_try_from(struct window *window, bool *err) {
         instance.dir_wd = inotify_add_watch(g_inotify, str_into(path), IN_CREATE);
     }
     if (instance.dir_wd == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to create directory watch for instance at '%s'",
+        LOG_ERRNO(LOG_ERROR, "failed to create directory watch for instance at '%s'",
                       instance.dir);
         goto fail;
     }

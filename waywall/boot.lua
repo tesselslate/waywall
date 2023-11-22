@@ -26,7 +26,7 @@ local force_jit = __c_waywall_force_jit
     Initialization
 ]]--
 
--- Override the "print" global to use wlr_log.
+-- Override the "print" global to use _ww_log.
 _G.print = function(...)
     local str = nil
     for _, v in ipairs({...}) do

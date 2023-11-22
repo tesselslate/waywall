@@ -7,7 +7,6 @@
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
 #include <toml.h>
-#include <wlr/util/log.h>
 
 // TODO: Improve error messages (log broken objects?)
 // TODO: Additional checks (e.g. no duplicate instances until that is supported, instance IDs
@@ -61,7 +60,7 @@ marshal_array(lua_State *L, const toml_array_t *array) {
 
             toml_timestamp_t ts;
             if (toml_rtots(raw, &ts) == 0) {
-                wlr_log(WLR_ERROR, "timestamps are not supported");
+                LOG(LOG_ERROR, "timestamps are not supported");
                 return false;
             }
         } else {
@@ -80,7 +79,7 @@ marshal_array(lua_State *L, const toml_array_t *array) {
             }
         }
 
-        wlr_log(WLR_ERROR, "found unknown type when processing TOML");
+        LOG(LOG_ERROR, "found unknown type when processing TOML");
         ww_unreachable();
     }
 
@@ -129,7 +128,7 @@ marshal_table(lua_State *L, const toml_table_t *table) {
 
             toml_timestamp_t ts;
             if (toml_rtots(raw, &ts) == 0) {
-                wlr_log(WLR_ERROR, "timestamps are not supported");
+                LOG(LOG_ERROR, "timestamps are not supported");
                 return false;
             }
         } else {
@@ -148,7 +147,7 @@ marshal_table(lua_State *L, const toml_table_t *table) {
             }
         }
 
-        wlr_log(WLR_ERROR, "found unknown type when processing TOML");
+        LOG(LOG_ERROR, "found unknown type when processing TOML");
         ww_unreachable();
     }
 
@@ -212,17 +211,17 @@ static bool
 unmarshal_layout_entry(lua_State *L, struct layout_entry *entry) {
     // Perform basic checks.
     if (!lua_istable(L, -1)) {
-        wlr_log(WLR_ERROR, "found non-table entry");
+        LOG(LOG_ERROR, "found non-table entry");
         return false;
     }
 
     lua_pushnil(L);
     if (!lua_next(L, -2)) {
-        wlr_log(WLR_ERROR, "layout generator returned an empty entry");
+        LOG(LOG_ERROR, "layout generator returned an empty entry");
         return false;
     }
     if (!lua_isstring(L, -1)) {
-        wlr_log(WLR_ERROR, "layout generator returned an entry that did not begin with a string");
+        LOG(LOG_ERROR, "layout generator returned an entry that did not begin with a string");
         return false;
     }
 
@@ -232,11 +231,11 @@ unmarshal_layout_entry(lua_State *L, struct layout_entry *entry) {
         entry->type = INSTANCE;
         lua_pop(L, 1);
         if (!lua_next(L, -2)) {
-            wlr_log(WLR_ERROR, "layout generator did not return an instance ID");
+            LOG(LOG_ERROR, "layout generator did not return an instance ID");
             return false;
         }
         if (!lua_isnumber(L, -1)) {
-            wlr_log(WLR_ERROR, "layout generator returned non-number instance ID");
+            LOG(LOG_ERROR, "layout generator returned non-number instance ID");
         }
         entry->data.instance = lua_tointeger(L, -1);
         lua_pop(L, 1);
@@ -244,7 +243,7 @@ unmarshal_layout_entry(lua_State *L, struct layout_entry *entry) {
         entry->type = RECTANGLE;
         lua_pop(L, 1);
     } else {
-        wlr_log(WLR_ERROR, "received unknown entry type from layout generator ('%s')", type);
+        LOG(LOG_ERROR, "received unknown entry type from layout generator ('%s')", type);
         return false;
     }
 
@@ -254,7 +253,7 @@ unmarshal_layout_entry(lua_State *L, struct layout_entry *entry) {
     while (lua_next(L, -2)) {
         // There should be no more unkeyed values.
         if (!lua_isstring(L, -2)) {
-            wlr_log(WLR_ERROR,
+            LOG(LOG_ERROR,
                     "layout generator returned an invalid entry (too many unkeyed values)");
             return false;
         }
@@ -263,49 +262,49 @@ unmarshal_layout_entry(lua_State *L, struct layout_entry *entry) {
         const char *key = lua_tostring(L, -2);
         if (strcmp(key, "x") == 0) {
             if (!is_number) {
-                wlr_log(WLR_ERROR, "layout generator returned non-number X coordinate");
+                LOG(LOG_ERROR, "layout generator returned non-number X coordinate");
                 return false;
             }
             entry->x = lua_tointeger(L, -1);
             x = true;
         } else if (strcmp(key, "y") == 0) {
             if (!is_number) {
-                wlr_log(WLR_ERROR, "layout generator returned non-number Y coordinate");
+                LOG(LOG_ERROR, "layout generator returned non-number Y coordinate");
                 return false;
             }
             entry->y = lua_tointeger(L, -1);
             y = true;
         } else if (strcmp(key, "w") == 0) {
             if (!is_number) {
-                wlr_log(WLR_ERROR, "layout generated returned non-number width");
+                LOG(LOG_ERROR, "layout generated returned non-number width");
                 return false;
             }
             entry->w = lua_tointeger(L, -1);
             w = true;
         } else if (strcmp(key, "h") == 0) {
             if (!is_number) {
-                wlr_log(WLR_ERROR, "layout generated returned non-number width");
+                LOG(LOG_ERROR, "layout generated returned non-number width");
                 return false;
             }
             entry->h = lua_tointeger(L, -1);
             h = true;
         } else if (strcmp(key, "color") == 0) {
             if (entry->type != RECTANGLE) {
-                wlr_log(WLR_ERROR, "layout generator returned color for an instance");
+                LOG(LOG_ERROR, "layout generator returned color for an instance");
                 return false;
             }
             if (!lua_isstring(L, -1)) {
-                wlr_log(WLR_ERROR, "layout generator returned non-string color");
+                LOG(LOG_ERROR, "layout generator returned non-string color");
                 return false;
             }
             if (!ww_util_parse_color(entry->data.color, lua_tostring(L, -1))) {
-                wlr_log(WLR_ERROR, "layout generator returned invalid color ('%s')",
+                LOG(LOG_ERROR, "layout generator returned invalid color ('%s')",
                         lua_tostring(L, -1));
                 return false;
             }
             color = true;
         } else {
-            wlr_log(WLR_ERROR, "extraneous key-value pair in layout entry ('%s')", key);
+            LOG(LOG_ERROR, "extraneous key-value pair in layout entry ('%s')", key);
             return false;
         }
         lua_pop(L, 1);
@@ -313,11 +312,11 @@ unmarshal_layout_entry(lua_State *L, struct layout_entry *entry) {
 
     // Check that the necessary keys were present.
     if (!x || !y || !w || !h) {
-        wlr_log(WLR_ERROR, "layout entry missing dimensions");
+        LOG(LOG_ERROR, "layout entry missing dimensions");
         return false;
     }
     if (!color && entry->type == RECTANGLE) {
-        wlr_log(WLR_ERROR, "layout rectangle missing color");
+        LOG(LOG_ERROR, "layout rectangle missing color");
         return false;
     }
 
@@ -344,14 +343,14 @@ unmarshal_scene(lua_State *L, struct wall *wall, struct layout *layout) {
         if (lua_isnumber(L, -2)) {
             int j = lua_tointeger(L, -2);
             if (j != i + 1) {
-                wlr_log(WLR_ERROR,
+                LOG(LOG_ERROR,
                         "layout generator did not return a sequential array of objects (%d -> %d)",
                         i, j);
                 return false;
             }
             i = j;
         } else {
-            wlr_log(WLR_ERROR, "layout generator did not return an array of objects");
+            LOG(LOG_ERROR, "layout generator did not return an array of objects");
             return false;
         }
 
@@ -369,7 +368,7 @@ unmarshal_scene(lua_State *L, struct wall *wall, struct layout *layout) {
 
 static int
 l_waywall_log(lua_State *L) {
-    wlr_log(WLR_INFO, "layout: %s", lua_tostring(L, 1));
+    LOG(LOG_INFO, "layout: %s", lua_tostring(L, 1));
     return 0;
 }
 
@@ -410,7 +409,7 @@ static lua_State *
 vm_create() {
     lua_State *L = luaL_newstate();
     if (!L) {
-        wlr_log(WLR_ERROR, "failed to create new lua state");
+        LOG(LOG_ERROR, "failed to create new lua state");
         return NULL;
     }
 
@@ -435,7 +434,7 @@ vm_create() {
     }
 
     if (luaL_dostring(L, "require('boot')")) {
-        wlr_log(WLR_ERROR, "failed to create layout VM: %s", lua_tostring(L, -1));
+        LOG(LOG_ERROR, "failed to create layout VM: %s", lua_tostring(L, -1));
         luaL_traceback(L, L, NULL, 0);
         lua_pop(L, 1);
         lua_close(L);
@@ -477,7 +476,7 @@ layout_get_locked(struct wall *wall) {
         lua_sethook(current_vm, vm_hook, LUA_MASKCOUNT, 1000000);
     }
     if (lua_pcall(current_vm, 0, 1, 0) != 0) {
-        wlr_log(WLR_ERROR, "failed to request locked instance list: %s",
+        LOG(LOG_ERROR, "failed to request locked instance list: %s",
                 lua_tostring(current_vm, -1));
         goto fail;
     }
@@ -487,14 +486,14 @@ layout_get_locked(struct wall *wall) {
     current_wall = NULL;
 
     if (!lua_istable(current_vm, -1)) {
-        wlr_log(WLR_ERROR, "layout generator did not return a table of locked instances");
+        LOG(LOG_ERROR, "layout generator did not return a table of locked instances");
         goto fail;
     }
 
     lua_pushnil(current_vm);
     while (lua_next(current_vm, -2)) {
         if (!lua_isnumber(current_vm, -1)) {
-            wlr_log(WLR_ERROR,
+            LOG(LOG_ERROR,
                     "layout generator returned non-number instance ID in list of locked instances");
             goto fail;
         }
@@ -528,7 +527,7 @@ layout_get_reset_all(struct wall *wall) {
         lua_sethook(current_vm, vm_hook, LUA_MASKCOUNT, 1000000);
     }
     if (lua_pcall(current_vm, 0, 1, 0) != 0) {
-        wlr_log(WLR_ERROR, "failed to request reset all list: %s", lua_tostring(current_vm, -1));
+        LOG(LOG_ERROR, "failed to request reset all list: %s", lua_tostring(current_vm, -1));
         goto fail;
     }
     if (!g_config->force_jit) {
@@ -537,7 +536,7 @@ layout_get_reset_all(struct wall *wall) {
     current_wall = NULL;
 
     if (!lua_istable(current_vm, -1)) {
-        wlr_log(WLR_ERROR,
+        LOG(LOG_ERROR,
                 "layout generator did not return a table of instance IDs for the reset all list");
         goto fail;
     }
@@ -545,7 +544,7 @@ layout_get_reset_all(struct wall *wall) {
     lua_pushnil(current_vm);
     while (lua_next(current_vm, -2)) {
         if (!lua_isnumber(current_vm, -1)) {
-            wlr_log(WLR_ERROR,
+            LOG(LOG_ERROR,
                     "layout generator returned non-number instance ID in reset all list");
             goto fail;
         }
@@ -651,7 +650,7 @@ layout_request_new(struct wall *wall, struct layout_reason reason, struct layout
         lua_sethook(current_vm, vm_hook, LUA_MASKCOUNT, 1000000);
     }
     if (lua_pcall(current_vm, nargs, 1, 0) != 0) {
-        wlr_log(WLR_ERROR, "failed to request layout: %s", lua_tostring(current_vm, -1));
+        LOG(LOG_ERROR, "failed to request layout: %s", lua_tostring(current_vm, -1));
         goto fail;
     }
     if (!g_config->force_jit) {

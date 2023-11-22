@@ -6,7 +6,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
-#include <wlr/util/log.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define MAX_ACTIONS 8

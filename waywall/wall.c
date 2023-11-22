@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <linux/input-event-codes.h>
 #include <stdlib.h>
-#include <wlr/xwayland.h>
 
 // TODO: reimpl benchmark
 // TODO: overhaul keybind matching to be less specific
@@ -274,14 +273,14 @@ sleepbg_lock_toggle(bool state) {
     if (state) {
         int fd = creat(g_config->sleepbg_lock, 0644);
         if (fd == -1) {
-            wlr_log_errno(WLR_ERROR, "failed to create sleepbg.lock");
+            LOG_ERRNO(LOG_ERROR, "failed to create sleepbg.lock");
         } else {
             close(fd);
         }
     } else {
         int ret = remove(g_config->sleepbg_lock);
         if (ret == -1) {
-            wlr_log_errno(WLR_ERROR, "failed to delete sleepbg.lock");
+            LOG_ERRNO(LOG_ERROR, "failed to delete sleepbg.lock");
         }
     }
 }
@@ -511,7 +510,7 @@ on_button(struct wl_listener *listener, void *data) {
 
     int button = event->button - BTN_MOUSE;
     if (button < 0 || button >= (int)ARRAY_LEN(wall->input.buttons)) {
-        wlr_log(WLR_ERROR, "received button event for non-mouse button %" PRIu32, event->button);
+        LOG(LOG_ERROR, "received button event for non-mouse button %" PRIu32, event->button);
         return;
     }
     wall->input.buttons[button] = event->state;
@@ -664,14 +663,14 @@ on_window_map(struct wl_listener *listener, void *data) {
     if (err) {
         if (!ninb_try_window(window)) {
             const char *name = window->xwl_window->surface->title;
-            wlr_log(WLR_INFO, "unknown window opened (pid %d, name '%s') - killing",
+            LOG(LOG_INFO, "unknown window opened (pid %d, name '%s') - killing",
                     window->xwl_window->surface->pid, name ? name : "unnamed");
             xcb_kill_client(window->xwl_window->xwl->xcb, window->xwl_window->surface->window_id);
         }
         return;
     }
     if (wall->instance_count == MAX_INSTANCES) {
-        wlr_log(WLR_ERROR, "new instance detected but not added (instance limit of " STR(
+        LOG(LOG_ERROR, "new instance detected but not added (instance limit of " STR(
                                MAX_INSTANCES) " exceeded)");
         return;
     }
@@ -797,7 +796,7 @@ fail_layout:
 void
 wall_destroy(struct wall *wall) {
     if (wall->reset_counter) {
-        wlr_log(WLR_INFO, "finished counting resets (%d)",
+        LOG(LOG_INFO, "finished counting resets (%d)",
                 reset_counter_get_count(wall->reset_counter));
         reset_counter_destroy(wall->reset_counter);
     }
@@ -840,20 +839,20 @@ wall_update_config(struct wall *wall) {
         ww_assert(g_config->resets_file);
         if (wall->reset_counter) {
             if (!reset_counter_change_file(wall->reset_counter, g_config->resets_file)) {
-                wlr_log(WLR_ERROR, "failed to change reset count file");
+                LOG(LOG_ERROR, "failed to change reset count file");
                 return false;
             }
         } else {
             wall->reset_counter = reset_counter_from_file(g_config->resets_file);
             if (!wall->reset_counter) {
-                wlr_log(WLR_ERROR, "failed to create reset counter");
+                LOG(LOG_ERROR, "failed to create reset counter");
                 return false;
             }
         }
     } else {
         if (wall->reset_counter) {
             int count = reset_counter_get_count(wall->reset_counter);
-            wlr_log(WLR_INFO, "disabling reset counting (stopping at %d resets)", count);
+            LOG(LOG_INFO, "disabling reset counting (stopping at %d resets)", count);
             reset_counter_destroy(wall->reset_counter);
             wall->reset_counter = NULL;
         }

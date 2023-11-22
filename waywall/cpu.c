@@ -9,7 +9,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <wlr/util/log.h>
 
 static const char cgroup_dir[] = "/sys/fs/cgroup/waywall/";
 static const char *group_names[] = {
@@ -33,17 +32,17 @@ static bool
 check_dir(const char *dirname) {
     DIR *dir = opendir(dirname);
     if (!dir) {
-        wlr_log_errno(WLR_ERROR, "cpu_init: failed to open directory '%s'", dirname);
+        LOG_ERRNO(LOG_ERROR, "cpu_init: failed to open directory '%s'", dirname);
         return false;
     }
     closedir(dir);
     struct stat dstat = {0};
     if (stat(dirname, &dstat) != 0) {
-        wlr_log_errno(WLR_ERROR, "cpu_init: failed to stat directory '%s'", dirname);
+        LOG_ERRNO(LOG_ERROR, "cpu_init: failed to stat directory '%s'", dirname);
         return false;
     }
     if (geteuid() != dstat.st_uid) {
-        wlr_log(WLR_ERROR, "cpu_init: directory '%s' not owned by current user", dirname);
+        LOG(LOG_ERROR, "cpu_init: directory '%s' not owned by current user", dirname);
         return false;
     }
     return true;
@@ -53,15 +52,15 @@ static bool
 check_file(const char *filename) {
     struct stat fstat = {0};
     if (stat(filename, &fstat) != 0) {
-        wlr_log_errno(WLR_ERROR, "cpu_init: failed to stat file '%s'", filename);
+        LOG_ERRNO(LOG_ERROR, "cpu_init: failed to stat file '%s'", filename);
         return false;
     }
     if (!S_ISREG(fstat.st_mode)) {
-        wlr_log_errno(WLR_ERROR, "cpu_init: file '%s' is directory", filename);
+        LOG_ERRNO(LOG_ERROR, "cpu_init: file '%s' is directory", filename);
         return false;
     }
     if (geteuid() != fstat.st_uid) {
-        wlr_log(WLR_ERROR, "cpu_init: file '%s' not owned by current user", filename);
+        LOG(LOG_ERROR, "cpu_init: file '%s' not owned by current user", filename);
         return false;
     }
     return true;
@@ -133,7 +132,7 @@ cpu_move_to_group(pid_t pid, enum cpu_group group) {
 
         int fd = open(buf, O_WRONLY);
         if (fd == -1) {
-            wlr_log_errno(WLR_ERROR, "failed to open cgroup.procs of group %s for pid %d",
+            LOG_ERRNO(LOG_ERROR, "failed to open cgroup.procs of group %s for pid %d",
                           strgroup(group), (int)pid);
             return;
         }
@@ -143,7 +142,7 @@ cpu_move_to_group(pid_t pid, enum cpu_group group) {
     size_t n = snprintf(buf, ARRAY_LEN(buf), "%d", (int)pid);
     ww_assert(n < ARRAY_LEN(buf) - 1);
     if (write(fds[group], buf, n) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to write cgroup.procs of group %s for pid %d",
+        LOG_ERRNO(LOG_ERROR, "failed to write cgroup.procs of group %s for pid %d",
                       strgroup(group), (int)pid);
     }
 }
@@ -159,13 +158,13 @@ cpu_set_group_weight(enum cpu_group group, int weight) {
     strcat(buf, "/cpu.weight");
     int fd = open(buf, O_WRONLY);
     if (fd == -1) {
-        wlr_log_errno(WLR_ERROR, "cpu_set_group_parameters: failed to open cpu.weight");
+        LOG_ERRNO(LOG_ERROR, "cpu_set_group_parameters: failed to open cpu.weight");
         return false;
     }
     size_t n = snprintf(buf, ARRAY_LEN(buf), "%d", weight);
     ww_assert(n < ARRAY_LEN(buf) - 1);
     if (write(fd, buf, n) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to write cpu.weight of group %s", strgroup(group));
+        LOG_ERRNO(LOG_ERROR, "failed to write cpu.weight of group %s", strgroup(group));
         close(fd);
         return false;
     }

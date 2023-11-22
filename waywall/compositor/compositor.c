@@ -33,7 +33,7 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
 
     if (strcmp(interface, wl_seat_interface.name) == 0) {
         if (compositor->remote.seat) {
-            wlr_log(WLR_INFO, "multiple seats advertised by compositor");
+            LOG(LOG_INFO, "multiple seats advertised by compositor");
             return;
         }
 
@@ -79,27 +79,27 @@ struct compositor *
 compositor_create(struct compositor_config config) {
     struct compositor *compositor = calloc(1, sizeof(struct compositor));
     if (!compositor) {
-        wlr_log(WLR_ERROR, "failed to allocate compositor");
+        LOG(LOG_ERROR, "failed to allocate compositor");
         return NULL;
     }
     compositor->config = config;
 
     compositor->display = wl_display_create();
     if (!compositor->display) {
-        wlr_log(WLR_ERROR, "failed to create wl_display");
+        LOG(LOG_ERROR, "failed to create wl_display");
         goto cleanup;
     }
 
     compositor->backend_headless = wlr_headless_backend_create(compositor->display);
     if (!compositor->backend_headless) {
-        wlr_log(WLR_ERROR, "failed to create headless backend");
+        LOG(LOG_ERROR, "failed to create headless backend");
         goto cleanup;
     }
     wlr_headless_add_output(compositor->backend_headless, HEADLESS_WIDTH, HEADLESS_HEIGHT);
 
     compositor->backend_wl = wlr_wl_backend_create(compositor->display, NULL);
     if (!compositor->backend_wl) {
-        wlr_log(WLR_ERROR, "failed to create wayland backend");
+        LOG(LOG_ERROR, "failed to create wayland backend");
         goto cleanup;
     }
     wlr_wl_output_create(compositor->backend_wl);
@@ -111,15 +111,15 @@ compositor_create(struct compositor_config config) {
     wl_registry_add_listener(compositor->remote.registry, &registry_listener, compositor);
     wl_display_roundtrip(compositor->remote.display);
     if (!compositor->remote.pointer) {
-        wlr_log(WLR_ERROR, "failed to get remote wayland pointer");
+        LOG(LOG_ERROR, "failed to get remote wayland pointer");
         goto cleanup;
     }
     if (!compositor->remote.relative_pointer_manager) {
-        wlr_log(WLR_ERROR, "failed to get remote relative pointer manager");
+        LOG(LOG_ERROR, "failed to get remote relative pointer manager");
         goto cleanup;
     }
     if (!compositor->remote.constraints) {
-        wlr_log(WLR_ERROR, "failed to get remote pointer constraints");
+        LOG(LOG_ERROR, "failed to get remote pointer constraints");
         goto cleanup;
     }
 
@@ -129,50 +129,50 @@ compositor_create(struct compositor_config config) {
 
     compositor->backend = wlr_multi_backend_create(compositor->display);
     if (!compositor->backend) {
-        wlr_log(WLR_ERROR, "failed to create multi backend");
+        LOG(LOG_ERROR, "failed to create multi backend");
         goto cleanup;
     }
     if (!wlr_multi_backend_add(compositor->backend, compositor->backend_headless)) {
-        wlr_log(WLR_ERROR, "failed to add headless backend");
+        LOG(LOG_ERROR, "failed to add headless backend");
         goto cleanup;
     }
     if (!wlr_multi_backend_add(compositor->backend, compositor->backend_wl)) {
-        wlr_log(WLR_ERROR, "failed to add wayland backend");
+        LOG(LOG_ERROR, "failed to add wayland backend");
         goto cleanup;
     }
 
     compositor->renderer = wlr_renderer_autocreate(compositor->backend);
     if (!compositor->renderer) {
-        wlr_log(WLR_ERROR, "failed to create renderer");
+        LOG(LOG_ERROR, "failed to create renderer");
         goto cleanup;
     }
     wlr_renderer_init_wl_display(compositor->renderer, compositor->display);
 
     compositor->allocator = wlr_allocator_autocreate(compositor->backend, compositor->renderer);
     if (!compositor->allocator) {
-        wlr_log(WLR_ERROR, "failed to create allocator");
+        LOG(LOG_ERROR, "failed to create allocator");
         goto cleanup;
     }
 
     compositor->compositor = wlr_compositor_create(compositor->display, 5, compositor->renderer);
     if (!compositor->compositor) {
-        wlr_log(WLR_ERROR, "failed to create wlr_compositor");
+        LOG(LOG_ERROR, "failed to create wlr_compositor");
         goto cleanup;
     }
     if (!wlr_subcompositor_create(compositor->display)) {
-        wlr_log(WLR_ERROR, "failed to create subcompositor");
+        LOG(LOG_ERROR, "failed to create subcompositor");
         goto cleanup;
     }
 
     compositor->dmabuf_export = wlr_export_dmabuf_manager_v1_create(compositor->display);
     if (!compositor->dmabuf_export) {
-        wlr_log(WLR_ERROR, "failed to create export_dmabuf_manager");
+        LOG(LOG_ERROR, "failed to create export_dmabuf_manager");
         goto cleanup;
     }
 
     compositor->xwl = xwl_create(compositor);
     if (!compositor->xwl) {
-        wlr_log(WLR_ERROR, "failed to create comp_xwayland");
+        LOG(LOG_ERROR, "failed to create comp_xwayland");
         goto cleanup;
     }
 
@@ -181,13 +181,13 @@ compositor_create(struct compositor_config config) {
 
     compositor->render = render_create(compositor);
     if (!compositor->render) {
-        wlr_log(WLR_ERROR, "failed to create comp_render");
+        LOG(LOG_ERROR, "failed to create comp_render");
         goto cleanup;
     }
 
     compositor->input = input_create(compositor);
     if (!compositor->input) {
-        wlr_log(WLR_ERROR, "failed to create comp_input");
+        LOG(LOG_ERROR, "failed to create comp_input");
         goto cleanup;
     }
 
@@ -259,7 +259,7 @@ compositor_load_config(struct compositor *compositor, struct compositor_config c
     input_load_config(compositor->input, config);
 
     if (config.stop_on_close && !compositor->render->wl) {
-        wlr_log(WLR_INFO, "stop on close enabled with new configuration - stopping");
+        LOG(LOG_INFO, "stop on close enabled with new configuration - stopping");
         wl_display_terminate(compositor->display);
     }
 
@@ -282,15 +282,15 @@ compositor_run(struct compositor *compositor, int display_file_fd) {
     ssize_t len =
         snprintf(buf, ARRAY_LEN(buf), "%s\n%s", socket, compositor->xwl->xwayland->display_name);
     if (len >= (ssize_t)ARRAY_LEN(buf) || len < 0) {
-        wlr_log(WLR_ERROR, "failed to write waywall-display file (%zd)", len);
+        LOG(LOG_ERROR, "failed to write waywall-display file (%zd)", len);
         return false;
     }
     if (write(display_file_fd, buf, len) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to write waywall-display");
+        LOG_ERRNO(LOG_ERROR, "failed to write waywall-display");
         return false;
     }
     if (ftruncate(display_file_fd, len) == -1) {
-        wlr_log_errno(WLR_ERROR, "failed to truncate waywall-display");
+        LOG_ERRNO(LOG_ERROR, "failed to truncate waywall-display");
         return false;
     }
 
@@ -301,7 +301,7 @@ compositor_run(struct compositor *compositor, int display_file_fd) {
 void
 compositor_stop(struct compositor *compositor) {
     if (compositor->should_stop) {
-        wlr_log(WLR_INFO, "received 2nd stop call - terminating");
+        LOG(LOG_INFO, "received 2nd stop call - terminating");
         wl_display_terminate(compositor->display);
         return;
     }

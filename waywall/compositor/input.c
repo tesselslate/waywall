@@ -622,7 +622,7 @@ on_new_input(struct wl_listener *listener, void *data) {
         handle_new_pointer(input, device);
         break;
     default:
-        wlr_log(WLR_INFO, "unknown input device of type %d (name '%s')", (int)device->type,
+        LOG(LOG_INFO, "unknown input device of type %d (name '%s')", (int)device->type,
                 device->name);
         break;
     }
@@ -796,7 +796,7 @@ input_load_config(struct comp_input *input, struct compositor_config config) {
     struct wlr_xcursor_manager *cursor_manager =
         wlr_xcursor_manager_create(config.cursor_theme, config.cursor_size);
     if (!cursor_manager) {
-        wlr_log(WLR_ERROR, "failed to create new cursor manager");
+        LOG(LOG_ERROR, "failed to create new cursor manager");
     } else {
         wlr_xcursor_manager_destroy(input->cursor_manager);
         input->cursor_manager = cursor_manager;
