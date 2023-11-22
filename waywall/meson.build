@@ -40,7 +40,6 @@ executable('waywall',
   dependencies : [
     luajit,
     toml,
-    wlroots,
     wayland_client,
     wayland_server,
     xcb,
