@@ -1,6 +1,5 @@
 #include "waywall.h"
-#include "compositor/input.h"
-#include "compositor/render.h"
+#include "compositor.h"
 #include "config.h"
 #include "ninb.h"
 #include "wall.h"
@@ -19,30 +18,6 @@ struct wall *g_wall;
 static int config_wd;
 
 #define WAYWALL_DISPLAY_PATH "/tmp/waywall-display"
-
-static struct compositor_config
-create_compositor_config() {
-    struct compositor_config compositor_config = {
-        .repeat_rate = g_config->repeat_rate,
-        .repeat_delay = g_config->repeat_delay,
-        .floating_opacity = g_config->ninb_opacity,
-        .confine_pointer = g_config->confine_pointer,
-        .cursor_theme = g_config->cursor_theme,
-        .cursor_size = g_config->cursor_size,
-        .stop_on_close = !g_config->remain_in_background,
-        .layout = g_config->layout,
-        .rules = g_config->rules,
-        .model = g_config->model,
-        .variant = g_config->variant,
-        .options = g_config->options,
-        .remap_ingame = g_config->remap_ingame,
-        .remap_ingame_count = g_config->remap_ingame_count,
-        .remap_menu = g_config->remap_menu,
-        .remap_menu_count = g_config->remap_menu_count,
-    };
-    memcpy(compositor_config.background_color, g_config->background_color, sizeof(float) * 4);
-    return compositor_config;
-}
 
 static void
 process_config_inotify(const struct inotify_event *event) {
@@ -64,7 +39,7 @@ process_config_inotify(const struct inotify_event *event) {
         g_config = old;
         return;
     }
-    compositor_load_config(g_compositor, create_compositor_config());
+    compositor_update_config(g_compositor);
     ninb_update_config();
 
     config_destroy(old);
@@ -159,10 +134,11 @@ main(int argc, char **argv) {
     }
     free(config_path);
 
-    g_compositor = compositor_create(create_compositor_config());
+    g_compositor = compositor_create();
     if (!g_compositor) {
         return 1;
     }
+    // TODO: /tmp/waywall-display
     g_compositor->input->sensitivity = g_config->main_sens;
 
     struct wl_event_loop *loop = wl_display_get_event_loop(g_compositor->display);
@@ -179,7 +155,7 @@ main(int argc, char **argv) {
         return 1;
     }
 
-    bool success = compositor_run(g_compositor, display_file_fd);
+    bool success = compositor_run(g_compositor);
 
     wl_event_source_remove(inotify);
     wl_event_source_remove(evt_sigint);
