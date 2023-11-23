@@ -22,6 +22,12 @@ foreach proto : protocol_xmls
     output : '@BASENAME@-protocol.h',
     command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
   )
+  protocol_headers += custom_target(
+    proto.underscorify() + '-server-header',
+    input : proto,
+    output : '@BASENAME@-server-protocol.h',
+    command : [wl_scanner, 'server-header', '@INPUT@', '@OUTPUT@'],
+  )
   protocol_sources += custom_target(
     proto.underscorify() + '-src',
     input : proto,
