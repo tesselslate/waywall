@@ -37,11 +37,11 @@ subdir('waywall')
 
 executable('waywall-launch', 'waywall-launch.c')
 
-shared_library('waywall-obs',
-  protocol_sources, protocol_headers,
-  'waywall-obs.c',
-  dependencies : [
-    obs,
-    wayland_client,
-  ],
-)
+# shared_library('waywall-obs',
+#   protocol_sources, protocol_headers,
+#   'waywall-obs.c',
+#   dependencies : [
+#     obs,
+#     wayland_client,
+#   ],
+# )
