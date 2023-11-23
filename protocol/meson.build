@@ -9,8 +9,10 @@ protocol_xmls = [
   protocol_dir + 'stable/xdg-shell/xdg-shell.xml',
   protocol_dir + 'staging/single-pixel-buffer/single-pixel-buffer-v1.xml',
   protocol_dir + 'staging/tearing-control/tearing-control-v1.xml',
+  protocol_dir + 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
   protocol_dir + 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
   protocol_dir + 'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
+  protocol_dir + 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
 ]
 
 foreach proto : protocol_xmls
