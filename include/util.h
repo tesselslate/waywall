@@ -41,6 +41,18 @@ _ww_assert(const char *file, int line, const char *expr, bool value) {
 
 #define MAX_INSTANCES 128
 
+// XXX: GNU (statement expression)
+#define ww_alloc(nmemb, size)                                                                      \
+    ({                                                                                             \
+        void *_ww_alloc_ptr = calloc(nmemb, size);                                                 \
+        if (!_ww_alloc_ptr) {                                                                      \
+            fprintf(stderr, "[%s:%d] allocation failed (%s * %s)", __FILE__, __LINE__, STR(nmemb), \
+                    STR(size));                                                                    \
+            exit(1);                                                                               \
+        }                                                                                          \
+        _ww_alloc_ptr;                                                                             \
+    })
+
 #define ww_assert(expr) _ww_assert(__FILE__, __LINE__, #expr, expr)
 
 #define ww_unreachable()                                                                           \
