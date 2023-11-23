@@ -4,7 +4,7 @@ void
 _ww_log(enum log_level level, const char *fmt, ...) {
     struct timespec now = {0};
     clock_gettime(CLOCK_MONOTONIC, &now);
-    fprintf(stderr, "%09d.%04d ", (int)now.tv_sec, (int)now.tv_nsec);
+    fprintf(stderr, "[%7lu.%06lu] ", (unsigned long)now.tv_sec, (unsigned long)(now.tv_nsec / 1000));
 
     if (isatty(STDERR_FILENO) && level == LOG_ERROR) {
         fprintf(stderr, "\x1b[1;31m");
