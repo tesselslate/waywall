@@ -127,7 +127,7 @@ struct client_seat {
     struct wl_seat *wl;
     uint32_t caps;
     uint32_t name;
-    const char *str_name;
+    char *str_name;
 
     struct wl_pointer *pointer;
     struct wl_resource *pointer_focus;
@@ -1947,6 +1947,7 @@ client_seat_destroy(struct client_seat *seat) {
     wl_seat_release(seat->wl);
 
     wl_list_remove(&seat->link);
+    free(seat->str_name);
     free(seat);
 }
 
@@ -2373,7 +2374,7 @@ static void
 on_seat_name(void *data, struct wl_seat *wl_seat, const char *name) {
     struct client_seat *seat = data;
 
-    seat->str_name = name;
+    seat->str_name = strdup(name);
 }
 
 static const struct wl_seat_listener seat_listener = {
