@@ -1580,6 +1580,7 @@ destroy_xdg_toplevel(struct wl_resource *resource) {
         wl_resource_post_error(server_xdg_toplevel->decoration_resource,
                                ZXDG_TOPLEVEL_DECORATION_V1_ERROR_ORPHANED,
                                "xdg_toplevel destroyed before associated decoration");
+        wl_resource_destroy(server_xdg_toplevel->decoration_resource);
     }
     if (server_xdg_toplevel->server_xdg_surface->server_surface->subsurface) {
         wl_subsurface_destroy(server_xdg_toplevel->server_xdg_surface->server_surface->subsurface);
@@ -1764,8 +1765,6 @@ handle_get_xdg_surface_xdg_wm_base(struct wl_client *client, struct wl_resource 
                                "cannot create multiple xdg_surfaces for one wl_surface");
         return;
     }
-
-    ww_assert(!server_surface->xdg_resource);
 
     struct server_xdg_surface *server_xdg_surface = ww_alloc(1, sizeof(*server_xdg_surface));
     server_surface->xdg_resource =
@@ -2884,13 +2883,14 @@ compositor_destroy(struct compositor *compositor) {
     wl_registry_destroy(compositor->remote.registry);
 
     // Server
+    wl_display_destroy_clients(compositor->display);
+
     wl_global_destroy(compositor->globals.wl_compositor);
     wl_global_destroy(compositor->globals.wl_shm);
     wl_global_destroy(compositor->globals.linux_dmabuf);
     wl_global_destroy(compositor->globals.xdg_decoration);
     wl_global_destroy(compositor->globals.xdg_wm_base);
 
-    wl_display_destroy_clients(compositor->display);
     wl_display_destroy(compositor->display);
 
     // Wait to disconnect from the remote display until all of the server objects have run their
