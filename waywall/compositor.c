@@ -565,7 +565,7 @@ handle_create_surface_wl_compositor(struct wl_client *client, struct wl_resource
 
 static void
 destroy_wl_compositor(struct wl_resource *resource) {
-    wl_list_remove(wl_resource_get_link(resource));
+    // Unused.
 }
 
 static const struct wl_compositor_interface wl_compositor_implementation = {
@@ -582,8 +582,6 @@ handle_bind_wl_compositor(struct wl_client *client, void *data, uint32_t version
         wl_resource_create(client, &wl_compositor_interface, wl_compositor_interface.version, id);
     wl_resource_set_implementation(resource, &wl_compositor_implementation, compositor,
                                    destroy_wl_compositor);
-
-    wl_list_insert(&compositor->globals.wl_compositor_clients, wl_resource_get_link(resource));
 }
 
 static void
@@ -623,7 +621,7 @@ handle_get_relative_pointer_relative_pointer_manager(struct wl_client *client,
 
 static void
 destroy_relative_pointer_manager(struct wl_resource *resource) {
-    wl_list_remove(wl_resource_get_link(resource));
+    // Unused.
 }
 
 static const struct zwp_relative_pointer_manager_v1_interface
@@ -642,8 +640,6 @@ handle_bind_relative_pointer(struct wl_client *client, void *data, uint32_t vers
                            zwp_relative_pointer_manager_v1_interface.version, id);
     wl_resource_set_implementation(resource, &relative_pointer_manager_implementation, compositor,
                                    destroy_relative_pointer_manager);
-
-    wl_list_insert(&compositor->globals.relative_pointer_clients, wl_resource_get_link(resource));
 }
 
 static void
@@ -753,7 +749,7 @@ handle_create_pool_wl_shm(struct wl_client *client, struct wl_resource *resource
 
 static void
 destroy_wl_shm(struct wl_resource *resource) {
-    wl_list_remove(wl_resource_get_link(resource));
+    // Unused.
 }
 
 static const struct wl_shm_interface wl_shm_implementation = {
@@ -768,8 +764,6 @@ handle_bind_wl_shm(struct wl_client *client, void *data, uint32_t version, uint3
     struct wl_resource *resource =
         wl_resource_create(client, &wl_shm_interface, wl_shm_interface.version, id);
     wl_resource_set_implementation(resource, &wl_shm_implementation, compositor, destroy_wl_shm);
-
-    wl_list_insert(&compositor->globals.wl_shm_clients, wl_resource_get_link(resource));
 
     uint32_t *format;
     wl_array_for_each(format, &compositor->remote.shm_formats) {
@@ -1129,7 +1123,6 @@ destroy_linux_dmabuf(struct wl_resource *resource) {
         wl_resource_destroy(dmabuf_feedback_resource);
     }
 
-    wl_list_remove(wl_resource_get_link(resource));
     free(linux_dmabuf);
 }
 
@@ -1155,8 +1148,6 @@ handle_bind_linux_dmabuf(struct wl_client *client, void *data, uint32_t version,
     wl_list_init(&linux_dmabuf->buffer_params);
     wl_list_init(&linux_dmabuf->dmabuf_feedback);
 
-    wl_list_insert(&compositor->globals.linux_dmabuf_clients, wl_resource_get_link(resource));
-
     if (version < 4) {
         // TODO: send formats
         // TODO: send modifiers
@@ -1170,7 +1161,7 @@ handle_release_wl_output(struct wl_client *client, struct wl_resource *resource)
 
 static void
 destroy_wl_output(struct wl_resource *resource) {
-    wl_list_remove(wl_resource_get_link(resource));
+    // Unused.
 }
 
 static const struct wl_output_interface wl_output_implementation = {.release =
@@ -1185,8 +1176,6 @@ handle_bind_wl_output(struct wl_client *client, void *data, uint32_t version, ui
         wl_resource_create(client, &wl_output_interface, wl_output_interface.version, id);
     wl_resource_set_implementation(resource, &wl_output_implementation, compositor,
                                    destroy_wl_output);
-
-    wl_list_insert(&compositor->globals.wl_output_clients, wl_resource_get_link(resource));
 
     if (version >= WL_OUTPUT_SCALE_SINCE_VERSION) {
         wl_output_send_scale(resource, 1);
@@ -1476,7 +1465,7 @@ handle_get_toplevel_decoration_xdg_decoration_manager(struct wl_client *client,
 
 static void
 destroy_xdg_decoration_manager(struct wl_resource *resource) {
-    wl_list_remove(wl_resource_get_link(resource));
+    // Unused.
 }
 
 static const struct zxdg_decoration_manager_v1_interface xdg_decoration_manager_implementation = {
@@ -1494,8 +1483,6 @@ handle_bind_xdg_decoration(struct wl_client *client, void *data, uint32_t versio
                            zxdg_decoration_manager_v1_interface.version, id);
     wl_resource_set_implementation(resource, &xdg_decoration_manager_implementation, compositor,
                                    destroy_xdg_decoration_manager);
-
-    wl_list_insert(&compositor->globals.xdg_decoration_clients, wl_resource_get_link(resource));
 }
 
 static void
@@ -1882,7 +1869,6 @@ destroy_xdg_wm_base(struct wl_resource *resource) {
         }
     }
 
-    wl_list_remove(wl_resource_get_link(resource));
     free(server_xdg_wm_base);
 }
 
@@ -1906,8 +1892,6 @@ handle_bind_xdg_wm_base(struct wl_client *client, void *data, uint32_t version, 
 
     server_xdg_wm_base->compositor = compositor;
     wl_list_init(&server_xdg_wm_base->surfaces);
-
-    wl_list_insert(&compositor->globals.xdg_wm_base_clients, wl_resource_get_link(resource));
 }
 
 /*
@@ -2840,17 +2824,10 @@ compositor_create() {
     compositor->src_sigint =
         wl_event_loop_add_signal(event_loop, SIGINT, process_sigint, compositor);
 
-    wl_list_init(&compositor->globals.wl_compositor_clients);
-    wl_list_init(&compositor->globals.surfaces);
-    wl_list_init(&compositor->globals.wl_shm_clients);
-    wl_list_init(&compositor->globals.relative_pointer_clients);
-    wl_list_init(&compositor->globals.linux_dmabuf_clients);
-    wl_list_init(&compositor->globals.xdg_decoration_clients);
-    wl_list_init(&compositor->globals.xdg_wm_base_clients);
-    wl_list_init(&compositor->globals.wl_output_clients);
     wl_list_init(&compositor->remote.seats);
-
     wl_array_init(&compositor->remote.shm_formats);
+
+    wl_list_init(&compositor->globals.surfaces);
 
     compositor->remote.registry = wl_display_get_registry(compositor->remote.display);
     wl_registry_add_listener(compositor->remote.registry, &registry_listener, compositor);

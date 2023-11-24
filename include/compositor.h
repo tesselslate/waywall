@@ -14,26 +14,14 @@ struct compositor {
     // Server globals
     struct {
         struct wl_global *wl_compositor;
-        struct wl_list wl_compositor_clients;
         struct wl_list surfaces;
 
         struct wl_global *wl_shm;
-        struct wl_list wl_shm_clients;
-
         struct wl_global *relative_pointer;
-        struct wl_list relative_pointer_clients;
-
         struct wl_global *linux_dmabuf;
-        struct wl_list linux_dmabuf_clients;
-
         struct wl_global *xdg_decoration;
-        struct wl_list xdg_decoration_clients;
-
         struct wl_global *xdg_wm_base;
-        struct wl_list xdg_wm_base_clients;
-
         struct wl_global *wl_output; // represents the remote xdg_surface
-        struct wl_list wl_output_clients;
     } globals;
 
     // Client (remote)
