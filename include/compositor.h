@@ -66,7 +66,6 @@ struct compositor {
         struct zxdg_toplevel_decoration_v1 *xdg_decoration;
 
         int32_t win_width, win_height;
-        int32_t preferred_scale;
     } remote;
 };
 

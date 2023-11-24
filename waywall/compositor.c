@@ -416,15 +416,12 @@ handle_set_input_region_wl_surface(struct wl_client *client, struct wl_resource 
 static void
 handle_commit_wl_surface(struct wl_client *client, struct wl_resource *resource) {
     struct server_surface *server_surface = wl_resource_get_user_data(resource);
-    struct compositor *compositor = server_surface->compositor;
 
     if (server_surface->xdg_resource) {
         struct server_xdg_surface *server_xdg_surface =
             wl_resource_get_user_data(server_surface->xdg_resource);
 
         if (!server_surface->buffer_resource) {
-            wl_surface_send_preferred_buffer_scale(resource, compositor->remote.preferred_scale);
-
             if (server_xdg_surface->toplevel_resource) {
                 send_xdg_toplevel_configure(server_xdg_surface->toplevel_resource);
             }
@@ -1113,8 +1110,8 @@ handle_bind_wl_output(struct wl_client *client, void *data, uint32_t version, ui
 
     wl_list_insert(&compositor->globals.wl_output_clients, wl_resource_get_link(resource));
 
-    if (version >= WL_OUTPUT_SCALE_SINCE_VERSION && compositor->remote.preferred_scale > 0) {
-        wl_output_send_scale(resource, compositor->remote.preferred_scale);
+    if (version >= WL_OUTPUT_SCALE_SINCE_VERSION) {
+        wl_output_send_scale(resource, 1);
     }
 
     // GLFW does not make use of subpixel or transformation information as of v3.3.8.
@@ -2543,47 +2540,6 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 };
 
 static void
-on_surface_enter(void *data, struct wl_surface *surface, struct wl_output *output) {
-    // Unused.
-}
-
-static void
-on_surface_leave(void *data, struct wl_surface *surface, struct wl_output *output) {
-    // Unused.
-}
-
-static void
-on_surface_preferred_buffer_scale(void *data, struct wl_surface *surface, int32_t factor) {
-    static_assert(WL_OUTPUT_DONE_SINCE_VERSION <= WL_OUTPUT_SCALE_SINCE_VERSION,
-                  "wl_output.done <= wl_output.scale");
-
-    struct compositor *compositor = data;
-    ww_assert(surface == compositor->remote.surface);
-
-    compositor->remote.preferred_scale = factor;
-
-    struct wl_resource *output_resource;
-    wl_resource_for_each(output_resource, &compositor->globals.wl_output_clients) {
-        if (wl_resource_get_version(output_resource) >= WL_OUTPUT_SCALE_SINCE_VERSION) {
-            wl_output_send_scale(output_resource, factor);
-        }
-        wl_output_send_done(output_resource);
-    }
-}
-
-static void
-on_surface_preferred_buffer_transform(void *data, struct wl_surface *surface, uint32_t transform) {
-    // Unused.
-}
-
-static const struct wl_surface_listener surface_listener = {
-    .enter = on_surface_enter,
-    .leave = on_surface_leave,
-    .preferred_buffer_scale = on_surface_preferred_buffer_scale,
-    .preferred_buffer_transform = on_surface_preferred_buffer_transform,
-};
-
-static void
 create_remote_buffer(struct compositor *compositor, const uint32_t color[4]) {
     ww_assert(compositor);
     ww_assert(!compositor->remote.buffer);
@@ -2612,7 +2568,6 @@ create_remote_window(struct compositor *compositor) {
 
     // Setup the XDG toplevel.
     compositor->remote.surface = wl_compositor_create_surface(compositor->remote.compositor);
-    wl_surface_add_listener(compositor->remote.surface, &surface_listener, compositor);
     wl_surface_set_user_data(compositor->remote.surface, NULL);
 
     compositor->remote.xdg_surface =
