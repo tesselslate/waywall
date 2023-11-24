@@ -1288,7 +1288,7 @@ handle_get_pointer_wl_seat(struct wl_client *client, struct wl_resource *resourc
                                    destroy_wl_pointer);
     wl_list_insert(&server_seat->pointers, wl_resource_get_link(pointer_resource));
 
-    server_pointer->server_seat = NULL;
+    server_pointer->server_seat = server_seat;
     wl_list_init(&server_pointer->relative_pointers);
 }
 
