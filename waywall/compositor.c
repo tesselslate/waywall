@@ -1210,6 +1210,10 @@ handle_set_cursor_wl_pointer(struct wl_client *client, struct wl_resource *resou
         // This pointer object has been invalidated (the pointer capability was removed.)
         return;
     }
+    if (!surface_resource) {
+        // The game wants to hide the cursor.
+        return;
+    }
 
     // We don't want to do what the client asks because it's wrong. GLFW doesn't hide the cursor
     // image in some cases where it should. Instead, we just give the surface a role.
