@@ -154,9 +154,21 @@ struct dmabuf {
 struct server_buffer {
     struct wl_buffer *buffer;
 
-    int32_t width, height;
-    uint32_t format, flags;
-    struct wl_list dmabuf; // dmabuf.link
+    enum {
+        BUFFER_SHM,
+        BUFFER_DMABUF,
+    } type;
+    union {
+        struct {
+            int32_t offset, width, height, stride;
+            uint32_t format;
+        } shm;
+        struct {
+            int32_t width, height;
+            uint32_t format, flags;
+            struct wl_list bufs; // dmabuf.link
+        } dmabuf;
+    } data;
 };
 
 struct server_xdg_surface {
@@ -183,6 +195,30 @@ static void destroy_remote_window(struct compositor *compositor);
 static void send_xdg_surface_configure(struct wl_resource *xdg_surface_resource);
 static void send_xdg_toplevel_configure(struct wl_resource *xdg_toplevel_resource);
 
+static inline int32_t
+server_buffer_get_width(struct server_buffer *buffer) {
+    switch (buffer->type) {
+    case BUFFER_SHM:
+        return buffer->data.shm.width;
+    case BUFFER_DMABUF:
+        return buffer->data.dmabuf.width;
+    default:
+        ww_unreachable();
+    }
+}
+
+static inline int32_t
+server_buffer_get_height(struct server_buffer *buffer) {
+    switch (buffer->type) {
+    case BUFFER_SHM:
+        return buffer->data.shm.height;
+    case BUFFER_DMABUF:
+        return buffer->data.dmabuf.width;
+    default:
+        ww_unreachable();
+    }
+}
+
 /*
  *  Server code
  */
@@ -205,6 +241,7 @@ current_time() {
 #define SERVER_WL_COMPOSITOR_VERSION 6
 #define SERVER_WL_OUTPUT_VERSION 4
 #define SERVER_WL_SEAT_VERSION 9
+#define SERVER_WL_SHM_VERSION 1
 #define SERVER_XDG_DECORATION_VERSION 1
 #define SERVER_XDG_WM_BASE_VERSION 6
 
@@ -287,12 +324,12 @@ handle_attach_wl_surface(struct wl_client *client, struct wl_resource *resource,
     struct server_surface *server_surface = wl_resource_get_user_data(resource);
     struct server_buffer *server_buffer = wl_resource_get_user_data(buffer_resource);
 
-    if (server_buffer->width % server_surface->buffer_scale != 0) {
+    if (server_buffer_get_width(server_buffer) % server_surface->buffer_scale != 0) {
         wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SIZE,
                                "width not multiple of buffer scale");
         return;
     }
-    if (server_buffer->height % server_surface->buffer_scale != 0) {
+    if (server_buffer_get_height(server_buffer) % server_surface->buffer_scale != 0) {
         wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SIZE,
                                "height not multiple of buffer scale");
     }
@@ -548,9 +585,17 @@ destroy_server_buffer(struct server_buffer *server_buffer) {
         server_buffer->buffer = NULL;
     }
 
-    struct dmabuf *dmabuf, *tmp;
-    wl_list_for_each_safe (dmabuf, tmp, &server_buffer->dmabuf, link) {
-        destroy_dmabuf(dmabuf);
+    switch (server_buffer->type) {
+    case BUFFER_SHM:
+        // Buffers from wl_shm_pool don't need any cleanup, the pool is responsible for their
+        // resources.
+        break;
+    case BUFFER_DMABUF:;
+        struct dmabuf *dmabuf, *tmp;
+        wl_list_for_each_safe (dmabuf, tmp, &server_buffer->data.dmabuf.bufs, link) {
+            destroy_dmabuf(dmabuf);
+        }
+        break;
     }
 
     free(server_buffer);
@@ -564,13 +609,98 @@ handle_destroy_wl_buffer(struct wl_client *client, struct wl_resource *resource)
 static void
 destroy_wl_buffer(struct wl_resource *resource) {
     struct server_buffer *server_buffer = wl_resource_get_user_data(resource);
-    wl_list_remove(wl_resource_get_link(resource));
     destroy_server_buffer(server_buffer);
 }
 
 static const struct wl_buffer_interface wl_buffer_implementation = {
     .destroy = handle_destroy_wl_buffer,
 };
+
+static void
+handle_create_buffer_wl_shm_pool(struct wl_client *client, struct wl_resource *resource,
+                                 uint32_t id, int32_t offset, int32_t width, int32_t height,
+                                 int32_t stride, uint32_t format) {
+    struct wl_shm_pool *shm_pool = wl_resource_get_user_data(resource);
+
+    struct wl_buffer *wl_buffer =
+        wl_shm_pool_create_buffer(shm_pool, offset, width, height, stride, format);
+    struct server_buffer *server_buffer = ww_alloc(1, sizeof(*server_buffer));
+    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
+    wl_resource_set_implementation(buffer_resource, &wl_buffer_implementation, server_buffer,
+                                   destroy_wl_buffer);
+
+    server_buffer->type = BUFFER_SHM;
+    server_buffer->buffer = wl_buffer;
+    server_buffer->data.shm.offset = offset;
+    server_buffer->data.shm.width = width;
+    server_buffer->data.shm.height = height;
+    server_buffer->data.shm.stride = stride;
+    server_buffer->data.shm.format = format;
+}
+
+static void
+handle_destroy_wl_shm_pool(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void
+handle_resize_wl_shm_pool(struct wl_client *client, struct wl_resource *resource, int32_t size) {
+    struct wl_shm_pool *shm_pool = wl_resource_get_user_data(resource);
+
+    wl_shm_pool_resize(shm_pool, size);
+}
+
+static void
+destroy_wl_shm_pool(struct wl_resource *resource) {
+    struct wl_shm_pool *shm_pool = wl_resource_get_user_data(resource);
+
+    wl_shm_pool_destroy(shm_pool);
+}
+
+static const struct wl_shm_pool_interface wl_shm_pool_implementation = {
+    .create_buffer = handle_create_buffer_wl_shm_pool,
+    .destroy = handle_destroy_wl_shm_pool,
+    .resize = handle_resize_wl_shm_pool,
+};
+
+static void
+handle_create_pool_wl_shm(struct wl_client *client, struct wl_resource *resource, uint32_t id,
+                          int32_t fd, int32_t size) {
+    struct compositor *compositor = wl_resource_get_user_data(resource);
+
+    struct wl_shm_pool *shm_pool = wl_shm_create_pool(compositor->remote.shm, fd, size);
+    close(fd);
+    struct wl_resource *pool_resource =
+        wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
+    wl_resource_set_implementation(pool_resource, &wl_shm_pool_implementation, shm_pool,
+                                   destroy_wl_shm_pool);
+}
+
+static void
+destroy_wl_shm(struct wl_resource *resource) {
+    wl_list_remove(wl_resource_get_link(resource));
+}
+
+static const struct wl_shm_interface wl_shm_implementation = {
+    .create_pool = handle_create_pool_wl_shm,
+};
+
+static void
+handle_bind_wl_shm(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
+    ww_assert(version <= SERVER_WL_SHM_VERSION);
+    struct compositor *compositor = data;
+
+    struct wl_resource *resource =
+        wl_resource_create(client, &wl_shm_interface, wl_shm_interface.version, id);
+    wl_resource_set_implementation(resource, &wl_shm_implementation, compositor, destroy_wl_shm);
+
+    wl_list_insert(&compositor->globals.wl_shm_clients, wl_resource_get_link(resource));
+
+    uint32_t *format;
+    wl_array_for_each(format, &compositor->remote.shm_formats) {
+        wl_shm_send_format(resource, *format);
+    }
+}
 
 static void
 on_buffer_release(void *data, struct wl_buffer *wl_buffer) {
@@ -599,7 +729,6 @@ on_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *buffer_p
     struct wl_resource *buffer_params_resource = data;
     struct server_buffer_params *server_buffer_params =
         wl_resource_get_user_data(buffer_params_resource);
-    struct compositor *compositor = server_buffer_params->compositor;
 
     server_buffer_params->buffer->buffer = wl_buffer;
 
@@ -607,8 +736,6 @@ on_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *buffer_p
         wl_resource_get_client(buffer_params_resource), &wl_buffer_interface, 1, 0);
     wl_resource_set_implementation(server_buffer_params->buffer_resource, &wl_buffer_implementation,
                                    server_buffer_params->buffer, destroy_wl_buffer);
-    wl_list_insert(&compositor->globals.buffers,
-                   wl_resource_get_link(server_buffer_params->buffer_resource));
 
     wl_buffer_add_listener(wl_buffer, &buffer_listener, server_buffer_params->buffer_resource);
 
@@ -652,7 +779,7 @@ handle_add_linux_buffer_params(struct wl_client *client, struct wl_resource *res
     dmabuf->offset = offset;
     dmabuf->stride = stride;
     dmabuf->modifier = (((uint64_t)modifier_hi) << 32) | (uint64_t)modifier_lo;
-    wl_list_insert(&server_buffer_params->buffer->dmabuf, &dmabuf->link);
+    wl_list_insert(&server_buffer_params->buffer->data.dmabuf.bufs, &dmabuf->link);
 
     zwp_linux_buffer_params_v1_add(server_buffer_params->buffer_params, fd, plane_idx, offset,
                                    stride, modifier_hi, modifier_lo);
@@ -673,10 +800,10 @@ handle_create_linux_buffer_params(struct wl_client *client, struct wl_resource *
 
     // TODO: errors (incomplete, invalid_format, invalid_dimensions, out_of_bounds)
 
-    server_buffer_params->buffer->width = width;
-    server_buffer_params->buffer->height = height;
-    server_buffer_params->buffer->format = format;
-    server_buffer_params->buffer->flags = flags;
+    server_buffer_params->buffer->data.dmabuf.width = width;
+    server_buffer_params->buffer->data.dmabuf.height = height;
+    server_buffer_params->buffer->data.dmabuf.format = format;
+    server_buffer_params->buffer->data.dmabuf.flags = flags;
 
     server_buffer_params->issued_create = true;
 
@@ -702,10 +829,10 @@ handle_create_immed_linux_buffer_params(struct wl_client *client, struct wl_reso
 
     // TODO: errors (incomplete, invalid_format, invalid_dimensions, out_of_bounds)
 
-    server_buffer_params->buffer->width = width;
-    server_buffer_params->buffer->height = height;
-    server_buffer_params->buffer->format = format;
-    server_buffer_params->buffer->flags = flags;
+    server_buffer_params->buffer->data.dmabuf.width = width;
+    server_buffer_params->buffer->data.dmabuf.height = height;
+    server_buffer_params->buffer->data.dmabuf.format = format;
+    server_buffer_params->buffer->data.dmabuf.flags = flags;
 
     server_buffer_params->issued_create = true;
 
@@ -723,9 +850,6 @@ handle_create_immed_linux_buffer_params(struct wl_client *client, struct wl_reso
     wl_resource_set_implementation(
         server_buffer_params->buffer_resource, &wl_buffer_implementation,
         server_buffer_params->failed ? NULL : server_buffer_params->buffer, destroy_wl_buffer);
-
-    wl_list_insert(&compositor->globals.buffers,
-                   wl_resource_get_link(server_buffer_params->buffer_resource));
 
     wl_buffer_add_listener(server_buffer_params->buffer->buffer, &buffer_listener,
                            server_buffer_params->buffer_resource);
@@ -864,7 +988,8 @@ handle_create_params_linux_dmabuf(struct wl_client *client, struct wl_resource *
     zwp_linux_buffer_params_v1_add_listener(server_buffer_params->buffer_params,
                                             &buffer_params_listener, buffer_params_resource);
 
-    wl_list_init(&server_buffer_params->buffer->dmabuf);
+    server_buffer_params->buffer->type = BUFFER_DMABUF;
+    wl_list_init(&server_buffer_params->buffer->data.dmabuf.bufs);
 
     wl_list_insert(&linux_dmabuf->buffer_params, wl_resource_get_link(buffer_params_resource));
 
@@ -1716,6 +1841,7 @@ handle_bind_xdg_wm_base(struct wl_client *client, void *data, uint32_t version, 
 #define WL_DATA_DEVICE_MANAGER_VERSION 3
 #define WL_SUBCOMPOSITOR_VERSION 1
 #define WL_SEAT_VERSION 8
+#define WL_SHM_VERSION 1
 #define WP_VIEWPORTER_VERSION 1
 #define WP_SINGLE_PIXEL_BUFFER_VERSION 1
 #define WP_TEARING_CONTROL_VERSION 1
@@ -2259,6 +2385,18 @@ static const struct wl_seat_listener seat_listener = {
 };
 
 static void
+on_shm_format(void *data, struct wl_shm *shm, uint32_t format) {
+    struct compositor *compositor = data;
+
+    uint32_t *format_ptr = wl_array_add(&compositor->remote.shm_formats, sizeof(uint32_t));
+    *format_ptr = format;
+}
+
+static const struct wl_shm_listener shm_listener = {
+    .format = on_shm_format,
+};
+
+static void
 on_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface,
                    uint32_t version) {
     struct compositor *compositor = data;
@@ -2269,6 +2407,10 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (strcmp(interface, wl_subcompositor_interface.name) == 0) {
         compositor->remote.subcompositor =
             wl_registry_bind(registry, name, &wl_subcompositor_interface, WL_SUBCOMPOSITOR_VERSION);
+    } else if (strcmp(interface, wl_shm_interface.name) == 0) {
+        compositor->remote.shm =
+            wl_registry_bind(registry, name, &wl_shm_interface, WL_SHM_VERSION);
+        wl_shm_add_listener(compositor->remote.shm, &shm_listener, compositor);
     } else if (strcmp(interface, wl_data_device_manager_interface.name) == 0) {
         compositor->remote.data_device_manager = wl_registry_bind(
             registry, name, &wl_data_device_manager_interface, WL_DATA_DEVICE_MANAGER_VERSION);
@@ -2612,12 +2754,14 @@ compositor_create() {
 
     wl_list_init(&compositor->globals.wl_compositor_clients);
     wl_list_init(&compositor->globals.surfaces);
+    wl_list_init(&compositor->globals.wl_shm_clients);
     wl_list_init(&compositor->globals.linux_dmabuf_clients);
-    wl_list_init(&compositor->globals.buffers);
     wl_list_init(&compositor->globals.xdg_decoration_clients);
     wl_list_init(&compositor->globals.xdg_wm_base_clients);
     wl_list_init(&compositor->globals.wl_output_clients);
     wl_list_init(&compositor->remote.seats);
+
+    wl_array_init(&compositor->remote.shm_formats);
 
     compositor->remote.registry = wl_display_get_registry(compositor->remote.display);
     wl_registry_add_listener(compositor->remote.registry, &registry_listener, compositor);
@@ -2630,6 +2774,10 @@ compositor_create() {
     }
     if (!compositor->remote.subcompositor) {
         LOG(LOG_ERROR, "host compositor does not provide wl_subcompositor global");
+        goto fail_remote_registry;
+    }
+    if (!compositor->remote.shm) {
+        LOG(LOG_ERROR, "host compositor does not provide wl_shm global");
         goto fail_remote_registry;
     }
     if (!compositor->remote.pointer_constraints) {
@@ -2665,6 +2813,9 @@ compositor_create() {
     compositor->globals.wl_compositor =
         wl_global_create(compositor->display, &wl_compositor_interface,
                          SERVER_WL_COMPOSITOR_VERSION, compositor, handle_bind_wl_compositor);
+    compositor->globals.wl_shm =
+        wl_global_create(compositor->display, &wl_shm_interface, SERVER_WL_SHM_VERSION, compositor,
+                         handle_bind_wl_shm);
     compositor->globals.linux_dmabuf =
         wl_global_create(compositor->display, &zwp_linux_dmabuf_v1_interface,
                          SERVER_LINUX_DMABUF_VERSION, compositor, handle_bind_linux_dmabuf);
@@ -2696,6 +2847,9 @@ fail_remote_registry:;
     if (compositor->remote.subcompositor) {
         wl_subcompositor_destroy(compositor->remote.subcompositor);
     }
+    if (compositor->remote.shm) {
+        wl_shm_destroy(compositor->remote.shm);
+    }
     if (compositor->remote.data_device_manager) {
         wl_data_device_manager_destroy(compositor->remote.data_device_manager);
     }
@@ -2726,8 +2880,11 @@ fail_remote_registry:;
     wl_event_source_remove(compositor->src_remote);
     wl_event_source_remove(compositor->src_sigint);
 
+    wl_array_release(&compositor->remote.shm_formats);
+
 fail_remote_display:
     wl_display_destroy(compositor->display);
+
     free(compositor);
     return NULL;
 }
@@ -2748,6 +2905,7 @@ compositor_destroy(struct compositor *compositor) {
     // Client globals
     wl_compositor_destroy(compositor->remote.compositor);
     wl_subcompositor_destroy(compositor->remote.subcompositor);
+    wl_shm_destroy(compositor->remote.shm);
     zwp_linux_dmabuf_v1_destroy(compositor->remote.linux_dmabuf);
     zwp_pointer_constraints_v1_destroy(compositor->remote.pointer_constraints);
     zwp_relative_pointer_manager_v1_destroy(compositor->remote.relative_pointer_manager);
@@ -2771,6 +2929,7 @@ compositor_destroy(struct compositor *compositor) {
 
     // Server
     wl_global_destroy(compositor->globals.wl_compositor);
+    wl_global_destroy(compositor->globals.wl_shm);
     wl_global_destroy(compositor->globals.linux_dmabuf);
     wl_global_destroy(compositor->globals.xdg_decoration);
     wl_global_destroy(compositor->globals.xdg_wm_base);
@@ -2782,6 +2941,7 @@ compositor_destroy(struct compositor *compositor) {
     // teardown code.
     wl_display_disconnect(compositor->remote.display);
 
+    wl_array_release(&compositor->remote.shm_formats);
     free(compositor);
 }
 

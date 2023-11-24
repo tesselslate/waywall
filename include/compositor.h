@@ -17,9 +17,11 @@ struct compositor {
         struct wl_list wl_compositor_clients;
         struct wl_list surfaces;
 
+        struct wl_global *wl_shm;
+        struct wl_list wl_shm_clients;
+
         struct wl_global *linux_dmabuf;
         struct wl_list linux_dmabuf_clients;
-        struct wl_list buffers;
 
         struct wl_global *xdg_decoration;
         struct wl_list xdg_decoration_clients;
@@ -40,6 +42,7 @@ struct compositor {
         // Remote globals
         struct wl_compositor *compositor;
         struct wl_subcompositor *subcompositor;
+        struct wl_shm *shm;
         struct wl_data_device_manager *data_device_manager;
         struct zwp_linux_dmabuf_v1 *linux_dmabuf;
         struct zwp_pointer_constraints_v1 *pointer_constraints;
@@ -48,6 +51,8 @@ struct compositor {
         struct wp_tearing_control_manager_v1 *tearing_control_manager;
         struct wp_viewporter *viewporter;
         struct xdg_wm_base *xdg_wm_base;
+
+        struct wl_array shm_formats;
 
         struct wl_list outputs; // client_output.link
         struct wl_list seats;   // client_seat.link
