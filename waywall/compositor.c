@@ -54,8 +54,8 @@
  */
 
 // TODO: use instance stretch height by default
-#define WINDOW_WIDTH 160
-#define WINDOW_HEIGHT 160
+#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 640
 
 #include "compositor.h"
 #include "util.h"
@@ -131,13 +131,19 @@ struct client_seat {
 
     struct wl_pointer *pointer;
     struct wl_resource *pointer_focus;
+
     struct zwp_relative_pointer_v1 *relative_pointer;
+    double px, py;
 
     struct wl_keyboard *keyboard;
     struct wl_resource *keyboard_focus;
+
     uint32_t pressed_keys[128];
     uint32_t num_pressed_keys;
     uint32_t mods_depressed, mods_latched, mods_locked, group;
+
+    uint32_t keymap_format, keymap_size;
+    int32_t keymap_fd;
 
     // Server state (associated wl_seat global)
     struct wl_global *global;
@@ -200,6 +206,13 @@ struct server_seat {
     uint32_t caps, past_caps;
 
     struct wl_list pointers, keyboards;
+
+    struct {
+        struct zwp_locked_pointer_v1 *remote_locked_pointer;
+
+        struct wl_resource *surface_resource;
+        struct wl_resource *locked_pointer_resource;
+    } constraint;
 };
 
 struct server_pointer {
@@ -209,8 +222,13 @@ struct server_pointer {
 };
 
 static void destroy_remote_window(struct compositor *compositor);
+static void give_input_focus(struct client_seat *client_seat, struct wl_resource *surface_resource);
+static void send_pointer_leave(struct client_seat *seat);
+static void send_keyboard_leave(struct client_seat *seat);
 static void send_xdg_surface_configure(struct wl_resource *xdg_surface_resource);
 static void send_xdg_toplevel_configure(struct wl_resource *xdg_toplevel_resource);
+static void lock_pointer(struct server_seat *server_seat);
+static void unlock_pointer(struct server_seat *server_seat);
 
 static inline int32_t
 server_buffer_get_width(struct server_buffer *buffer) {
@@ -259,6 +277,7 @@ current_time() {
 #define SERVER_WL_OUTPUT_VERSION 4
 #define SERVER_WL_SEAT_VERSION 9
 #define SERVER_WL_SHM_VERSION 1
+#define SERVER_POINTER_CONSTRAINTS_VERSION 1
 #define SERVER_RELATIVE_POINTER_VERSION 1
 #define SERVER_XDG_DECORATION_VERSION 1
 #define SERVER_XDG_WM_BASE_VERSION 6
@@ -420,15 +439,9 @@ handle_set_opaque_region_wl_surface(struct wl_client *client, struct wl_resource
 static void
 handle_set_input_region_wl_surface(struct wl_client *client, struct wl_resource *resource,
                                    struct wl_resource *region_resource) {
-    struct server_surface *server_surface = wl_resource_get_user_data(resource);
-
-    if (!region_resource) {
-        wl_surface_set_input_region(server_surface->surface, NULL);
-        return;
-    }
-
-    struct wl_region *region = wl_resource_get_user_data(region_resource);
-    wl_surface_set_input_region(server_surface->surface, region);
+    // GLFW doesn't use this and we want to make sure that all of the subsurfaces have no input
+    // region.
+    wl_client_post_implementation_error(client, "wl_surface.set_input_region is not implemented");
 }
 
 static void
@@ -513,6 +526,34 @@ destroy_wl_surface(struct wl_resource *resource) {
         wl_resource_destroy(server_surface->xdg_resource);
     }
 
+    struct compositor *compositor = server_surface->compositor;
+    struct client_seat *seat;
+    wl_list_for_each (seat, &compositor->remote.seats, link) {
+        struct wl_resource *seat_resource;
+
+        if (seat->pointer_focus == resource) {
+            send_pointer_leave(seat);
+        }
+        if (seat->keyboard_focus == resource) {
+            send_keyboard_leave(seat);
+        }
+
+        wl_resource_for_each(seat_resource, &seat->clients) {
+            if (wl_resource_get_client(resource) != wl_resource_get_client(seat_resource)) {
+                continue;
+            }
+
+            struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+            if (server_seat->constraint.surface_resource == resource) {
+                unlock_pointer(server_seat);
+
+                wl_resource_set_user_data(server_seat->constraint.locked_pointer_resource, NULL);
+                server_seat->constraint.surface_resource = NULL;
+                server_seat->constraint.locked_pointer_resource = NULL;
+            }
+        }
+    }
+
     wl_list_remove(wl_resource_get_link(resource));
     free(server_surface);
 }
@@ -585,6 +626,166 @@ handle_bind_wl_compositor(struct wl_client *client, void *data, uint32_t version
 }
 
 static void
+lock_pointer(struct server_seat *server_seat) {
+    struct compositor *compositor = server_seat->client_seat->compositor;
+
+    ww_assert(compositor->allow_locked_pointer);
+    ww_assert(server_seat->client_seat->pointer_focus == server_seat->constraint.surface_resource);
+    ww_assert(server_seat->constraint.locked_pointer_resource);
+    ww_assert(server_seat->constraint.surface_resource);
+    ww_assert(!server_seat->constraint.remote_locked_pointer);
+
+    server_seat->constraint.remote_locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
+        compositor->remote.pointer_constraints, compositor->remote.surface,
+        server_seat->client_seat->pointer, NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+
+    // TODO: why does the cursor position hint not get respected sometimes
+    zwp_locked_pointer_v1_set_cursor_position_hint(
+        server_seat->constraint.remote_locked_pointer,
+        wl_fixed_from_int(compositor->remote.win_width / 2),
+        wl_fixed_from_int(compositor->remote.win_height / 2));
+
+    zwp_locked_pointer_v1_send_locked(server_seat->constraint.locked_pointer_resource);
+
+    // TODO: unset cursor image
+}
+
+static void
+unlock_pointer(struct server_seat *server_seat) {
+    ww_assert(server_seat->constraint.remote_locked_pointer);
+
+    zwp_locked_pointer_v1_destroy(server_seat->constraint.remote_locked_pointer);
+    server_seat->constraint.remote_locked_pointer = NULL;
+
+    zwp_locked_pointer_v1_send_unlocked(server_seat->constraint.locked_pointer_resource);
+
+    // TODO: set cursor image
+}
+
+static void
+handle_destroy_locked_pointer(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void
+handle_set_cursor_position_hint_locked_pointer(struct wl_client *client,
+                                               struct wl_resource *resource, wl_fixed_t surface_x,
+                                               wl_fixed_t surface_y) {
+    // Do nothing. We will set the hint to the center of the surface.
+}
+
+static void
+handle_set_region_locked_pointer(struct wl_client *client, struct wl_resource *resource,
+                                 struct wl_resource *region_resource) {
+    // Do nothing. We don't care about what the client wants.
+}
+
+static void
+destroy_locked_pointer(struct wl_resource *resource) {
+    struct server_seat *server_seat = wl_resource_get_user_data(resource);
+
+    if (!server_seat) {
+        return;
+    }
+
+    if (server_seat->constraint.remote_locked_pointer) {
+        zwp_locked_pointer_v1_destroy(server_seat->constraint.remote_locked_pointer);
+        server_seat->constraint.remote_locked_pointer = NULL;
+    }
+
+    server_seat->constraint.locked_pointer_resource = NULL;
+    server_seat->constraint.surface_resource = NULL;
+
+    // TODO: set cursor image
+}
+
+static const struct zwp_locked_pointer_v1_interface locked_pointer_implementation = {
+    .destroy = handle_destroy_locked_pointer,
+    .set_cursor_position_hint = handle_set_cursor_position_hint_locked_pointer,
+    .set_region = handle_set_region_locked_pointer,
+};
+
+static void
+handle_destroy_pointer_constraints(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void
+handle_lock_pointer_pointer_constraints(struct wl_client *client, struct wl_resource *resource,
+                                        uint32_t id, struct wl_resource *surface_resource,
+                                        struct wl_resource *pointer_resource,
+                                        struct wl_resource *region_resource, uint32_t lifetime) {
+    // Assume a persistent lifetime, since that is all GLFW uses.
+    if (lifetime != ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT) {
+        wl_client_post_implementation_error(client, "only persistent lifetime is supported");
+        return;
+    }
+
+    // We assume that any client will only have one active lock at a time, because that's all
+    // Minecraft should use.
+    struct server_pointer *server_pointer = wl_resource_get_user_data(pointer_resource);
+    if (!server_pointer->server_seat) {
+        wl_client_post_implementation_error(
+            client, "attempted to lock pointer after owning pointer was destroyed");
+        return;
+    }
+
+    if (server_pointer->server_seat->constraint.locked_pointer_resource) {
+        wl_client_post_implementation_error(client, "more than one wp_locked_pointer created");
+        return;
+    }
+
+    struct compositor *compositor = server_pointer->server_seat->client_seat->compositor;
+
+    struct wl_resource *locked_pointer_resource = wl_resource_create(
+        client, &zwp_locked_pointer_v1_interface, zwp_locked_pointer_v1_interface.version, id);
+    wl_resource_set_implementation(locked_pointer_resource, &locked_pointer_implementation,
+                                   server_pointer->server_seat, destroy_locked_pointer);
+
+    server_pointer->server_seat->constraint.surface_resource = surface_resource;
+    server_pointer->server_seat->constraint.locked_pointer_resource = locked_pointer_resource;
+
+    if (compositor->allow_locked_pointer &&
+        server_pointer->server_seat->client_seat->pointer_focus == surface_resource) {
+        lock_pointer(server_pointer->server_seat);
+    }
+}
+
+static void
+handle_confine_pointer_pointer_constraints(struct wl_client *client, struct wl_resource *resource,
+                                           uint32_t id, struct wl_resource *surface_resource,
+                                           struct wl_resource *pointer_resource,
+                                           struct wl_resource *region_resource, uint32_t lifetime) {
+    // GLFW doesn't use confined pointers. Don't implement it.
+    wl_client_post_implementation_error(
+        client, "wp_pointer_constraints.confine_pointer is not implemented");
+}
+
+static void
+destroy_pointer_constraints(struct wl_resource *resource) {
+    // Unused.
+}
+
+static const struct zwp_pointer_constraints_v1_interface pointer_constraints_implementation = {
+    .destroy = handle_destroy_pointer_constraints,
+    .lock_pointer = handle_lock_pointer_pointer_constraints,
+    .confine_pointer = handle_confine_pointer_pointer_constraints,
+};
+
+static void
+handle_bind_pointer_constraints(struct wl_client *client, void *data, uint32_t version,
+                                uint32_t id) {
+    ww_assert(version <= SERVER_POINTER_CONSTRAINTS_VERSION);
+    struct compositor *compositor = data;
+
+    struct wl_resource *resource =
+        wl_resource_create(client, &zwp_pointer_constraints_v1_interface,
+                           zwp_pointer_constraints_v1_interface.version, id);
+    wl_resource_set_implementation(resource, &pointer_constraints_implementation, compositor,
+                                   destroy_pointer_constraints);
+}
+
+static void
 handle_destroy_relative_pointer(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
 }
@@ -617,6 +818,9 @@ handle_get_relative_pointer_relative_pointer_manager(struct wl_client *client,
         client, &zwp_relative_pointer_v1_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(relative_pointer_resource, &relative_pointer_implementation,
                                    server_pointer, destroy_relative_pointer);
+
+    wl_list_insert(&server_pointer->relative_pointers,
+                   wl_resource_get_link(relative_pointer_resource));
 }
 
 static void
@@ -1290,6 +1494,8 @@ handle_get_pointer_wl_seat(struct wl_client *client, struct wl_resource *resourc
 
     server_pointer->server_seat = server_seat;
     wl_list_init(&server_pointer->relative_pointers);
+
+    // TODO: client could have surface with pointer focus, we should notify them here
 }
 
 static void
@@ -1309,8 +1515,14 @@ handle_get_keyboard_wl_seat(struct wl_client *client, struct wl_resource *resour
                                    destroy_wl_keyboard);
     wl_list_insert(&server_seat->keyboards, wl_resource_get_link(keyboard_resource));
 
-    // TODO: send repeat_info
-    // TODO: send keymap
+    // TODO: send correct repeat_info
+    wl_keyboard_send_repeat_info(keyboard_resource, 40, 300);
+    // TODO: send correct keymap
+    wl_keyboard_send_keymap(keyboard_resource, server_seat->client_seat->keymap_format,
+                            server_seat->client_seat->keymap_fd,
+                            server_seat->client_seat->keymap_size);
+
+    // TODO: client could have surface with keyboard focus, we should notify them here
 }
 
 static void
@@ -1337,6 +1549,13 @@ destroy_wl_seat(struct wl_resource *resource) {
     struct wl_resource *keyboard_resource;
     wl_resource_for_each_safe(keyboard_resource, tmp, &server_seat->keyboards) {
         wl_resource_destroy(keyboard_resource);
+    }
+
+    if (server_seat->constraint.remote_locked_pointer) {
+        unlock_pointer(server_seat);
+    }
+    if (server_seat->constraint.locked_pointer_resource) {
+        wl_resource_set_user_data(server_seat->constraint.locked_pointer_resource, NULL);
     }
 
     wl_list_remove(wl_resource_get_link(resource));
@@ -1724,6 +1943,7 @@ static void
 handle_get_toplevel_xdg_surface(struct wl_client *client, struct wl_resource *resource,
                                 uint32_t id) {
     struct server_xdg_surface *server_xdg_surface = wl_resource_get_user_data(resource);
+    struct server_surface *server_surface = server_xdg_surface->server_surface;
 
     struct server_xdg_toplevel *server_xdg_toplevel = ww_alloc(1, sizeof(*server_xdg_toplevel));
     server_xdg_surface->toplevel_resource =
@@ -1737,13 +1957,29 @@ handle_get_toplevel_xdg_surface(struct wl_client *client, struct wl_resource *re
     server_xdg_surface->fullscreen = false;
 
     server_xdg_toplevel->server_xdg_surface = server_xdg_surface;
-    server_xdg_surface->server_surface->role = ROLE_XDG;
-    server_xdg_surface->server_surface->subsurface = wl_subcompositor_get_subsurface(
-        server_xdg_surface->server_surface->compositor->remote.subcompositor,
-        server_xdg_surface->server_surface->surface,
-        server_xdg_surface->server_surface->compositor->remote.surface);
-    wl_subsurface_set_desync(server_xdg_surface->server_surface->subsurface);
-    wl_surface_commit(server_xdg_surface->server_surface->compositor->remote.surface);
+    server_surface->role = ROLE_XDG;
+    server_surface->subsurface = wl_subcompositor_get_subsurface(
+        server_surface->compositor->remote.subcompositor, server_surface->surface,
+        server_surface->compositor->remote.surface);
+    wl_subsurface_set_desync(server_surface->subsurface);
+
+    // Disable input on the surface. We want to pass all input events through to the parent surface,
+    // since some compositors do not allow subsurfaces to get keyboard and/or pointer focus.
+    struct wl_region *region =
+        wl_compositor_create_region(server_surface->compositor->remote.compositor);
+    wl_surface_set_input_region(server_surface->surface, region);
+    wl_region_destroy(region);
+    wl_surface_commit(server_surface->surface);
+
+    wl_surface_commit(server_surface->compositor->remote.surface);
+
+    // XXX: TODO: Set up proper input focus management
+    struct compositor *compositor = server_surface->compositor;
+
+    struct client_seat *seat;
+    wl_list_for_each (seat, &compositor->remote.seats, link) {
+        give_input_focus(seat, wl_surface_get_user_data(server_surface->surface));
+    }
 }
 
 static void
@@ -1925,8 +2161,6 @@ send_pointer_leave(struct client_seat *seat) {
     ww_assert(seat);
     ww_assert(seat->pointer_focus);
 
-    bool found_client = false;
-
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
         if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->pointer_focus)) {
@@ -1941,12 +2175,12 @@ send_pointer_leave(struct client_seat *seat) {
                                   seat->pointer_focus);
         }
 
-        found_client = true;
+        if (server_seat->constraint.surface_resource == seat->pointer_focus &&
+            server_seat->constraint.remote_locked_pointer) {
+            unlock_pointer(server_seat);
+        }
     }
 
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_pointer.leave to");
-    }
     seat->pointer_focus = NULL;
 }
 
@@ -1954,8 +2188,6 @@ static void
 send_keyboard_leave(struct client_seat *seat) {
     ww_assert(seat);
     ww_assert(seat->keyboard_focus);
-
-    bool found_client = false;
 
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
@@ -1979,19 +2211,7 @@ send_keyboard_leave(struct client_seat *seat) {
             wl_keyboard_send_leave(keyboard_resource, next_serial(keyboard_resource),
                                    seat->keyboard_focus);
         }
-
-        found_client = true;
     }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_keyboard.leave to");
-    }
-
-    seat->mods_depressed = 0;
-    seat->mods_latched = 0;
-    seat->mods_locked = 0;
-    seat->group = 0;
-    seat->num_pressed_keys = 0;
 
     seat->keyboard_focus = NULL;
 }
@@ -2023,6 +2243,55 @@ client_seat_destroy(struct client_seat *seat) {
     wl_list_remove(&seat->link);
     free(seat->str_name);
     free(seat);
+}
+
+static void
+give_input_focus(struct client_seat *client_seat, struct wl_resource *surface_resource) {
+    if (client_seat->pointer_focus) {
+        send_pointer_leave(client_seat);
+    }
+    if (client_seat->keyboard_focus) {
+        send_keyboard_leave(client_seat);
+    }
+
+    struct wl_resource *seat_resource;
+    wl_resource_for_each(seat_resource, &client_seat->clients) {
+        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(surface_resource)) {
+            continue;
+        }
+
+        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+        struct wl_resource *pointer_resource;
+        wl_resource_for_each(pointer_resource, &server_seat->pointers) {
+            wl_pointer_send_enter(pointer_resource, next_serial(pointer_resource), surface_resource,
+                                  0, 0);
+            // TODO: Send a motion event. GLFW doesn't process cursor position from the enter event.
+        }
+
+        struct wl_resource *keyboard_resource;
+        wl_resource_for_each(keyboard_resource, &server_seat->keyboards) {
+            // GLFW doesn't process keys from the enter event.
+            struct wl_array keys;
+            wl_array_init(&keys);
+            wl_keyboard_send_enter(keyboard_resource, next_serial(keyboard_resource),
+                                   surface_resource, &keys);
+            wl_array_release(&keys);
+
+            wl_keyboard_send_modifiers(keyboard_resource, next_serial(keyboard_resource),
+                                       client_seat->mods_depressed, client_seat->mods_latched,
+                                       client_seat->mods_locked, client_seat->group);
+
+            for (size_t i = 0; i < client_seat->num_pressed_keys; i++) {
+                wl_keyboard_send_key(keyboard_resource, next_serial(keyboard_resource),
+                                     current_time(), client_seat->pressed_keys[i],
+                                     WL_KEYBOARD_KEY_STATE_PRESSED);
+            }
+        }
+    }
+
+    client_seat->pointer_focus = surface_resource;
+    client_seat->keyboard_focus = surface_resource;
 }
 
 static void
@@ -2066,94 +2335,25 @@ static void
 on_pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
                  struct wl_surface *wl_surface, wl_fixed_t surface_x, wl_fixed_t surface_y) {
     struct client_seat *seat = data;
-    struct wl_resource *surface_resource = wl_surface_get_user_data(wl_surface);
+    struct compositor *compositor = seat->compositor;
+    ww_assert(wl_surface == compositor->remote.surface);
 
-    if (!surface_resource) {
-        if (seat->pointer_focus) {
-            send_pointer_leave(seat);
-        }
-        return;
-    }
-
-    seat->pointer_focus = surface_resource;
-
-    bool found_client = false;
-
-    struct wl_resource *seat_resource;
-    wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(surface_resource)) {
-            continue;
-        }
-
-        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
-
-        struct wl_resource *pointer_resource;
-        wl_resource_for_each(pointer_resource, &server_seat->pointers) {
-            wl_pointer_send_enter(pointer_resource, next_serial(pointer_resource), surface_resource,
-                                  surface_x, surface_y);
-        }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_pointer.enter to");
-    }
+#warning TODO
 }
 
 static void
 on_pointer_leave(void *data, struct wl_pointer *pointer, uint32_t serial,
                  struct wl_surface *wl_surface) {
-    struct client_seat *seat = data;
-
-    if (!wl_surface) {
-        // We can receive a null wl_surface (e.g. when the surface is destroyed).
-        ww_assert(!seat->pointer_focus);
-        return;
-    }
-
-    struct wl_resource *surface_resource = wl_surface_get_user_data(wl_surface);
-
-    if (!surface_resource) {
-        ww_assert(!seat->pointer_focus);
-        return;
-    }
-
-    ww_assert(seat->pointer_focus);
-
-    send_pointer_leave(seat);
+    // Unused.
 }
 
 static void
 on_pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t surface_x,
                   wl_fixed_t surface_y) {
     struct client_seat *seat = data;
+    struct compositor *compositor = seat->compositor;
 
-    if (!seat->pointer_focus) {
-        return;
-    }
-
-    bool found_client = false;
-
-    struct wl_resource *seat_resource;
-    wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->pointer_focus)) {
-            continue;
-        }
-
-        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
-
-        struct wl_resource *pointer_resource;
-        wl_resource_for_each(pointer_resource, &server_seat->pointers) {
-            wl_pointer_send_motion(pointer_resource, current_time(), surface_x, surface_y);
-        }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_pointer.motion to");
-    }
+#warning TODO
 }
 
 static void
@@ -2161,15 +2361,9 @@ on_pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint3
                   uint32_t button, uint32_t state) {
     struct client_seat *seat = data;
 
-    if (!seat->pointer_focus) {
-        return;
-    }
-
-    bool found_client = false;
-
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->pointer_focus)) {
+        if (wl_resource_get_client(seat->pointer_focus) != wl_resource_get_client(seat_resource)) {
             continue;
         }
 
@@ -2180,12 +2374,6 @@ on_pointer_button(void *data, struct wl_pointer *pointer, uint32_t serial, uint3
             wl_pointer_send_button(pointer_resource, next_serial(pointer_resource), current_time(),
                                    button, state);
         }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_pointer.button to");
     }
 }
 
@@ -2198,11 +2386,9 @@ on_pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t 
         return;
     }
 
-    bool found_client = false;
-
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->pointer_focus)) {
+        if (wl_resource_get_client(seat->pointer_focus) != wl_resource_get_client(seat_resource)) {
             continue;
         }
 
@@ -2212,12 +2398,6 @@ on_pointer_axis(void *data, struct wl_pointer *pointer, uint32_t time, uint32_t 
         wl_resource_for_each(pointer_resource, &server_seat->pointers) {
             wl_pointer_send_axis(pointer_resource, current_time(), axis, value);
         }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_pointer.axis to");
     }
 }
 
@@ -2270,36 +2450,49 @@ static void
 on_keyboard_keymap(void *data, struct wl_keyboard *keyboard, uint32_t format, int32_t fd,
                    uint32_t size) {
     struct client_seat *seat = data;
+
+    if (seat->keymap_fd >= 0) {
+        close(seat->keymap_fd);
+    }
+
+    seat->keymap_format = format;
+    seat->keymap_fd = fd;
+    seat->keymap_size = size;
+
     // TODO: do something with this for processing config keybindings
-    // TODO: forward to server seat if needed (no user-specified keymap)
+    // TODO: figure out how to send keymap to compositor correctly (this is temporary)
+
+    struct wl_resource *seat_resource;
+    wl_resource_for_each(seat_resource, &seat->clients) {
+        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+        struct wl_resource *keyboard_resource;
+        wl_resource_for_each(keyboard_resource, &server_seat->keyboards) {
+            wl_keyboard_send_keymap(keyboard_resource, format, fd, size);
+        }
+    }
 }
 
 static void
 on_keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial,
                   struct wl_surface *wl_surface, struct wl_array *keys) {
     struct client_seat *seat = data;
-    struct wl_resource *surface_resource = wl_surface_get_user_data(wl_surface);
+    struct compositor *compositor = seat->compositor;
+    ww_assert(wl_surface == compositor->remote.surface);
 
-    if (!surface_resource) {
-        if (seat->keyboard_focus) {
-            send_keyboard_leave(seat);
-        }
+    seat->num_pressed_keys = 0;
+    uint32_t *key;
+    wl_array_for_each(key, keys) {
+        seat->pressed_keys[seat->num_pressed_keys++] = *key;
+    }
+
+    if (!seat->keyboard_focus) {
         return;
     }
 
-    seat->keyboard_focus = surface_resource;
-
-    seat->num_pressed_keys = 0;
-    uint32_t *key_ptr;
-    wl_array_for_each(key_ptr, keys) {
-        seat->pressed_keys[seat->num_pressed_keys++] = *key_ptr;
-    }
-
-    bool found_client = false;
-
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(surface_resource)) {
+        if (wl_resource_get_client(seat->keyboard_focus) != wl_resource_get_client(seat_resource)) {
             continue;
         }
 
@@ -2307,15 +2500,12 @@ on_keyboard_enter(void *data, struct wl_keyboard *keyboard, uint32_t serial,
 
         struct wl_resource *keyboard_resource;
         wl_resource_for_each(keyboard_resource, &server_seat->keyboards) {
-            wl_keyboard_send_enter(keyboard_resource, next_serial(keyboard_resource),
-                                   surface_resource, keys);
+            for (size_t i = 0; i < seat->num_pressed_keys; i++) {
+                wl_keyboard_send_key(keyboard_resource, next_serial(keyboard_resource),
+                                     current_time(), seat->pressed_keys[i],
+                                     WL_KEYBOARD_KEY_STATE_PRESSED);
+            }
         }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_keybaord.enter to");
     }
 }
 
@@ -2324,22 +2514,36 @@ on_keyboard_leave(void *data, struct wl_keyboard *keyboard, uint32_t serial,
                   struct wl_surface *wl_surface) {
     struct client_seat *seat = data;
 
-    if (!wl_surface) {
-        // We can receive a leave event for a null surface (e.g. when the surface is destroyed).
-        ww_assert(!seat->keyboard_focus);
+    seat->mods_depressed = 0;
+    seat->mods_latched = 0;
+    seat->mods_locked = 0;
+    seat->group = 0;
+    seat->num_pressed_keys = 0;
+
+    if (!seat->keyboard_focus) {
         return;
     }
 
-    struct wl_resource *surface_resource = wl_surface_get_user_data(wl_surface);
+    struct wl_resource *seat_resource;
+    wl_resource_for_each(seat_resource, &seat->clients) {
+        if (wl_resource_get_client(seat->keyboard_focus) != wl_resource_get_client(seat_resource)) {
+            continue;
+        }
 
-    if (!surface_resource) {
-        ww_assert(!seat->keyboard_focus);
-        return;
+        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+        struct wl_resource *keyboard_resource;
+        wl_resource_for_each(keyboard_resource, &server_seat->keyboards) {
+            wl_keyboard_send_modifiers(keyboard_resource, next_serial(keyboard_resource), 0, 0, 0,
+                                       0);
+
+            for (size_t i = 0; i < seat->num_pressed_keys; i++) {
+                wl_keyboard_send_key(keyboard_resource, next_serial(keyboard_resource),
+                                     current_time(), seat->pressed_keys[i],
+                                     WL_KEYBOARD_KEY_STATE_RELEASED);
+            }
+        }
     }
-
-    ww_assert(seat->keyboard_focus);
-
-    send_keyboard_leave(seat);
 }
 
 static void
@@ -2354,25 +2558,26 @@ on_keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint3
     if (state == WL_KEYBOARD_KEY_STATE_PRESSED) {
         seat->pressed_keys[seat->num_pressed_keys++] = key;
     } else {
+        bool removed = false;
+
         for (size_t i = 0; i < seat->num_pressed_keys; i++) {
             if (seat->pressed_keys[i] == key) {
                 memmove(seat->pressed_keys + i, seat->pressed_keys + i + 1,
                         sizeof(uint32_t) * (seat->num_pressed_keys - i - 1));
                 seat->num_pressed_keys--;
-                goto send_event;
+                removed = true;
             }
         }
-        LOG(LOG_ERROR, "received spurious key release event (keycode %" PRIu32 ")", key);
-        return;
+
+        if (!removed) {
+            LOG(LOG_ERROR, "received spurious key release event (keycode %" PRIu32 ")", key);
+            return;
+        }
     }
-
-send_event:;
-
-    bool found_client = false;
 
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->keyboard_focus)) {
+        if (wl_resource_get_client(seat->keyboard_focus) != wl_resource_get_client(seat_resource)) {
             continue;
         }
 
@@ -2383,12 +2588,6 @@ send_event:;
             wl_keyboard_send_key(keyboard_resource, next_serial(keyboard_resource), current_time(),
                                  key, state);
         }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_keyboard.key to");
     }
 }
 
@@ -2397,7 +2596,6 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
                       uint32_t mods_depressed, uint32_t mods_latched, uint32_t mods_locked,
                       uint32_t group) {
     struct client_seat *seat = data;
-
     if (!seat->keyboard_focus) {
         return;
     }
@@ -2407,12 +2605,10 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
     seat->mods_locked = mods_locked;
     seat->group = group;
 
-    bool found_client = false;
-
     struct wl_resource *seat_resource;
     wl_resource_for_each(seat_resource, &seat->clients) {
-        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->keyboard_focus)) {
-            return;
+        if (wl_resource_get_client(seat->keyboard_focus) != wl_resource_get_client(seat_resource)) {
+            continue;
         }
 
         struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
@@ -2422,12 +2618,6 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *keyboard, uint32_t serial,
             wl_keyboard_send_modifiers(keyboard_resource, next_serial(keyboard_resource),
                                        mods_depressed, mods_latched, mods_locked, group);
         }
-
-        found_client = true;
-    }
-
-    if (!found_client) {
-        LOG(LOG_ERROR, "failed to find client to send wl_keyboard.modifiers to");
     }
 }
 
@@ -2565,6 +2755,8 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
         seat->wl = wl_registry_bind(registry, name, &wl_seat_interface, WL_SEAT_VERSION);
         seat->name = name;
 
+        seat->keymap_fd = -1;
+
         wl_list_init(&seat->clients);
         seat->global = wl_global_create(compositor->display, &wl_seat_interface,
                                         SERVER_WL_SEAT_VERSION, seat, &handle_bind_wl_seat);
@@ -2606,6 +2798,22 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
     }
     if (compositor->remote.surface) {
         wl_surface_commit(compositor->remote.surface);
+    }
+
+    struct client_seat *client_seat;
+    wl_list_for_each (client_seat, &compositor->remote.seats, link) {
+        struct wl_resource *seat_resource;
+
+        wl_resource_for_each(seat_resource, &client_seat->clients) {
+            struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+            if (server_seat->constraint.remote_locked_pointer) {
+                zwp_locked_pointer_v1_set_cursor_position_hint(
+                    server_seat->constraint.remote_locked_pointer,
+                    wl_fixed_from_int(compositor->remote.win_width / 2),
+                    wl_fixed_from_int(compositor->remote.win_height / 2));
+            }
+        }
     }
 }
 
@@ -2833,6 +3041,9 @@ struct compositor *
 compositor_create() {
     struct compositor *compositor = ww_alloc(1, sizeof(*compositor));
 
+    // XXX: testing purposes
+    compositor->allow_locked_pointer = true;
+
     compositor->display = wl_display_create();
     compositor->socket_name = wl_display_add_socket_auto(compositor->display);
 
@@ -2908,6 +3119,9 @@ compositor_create() {
     compositor->globals.wl_shm =
         wl_global_create(compositor->display, &wl_shm_interface, SERVER_WL_SHM_VERSION, compositor,
                          handle_bind_wl_shm);
+    compositor->globals.pointer_constraints = wl_global_create(
+        compositor->display, &zwp_pointer_constraints_v1_interface,
+        SERVER_POINTER_CONSTRAINTS_VERSION, compositor, handle_bind_pointer_constraints);
     compositor->globals.relative_pointer =
         wl_global_create(compositor->display, &zwp_relative_pointer_manager_v1_interface,
                          SERVER_RELATIVE_POINTER_VERSION, compositor, handle_bind_relative_pointer);
@@ -3027,6 +3241,7 @@ compositor_destroy(struct compositor *compositor) {
 
     wl_global_destroy(compositor->globals.wl_compositor);
     wl_global_destroy(compositor->globals.wl_shm);
+    wl_global_destroy(compositor->globals.pointer_constraints);
     wl_global_destroy(compositor->globals.relative_pointer);
     wl_global_destroy(compositor->globals.linux_dmabuf);
     wl_global_destroy(compositor->globals.xdg_decoration);

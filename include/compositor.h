@@ -11,12 +11,15 @@ struct compositor {
 
     struct wl_event_source *src_remote, *src_sigint;
 
+    bool allow_locked_pointer;
+
     // Server globals
     struct {
         struct wl_global *wl_compositor;
         struct wl_list surfaces;
 
         struct wl_global *wl_shm;
+        struct wl_global *pointer_constraints;
         struct wl_global *relative_pointer;
         struct wl_global *linux_dmabuf;
         struct wl_global *xdg_decoration;
