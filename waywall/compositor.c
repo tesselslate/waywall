@@ -1136,6 +1136,13 @@ static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_implementation = 
 static void
 handle_bind_linux_dmabuf(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SERVER_LINUX_DMABUF_VERSION);
+
+    if (version < 4) {
+        wl_client_post_implementation_error(
+            client, "wp_linux_dmabuf versions older than 4 are unsupported");
+        return;
+    }
+
     struct compositor *compositor = data;
 
     struct linux_dmabuf *linux_dmabuf = ww_alloc(1, sizeof(*linux_dmabuf));
@@ -1147,11 +1154,6 @@ handle_bind_linux_dmabuf(struct wl_client *client, void *data, uint32_t version,
     linux_dmabuf->compositor = compositor;
     wl_list_init(&linux_dmabuf->buffer_params);
     wl_list_init(&linux_dmabuf->dmabuf_feedback);
-
-    if (version < 4) {
-        // TODO: send formats
-        // TODO: send modifiers
-    }
 }
 
 static void
