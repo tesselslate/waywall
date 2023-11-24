@@ -2713,6 +2713,26 @@ create_remote_window(struct compositor *compositor) {
     compositor->globals.wl_output =
         wl_global_create(compositor->display, &wl_output_interface, SERVER_WL_OUTPUT_VERSION,
                          compositor, &handle_bind_wl_output);
+
+    // Recreate the subsurfaces associated with the toplevel, if needed.
+    bool recreated_subsurfaces = false;
+
+    struct wl_resource *surface_resource;
+    wl_resource_for_each(surface_resource, &compositor->globals.surfaces) {
+        struct server_surface *server_surface = wl_resource_get_user_data(surface_resource);
+        if (!server_surface->subsurface) {
+            server_surface->subsurface = wl_subcompositor_get_subsurface(
+                compositor->remote.subcompositor, server_surface->surface,
+                compositor->remote.surface);
+            wl_subsurface_set_desync(server_surface->subsurface);
+
+            recreated_subsurfaces = true;
+        }
+    }
+
+    if (recreated_subsurfaces) {
+        wl_surface_commit(compositor->remote.surface);
+    }
 }
 
 static void
