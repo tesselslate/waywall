@@ -131,6 +131,7 @@ struct client_seat {
 
     struct wl_pointer *pointer;
     struct wl_resource *pointer_focus;
+    struct zwp_relative_pointer_v1 *relative_pointer;
 
     struct wl_keyboard *keyboard;
     struct wl_resource *keyboard_focus;
@@ -191,6 +192,22 @@ struct server_xdg_toplevel {
     int32_t min_width, min_height, max_width, max_height;
 };
 
+struct server_seat {
+    struct wl_resource *resource;
+    uint32_t version;
+
+    struct client_seat *client_seat;
+    uint32_t caps, past_caps;
+
+    struct wl_list pointers, keyboards;
+};
+
+struct server_pointer {
+    struct server_seat *server_seat;
+
+    struct wl_list relative_pointers;
+};
+
 static void destroy_remote_window(struct compositor *compositor);
 static void send_xdg_surface_configure(struct wl_resource *xdg_surface_resource);
 static void send_xdg_toplevel_configure(struct wl_resource *xdg_toplevel_resource);
@@ -242,6 +259,7 @@ current_time() {
 #define SERVER_WL_OUTPUT_VERSION 4
 #define SERVER_WL_SEAT_VERSION 9
 #define SERVER_WL_SHM_VERSION 1
+#define SERVER_RELATIVE_POINTER_VERSION 1
 #define SERVER_XDG_DECORATION_VERSION 1
 #define SERVER_XDG_WM_BASE_VERSION 6
 
@@ -566,6 +584,66 @@ handle_bind_wl_compositor(struct wl_client *client, void *data, uint32_t version
                                    destroy_wl_compositor);
 
     wl_list_insert(&compositor->globals.wl_compositor_clients, wl_resource_get_link(resource));
+}
+
+static void
+handle_destroy_relative_pointer(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void
+destroy_relative_pointer(struct wl_resource *resource) {
+    struct server_pointer *server_pointer = wl_resource_get_user_data(resource);
+
+    if (server_pointer) {
+        wl_list_remove(wl_resource_get_link(resource));
+    }
+}
+
+static const struct zwp_relative_pointer_v1_interface relative_pointer_implementation = {
+    .destroy = handle_destroy_relative_pointer,
+};
+
+static void
+handle_destroy_relative_pointer_manager(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void
+handle_get_relative_pointer_relative_pointer_manager(struct wl_client *client,
+                                                     struct wl_resource *resource, uint32_t id,
+                                                     struct wl_resource *pointer_resource) {
+    struct server_pointer *server_pointer = wl_resource_get_user_data(pointer_resource);
+
+    struct wl_resource *relative_pointer_resource = wl_resource_create(
+        client, &zwp_relative_pointer_v1_interface, wl_resource_get_version(resource), id);
+    wl_resource_set_implementation(relative_pointer_resource, &relative_pointer_implementation,
+                                   server_pointer, destroy_relative_pointer);
+}
+
+static void
+destroy_relative_pointer_manager(struct wl_resource *resource) {
+    wl_list_remove(wl_resource_get_link(resource));
+}
+
+static const struct zwp_relative_pointer_manager_v1_interface
+    relative_pointer_manager_implementation = {
+        .destroy = handle_destroy_relative_pointer_manager,
+        .get_relative_pointer = handle_get_relative_pointer_relative_pointer_manager,
+};
+
+static void
+handle_bind_relative_pointer(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
+    ww_assert(version <= SERVER_RELATIVE_POINTER_VERSION);
+    struct compositor *compositor = data;
+
+    struct wl_resource *resource =
+        wl_resource_create(client, &zwp_relative_pointer_manager_v1_interface,
+                           zwp_relative_pointer_manager_v1_interface.version, id);
+    wl_resource_set_implementation(resource, &relative_pointer_manager_implementation, compositor,
+                                   destroy_relative_pointer_manager);
+
+    wl_list_insert(&compositor->globals.relative_pointer_clients, wl_resource_get_link(resource));
 }
 
 static void
@@ -1127,16 +1205,6 @@ handle_bind_wl_output(struct wl_client *client, void *data, uint32_t version, ui
     }
 }
 
-struct server_seat {
-    struct wl_resource *resource;
-    uint32_t version;
-
-    struct client_seat *client_seat;
-    uint32_t caps, past_caps;
-
-    struct wl_list pointers, keyboards;
-};
-
 static void
 handle_release_wl_pointer(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
@@ -1146,8 +1214,8 @@ static void
 handle_set_cursor_wl_pointer(struct wl_client *client, struct wl_resource *resource,
                              uint32_t serial, struct wl_resource *surface_resource,
                              int32_t hotspot_x, int32_t hotspot_y) {
-    struct server_seat *server_seat = wl_resource_get_user_data(resource);
-    if (!server_seat) {
+    struct server_pointer *server_pointer = wl_resource_get_user_data(resource);
+    if (!server_pointer->server_seat) {
         // This pointer object has been invalidated (the pointer capability was removed.)
         return;
     }
@@ -1165,13 +1233,21 @@ handle_set_cursor_wl_pointer(struct wl_client *client, struct wl_resource *resou
 
 static void
 destroy_wl_pointer(struct wl_resource *resource) {
-    struct server_seat *server_seat = wl_resource_get_user_data(resource);
+    struct server_pointer *server_pointer = wl_resource_get_user_data(resource);
 
-    if (server_seat) {
+    if (!server_pointer->server_seat) {
         // The pointer capability was not removed (this wl_pointer object is still valid) and so
         // it must be removed from the list.
         wl_list_remove(wl_resource_get_link(resource));
     }
+
+    struct wl_resource *relative_pointer_resource, *tmp;
+    wl_resource_for_each_safe(relative_pointer_resource, tmp, &server_pointer->relative_pointers) {
+        wl_resource_set_user_data(relative_pointer_resource, NULL);
+        wl_list_remove(wl_resource_get_link(relative_pointer_resource));
+    }
+
+    free(server_pointer);
 }
 
 static const struct wl_pointer_interface wl_pointer_implementation = {
@@ -1210,11 +1286,15 @@ handle_get_pointer_wl_seat(struct wl_client *client, struct wl_resource *resourc
         return;
     }
 
+    struct server_pointer *server_pointer = ww_alloc(1, sizeof(*server_pointer));
     struct wl_resource *pointer_resource =
         wl_resource_create(client, &wl_pointer_interface, wl_resource_get_version(resource), id);
-    wl_resource_set_implementation(pointer_resource, &wl_pointer_implementation, server_seat,
+    wl_resource_set_implementation(pointer_resource, &wl_pointer_implementation, server_pointer,
                                    destroy_wl_pointer);
     wl_list_insert(&server_seat->pointers, wl_resource_get_link(pointer_resource));
+
+    server_pointer->server_seat = NULL;
+    wl_list_init(&server_pointer->relative_pointers);
 }
 
 static void
@@ -1308,7 +1388,8 @@ server_seat_handle_caps(struct server_seat *server_seat, uint32_t caps) {
     if ((caps & WL_SEAT_CAPABILITY_POINTER) == 0) {
         struct wl_resource *pointer_resource, *tmp;
         wl_resource_for_each_safe(pointer_resource, tmp, &server_seat->pointers) {
-            wl_resource_set_user_data(pointer_resource, NULL);
+            struct server_pointer *server_pointer = wl_resource_get_user_data(pointer_resource);
+            server_pointer->server_seat = NULL;
             wl_list_remove(wl_resource_get_link(pointer_resource));
         }
     }
@@ -1935,6 +2016,10 @@ client_seat_destroy(struct client_seat *seat) {
             send_pointer_leave(seat);
         }
     }
+    if (seat->relative_pointer) {
+        zwp_relative_pointer_v1_destroy(seat->relative_pointer);
+        seat->relative_pointer = NULL;
+    }
     if (seat->keyboard) {
         wl_keyboard_release(seat->keyboard);
         if (seat->keyboard_focus) {
@@ -1949,6 +2034,43 @@ client_seat_destroy(struct client_seat *seat) {
     free(seat->str_name);
     free(seat);
 }
+
+static void
+on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *relative_pointer,
+                                    uint32_t utime_hi, uint32_t utime_lo, wl_fixed_t dx,
+                                    wl_fixed_t dy, wl_fixed_t dx_unaccel, wl_fixed_t dy_unaccel) {
+    struct client_seat *seat = data;
+
+    if (!seat || !seat->pointer_focus) {
+        return;
+    }
+
+    struct wl_resource *seat_resource;
+    wl_resource_for_each(seat_resource, &seat->clients) {
+        if (wl_resource_get_client(seat_resource) != wl_resource_get_client(seat->pointer_focus)) {
+            continue;
+        }
+
+        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+        struct wl_resource *pointer_resource;
+        wl_resource_for_each(pointer_resource, &server_seat->pointers) {
+            struct server_pointer *server_pointer = wl_resource_get_user_data(pointer_resource);
+
+            // TODO: multiply values according to sensitivity in config
+
+            struct wl_resource *relative_pointer_resource;
+            wl_resource_for_each(relative_pointer_resource, &server_pointer->relative_pointers) {
+                zwp_relative_pointer_v1_send_relative_motion(
+                    relative_pointer_resource, utime_hi, utime_lo, dx, dy, dx_unaccel, dy_unaccel);
+            }
+        }
+    }
+}
+
+static const struct zwp_relative_pointer_v1_listener relative_pointer_listener = {
+    .relative_motion = on_relative_pointer_relative_motion,
+};
 
 static void
 on_pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
@@ -2336,6 +2458,7 @@ static const struct wl_keyboard_listener keyboard_listener = {
 static void
 on_seat_capabilities(void *data, struct wl_seat *wl_seat, uint32_t capabilities) {
     struct client_seat *seat = data;
+    struct compositor *compositor = seat->compositor;
 
     if (seat->caps == capabilities) {
         return;
@@ -2351,10 +2474,20 @@ on_seat_capabilities(void *data, struct wl_seat *wl_seat, uint32_t capabilities)
     if (capabilities & WL_SEAT_CAPABILITY_POINTER) {
         seat->pointer = wl_seat_get_pointer(seat->wl);
         wl_pointer_add_listener(seat->pointer, &pointer_listener, seat);
+
+        seat->relative_pointer = zwp_relative_pointer_manager_v1_get_relative_pointer(
+            compositor->remote.relative_pointer_manager, seat->pointer);
+        zwp_relative_pointer_v1_add_listener(seat->relative_pointer, &relative_pointer_listener,
+                                             seat);
     } else {
         if (seat->pointer) {
             wl_pointer_release(seat->pointer);
             seat->pointer = NULL;
+        }
+
+        if (seat->relative_pointer) {
+            zwp_relative_pointer_v1_destroy(seat->relative_pointer);
+            seat->relative_pointer = NULL;
         }
     }
 
@@ -2710,6 +2843,7 @@ compositor_create() {
     wl_list_init(&compositor->globals.wl_compositor_clients);
     wl_list_init(&compositor->globals.surfaces);
     wl_list_init(&compositor->globals.wl_shm_clients);
+    wl_list_init(&compositor->globals.relative_pointer_clients);
     wl_list_init(&compositor->globals.linux_dmabuf_clients);
     wl_list_init(&compositor->globals.xdg_decoration_clients);
     wl_list_init(&compositor->globals.xdg_wm_base_clients);
@@ -2771,6 +2905,9 @@ compositor_create() {
     compositor->globals.wl_shm =
         wl_global_create(compositor->display, &wl_shm_interface, SERVER_WL_SHM_VERSION, compositor,
                          handle_bind_wl_shm);
+    compositor->globals.relative_pointer =
+        wl_global_create(compositor->display, &zwp_relative_pointer_manager_v1_interface,
+                         SERVER_RELATIVE_POINTER_VERSION, compositor, handle_bind_relative_pointer);
     compositor->globals.linux_dmabuf =
         wl_global_create(compositor->display, &zwp_linux_dmabuf_v1_interface,
                          SERVER_LINUX_DMABUF_VERSION, compositor, handle_bind_linux_dmabuf);
@@ -2780,7 +2917,7 @@ compositor_create() {
     compositor->globals.xdg_wm_base =
         wl_global_create(compositor->display, &xdg_wm_base_interface, SERVER_XDG_WM_BASE_VERSION,
                          compositor, handle_bind_xdg_wm_base);
-    // TODO: data device manager, tearing control, relative pointer, constraints
+    // TODO: data device manager, tearing control
 
     // Final setup (server + client)
     // TODO: configurable background color
@@ -2887,6 +3024,7 @@ compositor_destroy(struct compositor *compositor) {
 
     wl_global_destroy(compositor->globals.wl_compositor);
     wl_global_destroy(compositor->globals.wl_shm);
+    wl_global_destroy(compositor->globals.relative_pointer);
     wl_global_destroy(compositor->globals.linux_dmabuf);
     wl_global_destroy(compositor->globals.xdg_decoration);
     wl_global_destroy(compositor->globals.xdg_wm_base);

@@ -20,6 +20,9 @@ struct compositor {
         struct wl_global *wl_shm;
         struct wl_list wl_shm_clients;
 
+        struct wl_global *relative_pointer;
+        struct wl_list relative_pointer_clients;
+
         struct wl_global *linux_dmabuf;
         struct wl_list linux_dmabuf_clients;
 
