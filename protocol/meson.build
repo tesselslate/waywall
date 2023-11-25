@@ -17,9 +17,9 @@ protocol_xmls = [
 
 foreach proto : protocol_xmls
   protocol_headers += custom_target(
-    proto.underscorify() + '-header',
+    proto.underscorify() + '-client-header',
     input : proto,
-    output : '@BASENAME@-protocol.h',
+    output : '@BASENAME@-client-protocol.h',
     command : [wl_scanner, 'client-header', '@INPUT@', '@OUTPUT@'],
   )
   protocol_headers += custom_target(
