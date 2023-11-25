@@ -54,8 +54,8 @@
  */
 
 // TODO: use instance stretch height by default
-#define WINDOW_WIDTH 640
-#define WINDOW_HEIGHT 640
+#define WINDOW_WIDTH 1920
+#define WINDOW_HEIGHT 1080
 
 #include "compositor.h"
 #include "util.h"
@@ -321,6 +321,7 @@ struct server_surface {
 
     struct wl_surface *surface;
     struct wl_subsurface *subsurface;
+    int x, y;
 
     struct wl_list frame_callbacks;
 
@@ -2338,7 +2339,31 @@ on_pointer_enter(void *data, struct wl_pointer *pointer, uint32_t serial,
     struct compositor *compositor = seat->compositor;
     ww_assert(wl_surface == compositor->remote.surface);
 
-#warning TODO
+    if (!seat->pointer_focus) {
+        return;
+    }
+
+    struct server_surface *server_surface = wl_resource_get_user_data(seat->pointer_focus);
+    double x = wl_fixed_to_double(surface_x) - server_surface->x;
+    double y = wl_fixed_to_double(surface_y) - server_surface->y;
+
+    struct wl_resource *seat_resource;
+    wl_resource_for_each(seat_resource, &seat->clients) {
+        if (wl_resource_get_client(seat->pointer_focus) != wl_resource_get_client(seat_resource)) {
+            continue;
+        }
+
+        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+        struct wl_resource *pointer_resource;
+        wl_resource_for_each(pointer_resource, &server_seat->pointers) {
+            wl_pointer_send_enter(pointer_resource, next_serial(seat->pointer_focus),
+                                  seat->pointer_focus, wl_fixed_from_double(x),
+                                  wl_fixed_from_double(y));
+            wl_pointer_send_motion(pointer_resource, current_time(), wl_fixed_from_double(x),
+                                   wl_fixed_from_double(y));
+        }
+    }
 }
 
 static void
@@ -2351,9 +2376,29 @@ static void
 on_pointer_motion(void *data, struct wl_pointer *pointer, uint32_t time, wl_fixed_t surface_x,
                   wl_fixed_t surface_y) {
     struct client_seat *seat = data;
-    struct compositor *compositor = seat->compositor;
 
-#warning TODO
+    if (!seat->pointer_focus) {
+        return;
+    }
+
+    struct server_surface *server_surface = wl_resource_get_user_data(seat->pointer_focus);
+    double x = wl_fixed_to_double(surface_x) - server_surface->x;
+    double y = wl_fixed_to_double(surface_y) - server_surface->y;
+
+    struct wl_resource *seat_resource;
+    wl_resource_for_each(seat_resource, &seat->clients) {
+        if (wl_resource_get_client(seat->pointer_focus) != wl_resource_get_client(seat_resource)) {
+            continue;
+        }
+
+        struct server_seat *server_seat = wl_resource_get_user_data(seat_resource);
+
+        struct wl_resource *pointer_resource;
+        wl_resource_for_each(pointer_resource, &server_seat->pointers) {
+            wl_pointer_send_motion(pointer_resource, current_time(), wl_fixed_from_double(x),
+                                   wl_fixed_from_double(y));
+        }
+    }
 }
 
 static void
