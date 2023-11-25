@@ -360,6 +360,12 @@ static void
 handle_attach_wl_surface(struct wl_client *client, struct wl_resource *resource,
                          struct wl_resource *buffer_resource, int32_t x, int32_t y) {
     struct server_surface *server_surface = wl_resource_get_user_data(resource);
+    if (!buffer_resource) {
+        server_surface->buffer_resource = NULL;
+        wl_surface_attach(server_surface->surface, NULL, 0, 0);
+        return;
+    }
+
     struct server_buffer *server_buffer = wl_resource_get_user_data(buffer_resource);
 
     if (server_buffer_get_width(server_buffer) % server_surface->buffer_scale != 0) {
@@ -390,11 +396,6 @@ handle_attach_wl_surface(struct wl_client *client, struct wl_resource *resource,
     }
 
     server_surface->buffer_resource = buffer_resource;
-
-    if (!buffer_resource) {
-        wl_surface_attach(server_surface->surface, NULL, 0, 0);
-        return;
-    }
 
     wl_surface_attach(server_surface->surface, server_buffer->buffer, 0, 0);
 }
