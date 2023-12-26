@@ -3,7 +3,6 @@
 
 #define COMPOSITOR_REMOTE_VERSION 4
 
-#include <pixman-1/pixman.h>
 #include <wayland-server-core.h>
 
 struct server;

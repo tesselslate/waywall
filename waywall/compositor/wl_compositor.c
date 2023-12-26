@@ -2,7 +2,6 @@
 #include "compositor/buffer.h"
 #include "compositor/server.h"
 #include "util.h"
-#include <pixman-1/pixman.h>
 #include <wayland-client.h>
 #include <wayland-server.h>
 
