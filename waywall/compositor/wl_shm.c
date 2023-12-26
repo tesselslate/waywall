@@ -12,6 +12,10 @@
 
 #define VERSION 1
 
+struct server_shm_pool {
+    struct wl_shm_pool *remote;
+};
+
 static void
 on_shm_format(void *data, struct wl_shm *wl_shm, uint32_t format) {
     struct server_shm *shm = data;
@@ -38,20 +42,11 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 static void
-handle_server_buffer_shm_destroy(struct wl_client *client, struct wl_resource *resource) {
-    wl_resource_destroy(resource);
-}
-
-static void
 server_buffer_shm_destroy(struct wl_resource *resource) {
-    struct server_buffer *buffer = wl_resource_get_user_data(resource);
+    struct server_buffer *buffer = server_buffer_from_resource(resource);
 
     server_buffer_destroy(buffer);
 }
-
-static const struct wl_buffer_interface server_buffer_shm_impl = {
-    .destroy = handle_server_buffer_shm_destroy,
-};
 
 static void
 handle_shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, uint32_t id,
@@ -75,7 +70,7 @@ handle_shm_pool_create_buffer(struct wl_client *client, struct wl_resource *reso
     buffer->data.shm.height = height;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    wl_resource_set_implementation(buffer_resource, &server_buffer_shm_impl, buffer,
+    wl_resource_set_implementation(buffer_resource, &server_buffer_impl, buffer,
                                    server_buffer_shm_destroy);
 
     buffer->resource = buffer_resource;
@@ -110,7 +105,7 @@ static const struct wl_shm_pool_interface shm_pool_impl = {
 static void
 handle_shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t id,
                        int32_t fd, int32_t size) {
-    struct server_shm *shm = wl_resource_get_user_data(resource);
+    struct server_shm *shm = server_shm_from_resource(resource);
 
     struct server_shm_pool *shm_pool = calloc(1, sizeof(*shm_pool));
     if (!shm_pool) {
@@ -134,6 +129,12 @@ shm_destroy(struct wl_resource *resource) {
 static const struct wl_shm_interface shm_impl = {
     .create_pool = handle_shm_create_pool,
 };
+
+struct server_shm *
+server_shm_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_shm_interface, &shm_impl));
+    return wl_resource_get_user_data(resource);
+}
 
 static void
 handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {

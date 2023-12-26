@@ -51,6 +51,10 @@ struct remote_seat {
 
 struct server_seat *server_seat_create(struct server *server, struct wl_seat *remote);
 
+struct server_keyboard *server_keyboard_from_resource(struct wl_resource *resource);
+struct server_pointer *server_pointer_from_resource(struct wl_resource *resource);
+struct server_seat *server_seat_from_resource(struct wl_resource *resource);
+
 // TODO: function to change remote seat
 
 #endif

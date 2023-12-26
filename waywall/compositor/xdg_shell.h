@@ -38,4 +38,7 @@ struct server_xdg_toplevel {
 
 struct server_xdg_wm_base *server_xdg_wm_base_create(struct server *server);
 
+struct server_xdg_surface *server_xdg_surface_from_resource(struct wl_resource *resource);
+struct server_xdg_toplevel *server_xdg_toplevel_from_resource(struct wl_resource *resource);
+
 #endif

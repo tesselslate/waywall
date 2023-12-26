@@ -8,15 +8,33 @@
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "linux-dmabuf-unstable-v1-server-protocol.h"
 
-// TODO: Figure out how to safely set up and use a separate event queue for where
-// wl_display_roundtrip is used.
-
 /*
  *  Mesa uses a bunch of these functions. It's easy enough to just implement all of them since
  *  they're largely passthrough.
  */
 
 #define VERSION 4
+
+// TODO: Figure out how to safely set up and use a separate event queue for where
+// wl_display_roundtrip is used.
+
+struct server_buffer_params {
+    struct server_linux_dmabuf *parent;
+
+    struct wl_resource *resource;
+    struct zwp_linux_buffer_params_v1 *remote;
+
+    struct buffer_data_dmabuf data;
+    uint8_t plane_bitmask;
+
+    bool failed, created;
+    struct wl_resource *buffer_resource;
+};
+
+struct server_dmabuf_feedback {
+    struct wl_resource *resource;
+    struct zwp_linux_dmabuf_feedback_v1 *remote;
+};
 
 static bool check_buffer_params_creation(struct server_buffer_params *buffer_params);
 static struct wl_resource *create_buffer(struct server_buffer_params *buffer_params,
@@ -127,20 +145,11 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 static void
-handle_server_buffer_dmabuf_destroy(struct wl_client *client, struct wl_resource *resource) {
-    wl_resource_destroy(resource);
-}
-
-static void
 server_buffer_dmabuf_destroy(struct wl_resource *resource) {
-    struct server_buffer *buffer = wl_resource_get_user_data(resource);
+    struct server_buffer *buffer = server_buffer_from_resource(resource);
 
     server_buffer_destroy(buffer);
 }
-
-static const struct wl_buffer_interface server_buffer_dmabuf_impl = {
-    .destroy = handle_server_buffer_dmabuf_destroy,
-};
 
 static bool
 check_buffer_params_creation(struct server_buffer_params *buffer_params) {
@@ -182,7 +191,7 @@ create_buffer(struct server_buffer_params *buffer_params, struct wl_buffer *remo
     wl_buffer_add_listener(remote_buffer, &server_buffer_listener, buffer);
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    wl_resource_set_implementation(buffer_resource, &server_buffer_dmabuf_impl, buffer,
+    wl_resource_set_implementation(buffer_resource, &server_buffer_impl, buffer,
                                    server_buffer_dmabuf_destroy);
 
     buffer->resource = buffer_resource;
@@ -295,7 +304,7 @@ handle_buffer_params_create_immed(struct wl_client *client, struct wl_resource *
 
         struct wl_resource *buffer_resource =
             wl_resource_create(client, &wl_buffer_interface, 1, id);
-        server_buffer_make_invalid(buffer_resource);
+        server_buffer_create_invalid(buffer_resource);
 
         return;
     }
@@ -351,7 +360,7 @@ handle_linux_dmabuf_destroy(struct wl_client *client, struct wl_resource *resour
 static void
 handle_linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resource,
                                   uint32_t id) {
-    struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
+    struct server_linux_dmabuf *linux_dmabuf = server_linux_dmabuf_from_resource(resource);
 
     struct server_buffer_params *buffer_params = calloc(1, sizeof(*buffer_params));
     if (!buffer_params) {
@@ -373,7 +382,7 @@ handle_linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *
 static void
 handle_linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *resource,
                                          uint32_t id) {
-    struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
+    struct server_linux_dmabuf *linux_dmabuf = server_linux_dmabuf_from_resource(resource);
 
     struct server_dmabuf_feedback *dmabuf_feedback = calloc(1, sizeof(*dmabuf_feedback));
     if (!dmabuf_feedback) {
@@ -399,8 +408,8 @@ handle_linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_res
 static void
 handle_linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *resource,
                                          uint32_t id, struct wl_resource *surface_resource) {
-    struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
-    struct server_surface *surface = wl_resource_get_user_data(surface_resource);
+    struct server_linux_dmabuf *linux_dmabuf = server_linux_dmabuf_from_resource(resource);
+    struct server_surface *surface = server_surface_from_resource(surface_resource);
 
     struct server_dmabuf_feedback *dmabuf_feedback = calloc(1, sizeof(*dmabuf_feedback));
     if (!dmabuf_feedback) {
@@ -435,6 +444,13 @@ static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_impl = {
     .get_default_feedback = handle_linux_dmabuf_get_default_feedback,
     .get_surface_feedback = handle_linux_dmabuf_get_surface_feedback,
 };
+
+struct server_linux_dmabuf *
+server_linux_dmabuf_from_resource(struct wl_resource *resource) {
+    ww_assert(
+        wl_resource_instance_of(resource, &zwp_linux_dmabuf_v1_interface, &linux_dmabuf_impl));
+    return wl_resource_get_user_data(resource);
+}
 
 static void
 handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {

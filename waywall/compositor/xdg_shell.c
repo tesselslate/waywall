@@ -103,7 +103,7 @@ handle_xdg_toplevel_set_parent(struct wl_client *client, struct wl_resource *res
 static void
 handle_xdg_toplevel_set_title(struct wl_client *client, struct wl_resource *resource,
                               const char *title) {
-    struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     if (xdg_toplevel->title) {
         free(xdg_toplevel->title);
@@ -153,7 +153,7 @@ handle_xdg_toplevel_set_min_size(struct wl_client *client, struct wl_resource *r
 
 static void
 handle_xdg_toplevel_set_maximized(struct wl_client *client, struct wl_resource *resource) {
-    struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     if (xdg_toplevel->current.fullscreen) {
         return;
@@ -166,7 +166,7 @@ handle_xdg_toplevel_set_maximized(struct wl_client *client, struct wl_resource *
 
 static void
 handle_xdg_toplevel_unset_maximized(struct wl_client *client, struct wl_resource *resource) {
-    struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     if (xdg_toplevel->current.fullscreen) {
         return;
@@ -180,7 +180,7 @@ handle_xdg_toplevel_unset_maximized(struct wl_client *client, struct wl_resource
 static void
 handle_xdg_toplevel_set_fullscreen(struct wl_client *client, struct wl_resource *resource,
                                    struct wl_resource *output_resource) {
-    struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     // TODO: do not allow fullscreen on wall (queue it?)
 
@@ -192,7 +192,7 @@ handle_xdg_toplevel_set_fullscreen(struct wl_client *client, struct wl_resource 
 
 static void
 handle_xdg_toplevel_unset_fullscreen(struct wl_client *client, struct wl_resource *resource) {
-    struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     xdg_toplevel->pending.fullscreen = false;
 
@@ -207,7 +207,7 @@ handle_xdg_toplevel_set_minimized(struct wl_client *client, struct wl_resource *
 
 static void
 xdg_toplevel_destroy(struct wl_resource *resource) {
-    struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     xdg_toplevel->parent->toplevel = NULL;
     xdg_toplevel->parent->surface->role_object = NULL;
@@ -236,6 +236,12 @@ static const struct xdg_toplevel_interface xdg_toplevel_impl = {
     .set_minimized = handle_xdg_toplevel_set_minimized,
 };
 
+struct server_xdg_toplevel *
+server_xdg_toplevel_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &xdg_toplevel_interface, &xdg_toplevel_impl));
+    return wl_resource_get_user_data(resource);
+}
+
 static void
 handle_xdg_surface_destroy(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
@@ -244,7 +250,7 @@ handle_xdg_surface_destroy(struct wl_client *client, struct wl_resource *resourc
 static void
 handle_xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
                                 uint32_t id) {
-    struct server_xdg_surface *xdg_surface = wl_resource_get_user_data(resource);
+    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(resource);
 
     if (xdg_surface->toplevel) {
         wl_client_post_implementation_error(client,
@@ -301,7 +307,7 @@ handle_xdg_surface_set_window_geometry(struct wl_client *client, struct wl_resou
 static void
 handle_xdg_surface_ack_configure(struct wl_client *client, struct wl_resource *resource,
                                  uint32_t serial) {
-    struct server_xdg_surface *xdg_surface = wl_resource_get_user_data(resource);
+    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(resource);
 
     if (!xdg_surface->toplevel) {
         wl_resource_post_error(resource, XDG_SURFACE_ERROR_NOT_CONSTRUCTED,
@@ -323,7 +329,7 @@ handle_xdg_surface_ack_configure(struct wl_client *client, struct wl_resource *r
 
 static void
 xdg_surface_destroy(struct wl_resource *resource) {
-    struct server_xdg_surface *xdg_surface = wl_resource_get_user_data(resource);
+    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(resource);
 
     if (xdg_surface->toplevel) {
         wl_resource_post_error(resource, XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT,
@@ -346,6 +352,12 @@ static const struct xdg_surface_interface xdg_surface_impl = {
     .set_window_geometry = handle_xdg_surface_set_window_geometry,
     .ack_configure = handle_xdg_surface_ack_configure,
 };
+
+struct server_xdg_surface *
+server_xdg_surface_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &xdg_surface_interface, &xdg_surface_impl));
+    return wl_resource_get_user_data(resource);
+}
 
 static void
 handle_xdg_wm_base_destroy(struct wl_client *client, struct wl_resource *resource) {
@@ -370,7 +382,7 @@ static void
 handle_xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resource,
                                    uint32_t id, struct wl_resource *surface_resource) {
     struct client_xdg_wm_base *client_xdg_wm_base = wl_resource_get_user_data(resource);
-    struct server_surface *surface = wl_resource_get_user_data(surface_resource);
+    struct server_surface *surface = server_surface_from_resource(surface_resource);
 
     if (surface->role != ROLE_NONE) {
         wl_resource_post_error(resource, XDG_WM_BASE_ERROR_ROLE,

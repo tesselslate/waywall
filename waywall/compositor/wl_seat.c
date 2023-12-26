@@ -386,7 +386,7 @@ handle_pointer_release(struct wl_client *client, struct wl_resource *resource) {
 
 static void
 pointer_destroy(struct wl_resource *resource) {
-    struct server_pointer *pointer = wl_resource_get_user_data(resource);
+    struct server_pointer *pointer = server_pointer_from_resource(resource);
 
     wl_list_remove(&pointer->link);
     free(pointer);
@@ -397,6 +397,12 @@ static const struct wl_pointer_interface pointer_impl = {
     .release = handle_pointer_release,
 };
 
+struct server_pointer *
+server_pointer_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_pointer_interface, &pointer_impl));
+    return wl_resource_get_user_data(resource);
+}
+
 static void
 handle_keyboard_release(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
@@ -404,7 +410,7 @@ handle_keyboard_release(struct wl_client *client, struct wl_resource *resource) 
 
 static void
 keyboard_destroy(struct wl_resource *resource) {
-    struct server_keyboard *keyboard = wl_resource_get_user_data(resource);
+    struct server_keyboard *keyboard = server_keyboard_from_resource(resource);
 
     wl_list_remove(&keyboard->link);
     free(keyboard);
@@ -414,9 +420,15 @@ static const struct wl_keyboard_interface keyboard_impl = {
     .release = handle_keyboard_release,
 };
 
+struct server_keyboard *
+server_keyboard_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_keyboard_interface, &keyboard_impl));
+    return wl_resource_get_user_data(resource);
+}
+
 static void
 handle_seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_seat *seat = wl_resource_get_user_data(resource);
+    struct server_seat *seat = server_seat_from_resource(resource);
 
     struct server_pointer *pointer = calloc(1, sizeof(*pointer));
     if (!pointer) {
@@ -437,7 +449,7 @@ handle_seat_get_pointer(struct wl_client *client, struct wl_resource *resource, 
 
 static void
 handle_seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_seat *seat = wl_resource_get_user_data(resource);
+    struct server_seat *seat = server_seat_from_resource(resource);
 
     struct server_keyboard *keyboard = calloc(1, sizeof(*keyboard));
     if (!keyboard) {
@@ -482,6 +494,12 @@ static const struct wl_seat_interface seat_impl = {
     .get_touch = handle_seat_get_touch,
     .release = handle_seat_release,
 };
+
+struct server_seat *
+server_seat_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_seat_interface, &seat_impl));
+    return wl_resource_get_user_data(resource);
+}
 
 static void
 handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {

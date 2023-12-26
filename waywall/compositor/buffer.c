@@ -29,22 +29,22 @@ const struct wl_buffer_listener server_buffer_listener = {
 };
 
 static void
-handle_server_buffer_invalid_destroy(struct wl_client *client, struct wl_resource *resource) {
+buffer_destroy(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
 }
 
+const struct wl_buffer_interface server_buffer_impl = {
+    .destroy = buffer_destroy,
+};
+
 static void
 server_buffer_invalid_destroy(struct wl_resource *resource) {
-    struct server_buffer *buffer = wl_resource_get_user_data(resource);
+    struct server_buffer *buffer = server_buffer_from_resource(resource);
     server_buffer_destroy(buffer);
 }
 
-static const struct wl_buffer_interface server_buffer_invalid_impl = {
-    .destroy = handle_server_buffer_invalid_destroy,
-};
-
 void
-server_buffer_make_invalid(struct wl_resource *buffer_resource) {
+server_buffer_create_invalid(struct wl_resource *buffer_resource) {
     struct server_buffer *buffer = calloc(1, sizeof(*buffer));
 
     if (!buffer) {
@@ -57,6 +57,12 @@ server_buffer_make_invalid(struct wl_resource *buffer_resource) {
     buffer->remote = NULL;
     buffer->type = BUFFER_INVALID;
 
-    wl_resource_set_implementation(buffer_resource, &server_buffer_invalid_impl, buffer,
+    wl_resource_set_implementation(buffer_resource, &server_buffer_impl, buffer,
                                    server_buffer_invalid_destroy);
+}
+
+struct server_buffer *
+server_buffer_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_buffer_interface, &server_buffer_impl));
+    return wl_resource_get_user_data(resource);
 }

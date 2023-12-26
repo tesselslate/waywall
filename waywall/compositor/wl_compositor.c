@@ -70,7 +70,7 @@ handle_region_destroy(struct wl_client *client, struct wl_resource *resource) {
 static void
 handle_region_add(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y,
                   int32_t width, int32_t height) {
-    struct server_region *region = wl_resource_get_user_data(resource);
+    struct server_region *region = server_region_from_resource(resource);
 
     wl_region_add(region->remote, x, y, width, height);
 }
@@ -78,14 +78,14 @@ handle_region_add(struct wl_client *client, struct wl_resource *resource, int32_
 static void
 handle_region_subtract(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y,
                        int32_t width, int32_t height) {
-    struct server_region *region = wl_resource_get_user_data(resource);
+    struct server_region *region = server_region_from_resource(resource);
 
     wl_region_subtract(region->remote, x, y, width, height);
 }
 
 static void
 region_destroy(struct wl_resource *resource) {
-    struct server_region *region = wl_resource_get_user_data(resource);
+    struct server_region *region = server_region_from_resource(resource);
 
     wl_region_destroy(region->remote);
     free(region);
@@ -97,6 +97,12 @@ static const struct wl_region_interface region_impl = {
     .subtract = handle_region_subtract,
 };
 
+struct server_region *
+server_region_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_region_interface, &region_impl));
+    return wl_resource_get_user_data(resource);
+}
+
 static void
 handle_surface_destroy(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
@@ -105,8 +111,8 @@ handle_surface_destroy(struct wl_client *client, struct wl_resource *resource) {
 static void
 handle_surface_attach(struct wl_client *client, struct wl_resource *resource,
                       struct wl_resource *buffer_resource, int32_t x, int32_t y) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
-    struct server_buffer *buffer = wl_resource_get_user_data(buffer_resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
+    struct server_buffer *buffer = server_buffer_from_resource(buffer_resource);
 
     if (x != 0 || y != 0) {
         if (wl_resource_get_version(resource) >= WL_SURFACE_OFFSET_SINCE_VERSION) {
@@ -126,14 +132,14 @@ handle_surface_attach(struct wl_client *client, struct wl_resource *resource,
 static void
 handle_surface_damage(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y,
                       int32_t width, int32_t height) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
 
     wl_surface_damage(surface->remote, x, y, width, height);
 }
 
 static void
 handle_surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
 
     struct wl_callback *callback = wl_surface_frame(surface->remote);
 
@@ -147,8 +153,8 @@ handle_surface_frame(struct wl_client *client, struct wl_resource *resource, uin
 static void
 handle_surface_set_opaque_region(struct wl_client *client, struct wl_resource *resource,
                                  struct wl_resource *region_resource) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
-    struct server_region *region = wl_resource_get_user_data(region_resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
+    struct server_region *region = server_region_from_resource(region_resource);
 
     wl_surface_set_opaque_region(surface->remote, region->remote);
 }
@@ -166,7 +172,7 @@ handle_surface_set_input_region(struct wl_client *client, struct wl_resource *re
 
 static void
 handle_surface_commit(struct wl_client *client, struct wl_resource *resource) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
 
     wl_signal_emit_mutable(&surface->events.commit, surface);
 
@@ -190,7 +196,7 @@ handle_surface_set_buffer_transform(struct wl_client *client, struct wl_resource
 static void
 handle_surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource,
                                 int32_t scale) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
 
     // TODO: check that buffer scale is legal (kill client early instead of getting killed by host
     // compositor)
@@ -201,7 +207,7 @@ handle_surface_set_buffer_scale(struct wl_client *client, struct wl_resource *re
 static void
 handle_surface_damage_buffer(struct wl_client *client, struct wl_resource *resource, int32_t x,
                              int32_t y, int32_t width, int32_t height) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
 
     wl_surface_damage_buffer(surface->remote, x, y, width, height);
 }
@@ -215,7 +221,7 @@ handle_surface_offset(struct wl_client *client, struct wl_resource *resource, in
 
 static void
 surface_destroy(struct wl_resource *resource) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
+    struct server_surface *surface = server_surface_from_resource(resource);
 
     // TODO: destroy signal (for role objects or other interested modules)
     if (surface->role_object) {
@@ -241,10 +247,16 @@ static const struct wl_surface_interface surface_impl = {
     .offset = handle_surface_offset,
 };
 
+struct server_surface *
+server_surface_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_surface_interface, &surface_impl));
+    return wl_resource_get_user_data(resource);
+}
+
 static void
 handle_compositor_create_region(struct wl_client *client, struct wl_resource *resource,
                                 uint32_t id) {
-    struct server_compositor *compositor = wl_resource_get_user_data(resource);
+    struct server_compositor *compositor = server_compositor_from_resource(resource);
 
     struct server_region *region = calloc(1, sizeof(*region));
     if (!region) {
@@ -264,7 +276,7 @@ handle_compositor_create_region(struct wl_client *client, struct wl_resource *re
 static void
 handle_compositor_create_surface(struct wl_client *client, struct wl_resource *resource,
                                  uint32_t id) {
-    struct server_compositor *compositor = wl_resource_get_user_data(resource);
+    struct server_compositor *compositor = server_compositor_from_resource(resource);
 
     struct server_surface *surface = calloc(1, sizeof(*surface));
     if (!surface) {
@@ -293,6 +305,12 @@ static const struct wl_compositor_interface compositor_impl = {
     .create_region = handle_compositor_create_region,
     .create_surface = handle_compositor_create_surface,
 };
+
+struct server_compositor *
+server_compositor_from_resource(struct wl_resource *resource) {
+    ww_assert(wl_resource_instance_of(resource, &wl_compositor_interface, &compositor_impl));
+    return wl_resource_get_user_data(resource);
+}
 
 static void
 handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {

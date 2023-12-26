@@ -57,6 +57,7 @@ struct server_buffer {
 };
 
 extern const struct wl_buffer_listener server_buffer_listener;
+extern const struct wl_buffer_interface server_buffer_impl;
 
 static inline int32_t
 server_buffer_get_width(struct server_buffer *buffer) {
@@ -72,7 +73,11 @@ server_buffer_get_height(struct server_buffer *buffer) {
                                            : ww_unreachable();
 }
 
+void server_buffer_create_invalid(struct wl_resource *buffer_resource);
 void server_buffer_destroy(struct server_buffer *buffer);
-void server_buffer_make_invalid(struct wl_resource *buffer_resource);
+struct server_buffer *server_buffer_from_resource(struct wl_resource *resource);
+
+// TODO: server_buffer_from_resource
+// (related: common buffer impl to allow wl_resource_instance_of to work)
 
 #endif

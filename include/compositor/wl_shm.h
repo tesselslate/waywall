@@ -16,10 +16,8 @@ struct server_shm {
     struct wl_listener display_destroy;
 };
 
-struct server_shm_pool {
-    struct wl_shm_pool *remote;
-};
-
 struct server_shm *server_shm_create(struct server *server, struct wl_shm *remote);
+
+struct server_shm *server_shm_from_resource(struct wl_resource *resource);
 
 #endif

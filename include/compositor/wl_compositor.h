@@ -45,4 +45,8 @@ struct server_region {
 struct server_compositor *server_compositor_create(struct server *server,
                                                    struct wl_compositor *remote);
 
+struct server_compositor *server_compositor_from_resource(struct wl_resource *resource);
+struct server_region *server_region_from_resource(struct wl_resource *resource);
+struct server_surface *server_surface_from_resource(struct wl_resource *resource);
+
 #endif
