@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define ARRAY_SIZE 64
+#define ARRAY_SIZE 128
 #define RINGBUF_SIZE 64
 
 /*
@@ -95,7 +95,7 @@ u32_array_push(struct u32_array *arr, uint32_t datum) {
  */
 static inline void
 u32_array_remove(struct u32_array *arr, size_t i) {
-    memmove(arr->data + i, arr->data + i + 1, arr->count - i - 1);
+    memmove(&arr->data[i], &arr->data[i + 1], sizeof(uint32_t) * (arr->count - i - 1));
     arr->count--;
 }
 
