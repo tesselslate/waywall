@@ -1,7 +1,7 @@
 #ifndef WAYWALL_COMPOSITOR_XDG_SHELL_H
 #define WAYWALL_COMPOSITOR_XDG_SHELL_H
 
-#include "compositor/ringbuf.h"
+#include "compositor/cutil.h"
 #include <wayland-server-core.h>
 
 struct server;

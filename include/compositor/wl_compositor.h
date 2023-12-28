@@ -3,7 +3,7 @@
 
 #define COMPOSITOR_REMOTE_VERSION 4
 
-#include "compositor/box.h"
+#include "compositor/cutil.h"
 #include <wayland-server-core.h>
 
 struct server;
@@ -26,6 +26,10 @@ struct server_view {
     } type;
 
     struct wl_listener on_unmap;
+
+    struct {
+        struct wl_signal destroy; // data: server_view
+    } events;
 };
 
 struct server_compositor {
@@ -123,6 +127,7 @@ struct server_view *server_view_create_toplevel(struct server_compositor *compos
 struct server_view *server_view_from_toplevel(struct server_compositor *compositor,
                                               struct server_xdg_toplevel *toplevel);
 void server_view_destroy(struct server_view *view);
+struct server_surface *server_view_get_surface(struct server_view *view);
 
 void server_view_place_above(struct server_view *view, struct wl_surface *sibling);
 void server_view_place_below(struct server_view *view, struct wl_surface *sibling);

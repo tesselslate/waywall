@@ -1,6 +1,6 @@
 #include "compositor/wl_compositor.h"
-#include "compositor/box.h"
 #include "compositor/buffer.h"
+#include "compositor/cutil.h"
 #include "compositor/server.h"
 #include "compositor/xdg_shell.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
@@ -583,6 +583,8 @@ server_view_create_toplevel(struct server_compositor *compositor,
     view->on_unmap.notify = on_toplevel_unmap;
     wl_signal_add(&toplevel->events.unmap, &view->on_unmap);
 
+    wl_signal_init(&view->events.destroy);
+
     wl_list_insert(&compositor->output.views, &view->link);
 
     return view;
@@ -603,6 +605,8 @@ server_view_from_toplevel(struct server_compositor *compositor,
 
 void
 server_view_destroy(struct server_view *view) {
+    wl_signal_emit_mutable(&view->events.destroy, view);
+
     wp_viewport_destroy(view->viewport);
     wl_subsurface_destroy(view->subsurface);
 
@@ -610,6 +614,16 @@ server_view_destroy(struct server_view *view) {
     wl_list_remove(&view->link);
 
     free(view);
+}
+
+struct server_surface *
+server_view_get_surface(struct server_view *view) {
+    switch (view->type) {
+    case VIEW_XDG_SHELL:
+        return view->data.xdg_shell->parent->parent;
+    default:
+        ww_unreachable();
+    }
 }
 
 void
