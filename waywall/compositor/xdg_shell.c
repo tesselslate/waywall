@@ -11,6 +11,7 @@
 #define VERSION 6
 
 struct client_xdg_wm_base {
+    struct server_xdg_wm_base *parent;
     struct wl_list surfaces;
 };
 
@@ -60,7 +61,17 @@ on_surface_commit(struct wl_listener *listener, void *data) {
             return;
         }
 
-        server_xdg_surface_send_configure(xdg_surface);
+        if (xdg_surface->toplevel) {
+            server_xdg_surface_send_configure(xdg_surface);
+        }
+    } else {
+        if (!surface->pending.buffer) {
+            xdg_surface->configured = false;
+
+            if (xdg_surface->toplevel) {
+                wl_signal_emit(&xdg_surface->toplevel->events.unmap, &xdg_surface->toplevel);
+            }
+        }
     }
 }
 
@@ -198,13 +209,14 @@ static void
 xdg_toplevel_destroy(struct wl_resource *resource) {
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
+    if (xdg_toplevel->parent && xdg_toplevel->parent->configured) {
+        wl_signal_emit_mutable(&xdg_toplevel->events.unmap, xdg_toplevel);
+    }
+
     wl_signal_emit_mutable(&xdg_toplevel->events.destroy, xdg_toplevel);
 
     if (xdg_toplevel->parent) {
         xdg_toplevel->parent->toplevel = NULL;
-
-        ww_assert(xdg_toplevel->parent->parent->role == ROLE_XDG_TOPLEVEL);
-        xdg_toplevel->parent->parent->role_object = NULL;
     }
 
     if (xdg_toplevel->title) {
@@ -266,6 +278,7 @@ handle_xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *re
     }
 
     wl_signal_init(&xdg_toplevel->events.destroy);
+    wl_signal_init(&xdg_toplevel->events.unmap);
     wl_signal_init(&xdg_toplevel->events.unset_fullscreen);
     wl_signal_init(&xdg_toplevel->events.set_fullscreen);
     wl_signal_init(&xdg_toplevel->events.set_title);
@@ -273,10 +286,12 @@ handle_xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *re
     wl_resource_set_implementation(xdg_toplevel_resource, &xdg_toplevel_impl, xdg_toplevel,
                                    xdg_toplevel_destroy);
 
+    xdg_surface->toplevel = xdg_toplevel;
+
     xdg_toplevel->parent = xdg_surface;
     xdg_toplevel->resource = xdg_toplevel_resource;
     xdg_surface->parent->role = ROLE_XDG_TOPLEVEL;
-    xdg_surface->parent->role_object = xdg_toplevel->resource;
+    server_surface_set_role_object(xdg_surface->parent, xdg_toplevel->resource);
 }
 
 static void
@@ -321,7 +336,15 @@ handle_xdg_surface_ack_configure(struct wl_client *client, struct wl_resource *r
 
         if (buf_serial == serial) {
             ringbuf_shift(ringbuf, i + 1);
-            xdg_surface->configured = true;
+
+            ww_assert(xdg_surface->toplevel);
+            if (!xdg_surface->configured) {
+                xdg_surface->configured = true;
+
+                server_view_create_toplevel(xdg_surface->wm_base->parent->compositor,
+                                            xdg_surface->toplevel);
+            }
+
             return;
         }
     }
@@ -338,11 +361,7 @@ xdg_surface_destroy(struct wl_resource *resource) {
     if (xdg_surface->toplevel) {
         wl_resource_post_error(resource, XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT,
                                "xdg_surface was destroyed before its associated xdg_toplevel");
-    }
-
-    xdg_surface->toplevel->parent = NULL;
-    if (xdg_surface->parent->role == ROLE_XDG_SURFACE) {
-        xdg_surface->parent->role_object = NULL;
+        xdg_surface->toplevel->parent = NULL;
     }
 
     wl_list_remove(&xdg_surface->on_commit.link);
@@ -419,6 +438,11 @@ handle_xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource 
     wl_resource_set_implementation(xdg_surface_resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_destroy);
 
+    xdg_surface->resource = xdg_surface_resource;
+
+    xdg_surface->wm_base = xdg_wm_base;
+    xdg_surface->parent = surface;
+
     xdg_surface->on_commit.notify = on_surface_commit;
     wl_signal_add(&surface->events.commit, &xdg_surface->on_commit);
     xdg_surface->on_destroy.notify = on_surface_destroy;
@@ -427,7 +451,7 @@ handle_xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource 
     wl_list_insert(&xdg_wm_base->surfaces, &xdg_surface->link);
 
     surface->role = ROLE_XDG_SURFACE;
-    surface->role_object = xdg_surface_resource;
+    server_surface_set_role_object(surface, xdg_surface_resource);
 }
 
 static void
@@ -462,6 +486,8 @@ static void
 handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= VERSION);
 
+    struct server_xdg_wm_base *xdg_wm_base = data;
+
     struct wl_resource *resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
     if (!resource) {
         wl_client_post_no_memory(client);
@@ -474,6 +500,7 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
         return;
     }
 
+    client_xdg_wm_base->parent = xdg_wm_base;
     wl_list_init(&client_xdg_wm_base->surfaces);
 
     wl_resource_set_implementation(resource, &xdg_wm_base_impl, client_xdg_wm_base,
@@ -481,12 +508,14 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 }
 
 struct server_xdg_wm_base *
-server_xdg_wm_base_create(struct server *server) {
+server_xdg_wm_base_create(struct server *server, struct server_compositor *compositor) {
     struct server_xdg_wm_base *xdg_wm_base = calloc(1, sizeof(*xdg_wm_base));
     if (!xdg_wm_base) {
         LOG(LOG_ERROR, "failed to allocate server_xdg_wm_base");
         return NULL;
     }
+
+    xdg_wm_base->compositor = compositor;
 
     xdg_wm_base->global = wl_global_create(server->display, &xdg_wm_base_interface, VERSION,
                                            xdg_wm_base, handle_bind);
@@ -509,7 +538,9 @@ server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface) {
         return;
     }
 
-    ringbuf_push(ringbuf, next_serial(xdg_surface->resource));
+    uint32_t serial = next_serial(xdg_surface->resource);
+    xdg_surface_send_configure(xdg_surface->resource, serial);
+    ringbuf_push(ringbuf, serial);
 }
 
 struct server_xdg_surface *

@@ -1,6 +1,8 @@
 #include "compositor/wl_compositor.h"
+#include "compositor/box.h"
 #include "compositor/buffer.h"
 #include "compositor/server.h"
+#include "compositor/xdg_shell.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "util.h"
 #include "viewporter-client-protocol.h"
@@ -38,10 +40,6 @@
 
 #define VERSION 5
 #define REGION_VERSION 1
-
-struct damage {
-    int32_t x, y, width, height;
-};
 
 static void
 on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
@@ -100,6 +98,21 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
     .configure_bounds = on_xdg_toplevel_configure_bounds,
     .wm_capabilities = on_xdg_toplevel_wm_capabilities,
 };
+
+static void
+on_toplevel_unmap(struct wl_listener *listener, void *data) {
+    struct server_view *view = wl_container_of(listener, view, on_unmap);
+
+    server_view_destroy(view);
+}
+
+static void
+on_role_object_destroy(struct wl_listener *listener, void *data) {
+    struct server_surface *surface = wl_container_of(listener, surface, on_role_object_destroy);
+
+    surface->role_object = NULL;
+    wl_list_remove(&surface->on_role_object_destroy.link);
+}
 
 static void
 on_frame_callback_done(void *data, struct wl_callback *wl_callback, uint32_t time) {
@@ -209,7 +222,7 @@ handle_surface_damage(struct wl_client *client, struct wl_resource *resource, in
                       int32_t width, int32_t height) {
     struct server_surface *surface = server_surface_from_resource(resource);
 
-    struct damage *damage = wl_array_add(&surface->pending.damage, sizeof(*damage));
+    struct box *damage = wl_array_add(&surface->pending.damage, sizeof(*damage));
     damage->x = x;
     damage->y = y;
     damage->width = width;
@@ -238,11 +251,9 @@ handle_surface_frame(struct wl_client *client, struct wl_resource *resource, uin
 static void
 handle_surface_set_opaque_region(struct wl_client *client, struct wl_resource *resource,
                                  struct wl_resource *region_resource) {
-    struct server_surface *surface = server_surface_from_resource(resource);
-    struct server_region *region = server_region_from_resource(region_resource);
-
-    surface->pending.opaque = region;
-    surface->pending.changes |= SURFACE_STATE_OPAQUE;
+    // Unused. This might be worth implementing at some point but dealing with wl_region's copy
+    // semantics is annoying; we can't just store the server_region on its own (a refcount could
+    // work, or maybe I just need to give up and use pixman.)
 }
 
 static void
@@ -267,25 +278,25 @@ handle_surface_commit(struct wl_client *client, struct wl_resource *resource) {
         wl_surface_attach(surface->remote, surface->pending.buffer->remote, 0, 0);
     }
     if (surface->pending.changes & SURFACE_STATE_DAMAGE) {
-        struct damage *damage;
+        struct box *damage;
         wl_array_for_each(damage, &surface->pending.damage) {
             wl_surface_damage(surface->remote, damage->x, damage->y, damage->width, damage->height);
         }
     }
     if (surface->pending.changes & SURFACE_STATE_BUFFER_DAMAGE) {
-        struct damage *damage;
+        struct box *damage;
         wl_array_for_each(damage, &surface->pending.buffer_damage) {
             wl_surface_damage_buffer(surface->remote, damage->x, damage->y, damage->width,
                                      damage->height);
         }
     }
-    if (surface->pending.changes & SURFACE_STATE_OPAQUE) {
-        wl_surface_set_opaque_region(surface->remote, surface->pending.opaque->remote);
-    }
     if (surface->pending.changes & SURFACE_STATE_SCALE) {
         wl_surface_set_buffer_scale(surface->remote, surface->pending.scale);
     }
     wl_surface_commit(surface->remote);
+
+    wl_array_release(&surface->pending.damage);
+    wl_array_release(&surface->pending.buffer_damage);
 
     surface->pending = (struct surface_client_state){0};
     wl_array_init(&surface->pending.damage);
@@ -317,7 +328,7 @@ handle_surface_damage_buffer(struct wl_client *client, struct wl_resource *resou
                              int32_t y, int32_t width, int32_t height) {
     struct server_surface *surface = server_surface_from_resource(resource);
 
-    struct damage *damage = wl_array_add(&surface->pending.buffer_damage, sizeof(*damage));
+    struct box *damage = wl_array_add(&surface->pending.buffer_damage, sizeof(*damage));
     damage->x = x;
     damage->y = y;
     damage->width = width;
@@ -341,9 +352,15 @@ surface_destroy(struct wl_resource *resource) {
     wl_array_release(&surface->pending.damage);
     wl_array_release(&surface->pending.buffer_damage);
 
+    if (surface->role_object) {
+        struct wl_listener *listener =
+            wl_resource_get_destroy_listener(surface->role_object, on_role_object_destroy);
+        ww_assert(listener == &surface->on_role_object_destroy);
+
+        wl_list_remove(&surface->on_role_object_destroy.link);
+    }
+
     wl_surface_destroy(surface->remote);
-    wl_subsurface_destroy(surface->remote_subsurface);
-    wp_viewport_destroy(surface->remote_viewport);
     free(surface);
 }
 
@@ -411,15 +428,11 @@ handle_compositor_create_surface(struct wl_client *client, struct wl_resource *r
     }
 
     wl_signal_init(&surface->events.commit);
+    wl_signal_init(&surface->events.destroy);
 
     surface->remote = wl_compositor_create_surface(compositor->remote);
     wl_array_init(&surface->pending.damage);
     wl_array_init(&surface->pending.buffer_damage);
-
-    surface->remote_subsurface = wl_subcompositor_get_subsurface(
-        compositor->output.subcompositor, surface->remote, compositor->output.root_surface);
-    surface->remote_viewport =
-        wp_viewporter_get_viewport(compositor->output.viewporter, surface->remote);
 
     struct wl_region *input_region = wl_compositor_create_region(compositor->remote);
     wl_surface_set_input_region(surface->remote, input_region);
@@ -498,6 +511,8 @@ server_compositor_create(struct server *server, struct wl_compositor *remote) {
 
     server_compositor_show_window(compositor);
 
+    wl_list_init(&compositor->output.views);
+
     return compositor;
 }
 
@@ -527,39 +542,109 @@ server_compositor_show_window(struct server_compositor *compositor) {
 }
 
 void
-server_surface_place_above(struct server_surface *surface, struct wl_surface *sibling) {
-    wl_subsurface_place_above(surface->remote_subsurface, sibling);
-    wl_surface_commit(surface->remote);
-    return;
+server_surface_set_role_object(struct server_surface *surface, struct wl_resource *resource) {
+    if (surface->role_object) {
+        struct wl_listener *listener =
+            wl_resource_get_destroy_listener(surface->role_object, on_role_object_destroy);
+        ww_assert(listener == &surface->on_role_object_destroy);
+
+        wl_list_remove(&surface->on_role_object_destroy.link);
+    }
+
+    surface->role_object = resource;
+
+    surface->on_role_object_destroy.notify = on_role_object_destroy;
+    wl_resource_add_destroy_listener(resource, &surface->on_role_object_destroy);
+}
+
+struct server_view *
+server_view_create_toplevel(struct server_compositor *compositor,
+                            struct server_xdg_toplevel *toplevel) {
+    ww_assert(!server_view_from_toplevel(compositor, toplevel));
+
+    struct server_view *view = calloc(1, sizeof(*view));
+    if (!view) {
+        LOG(LOG_ERROR, "failed to allocate server_view");
+        return NULL;
+    }
+
+    view->surface = toplevel->parent->parent;
+    view->subsurface = wl_subcompositor_get_subsurface(
+        compositor->output.subcompositor, view->surface->remote, compositor->output.root_surface);
+    view->viewport =
+        wp_viewporter_get_viewport(compositor->output.viewporter, view->surface->remote);
+    view->data.xdg_shell = toplevel;
+    view->type = VIEW_XDG_SHELL;
+
+    // Place the view below the background until it is configured properly by us.
+    wl_subsurface_place_below(view->subsurface, compositor->output.root_surface);
+    wl_subsurface_set_desync(view->subsurface);
+
+    view->on_unmap.notify = on_toplevel_unmap;
+    wl_signal_add(&toplevel->events.unmap, &view->on_unmap);
+
+    wl_list_insert(&compositor->output.views, &view->link);
+
+    return view;
+}
+
+struct server_view *
+server_view_from_toplevel(struct server_compositor *compositor,
+                          struct server_xdg_toplevel *toplevel) {
+    struct server_view *view;
+    wl_list_for_each (view, &compositor->output.views, link) {
+        if (view->type == VIEW_XDG_SHELL && view->data.xdg_shell == toplevel) {
+            return view;
+        }
+    }
+
+    return NULL;
 }
 
 void
-server_surface_place_below(struct server_surface *surface, struct wl_surface *sibling) {
-    wl_subsurface_place_below(surface->remote_subsurface, sibling);
-    wl_surface_commit(surface->remote);
-    return;
+server_view_destroy(struct server_view *view) {
+    wp_viewport_destroy(view->viewport);
+    wl_subsurface_destroy(view->subsurface);
+
+    wl_list_remove(&view->on_unmap.link);
+    wl_list_remove(&view->link);
+
+    free(view);
 }
 
 void
-server_surface_set_pos(struct server_surface *surface, int32_t x, int32_t y) {
-    wl_subsurface_set_position(surface->remote_subsurface, x, y);
-    wl_surface_commit(surface->remote);
-    return;
+server_view_place_above(struct server_view *view, struct wl_surface *sibling) {
+    wl_subsurface_place_above(view->subsurface, sibling);
+    wl_surface_commit(view->surface->remote);
 }
 
 void
-server_surface_set_size(struct server_surface *surface, int32_t width, int32_t height) {
-    wp_viewport_set_destination(surface->remote_viewport, width, height);
-    wl_surface_commit(surface->remote);
-    return;
+server_view_place_below(struct server_view *view, struct wl_surface *sibling) {
+    wl_subsurface_place_below(view->subsurface, sibling);
+    wl_surface_commit(view->surface->remote);
 }
 
 void
-server_surface_set_source(struct server_surface *surface, double x, double y, double width,
-                          double height) {
-    wp_viewport_set_source(surface->remote_viewport, wl_fixed_from_double(x),
-                           wl_fixed_from_double(y), wl_fixed_from_double(width),
-                           wl_fixed_from_double(height));
-    wl_surface_commit(surface->remote);
-    return;
+server_view_set_pos(struct server_view *view, int32_t x, int32_t y) {
+    wl_subsurface_set_position(view->subsurface, x, y);
+    wl_surface_commit(view->surface->remote);
+
+    view->bounds.x = x;
+    view->bounds.y = y;
+}
+
+void
+server_view_set_size(struct server_view *view, int32_t width, int32_t height) {
+    wp_viewport_set_destination(view->viewport, width, height);
+    wl_surface_commit(view->surface->remote);
+
+    view->bounds.width = width;
+    view->bounds.height = height;
+}
+
+void
+server_view_set_source(struct server_view *view, double x, double y, double width, double height) {
+    wp_viewport_set_source(view->viewport, wl_fixed_from_double(x), wl_fixed_from_double(y),
+                           wl_fixed_from_double(width), wl_fixed_from_double(height));
+    wl_surface_commit(view->surface->remote);
 }

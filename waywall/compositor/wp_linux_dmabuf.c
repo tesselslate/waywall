@@ -173,7 +173,7 @@ check_buffer_params_creation(struct server_buffer_params *buffer_params) {
         return false;
     }
 
-    uint8_t expected_mask = (2 << buffer_params->data.num_planes) - 1;
+    uint8_t expected_mask = (1 << buffer_params->data.num_planes) - 1;
     if (expected_mask != buffer_params->plane_bitmask) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE,
                                "gap in planes");

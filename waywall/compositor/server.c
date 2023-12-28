@@ -199,7 +199,8 @@ server_create() {
         goto fail_create_globals;
     }
     if (!server->remote.single_pixel_buffer_manager) {
-        LOG(LOG_ERROR, "host session compositor did not provide wp_single_pixel_buffer_manager_v1 global");
+        LOG(LOG_ERROR,
+            "host session compositor did not provide wp_single_pixel_buffer_manager_v1 global");
         goto fail_create_globals;
     }
     if (!server->remote.viewporter) {
@@ -215,7 +216,9 @@ server_create() {
         goto fail_create_globals;
     }
 
-    if (!server_compositor_create(server, server->remote.compositor)) {
+    struct server_compositor *compositor =
+        server_compositor_create(server, server->remote.compositor);
+    if (!compositor) {
         goto fail_create_globals;
     }
     if (!server_output_create(server)) {
@@ -227,7 +230,7 @@ server_create() {
     if (!server_linux_dmabuf_create(server, server->remote.linux_dmabuf)) {
         goto fail_create_globals;
     }
-    if (!server_xdg_wm_base_create(server)) {
+    if (!server_xdg_wm_base_create(server, compositor)) {
         goto fail_create_globals;
     }
 

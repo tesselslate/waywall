@@ -3,9 +3,30 @@
 
 #define COMPOSITOR_REMOTE_VERSION 4
 
+#include "compositor/box.h"
 #include <wayland-server-core.h>
 
 struct server;
+
+struct server_view {
+    struct wl_list link; // server_compositor.output.views
+
+    struct server_surface *surface;
+
+    struct wl_subsurface *subsurface;
+    struct wp_viewport *viewport;
+    struct box bounds;
+
+    // TODO: xwayland
+    union {
+        struct server_xdg_toplevel *xdg_shell;
+    } data;
+    enum {
+        VIEW_XDG_SHELL,
+    } type;
+
+    struct wl_listener on_unmap;
+};
 
 struct server_compositor {
     struct wl_compositor *remote;
@@ -26,6 +47,8 @@ struct server_compositor {
         struct xdg_toplevel *xdg_toplevel;
         int width, height;
         bool mapped;
+
+        struct wl_list views; // server_view.link
     } output;
 
     struct wl_listener display_destroy;
@@ -54,9 +77,6 @@ struct surface_client_state {
     // wl_surface.damage | wl_surface.damage_buffer
     struct wl_array damage, buffer_damage;
 
-    // wl_surface.set_opaque_region
-    struct server_region *opaque;
-
     // wl_surface.set_buffer_scale | wl_surface.set_buffer_transform
     int32_t scale;
 
@@ -64,7 +84,6 @@ struct surface_client_state {
         SURFACE_STATE_BUFFER = (1 << 0),
         SURFACE_STATE_DAMAGE = (1 << 1),
         SURFACE_STATE_BUFFER_DAMAGE = (1 << 2),
-        SURFACE_STATE_OPAQUE = (1 << 3),
         SURFACE_STATE_SCALE = (1 << 4),
     } changes;
 };
@@ -72,9 +91,6 @@ struct surface_client_state {
 struct server_surface {
     struct wl_resource *resource;
     struct wl_surface *remote;
-
-    struct wl_subsurface *remote_subsurface;
-    struct wp_viewport *remote_viewport;
 
     enum server_surface_role role;
     struct wl_resource *role_object;
@@ -86,6 +102,8 @@ struct server_surface {
         struct wl_signal commit;  // data: surface
         struct wl_signal destroy; // data: surface
     } events;
+
+    struct wl_listener on_role_object_destroy;
 };
 
 struct server_region {
@@ -98,15 +116,23 @@ struct server_compositor *server_compositor_create(struct server *server,
 void server_compositor_hide_window(struct server_compositor *compositor);
 void server_compositor_show_window(struct server_compositor *compositor);
 
+void server_surface_set_role_object(struct server_surface *surface, struct wl_resource *resource);
+
+struct server_view *server_view_create_toplevel(struct server_compositor *compositor,
+                                                struct server_xdg_toplevel *toplevel);
+struct server_view *server_view_from_toplevel(struct server_compositor *compositor,
+                                              struct server_xdg_toplevel *toplevel);
+void server_view_destroy(struct server_view *view);
+
+void server_view_place_above(struct server_view *view, struct wl_surface *sibling);
+void server_view_place_below(struct server_view *view, struct wl_surface *sibling);
+void server_view_set_pos(struct server_view *view, int32_t x, int32_t y);
+void server_view_set_size(struct server_view *view, int32_t width, int32_t height);
+void server_view_set_source(struct server_view *view, double x, double y, double width,
+                            double height);
+
 struct server_compositor *server_compositor_from_resource(struct wl_resource *resource);
 struct server_region *server_region_from_resource(struct wl_resource *resource);
 struct server_surface *server_surface_from_resource(struct wl_resource *resource);
-
-void server_surface_place_above(struct server_surface *surface, struct wl_surface *sibling);
-void server_surface_place_below(struct server_surface *surface, struct wl_surface *sibling);
-void server_surface_set_pos(struct server_surface *surface, int32_t x, int32_t y);
-void server_surface_set_size(struct server_surface *surface, int32_t width, int32_t height);
-void server_surface_set_source(struct server_surface *surface, double x, double y, double width,
-                               double height);
 
 #endif
