@@ -84,7 +84,7 @@ send_keyboard_enter(struct server_seat *seat, struct wl_resource *keyboard_resou
 
 static void
 on_view_destroy(struct wl_listener *listener, void *data) {
-    struct server_seat *seat = wl_container_of(listener, seat, on_destroy);
+    struct server_seat *seat = wl_container_of(listener, seat, input_focus_destroy);
 
     server_seat_set_input_focus(seat, NULL);
 }
@@ -443,45 +443,6 @@ static const struct wl_keyboard_listener keyboard_listener = {
 };
 
 static void
-on_seat_capabilities(void *data, struct wl_seat *wl_seat, uint32_t capabilities) {
-    struct server_seat *seat = data;
-
-    bool has_pointer = (capabilities & WL_SEAT_CAPABILITY_POINTER) != 0;
-    bool has_keyboard = (capabilities & WL_SEAT_CAPABILITY_KEYBOARD) != 0;
-
-    // TODO: I think there is a weird edge case here where if a capability gets removed while the
-    // user is performing an input with it (e.g. holding a key or button) then it gets stuck. This
-    // is really niche though, I don't think wlroots revokes capabilities? Maybe other compositors
-    // do.
-
-    if (has_pointer && !seat->remote.pointer) {
-        seat->remote.pointer = wl_seat_get_pointer(wl_seat);
-        wl_pointer_add_listener(seat->remote.pointer, &pointer_listener, seat);
-    } else if (!has_pointer && seat->remote.pointer) {
-        wl_pointer_release(seat->remote.pointer);
-        seat->remote.pointer = NULL;
-    }
-
-    if (has_keyboard && !seat->remote.keyboard) {
-        seat->remote.keyboard = wl_seat_get_keyboard(wl_seat);
-        wl_keyboard_add_listener(seat->remote.keyboard, &keyboard_listener, seat);
-    } else if (!has_keyboard && seat->remote.keyboard) {
-        wl_keyboard_release(seat->remote.keyboard);
-        seat->remote.keyboard = NULL;
-    }
-}
-
-static void
-on_seat_name(void *data, struct wl_seat *wl_seat, const char *name) {
-    // Unused.
-}
-
-static const struct wl_seat_listener seat_listener = {
-    .capabilities = on_seat_capabilities,
-    .name = on_seat_name,
-};
-
-static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_seat *seat = wl_container_of(listener, seat, display_destroy);
 
@@ -603,7 +564,9 @@ handle_seat_release(struct wl_client *client, struct wl_resource *resource) {
 
 static void
 seat_destroy(struct wl_resource *resource) {
-    // Unused.
+    struct server_seat *seat = server_seat_from_resource(resource);
+
+    wl_signal_emit_mutable(&seat->events.destroy, seat);
 }
 
 static const struct wl_seat_interface seat_impl = {
@@ -633,14 +596,17 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 }
 
 struct server_seat *
-server_seat_create(struct server *server, struct wl_seat *remote) {
+server_seat_create(struct server *server) {
     struct server_seat *seat = calloc(1, sizeof(*seat));
     if (!seat) {
         LOG(LOG_ERROR, "failed to allocate server_seat");
         return NULL;
     }
 
-    seat->on_destroy.notify = on_view_destroy;
+    wl_list_init(&seat->pointers);
+    wl_list_init(&seat->keyboards);
+
+    seat->input_focus_destroy.notify = on_view_destroy;
     seat->remote.keymap_fd = -1;
 
     seat->global =
@@ -650,6 +616,8 @@ server_seat_create(struct server *server, struct wl_seat *remote) {
 
     wl_display_add_destroy_listener(server->display, &seat->display_destroy);
 
+    wl_signal_init(&seat->events.destroy);
+
     return seat;
 }
 
@@ -658,7 +626,7 @@ server_seat_set_input_focus(struct server_seat *seat, struct server_view *view) 
     struct wl_resource *pointer_resource, *keyboard_resource;
 
     if (seat->input_focus) {
-        wl_list_remove(&seat->on_destroy.link);
+        wl_list_remove(&seat->input_focus_destroy.link);
 
         struct server_surface *surface = server_view_get_surface(seat->input_focus);
         uint32_t time = current_time();
@@ -705,7 +673,35 @@ server_seat_set_input_focus(struct server_seat *seat, struct server_view *view) 
         }
     }
 
-    wl_signal_add(&view->events.destroy, &seat->on_destroy);
+    wl_signal_add(&view->events.destroy, &seat->input_focus_destroy);
+}
+
+void
+server_seat_set_caps(struct server_seat *seat, uint32_t caps) {
+    bool has_pointer = (caps & WL_SEAT_CAPABILITY_POINTER) != 0;
+    bool has_keyboard = (caps & WL_SEAT_CAPABILITY_KEYBOARD) != 0;
+
+    // TODO: I think there is a weird edge case here where if a capability gets removed while the
+    // user is performing an input with it (e.g. holding a key or button) then it gets stuck. This
+    // is really niche though, I don't think wlroots revokes capabilities? Maybe other compositors
+    // do.
+    // This may also have annoying implications for wp_relative_pointer and wp_pointer_constraints.
+
+    if (has_pointer && !seat->remote.pointer) {
+        seat->remote.pointer = wl_seat_get_pointer(seat->remote.seat);
+        wl_pointer_add_listener(seat->remote.pointer, &pointer_listener, seat);
+    } else if (!has_pointer && seat->remote.pointer) {
+        wl_pointer_release(seat->remote.pointer);
+        seat->remote.pointer = NULL;
+    }
+
+    if (has_keyboard && !seat->remote.keyboard) {
+        seat->remote.keyboard = wl_seat_get_keyboard(seat->remote.seat);
+        wl_keyboard_add_listener(seat->remote.keyboard, &keyboard_listener, seat);
+    } else if (!has_keyboard && seat->remote.keyboard) {
+        wl_keyboard_release(seat->remote.keyboard);
+        seat->remote.keyboard = NULL;
+    }
 }
 
 void
@@ -725,7 +721,6 @@ server_seat_set_remote(struct server_seat *seat, struct wl_seat *remote) {
     }
 
     seat->remote.seat = remote;
-    wl_seat_add_listener(remote, &seat_listener, seat);
 }
 
 struct server_seat *

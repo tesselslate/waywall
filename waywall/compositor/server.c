@@ -4,6 +4,7 @@
 #include "compositor/wl_seat.h"
 #include "compositor/wl_shm.h"
 #include "compositor/wp_linux_dmabuf.h"
+#include "compositor/wp_relative_pointer.h"
 #include "compositor/xdg_decoration.h"
 #include "compositor/xdg_shell.h"
 #include "util.h"
@@ -13,9 +14,81 @@
 #include <wayland-server.h>
 
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
+#include "relative-pointer-unstable-v1-client-protocol.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+
+struct remote_seat {
+    struct wl_list link; // server.remote.seats
+
+    struct server *parent;
+    struct wl_seat *remote;
+    uint32_t name;
+
+    uint32_t caps;
+    char *title;
+
+    bool active;
+};
+
+static void
+remote_seat_destroy(struct remote_seat *remote_seat) {
+    if (!remote_seat->active) {
+        wl_seat_release(remote_seat->remote);
+    }
+    if (remote_seat->title) {
+        free(remote_seat->title);
+    }
+
+    wl_list_remove(&remote_seat->link);
+    free(remote_seat);
+}
+
+static void
+remote_seat_update(struct server *server) {
+    struct remote_seat *remote_seat;
+
+    wl_list_for_each (remote_seat, &server->remote.seats, link) {
+        remote_seat->active = true;
+
+        server_seat_set_remote(server->seat, remote_seat->remote);
+        server_seat_set_caps(server->seat, remote_seat->caps);
+        LOG(LOG_INFO, "updated active remote seat to '%s' (%" PRIu32 ")",
+            remote_seat->title ? remote_seat->title : "unknown", remote_seat->name);
+        return;
+    }
+
+    LOG(LOG_INFO, "no seats remaining to assign to server seat");
+    server_seat_set_remote(server->seat, NULL);
+}
+
+static void
+on_seat_capabilities(void *data, struct wl_seat *wl_seat, uint32_t capabilities) {
+    struct remote_seat *remote_seat = data;
+
+    if (remote_seat->active) {
+        server_seat_set_caps(remote_seat->parent->seat, capabilities);
+    }
+
+    remote_seat->caps = capabilities;
+}
+
+static void
+on_seat_name(void *data, struct wl_seat *wl_seat, const char *name) {
+    struct remote_seat *remote_seat = data;
+
+    if (remote_seat->title) {
+        free(remote_seat->title);
+    }
+
+    remote_seat->title = strdup(name);
+}
+
+static const struct wl_seat_listener seat_listener = {
+    .capabilities = on_seat_capabilities,
+    .name = on_seat_name,
+};
 
 static void
 on_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface,
@@ -78,6 +151,33 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
             registry, name, &zwp_linux_dmabuf_v1_interface, LINUX_DMABUF_REMOTE_VERSION);
         ww_assert(server->remote.linux_dmabuf);
         server->remote.linux_dmabuf_id = name;
+    } else if (strcmp(interface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
+        ww_assert(version >= 1);
+
+        server->remote.relative_pointer_manager =
+            wl_registry_bind(registry, name, &zwp_relative_pointer_manager_v1_interface, 1);
+        ww_assert(server->remote.relative_pointer_manager);
+        server->remote.relative_pointer_manager_id = name;
+    } else if (strcmp(interface, wl_seat_interface.name) == 0) {
+        if (version < WL_SEAT_REMOTE_VERSION) {
+            LOG(LOG_ERROR, "found wl_seat global of version %" PRIu32 " (wanted %d)", version,
+                WL_SEAT_REMOTE_VERSION);
+            return;
+        }
+
+        struct remote_seat *remote_seat = calloc(1, sizeof(*remote_seat));
+        if (!remote_seat) {
+            LOG(LOG_ERROR, "failed to allocate remote seat");
+            return;
+        }
+
+        remote_seat->remote =
+            wl_registry_bind(registry, name, &wl_seat_interface, WL_SEAT_REMOTE_VERSION);
+        ww_assert(remote_seat->remote);
+        wl_seat_add_listener(remote_seat->remote, &seat_listener, remote_seat);
+
+        remote_seat->name = name;
+        wl_list_insert(&server->remote.seats, &remote_seat->link);
     }
 }
 
@@ -101,6 +201,23 @@ on_registry_global_remove(void *data, struct wl_registry *registry, uint32_t nam
         LOG(LOG_ERROR, "host session compositor revoked xdg_wm_base global");
     } else if (name == server->remote.linux_dmabuf_id) {
         LOG(LOG_ERROR, "host session compositor revoked zwp_linux_dmabuf_v1 global");
+    } else if (name == server->remote.relative_pointer_manager_id) {
+        LOG(LOG_ERROR, "host session compositor revoked zwp_relative_pointer_manager_v1 global");
+    }
+
+    struct remote_seat *remote_seat, *tmp;
+    bool destroyed_active = false;
+
+    wl_list_for_each_safe (remote_seat, tmp, &server->remote.seats, link) {
+        if (remote_seat->name == name) {
+            destroyed_active = remote_seat->active;
+            remote_seat_destroy(remote_seat);
+            break;
+        }
+    }
+
+    if (destroyed_active) {
+        remote_seat_update(server);
     }
 }
 
@@ -181,6 +298,8 @@ server_create() {
         goto fail_display_connect;
     }
 
+    wl_list_init(&server->remote.seats);
+
     server->remote.registry = wl_display_get_registry(server->remote.display);
     ww_assert(server->remote.registry);
     wl_registry_add_listener(server->remote.registry, &registry_listener, server);
@@ -207,32 +326,48 @@ server_create() {
         LOG(LOG_ERROR, "host session compositor did not provide wp_viewporter global");
         goto fail_create_globals;
     }
-    if (!server->remote.linux_dmabuf) {
-        LOG(LOG_ERROR, "host session compositor did not provide zwp_linux_dmabuf_v1 global");
-        goto fail_create_globals;
-    }
     if (!server->remote.xdg_wm_base) {
         LOG(LOG_ERROR, "host session compositor did not provide xdg_wm_base global");
         goto fail_create_globals;
     }
-
-    struct server_compositor *compositor =
-        server_compositor_create(server, server->remote.compositor);
-    if (!compositor) {
+    if (!server->remote.linux_dmabuf) {
+        LOG(LOG_ERROR, "host session compositor did not provide zwp_linux_dmabuf_v1 global");
         goto fail_create_globals;
     }
+    if (!server->remote.relative_pointer_manager) {
+        LOG(LOG_ERROR,
+            "host session compostior did not provide zwp_relative_pointer_manager_v1 global");
+        goto fail_create_globals;
+    }
+
+    server->seat = server_seat_create(server);
+    if (!server->seat) {
+        goto fail_create_globals;
+    }
+
+    server->compositor = server_compositor_create(server, server->remote.compositor);
+    if (!server->compositor) {
+        goto fail_create_globals;
+    }
+
     if (!server_output_create(server)) {
         goto fail_create_globals;
     }
     if (!server_shm_create(server, server->remote.shm)) {
         goto fail_create_globals;
     }
+    if (!server_xdg_wm_base_create(server, server->compositor)) {
+        goto fail_create_globals;
+    }
     if (!server_linux_dmabuf_create(server, server->remote.linux_dmabuf)) {
         goto fail_create_globals;
     }
-    if (!server_xdg_wm_base_create(server, compositor)) {
+    if (!server_relative_pointer_manager_create(server, server->seat,
+                                                server->remote.relative_pointer_manager)) {
         goto fail_create_globals;
     }
+
+    remote_seat_update(server);
 
     server->socket_name = wl_display_add_socket_auto(server->display);
     if (!server->socket_name) {
@@ -270,6 +405,11 @@ server_destroy(struct server *server) {
 
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
+
+    struct remote_seat *remote_seat, *tmp;
+    wl_list_for_each_safe (remote_seat, tmp, &server->remote.seats, link) {
+        remote_seat_destroy(remote_seat);
+    }
 
     wl_registry_destroy(server->remote.registry);
     wl_display_disconnect(server->remote.display);

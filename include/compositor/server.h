@@ -28,6 +28,9 @@ struct server {
         struct wp_viewporter *viewporter;
         struct xdg_wm_base *xdg_wm_base;
         struct zwp_linux_dmabuf_v1 *linux_dmabuf;
+        struct zwp_relative_pointer_manager_v1 *relative_pointer_manager;
+
+        struct wl_list seats; // remote_seat.link
 
         uint32_t compositor_id;
         uint32_t subcompositor_id;
@@ -36,8 +39,10 @@ struct server {
         uint32_t viewporter_id;
         uint32_t xdg_wm_base_id;
         uint32_t linux_dmabuf_id;
+        uint32_t relative_pointer_manager_id;
     } remote;
 
+    struct server_compositor *compositor;
     struct server_seat *seat;
 };
 

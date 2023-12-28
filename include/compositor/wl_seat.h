@@ -5,6 +5,7 @@
 #include <wayland-server-core.h>
 
 #define MAX_PRESSED_KEYS 127
+#define WL_SEAT_REMOTE_VERSION 5
 
 struct server;
 
@@ -15,7 +16,7 @@ struct server_seat {
     struct wl_list keyboards; // server_keyboard.link
 
     struct server_view *input_focus;
-    struct wl_listener on_destroy;
+    struct wl_listener input_focus_destroy;
 
     struct {
         uint32_t keymap_format, keymap_size;
@@ -33,10 +34,15 @@ struct server_seat {
     } remote;
 
     struct wl_listener display_destroy;
+
+    struct {
+        struct wl_signal destroy; // data: server_seat
+    } events;
 };
 
-struct server_seat *server_seat_create(struct server *server, struct wl_seat *remote);
+struct server_seat *server_seat_create(struct server *server);
 void server_seat_set_input_focus(struct server_seat *seat, struct server_view *view);
+void server_seat_set_caps(struct server_seat *seat, uint32_t caps);
 void server_seat_set_remote(struct server_seat *seat, struct wl_seat *remote);
 
 /*

@@ -5,6 +5,9 @@
 #include <wayland-client.h>
 #include <wayland-server.h>
 
+// TODO: formats are broken. we do not receive the list of formats because it's too late by the time
+// we add our listener
+
 /*
  *  Most functions are needed by relevant clients (GLFW, Mesa).
  *  They are all just passthrough for the most part.
@@ -22,6 +25,8 @@ on_shm_format(void *data, struct wl_shm *wl_shm, uint32_t format) {
 
     uint32_t *format_arr = wl_array_add(&shm->formats, sizeof(uint32_t));
     *format_arr = format;
+
+    LOG(LOG_INFO, "shm format %" PRIu32, format);
 }
 
 static const struct wl_shm_listener shm_listener = {
