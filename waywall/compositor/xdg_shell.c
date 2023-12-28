@@ -241,6 +241,13 @@ handle_xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *re
                                 uint32_t id) {
     struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(resource);
 
+    struct wl_resource *xdg_toplevel_resource =
+        wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
+    if (!xdg_toplevel_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     if (xdg_surface->toplevel) {
         // XXX: Is this the "correct" error code? I cannot find any codebases elsewhere which make
         // use of this, but I can't find anything better either.
@@ -263,8 +270,6 @@ handle_xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *re
     wl_signal_init(&xdg_toplevel->events.set_fullscreen);
     wl_signal_init(&xdg_toplevel->events.set_title);
 
-    struct wl_resource *xdg_toplevel_resource =
-        wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(xdg_toplevel_resource, &xdg_toplevel_impl, xdg_toplevel,
                                    xdg_toplevel_destroy);
 
@@ -373,6 +378,13 @@ handle_xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource 
     struct client_xdg_wm_base *xdg_wm_base = client_xdg_wm_base_from_resource(resource);
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
+    struct wl_resource *xdg_surface_resource =
+        wl_resource_create(client, &xdg_surface_interface, wl_resource_get_version(resource), id);
+    if (!xdg_surface_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     if (surface->role != ROLE_NONE && surface->role != ROLE_XDG_SURFACE &&
         surface->role != ROLE_XDG_TOPLEVEL) {
         wl_resource_post_error(resource, XDG_WM_BASE_ERROR_ROLE,
@@ -404,8 +416,6 @@ handle_xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource 
         return;
     }
 
-    struct wl_resource *xdg_surface_resource =
-        wl_resource_create(client, &xdg_surface_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(xdg_surface_resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_destroy);
 
@@ -452,6 +462,12 @@ static void
 handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= VERSION);
 
+    struct wl_resource *resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct client_xdg_wm_base *client_xdg_wm_base = calloc(1, sizeof(*client_xdg_wm_base));
     if (!client_xdg_wm_base) {
         wl_client_post_no_memory(client);
@@ -460,7 +476,6 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 
     wl_list_init(&client_xdg_wm_base->surfaces);
 
-    struct wl_resource *resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
     wl_resource_set_implementation(resource, &xdg_wm_base_impl, client_xdg_wm_base,
                                    xdg_wm_base_destroy);
 }

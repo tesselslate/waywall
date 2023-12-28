@@ -225,6 +225,11 @@ handle_surface_frame(struct wl_client *client, struct wl_resource *resource, uin
 
     struct wl_resource *callback_resource =
         wl_resource_create(client, &wl_callback_interface, 1, id);
+    if (!callback_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     wl_resource_set_implementation(callback_resource, NULL, callback, frame_callback_destroy);
 
     wl_callback_add_listener(callback, &frame_callback_listener, callback_resource);
@@ -367,6 +372,13 @@ handle_compositor_create_region(struct wl_client *client, struct wl_resource *re
                                 uint32_t id) {
     struct server_compositor *compositor = server_compositor_from_resource(resource);
 
+    struct wl_resource *region_resource =
+        wl_resource_create(client, &wl_region_interface, REGION_VERSION, id);
+    if (!region_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct server_region *region = calloc(1, sizeof(*region));
     if (!region) {
         wl_client_post_no_memory(client);
@@ -375,8 +387,6 @@ handle_compositor_create_region(struct wl_client *client, struct wl_resource *re
 
     region->remote = wl_compositor_create_region(compositor->remote);
 
-    struct wl_resource *region_resource =
-        wl_resource_create(client, &wl_region_interface, REGION_VERSION, id);
     wl_resource_set_implementation(region_resource, &region_impl, region, region_destroy);
 
     region->resource = region_resource;
@@ -386,6 +396,13 @@ static void
 handle_compositor_create_surface(struct wl_client *client, struct wl_resource *resource,
                                  uint32_t id) {
     struct server_compositor *compositor = server_compositor_from_resource(resource);
+
+    struct wl_resource *surface_resource =
+        wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
+    if (!surface_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
 
     struct server_surface *surface = calloc(1, sizeof(*surface));
     if (!surface) {
@@ -408,8 +425,6 @@ handle_compositor_create_surface(struct wl_client *client, struct wl_resource *r
     wl_surface_set_input_region(surface->remote, input_region);
     wl_region_destroy(input_region);
 
-    struct wl_resource *surface_resource =
-        wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(surface_resource, &surface_impl, surface, surface_destroy);
 
     surface->resource = surface_resource;
@@ -438,6 +453,11 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 
     struct wl_resource *resource =
         wl_resource_create(client, &wl_compositor_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     wl_resource_set_implementation(resource, &compositor_impl, compositor, compositor_destroy);
 }
 

@@ -37,15 +37,22 @@ struct server_dmabuf_feedback {
 };
 
 static bool check_buffer_params_creation(struct server_buffer_params *buffer_params);
-static struct wl_resource *create_buffer(struct server_buffer_params *buffer_params,
-                                         struct wl_buffer *remote_buffer, uint32_t id);
+static void create_buffer(struct server_buffer_params *buffer_params,
+                          struct wl_buffer *remote_buffer, struct wl_resource *buffer_resource);
 
 static void
 on_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *wp_buffer_params,
                          struct wl_buffer *remote_buffer) {
     struct server_buffer_params *buffer_params = data;
+    struct wl_client *client = wl_resource_get_client(buffer_params->resource);
 
-    struct wl_resource *buffer_resource = create_buffer(buffer_params, remote_buffer, 0);
+    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, 0);
+    if (!buffer_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
+    create_buffer(buffer_params, remote_buffer, buffer_resource);
     zwp_linux_buffer_params_v1_send_created(buffer_params->resource, buffer_resource);
 }
 
@@ -176,21 +183,20 @@ check_buffer_params_creation(struct server_buffer_params *buffer_params) {
     return true;
 }
 
-static struct wl_resource *
+static void
 create_buffer(struct server_buffer_params *buffer_params, struct wl_buffer *remote_buffer,
-              uint32_t id) {
+              struct wl_resource *buffer_resource) {
     struct wl_client *client = wl_resource_get_client(buffer_params->resource);
 
     struct server_buffer *buffer = calloc(1, sizeof(*buffer));
     if (!buffer) {
         wl_buffer_destroy(remote_buffer);
         wl_client_post_no_memory(client);
-        return NULL;
+        return;
     }
 
     wl_buffer_add_listener(remote_buffer, &server_buffer_listener, buffer);
 
-    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
     wl_resource_set_implementation(buffer_resource, &server_buffer_impl, buffer,
                                    server_buffer_dmabuf_destroy);
 
@@ -198,8 +204,6 @@ create_buffer(struct server_buffer_params *buffer_params, struct wl_buffer *remo
     buffer->remote = remote_buffer;
     buffer->type = BUFFER_DMABUF;
     buffer->data.dmabuf = buffer_params->data;
-
-    return buffer_resource;
 }
 
 static void
@@ -279,6 +283,12 @@ handle_buffer_params_create_immed(struct wl_client *client, struct wl_resource *
                                   uint32_t flags) {
     struct server_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
+    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
+    if (!buffer_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     if (!check_buffer_params_creation(buffer_params)) {
         return;
     }
@@ -302,14 +312,12 @@ handle_buffer_params_create_immed(struct wl_client *client, struct wl_resource *
         }
         wl_buffer_destroy(remote_buffer);
 
-        struct wl_resource *buffer_resource =
-            wl_resource_create(client, &wl_buffer_interface, 1, id);
         server_buffer_create_invalid(buffer_resource);
 
         return;
     }
 
-    create_buffer(buffer_params, remote_buffer, id);
+    create_buffer(buffer_params, remote_buffer, buffer_resource);
 }
 
 static void
@@ -362,6 +370,13 @@ handle_linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *
                                   uint32_t id) {
     struct server_linux_dmabuf *linux_dmabuf = server_linux_dmabuf_from_resource(resource);
 
+    struct wl_resource *buffer_params_resource = wl_resource_create(
+        client, &zwp_linux_buffer_params_v1_interface, wl_resource_get_version(resource), id);
+    if (!buffer_params_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct server_buffer_params *buffer_params = calloc(1, sizeof(*buffer_params));
     if (!buffer_params) {
         wl_client_post_no_memory(client);
@@ -371,8 +386,6 @@ handle_linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *
     buffer_params->parent = linux_dmabuf;
     buffer_params->remote = zwp_linux_dmabuf_v1_create_params(linux_dmabuf->remote);
 
-    struct wl_resource *buffer_params_resource = wl_resource_create(
-        client, &zwp_linux_buffer_params_v1_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(buffer_params_resource, &buffer_params_impl, buffer_params,
                                    buffer_params_destroy);
 
@@ -384,6 +397,13 @@ handle_linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_res
                                          uint32_t id) {
     struct server_linux_dmabuf *linux_dmabuf = server_linux_dmabuf_from_resource(resource);
 
+    struct wl_resource *dmabuf_feedback_resource = wl_resource_create(
+        client, &zwp_linux_dmabuf_feedback_v1_interface, wl_resource_get_version(resource), id);
+    if (!dmabuf_feedback_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct server_dmabuf_feedback *dmabuf_feedback = calloc(1, sizeof(*dmabuf_feedback));
     if (!dmabuf_feedback) {
         wl_client_post_no_memory(client);
@@ -392,8 +412,6 @@ handle_linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_res
 
     dmabuf_feedback->remote = zwp_linux_dmabuf_v1_get_default_feedback(linux_dmabuf->remote);
 
-    struct wl_resource *dmabuf_feedback_resource = wl_resource_create(
-        client, &zwp_linux_dmabuf_feedback_v1_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(dmabuf_feedback_resource, &dmabuf_feedback_impl, dmabuf_feedback,
                                    dmabuf_feedback_destroy);
 
@@ -411,6 +429,13 @@ handle_linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_res
     struct server_linux_dmabuf *linux_dmabuf = server_linux_dmabuf_from_resource(resource);
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
+    struct wl_resource *dmabuf_feedback_resource = wl_resource_create(
+        client, &zwp_linux_dmabuf_feedback_v1_interface, wl_resource_get_version(resource), id);
+    if (!dmabuf_feedback_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct server_dmabuf_feedback *dmabuf_feedback = calloc(1, sizeof(*dmabuf_feedback));
     if (!dmabuf_feedback) {
         wl_client_post_no_memory(client);
@@ -420,8 +445,6 @@ handle_linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_res
     dmabuf_feedback->remote =
         zwp_linux_dmabuf_v1_get_surface_feedback(linux_dmabuf->remote, surface->remote);
 
-    struct wl_resource *dmabuf_feedback_resource = wl_resource_create(
-        client, &zwp_linux_dmabuf_feedback_v1_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(dmabuf_feedback_resource, &dmabuf_feedback_impl, dmabuf_feedback,
                                    dmabuf_feedback_destroy);
 
@@ -457,6 +480,13 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
     ww_assert(version <= VERSION);
     struct server_linux_dmabuf *linux_dmabuf = data;
 
+    struct wl_resource *resource =
+        wl_resource_create(client, &zwp_linux_dmabuf_v1_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     if (version < 4) {
         // Supporting versions of the protocol older than 4 would require us to send format and
         // modifier events whenever the global is bound. It's doable without being the one talking
@@ -467,8 +497,6 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
         return;
     }
 
-    struct wl_resource *resource =
-        wl_resource_create(client, &zwp_linux_dmabuf_v1_interface, version, id);
     wl_resource_set_implementation(resource, &linux_dmabuf_impl, linux_dmabuf,
                                    linux_dmabuf_destroy);
 }

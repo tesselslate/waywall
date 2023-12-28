@@ -65,6 +65,11 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
     struct server_output *output = data;
 
     struct wl_resource *resource = wl_resource_create(client, &wl_output_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     wl_resource_set_implementation(resource, &output_impl, output, output_destroy);
 
     wl_list_insert(&output->clients, wl_resource_get_link(resource));

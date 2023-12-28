@@ -54,6 +54,12 @@ handle_shm_pool_create_buffer(struct wl_client *client, struct wl_resource *reso
                               uint32_t format) {
     struct server_shm_pool *shm_pool = wl_resource_get_user_data(resource);
 
+    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
+    if (!buffer_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct server_buffer *buffer = calloc(1, sizeof(*buffer));
     if (!buffer) {
         wl_client_post_no_memory(client);
@@ -69,7 +75,6 @@ handle_shm_pool_create_buffer(struct wl_client *client, struct wl_resource *reso
     buffer->data.shm.width = width;
     buffer->data.shm.height = height;
 
-    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
     wl_resource_set_implementation(buffer_resource, &server_buffer_impl, buffer,
                                    server_buffer_shm_destroy);
 
@@ -107,6 +112,13 @@ handle_shm_create_pool(struct wl_client *client, struct wl_resource *resource, u
                        int32_t fd, int32_t size) {
     struct server_shm *shm = server_shm_from_resource(resource);
 
+    struct wl_resource *shm_pool_resource =
+        wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
+    if (!shm_pool_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     struct server_shm_pool *shm_pool = calloc(1, sizeof(*shm_pool));
     if (!shm_pool) {
         wl_client_post_no_memory(client);
@@ -116,8 +128,6 @@ handle_shm_create_pool(struct wl_client *client, struct wl_resource *resource, u
     shm_pool->remote = wl_shm_create_pool(shm->remote, fd, size);
     close(fd);
 
-    struct wl_resource *shm_pool_resource =
-        wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
     wl_resource_set_implementation(shm_pool_resource, &shm_pool_impl, shm_pool, shm_pool_destroy);
 }
 
@@ -142,6 +152,11 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
     struct server_shm *shm = data;
 
     struct wl_resource *resource = wl_resource_create(client, &wl_shm_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     wl_resource_set_implementation(resource, &shm_impl, shm, shm_destroy);
 
     uint32_t *format;

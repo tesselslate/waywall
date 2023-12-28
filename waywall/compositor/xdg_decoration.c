@@ -81,6 +81,10 @@ handle_xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
 
     struct wl_resource *toplevel_decoration_resource = wl_resource_create(
         client, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(resource), id);
+    if (!toplevel_decoration_resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
 
     if (surface->pending.buffer) {
         wl_resource_post_error(
@@ -157,6 +161,11 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
 
     struct wl_resource *resource =
         wl_resource_create(client, &zxdg_decoration_manager_v1_interface, version, id);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
+
     wl_resource_set_implementation(resource, &xdg_decoration_manager_impl, xdg_decoration,
                                    xdg_decoration_manager_destroy);
 }
