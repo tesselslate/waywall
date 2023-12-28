@@ -24,23 +24,6 @@ client_xdg_wm_base_from_resource(struct wl_resource *resource) {
 }
 
 static void
-send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
-    struct wl_array states;
-
-    wl_array_init(&states);
-
-    if (xdg_toplevel->fullscreen) {
-        uint32_t *state = wl_array_add(&states, sizeof(uint32_t));
-        *state = XDG_TOPLEVEL_STATE_FULLSCREEN;
-    }
-
-    xdg_toplevel_send_configure(xdg_toplevel->resource, xdg_toplevel->width, xdg_toplevel->height,
-                                &states);
-    server_xdg_surface_send_configure(xdg_toplevel->parent);
-    wl_array_release(&states);
-}
-
-static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_xdg_wm_base *xdg_wm_base =
         wl_container_of(listener, xdg_wm_base, display_destroy);
@@ -69,7 +52,8 @@ on_surface_commit(struct wl_listener *listener, void *data) {
             xdg_surface->configured = false;
 
             if (xdg_surface->toplevel) {
-                wl_signal_emit(&xdg_surface->toplevel->events.unmap, &xdg_surface->toplevel);
+                wl_signal_emit_mutable(&xdg_surface->toplevel->events.unmap,
+                                       &xdg_surface->toplevel);
             }
         }
     }
@@ -105,8 +89,6 @@ handle_xdg_toplevel_set_title(struct wl_client *client, struct wl_resource *reso
         free(xdg_toplevel->title);
     }
     xdg_toplevel->title = strdup(title);
-
-    wl_signal_emit_mutable(&xdg_toplevel->events.set_title, xdg_toplevel->title);
 }
 
 static void
@@ -169,7 +151,7 @@ handle_xdg_toplevel_set_maximized(struct wl_client *client, struct wl_resource *
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     // We do not care about maximization. Tell the client they are not maximized.
-    send_toplevel_configure(xdg_toplevel);
+    server_xdg_toplevel_send_configure(xdg_toplevel);
 }
 
 static void
@@ -177,7 +159,7 @@ handle_xdg_toplevel_unset_maximized(struct wl_client *client, struct wl_resource
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(resource);
 
     // We do not care about maximization. Tell the client they are not maximized.
-    send_toplevel_configure(xdg_toplevel);
+    server_xdg_toplevel_send_configure(xdg_toplevel);
 }
 
 static void
@@ -188,7 +170,7 @@ handle_xdg_toplevel_set_fullscreen(struct wl_client *client, struct wl_resource 
     // It is up to whoever is listening to this event to decide if the surface should be
     // fullscreened. They can set the `fullscreen` field on the server_xdg_toplevel.
     wl_signal_emit_mutable(&xdg_toplevel->events.set_fullscreen, xdg_toplevel);
-    send_toplevel_configure(xdg_toplevel);
+    server_xdg_toplevel_send_configure(xdg_toplevel);
 }
 
 static void
@@ -197,7 +179,7 @@ handle_xdg_toplevel_unset_fullscreen(struct wl_client *client, struct wl_resourc
 
     xdg_toplevel->fullscreen = false;
     wl_signal_emit_mutable(&xdg_toplevel->events.unset_fullscreen, xdg_toplevel);
-    send_toplevel_configure(xdg_toplevel);
+    server_xdg_toplevel_send_configure(xdg_toplevel);
 }
 
 static void
@@ -281,7 +263,6 @@ handle_xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *re
     wl_signal_init(&xdg_toplevel->events.unmap);
     wl_signal_init(&xdg_toplevel->events.unset_fullscreen);
     wl_signal_init(&xdg_toplevel->events.set_fullscreen);
-    wl_signal_init(&xdg_toplevel->events.set_title);
 
     wl_resource_set_implementation(xdg_toplevel_resource, &xdg_toplevel_impl, xdg_toplevel,
                                    xdg_toplevel_destroy);
@@ -541,6 +522,23 @@ server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface) {
     uint32_t serial = next_serial(xdg_surface->resource);
     xdg_surface_send_configure(xdg_surface->resource, serial);
     ringbuf_push(ringbuf, serial);
+}
+
+void
+server_xdg_toplevel_send_configure(struct server_xdg_toplevel *xdg_toplevel) {
+    struct wl_array states;
+
+    wl_array_init(&states);
+
+    if (xdg_toplevel->fullscreen) {
+        uint32_t *state = wl_array_add(&states, sizeof(uint32_t));
+        *state = XDG_TOPLEVEL_STATE_FULLSCREEN;
+    }
+
+    xdg_toplevel_send_configure(xdg_toplevel->resource, xdg_toplevel->width, xdg_toplevel->height,
+                                &states);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
+    wl_array_release(&states);
 }
 
 struct server_xdg_surface *

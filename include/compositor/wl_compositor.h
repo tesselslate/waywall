@@ -8,14 +8,26 @@
 
 struct server;
 
+struct view_configure_event {
+    struct server_view *view;
+
+    enum {
+        CONFIGURE_EVENT_FULLSCREEN,
+        CONFIGURE_EVENT_UNFULLSCREEN,
+    } type;
+};
+
 struct server_view {
     struct wl_list link; // server_compositor.output.views
 
+    struct server_compositor *parent;
     struct server_surface *surface;
 
     struct wl_subsurface *subsurface;
     struct wp_viewport *viewport;
+
     struct box bounds;
+    bool allow_fullscreen;
 
     // TODO: xwayland
     union {
@@ -25,6 +37,8 @@ struct server_view {
         VIEW_XDG_SHELL,
     } type;
 
+    struct wl_listener on_fullscreen;
+    struct wl_listener on_unfullscreen;
     struct wl_listener on_unmap;
 
     struct {
@@ -56,6 +70,12 @@ struct server_compositor {
     } output;
 
     struct wl_listener display_destroy;
+
+    struct {
+        struct wl_signal configure; // data: view_configure_event
+        struct wl_signal map;       // data: server_view
+        struct wl_signal unmap;     // data: server_view
+    } events;
 };
 
 enum server_surface_role {

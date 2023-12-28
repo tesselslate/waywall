@@ -45,7 +45,6 @@ struct server_xdg_toplevel {
         struct wl_signal unmap;            // data: xdg_toplevel
         struct wl_signal unset_fullscreen; // data: xdg_toplevel
         struct wl_signal set_fullscreen;   // data: xdg_toplevel
-        struct wl_signal set_title;        // data: const char*
     } events;
 };
 
@@ -53,6 +52,7 @@ struct server_xdg_wm_base *server_xdg_wm_base_create(struct server *server,
                                                      struct server_compositor *compositor);
 
 void server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface);
+void server_xdg_toplevel_send_configure(struct server_xdg_toplevel *xdg_toplevel);
 struct server_xdg_surface *server_xdg_surface_from_resource(struct wl_resource *resource);
 struct server_xdg_toplevel *server_xdg_toplevel_from_resource(struct wl_resource *resource);
 

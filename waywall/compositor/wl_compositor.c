@@ -41,6 +41,16 @@
 #define VERSION 5
 #define REGION_VERSION 1
 
+static inline void
+set_fullscreen(struct server_view *view, bool fullscreen) {
+    switch (view->type) {
+    case VIEW_XDG_SHELL:
+        view->data.xdg_shell->fullscreen = fullscreen;
+        return;
+    }
+    ww_unreachable();
+}
+
 static void
 on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
     struct server_compositor *compositor = data;
@@ -100,8 +110,36 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
 };
 
 static void
+on_toplevel_fullscreen(struct wl_listener *listener, void *data) {
+    struct server_view *view = wl_container_of(listener, view, on_fullscreen);
+
+    set_fullscreen(view, view->allow_fullscreen);
+
+    struct view_configure_event event = {
+        .view = view,
+        .type = CONFIGURE_EVENT_FULLSCREEN,
+    };
+
+    wl_signal_emit_mutable(&view->parent->events.configure, &event);
+}
+
+static void
+on_toplevel_unfullscreen(struct wl_listener *listener, void *data) {
+    struct server_view *view = wl_container_of(listener, view, on_unfullscreen);
+
+    struct view_configure_event event = {
+        .view = view,
+        .type = CONFIGURE_EVENT_UNFULLSCREEN,
+    };
+
+    wl_signal_emit_mutable(&view->parent->events.configure, &event);
+}
+
+static void
 on_toplevel_unmap(struct wl_listener *listener, void *data) {
     struct server_view *view = wl_container_of(listener, view, on_unmap);
+
+    wl_signal_emit_mutable(&view->parent->events.unmap, view);
 
     server_view_destroy(view);
 }
@@ -495,6 +533,10 @@ server_compositor_create(struct server *server, struct wl_compositor *remote) {
 
     wl_display_add_destroy_listener(server->display, &compositor->display_destroy);
 
+    wl_signal_init(&compositor->events.configure);
+    wl_signal_init(&compositor->events.map);
+    wl_signal_init(&compositor->events.unmap);
+
     // TODO: allow configuring background color
     compositor->output.background = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
         compositor->output.single_pixel_buffer_manager, UINT32_MAX, UINT32_MAX, UINT32_MAX,
@@ -568,6 +610,7 @@ server_view_create_toplevel(struct server_compositor *compositor,
         return NULL;
     }
 
+    view->parent = compositor;
     view->surface = toplevel->parent->parent;
     view->subsurface = wl_subcompositor_get_subsurface(
         compositor->output.subcompositor, view->surface->remote, compositor->output.root_surface);
@@ -580,12 +623,18 @@ server_view_create_toplevel(struct server_compositor *compositor,
     wl_subsurface_place_below(view->subsurface, compositor->output.root_surface);
     wl_subsurface_set_desync(view->subsurface);
 
+    view->on_fullscreen.notify = on_toplevel_fullscreen;
+    wl_signal_add(&toplevel->events.set_fullscreen, &view->on_fullscreen);
+    view->on_unfullscreen.notify = on_toplevel_unfullscreen;
+    wl_signal_add(&toplevel->events.unset_fullscreen, &view->on_unfullscreen);
     view->on_unmap.notify = on_toplevel_unmap;
     wl_signal_add(&toplevel->events.unmap, &view->on_unmap);
 
     wl_signal_init(&view->events.destroy);
 
     wl_list_insert(&compositor->output.views, &view->link);
+
+    wl_signal_emit_mutable(&compositor->events.map, view);
 
     return view;
 }
@@ -610,6 +659,8 @@ server_view_destroy(struct server_view *view) {
     wp_viewport_destroy(view->viewport);
     wl_subsurface_destroy(view->subsurface);
 
+    wl_list_remove(&view->on_fullscreen.link);
+    wl_list_remove(&view->on_unfullscreen.link);
     wl_list_remove(&view->on_unmap.link);
     wl_list_remove(&view->link);
 
@@ -621,8 +672,6 @@ server_view_get_surface(struct server_view *view) {
     switch (view->type) {
     case VIEW_XDG_SHELL:
         return view->data.xdg_shell->parent->parent;
-    default:
-        ww_unreachable();
     }
 }
 
