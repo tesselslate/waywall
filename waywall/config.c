@@ -329,7 +329,7 @@ config_get_dir() {
             return NULL;
         }
         path = str_copy(path, str_from(dir));
-        path = str_appendl(path, "./config");
+        path = str_appendl(path, "/.config");
     }
     path = str_appendl(path, waywall_dir);
     return strdup(buf);
