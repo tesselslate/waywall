@@ -397,7 +397,7 @@ on_keyboard_key(void *data, struct wl_keyboard *keyboard, uint32_t serial, uint3
                 return;
             }
         }
-        LOG(LOG_ERROR, "received mismatch key release for key %" PRIu32, key);
+        LOG(LOG_ERROR, "received mismatched key release for key %" PRIu32, key);
     }
 }
 
