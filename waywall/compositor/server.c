@@ -197,12 +197,20 @@ server_create() {
         LOG(LOG_ERROR, "host session compositor did not provide wl_subcompositor global");
         goto fail_create_globals;
     }
+    if (!server->remote.single_pixel_buffer_manager) {
+        LOG(LOG_ERROR, "host session compositor did not provide wp_single_pixel_buffer_manager_v1 global");
+        goto fail_create_globals;
+    }
     if (!server->remote.viewporter) {
         LOG(LOG_ERROR, "host session compositor did not provide wp_viewporter global");
         goto fail_create_globals;
     }
     if (!server->remote.linux_dmabuf) {
         LOG(LOG_ERROR, "host session compositor did not provide zwp_linux_dmabuf_v1 global");
+        goto fail_create_globals;
+    }
+    if (!server->remote.xdg_wm_base) {
+        LOG(LOG_ERROR, "host session compositor did not provide xdg_wm_base global");
         goto fail_create_globals;
     }
 
