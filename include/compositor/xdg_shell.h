@@ -13,27 +13,33 @@ struct server_xdg_wm_base {
 };
 
 struct server_xdg_surface {
-    struct client_xdg_wm_base *parent;
+    struct wl_list link;
     struct wl_resource *resource;
 
-    struct server_surface *surface;
+    struct server_surface *parent;
     struct server_xdg_toplevel *toplevel;
 
     struct ringbuf configure_serials;
+    bool configured;
 
     struct wl_listener on_commit;
+    struct wl_listener on_destroy;
 };
 
 struct server_xdg_toplevel {
-    struct server_xdg_surface *parent;
     struct wl_resource *resource;
 
+    struct server_xdg_surface *parent;
     char *title;
+    int32_t width, height;
+    bool fullscreen;
 
     struct {
-        uint32_t width, height;
-        bool fullscreen;
-    } pending, current;
+        struct wl_signal destroy;          // data: xdg_toplevel
+        struct wl_signal unset_fullscreen; // data: xdg_toplevel
+        struct wl_signal set_fullscreen;   // data: xdg_toplevel
+        struct wl_signal set_title;        // data: const char*
+    } events;
 };
 
 struct server_xdg_wm_base *server_xdg_wm_base_create(struct server *server);

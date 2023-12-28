@@ -16,8 +16,6 @@
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 
-static void destroy_remote_window(struct server *server);
-
 static void
 on_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface,
                    uint32_t version) {
@@ -52,9 +50,9 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
     } else if (strcmp(interface, wp_single_pixel_buffer_manager_v1_interface.name) == 0) {
         ww_assert(version >= 1);
 
-        server->remote.single_pixel_manager =
+        server->remote.single_pixel_buffer_manager =
             wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
-        ww_assert(server->remote.single_pixel_manager);
+        ww_assert(server->remote.single_pixel_buffer_manager);
         server->remote.single_pixel_manager_id = name;
     } else if (strcmp(interface, wp_viewporter_interface.name) == 0) {
         ww_assert(version >= 1);
@@ -158,117 +156,6 @@ process_sigint(int signal, void *data) {
     return 0;
 }
 
-static void
-on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
-    struct server *server = data;
-
-    xdg_surface_ack_configure(xdg_surface, serial);
-    xdg_surface_set_window_geometry(xdg_surface, 0, 0, server->remote.width, server->remote.height);
-    wp_viewport_set_destination(server->remote.root_viewport, server->remote.width,
-                                server->remote.height);
-    wl_surface_commit(server->remote.root_surface);
-
-    // TODO: update locked pointer hint
-}
-
-static const struct xdg_surface_listener xdg_surface_listener = {
-    .configure = on_xdg_surface_configure,
-};
-
-static void
-on_xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width,
-                          int32_t height, struct wl_array *states) {
-    struct server *server = data;
-
-    width = width > 0 ? width : server->remote.width > 0 ? server->remote.width : 640;
-    height = height > 0 ? height : server->remote.height > 0 ? server->remote.height : 480;
-
-    server->remote.width = width;
-    server->remote.height = height;
-}
-
-static void
-on_xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
-    struct server *server = data;
-
-    destroy_remote_window(server);
-
-    // TODO: show popup or something to user maybe
-}
-
-static void
-on_xdg_toplevel_configure_bounds(void *data, struct xdg_toplevel *xdg_toplevel, int32_t width,
-                                 int32_t height) {
-    // Unused. We do not do any CSD.
-}
-
-static void
-on_xdg_toplevel_wm_capabilities(void *data, struct xdg_toplevel *xdg_toplevel,
-                                struct wl_array *capabilities) {
-    // Unused.
-}
-
-static const struct xdg_toplevel_listener xdg_toplevel_listener = {
-    .configure = on_xdg_toplevel_configure,
-    .close = on_xdg_toplevel_close,
-    .configure_bounds = on_xdg_toplevel_configure_bounds,
-    .wm_capabilities = on_xdg_toplevel_wm_capabilities,
-};
-
-static void
-create_remote_window(struct server *server) {
-    ww_assert(!server->remote.mapped);
-
-    // TODO: allow configuring background color
-    ww_assert(!server->remote.background);
-    server->remote.background = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
-        server->remote.single_pixel_manager, UINT32_MAX, UINT32_MAX, UINT32_MAX, UINT32_MAX);
-
-    ww_assert(!server->remote.root_surface);
-    server->remote.root_surface = wl_compositor_create_surface(server->remote.compositor);
-    server->remote.root_viewport =
-        wp_viewporter_get_viewport(server->remote.viewporter, server->remote.root_surface);
-
-    ww_assert(!server->remote.xdg_surface);
-    server->remote.xdg_surface =
-        xdg_wm_base_get_xdg_surface(server->remote.xdg_wm_base, server->remote.root_surface);
-    xdg_surface_add_listener(server->remote.xdg_surface, &xdg_surface_listener, server);
-
-    ww_assert(!server->remote.xdg_toplevel);
-    server->remote.xdg_toplevel = xdg_surface_get_toplevel(server->remote.xdg_surface);
-    xdg_toplevel_add_listener(server->remote.xdg_toplevel, &xdg_toplevel_listener, server);
-
-    wl_surface_commit(server->remote.root_surface);
-    wl_display_roundtrip(server->remote.display);
-
-    wl_surface_attach(server->remote.root_surface, server->remote.background, 0, 0);
-    wl_surface_commit(server->remote.root_surface);
-    wl_display_roundtrip(server->remote.display);
-
-    server->remote.mapped = true;
-}
-
-static void
-destroy_remote_window(struct server *server) {
-    ww_assert(server->remote.mapped);
-
-    xdg_toplevel_destroy(server->remote.xdg_toplevel);
-    server->remote.xdg_toplevel = NULL;
-    xdg_surface_destroy(server->remote.xdg_surface);
-    server->remote.xdg_surface = NULL;
-    server->remote.width = 0;
-    server->remote.height = 0;
-
-    wp_viewport_destroy(server->remote.root_viewport);
-    server->remote.root_viewport = NULL;
-    wl_surface_destroy(server->remote.root_surface);
-    server->remote.root_surface = NULL;
-    wl_buffer_destroy(server->remote.background);
-    server->remote.background = NULL;
-
-    server->remote.mapped = false;
-}
-
 /*
  *  Public API
  */
@@ -335,8 +222,6 @@ server_create() {
         goto fail_create_globals;
     }
 
-    create_remote_window(server);
-
     server->socket_name = wl_display_add_socket_auto(server->display);
     if (!server->socket_name) {
         LOG(LOG_ERROR, "failed to create server display socket");
@@ -352,8 +237,6 @@ server_create() {
     return server;
 
 fail_add_socket:
-    destroy_remote_window(server);
-
 fail_create_globals:
     wl_registry_destroy(server->remote.registry);
     wl_display_disconnect(server->remote.display);
@@ -375,15 +258,6 @@ server_destroy(struct server *server) {
 
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
-
-    if (server->remote.mapped) {
-        destroy_remote_window(server);
-    }
-
-    wl_subcompositor_destroy(server->remote.subcompositor);
-    wp_viewporter_destroy(server->remote.viewporter);
-    wp_single_pixel_buffer_manager_v1_destroy(server->remote.single_pixel_manager);
-    xdg_wm_base_destroy(server->remote.xdg_wm_base);
 
     wl_registry_destroy(server->remote.registry);
     wl_display_disconnect(server->remote.display);

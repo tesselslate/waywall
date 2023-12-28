@@ -24,7 +24,7 @@ struct server {
         struct wl_compositor *compositor;
         struct wl_subcompositor *subcompositor;
         struct wl_shm *shm;
-        struct wp_single_pixel_buffer_manager_v1 *single_pixel_manager;
+        struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager;
         struct wp_viewporter *viewporter;
         struct xdg_wm_base *xdg_wm_base;
         struct zwp_linux_dmabuf_v1 *linux_dmabuf;
@@ -36,14 +36,6 @@ struct server {
         uint32_t viewporter_id;
         uint32_t xdg_wm_base_id;
         uint32_t linux_dmabuf_id;
-
-        struct wl_buffer *background;
-        struct wl_surface *root_surface;
-        struct wp_viewport *root_viewport;
-        struct xdg_surface *xdg_surface;
-        struct xdg_toplevel *xdg_toplevel;
-        int width, height;
-        bool mapped;
     } remote;
 
     struct server_seat *seat;
