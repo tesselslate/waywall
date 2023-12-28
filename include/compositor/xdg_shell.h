@@ -30,6 +30,7 @@ struct server_xdg_toplevel {
     struct wl_resource *resource;
 
     struct server_xdg_surface *parent;
+    struct server_toplevel_decoration *decoration;
     char *title;
     int32_t width, height;
     bool fullscreen;
@@ -44,6 +45,7 @@ struct server_xdg_toplevel {
 
 struct server_xdg_wm_base *server_xdg_wm_base_create(struct server *server);
 
+void server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface);
 struct server_xdg_surface *server_xdg_surface_from_resource(struct wl_resource *resource);
 struct server_xdg_toplevel *server_xdg_toplevel_from_resource(struct wl_resource *resource);
 

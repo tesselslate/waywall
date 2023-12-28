@@ -4,6 +4,7 @@
 #include "compositor/wl_seat.h"
 #include "compositor/wl_shm.h"
 #include "compositor/wp_linux_dmabuf.h"
+#include "compositor/xdg_decoration.h"
 #include "compositor/xdg_shell.h"
 #include "util.h"
 #include <signal.h>

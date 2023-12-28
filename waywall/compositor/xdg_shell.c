@@ -23,20 +23,6 @@ client_xdg_wm_base_from_resource(struct wl_resource *resource) {
 }
 
 static void
-send_surface_configure(struct server_xdg_surface *xdg_surface) {
-    struct ringbuf *ringbuf = &xdg_surface->configure_serials;
-
-    if (ringbuf->count == RINGBUF_SIZE) {
-        wl_client_post_implementation_error(
-            wl_resource_get_client(xdg_surface->resource),
-            "xdg_surface has not responded to the past %d configure requests", RINGBUF_SIZE);
-        return;
-    }
-
-    ringbuf_push(ringbuf, next_serial(xdg_surface->resource));
-}
-
-static void
 send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
     struct wl_array states;
 
@@ -49,7 +35,7 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
 
     xdg_toplevel_send_configure(xdg_toplevel->resource, xdg_toplevel->width, xdg_toplevel->height,
                                 &states);
-    send_surface_configure(xdg_toplevel->parent);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
     wl_array_release(&states);
 }
 
@@ -74,7 +60,7 @@ on_surface_commit(struct wl_listener *listener, void *data) {
             return;
         }
 
-        send_surface_configure(xdg_surface);
+        server_xdg_surface_send_configure(xdg_surface);
     }
 }
 
@@ -495,6 +481,20 @@ server_xdg_wm_base_create(struct server *server) {
     wl_display_add_destroy_listener(server->display, &xdg_wm_base->display_destroy);
 
     return xdg_wm_base;
+}
+
+void
+server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface) {
+    struct ringbuf *ringbuf = &xdg_surface->configure_serials;
+
+    if (ringbuf->count == RINGBUF_SIZE) {
+        wl_client_post_implementation_error(
+            wl_resource_get_client(xdg_surface->resource),
+            "xdg_surface has not responded to the past %d configure requests", RINGBUF_SIZE);
+        return;
+    }
+
+    ringbuf_push(ringbuf, next_serial(xdg_surface->resource));
 }
 
 struct server_xdg_surface *
