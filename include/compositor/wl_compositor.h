@@ -148,9 +148,11 @@ struct server_view *server_view_from_toplevel(struct server_compositor *composit
                                               struct server_xdg_toplevel *toplevel);
 void server_view_destroy(struct server_view *view);
 struct server_surface *server_view_get_surface(struct server_view *view);
+const char *server_view_get_title(struct server_view *view);
 
 void server_view_place_above(struct server_view *view, struct wl_surface *sibling);
 void server_view_place_below(struct server_view *view, struct wl_surface *sibling);
+void server_view_set_dest(struct server_view *view, int32_t width, int32_t height);
 void server_view_set_pos(struct server_view *view, int32_t x, int32_t y);
 void server_view_set_size(struct server_view *view, int32_t width, int32_t height);
 void server_view_set_source(struct server_view *view, double x, double y, double width,

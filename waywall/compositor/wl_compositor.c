@@ -673,6 +673,16 @@ server_view_get_surface(struct server_view *view) {
     case VIEW_XDG_SHELL:
         return view->data.xdg_shell->parent->parent;
     }
+    ww_unreachable();
+}
+
+const char *
+server_view_get_title(struct server_view *view) {
+    switch (view->type) {
+    case VIEW_XDG_SHELL:
+        return view->data.xdg_shell->title;
+    }
+    ww_unreachable();
 }
 
 void
@@ -688,6 +698,15 @@ server_view_place_below(struct server_view *view, struct wl_surface *sibling) {
 }
 
 void
+server_view_set_dest(struct server_view *view, int32_t width, int32_t height) {
+    wp_viewport_set_destination(view->viewport, width, height);
+    wl_surface_commit(view->surface->remote);
+
+    view->bounds.width = width;
+    view->bounds.height = height;
+}
+
+void
 server_view_set_pos(struct server_view *view, int32_t x, int32_t y) {
     wl_subsurface_set_position(view->subsurface, x, y);
     wl_surface_commit(view->surface->remote);
@@ -698,11 +717,13 @@ server_view_set_pos(struct server_view *view, int32_t x, int32_t y) {
 
 void
 server_view_set_size(struct server_view *view, int32_t width, int32_t height) {
-    wp_viewport_set_destination(view->viewport, width, height);
-    wl_surface_commit(view->surface->remote);
-
-    view->bounds.width = width;
-    view->bounds.height = height;
+    switch (view->type) {
+    case VIEW_XDG_SHELL:
+        view->data.xdg_shell->width = width;
+        view->data.xdg_shell->height = height;
+        server_xdg_toplevel_send_configure(view->data.xdg_shell);
+    }
+    ww_unreachable();
 }
 
 void
