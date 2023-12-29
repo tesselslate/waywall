@@ -1,6 +1,6 @@
 #include "compositor/wl_compositor.h"
 #include "compositor/buffer.h"
-#include "compositor/cutil.h"
+#include "compositor/box.h"
 #include "compositor/server.h"
 #include "compositor/xdg_shell.h"
 #include "single-pixel-buffer-v1-client-protocol.h"

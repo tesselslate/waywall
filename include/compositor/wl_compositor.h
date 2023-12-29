@@ -3,7 +3,7 @@
 
 #define COMPOSITOR_REMOTE_VERSION 4
 
-#include "compositor/cutil.h"
+#include "compositor/box.h"
 #include <wayland-server-core.h>
 
 struct server;

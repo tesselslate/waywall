@@ -1,7 +1,7 @@
 #ifndef WAYWALL_COMPOSITOR_WL_SEAT_H
 #define WAYWALL_COMPOSITOR_WL_SEAT_H
 
-#include "compositor/cutil.h"
+#include "compositor/arr.h"
 #include <wayland-server-core.h>
 
 #define MAX_PRESSED_KEYS 127
