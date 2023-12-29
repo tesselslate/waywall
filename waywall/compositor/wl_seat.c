@@ -2,6 +2,7 @@
 #include "compositor/server.h"
 #include "compositor/wl_compositor.h"
 #include "util.h"
+#include <linux/input-event-codes.h>
 #include <wayland-client.h>
 #include <wayland-server.h>
 
@@ -619,6 +620,70 @@ server_seat_create(struct server *server) {
     wl_signal_init(&seat->events.destroy);
 
     return seat;
+}
+
+void
+server_seat_send_click(struct server_seat *seat, struct server_view *view) {
+    if (seat->input_focus == view) {
+        LOG(LOG_ERROR, "server_seat_send_click called on active view");
+        return;
+    }
+
+    struct server_surface *surface = server_view_get_surface(view);
+    struct wl_client *view_client = wl_resource_get_client(surface->resource);
+
+    struct wl_resource *pointer_resource;
+
+    wl_resource_for_each(pointer_resource, &seat->pointers) {
+        if (wl_resource_get_client(pointer_resource) != view_client) {
+            continue;
+        }
+
+        wl_pointer_send_enter(pointer_resource, next_serial(pointer_resource), surface->resource,
+                              wl_fixed_from_int(0), wl_fixed_from_int(0));
+        wl_pointer_send_button(pointer_resource, next_serial(pointer_resource), current_time(),
+                               BTN_LEFT, WL_POINTER_BUTTON_STATE_PRESSED);
+        wl_pointer_send_button(pointer_resource, next_serial(pointer_resource), current_time(),
+                               BTN_LEFT, WL_POINTER_BUTTON_STATE_RELEASED);
+        wl_pointer_send_leave(pointer_resource, next_serial(pointer_resource), surface->resource);
+    }
+}
+
+void
+server_seat_send_keys(struct server_seat *seat, struct server_view *view,
+                      struct synthetic_key *keys, size_t num_keys) {
+    struct server_surface *surface = server_view_get_surface(view);
+    struct wl_client *view_client = wl_resource_get_client(surface->resource);
+    bool focused = view == seat->input_focus;
+
+    struct wl_array wl_keys;
+    wl_array_init(&wl_keys);
+
+    struct wl_resource *keyboard_resource;
+
+    wl_resource_for_each(keyboard_resource, &seat->keyboards) {
+        if (wl_resource_get_client(keyboard_resource) != view_client) {
+            continue;
+        }
+
+        if (!focused) {
+            wl_keyboard_send_enter(keyboard_resource, next_serial(keyboard_resource),
+                                   surface->resource, &wl_keys);
+        }
+
+        for (size_t i = 0; i < num_keys; i++) {
+            wl_keyboard_send_key(
+                keyboard_resource, next_serial(keyboard_resource), current_time(), keys[i].keycode,
+                keys[i].state ? WL_KEYBOARD_KEY_STATE_PRESSED : WL_KEYBOARD_KEY_STATE_RELEASED);
+        }
+
+        if (!focused) {
+            wl_keyboard_send_leave(keyboard_resource, next_serial(keyboard_resource),
+                                   surface->resource);
+        }
+    }
+
+    wl_array_release(&wl_keys);
 }
 
 void

@@ -40,7 +40,15 @@ struct server_seat {
     } events;
 };
 
+struct synthetic_key {
+    uint8_t keycode;
+    bool state;
+};
+
 struct server_seat *server_seat_create(struct server *server);
+void server_seat_send_click(struct server_seat *seat, struct server_view *view);
+void server_seat_send_keys(struct server_seat *seat, struct server_view *view,
+                           struct synthetic_key *keys, size_t num_keys);
 void server_seat_set_input_focus(struct server_seat *seat, struct server_view *view);
 void server_seat_set_caps(struct server_seat *seat, uint32_t caps);
 void server_seat_set_remote(struct server_seat *seat, struct wl_seat *remote);
