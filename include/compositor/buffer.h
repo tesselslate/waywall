@@ -77,7 +77,4 @@ void server_buffer_create_invalid(struct wl_resource *buffer_resource);
 void server_buffer_destroy(struct server_buffer *buffer);
 struct server_buffer *server_buffer_from_resource(struct wl_resource *resource);
 
-// TODO: server_buffer_from_resource
-// (related: common buffer impl to allow wl_resource_instance_of to work)
-
 #endif
