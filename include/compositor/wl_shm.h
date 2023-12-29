@@ -8,10 +8,10 @@
 struct server;
 
 struct server_shm {
-    struct wl_shm *remote;
-    struct wl_global *global;
+    struct wl_shm *remote;    // owned by server
+    struct wl_array *formats; // owned by server
 
-    struct wl_array formats;
+    struct wl_global *global;
 
     struct wl_listener display_destroy;
 };

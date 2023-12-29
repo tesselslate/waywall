@@ -453,9 +453,6 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     if (seat->remote.pointer) {
         wl_pointer_release(seat->remote.pointer);
     }
-    if (seat->remote.seat) {
-        wl_seat_release(seat->remote.seat);
-    }
 
     wl_global_destroy(seat->global);
 
@@ -780,9 +777,6 @@ server_seat_set_remote(struct server_seat *seat, struct wl_seat *remote) {
     }
     if (seat->remote.pointer) {
         wl_pointer_release(seat->remote.pointer);
-    }
-    if (seat->remote.seat) {
-        wl_seat_release(seat->remote.seat);
     }
 
     seat->remote.seat = remote;

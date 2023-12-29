@@ -7,7 +7,6 @@ protocol_dir = wayland_protocols.get_variable('pkgdatadir') + '/'
 protocol_xmls = [
   protocol_dir + 'stable/viewporter/viewporter.xml',
   protocol_dir + 'stable/xdg-shell/xdg-shell.xml',
-  protocol_dir + 'staging/single-pixel-buffer/single-pixel-buffer-v1.xml',
   protocol_dir + 'staging/tearing-control/tearing-control-v1.xml',
   protocol_dir + 'unstable/linux-dmabuf/linux-dmabuf-unstable-v1.xml',
   protocol_dir + 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',

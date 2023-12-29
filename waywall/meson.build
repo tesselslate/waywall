@@ -21,6 +21,7 @@ executable('waywall',
   protocol_sources, protocol_headers,
 
   'compositor/buffer.c',
+  'compositor/remote_buf.c',
   'compositor/server.c',
   'compositor/wl_compositor.c',
   'compositor/wl_output.c',

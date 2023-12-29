@@ -15,7 +15,6 @@
 
 #include "linux-dmabuf-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
-#include "single-pixel-buffer-v1-client-protocol.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 
@@ -34,9 +33,8 @@ struct remote_seat {
 
 static void
 remote_seat_destroy(struct remote_seat *remote_seat) {
-    if (!remote_seat->active) {
-        wl_seat_release(remote_seat->remote);
-    }
+    wl_seat_release(remote_seat->remote);
+
     if (remote_seat->title) {
         free(remote_seat->title);
     }
@@ -91,6 +89,18 @@ static const struct wl_seat_listener seat_listener = {
 };
 
 static void
+on_shm_format(void *data, struct wl_shm *shm, uint32_t format) {
+    struct server *server = data;
+
+    uint32_t *arr_format = wl_array_add(&server->remote.shm_formats, sizeof(uint32_t));
+    *arr_format = format;
+}
+
+static const struct wl_shm_listener shm_listener = {
+    .format = on_shm_format,
+};
+
+static void
 on_registry_global(void *data, struct wl_registry *registry, uint32_t name, const char *interface,
                    uint32_t version) {
     struct server *server = data;
@@ -110,10 +120,15 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
         static_assert(SHM_REMOTE_VERSION == 1, "wl_shm remote version == 1");
         ww_assert(version >= SHM_REMOTE_VERSION);
 
+        wl_array_init(&server->remote.shm_formats);
+
         server->remote.shm =
             wl_registry_bind(registry, name, &wl_shm_interface, SHM_REMOTE_VERSION);
         ww_assert(server->remote.shm);
+        wl_shm_add_listener(server->remote.shm, &shm_listener, server);
+
         server->remote.shm_id = name;
+        wl_display_roundtrip(server->remote.display);
     } else if (strcmp(interface, wl_subcompositor_interface.name) == 0) {
         ww_assert(version >= 1);
 
@@ -121,13 +136,6 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
             wl_registry_bind(registry, name, &wl_subcompositor_interface, 1);
         ww_assert(server->remote.subcompositor);
         server->remote.subcompositor_id = name;
-    } else if (strcmp(interface, wp_single_pixel_buffer_manager_v1_interface.name) == 0) {
-        ww_assert(version >= 1);
-
-        server->remote.single_pixel_buffer_manager =
-            wl_registry_bind(registry, name, &wp_single_pixel_buffer_manager_v1_interface, 1);
-        ww_assert(server->remote.single_pixel_buffer_manager);
-        server->remote.single_pixel_manager_id = name;
     } else if (strcmp(interface, wp_viewporter_interface.name) == 0) {
         ww_assert(version >= 1);
 
@@ -178,6 +186,7 @@ on_registry_global(void *data, struct wl_registry *registry, uint32_t name, cons
 
         remote_seat->name = name;
         wl_list_insert(&server->remote.seats, &remote_seat->link);
+        wl_display_roundtrip(server->remote.display);
     }
 }
 
@@ -193,8 +202,6 @@ on_registry_global_remove(void *data, struct wl_registry *registry, uint32_t nam
         LOG(LOG_ERROR, "host session compositor revoked wl_shm global");
     } else if (name == server->remote.subcompositor_id) {
         LOG(LOG_ERROR, "host session compositor revoked wl_subcompositor global");
-    } else if (name == server->remote.single_pixel_manager_id) {
-        LOG(LOG_ERROR, "host session compositor revoked wp_single_pixel_buffer_manager global");
     } else if (name == server->remote.viewporter_id) {
         LOG(LOG_ERROR, "host session compositor revoked wp_viewporter global");
     } else if (name == server->remote.xdg_wm_base_id) {
@@ -317,11 +324,6 @@ server_create() {
         LOG(LOG_ERROR, "host session compositor did not provide wl_subcompositor global");
         goto fail_create_globals;
     }
-    if (!server->remote.single_pixel_buffer_manager) {
-        LOG(LOG_ERROR,
-            "host session compositor did not provide wp_single_pixel_buffer_manager_v1 global");
-        goto fail_create_globals;
-    }
     if (!server->remote.viewporter) {
         LOG(LOG_ERROR, "host session compositor did not provide wp_viewporter global");
         goto fail_create_globals;
@@ -410,6 +412,8 @@ server_destroy(struct server *server) {
     wl_list_for_each_safe (remote_seat, tmp, &server->remote.seats, link) {
         remote_seat_destroy(remote_seat);
     }
+    wl_shm_destroy(server->remote.shm);
+    wl_array_release(&server->remote.shm_formats);
 
     wl_registry_destroy(server->remote.registry);
     wl_display_disconnect(server->remote.display);

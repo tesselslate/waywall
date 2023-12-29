@@ -52,9 +52,9 @@ struct server_compositor {
 
     struct {
         struct wl_display *remote_display;
+        struct remote_buffer_manager *buffer_manager;
 
         struct wl_subcompositor *subcompositor;
-        struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager;
         struct wp_viewporter *viewporter;
         struct xdg_wm_base *xdg_wm_base;
 

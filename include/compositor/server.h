@@ -24,18 +24,17 @@ struct server {
         struct wl_compositor *compositor;
         struct wl_subcompositor *subcompositor;
         struct wl_shm *shm;
-        struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager;
         struct wp_viewporter *viewporter;
         struct xdg_wm_base *xdg_wm_base;
         struct zwp_linux_dmabuf_v1 *linux_dmabuf;
         struct zwp_relative_pointer_manager_v1 *relative_pointer_manager;
 
-        struct wl_list seats; // remote_seat.link
+        struct wl_list seats;        // remote_seat.link
+        struct wl_array shm_formats; // uint32_t
 
         uint32_t compositor_id;
         uint32_t subcompositor_id;
         uint32_t shm_id;
-        uint32_t single_pixel_manager_id;
         uint32_t viewporter_id;
         uint32_t xdg_wm_base_id;
         uint32_t linux_dmabuf_id;

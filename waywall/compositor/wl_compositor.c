@@ -1,9 +1,9 @@
 #include "compositor/wl_compositor.h"
-#include "compositor/buffer.h"
 #include "compositor/box.h"
+#include "compositor/buffer.h"
+#include "compositor/remote_buf.h"
 #include "compositor/server.h"
 #include "compositor/xdg_shell.h"
-#include "single-pixel-buffer-v1-client-protocol.h"
 #include "util.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
@@ -170,10 +170,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     xdg_surface_destroy(compositor->output.xdg_surface);
     wp_viewport_destroy(compositor->output.root_viewport);
     wl_surface_destroy(compositor->output.root_surface);
-    wl_buffer_destroy(compositor->output.background);
+    remote_buffer_manager_deref(compositor->output.background);
 
     wl_subcompositor_destroy(compositor->output.subcompositor);
-    wp_single_pixel_buffer_manager_v1_destroy(compositor->output.single_pixel_buffer_manager);
     wp_viewporter_destroy(compositor->output.viewporter);
     xdg_wm_base_destroy(compositor->output.xdg_wm_base);
 
@@ -523,9 +522,15 @@ server_compositor_create(struct server *server, struct wl_compositor *remote) {
     compositor->remote = remote;
     compositor->output.remote_display = server->remote.display;
     compositor->output.subcompositor = server->remote.subcompositor;
-    compositor->output.single_pixel_buffer_manager = server->remote.single_pixel_buffer_manager;
     compositor->output.viewporter = server->remote.viewporter;
     compositor->output.xdg_wm_base = server->remote.xdg_wm_base;
+
+    compositor->output.buffer_manager = remote_buffer_manager_create(server, server->remote.shm);
+    if (!compositor->output.buffer_manager) {
+        free(compositor);
+        return NULL;
+    }
+
     compositor->global = wl_global_create(server->display, &wl_compositor_interface, VERSION,
                                           compositor, handle_bind);
 
@@ -538,9 +543,8 @@ server_compositor_create(struct server *server, struct wl_compositor *remote) {
     wl_signal_init(&compositor->events.unmap);
 
     // TODO: allow configuring background color
-    compositor->output.background = wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
-        compositor->output.single_pixel_buffer_manager, UINT32_MAX, UINT32_MAX, UINT32_MAX,
-        UINT32_MAX);
+    compositor->output.background =
+        remote_buffer_manager_get_color(compositor->output.buffer_manager, 255, 255, 255, 255);
     compositor->output.root_surface = wl_compositor_create_surface(compositor->remote);
     compositor->output.root_viewport =
         wp_viewporter_get_viewport(compositor->output.viewporter, compositor->output.root_surface);

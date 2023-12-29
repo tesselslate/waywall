@@ -28,7 +28,7 @@ struct server_seat {
         struct u32_array buttons;
         double pointer_x, pointer_y;
 
-        struct wl_seat *seat;
+        struct wl_seat *seat; // owned by server
         struct wl_keyboard *keyboard;
         struct wl_pointer *pointer;
     } remote;

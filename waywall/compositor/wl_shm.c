@@ -5,9 +5,6 @@
 #include <wayland-client.h>
 #include <wayland-server.h>
 
-// TODO: formats are broken. we do not receive the list of formats because it's too late by the time
-// we add our listener
-
 /*
  *  Most functions are needed by relevant clients (GLFW, Mesa).
  *  They are all just passthrough for the most part.
@@ -20,29 +17,11 @@ struct server_shm_pool {
 };
 
 static void
-on_shm_format(void *data, struct wl_shm *wl_shm, uint32_t format) {
-    struct server_shm *shm = data;
-
-    uint32_t *format_arr = wl_array_add(&shm->formats, sizeof(uint32_t));
-    *format_arr = format;
-
-    LOG(LOG_INFO, "shm format %" PRIu32, format);
-}
-
-static const struct wl_shm_listener shm_listener = {
-    .format = on_shm_format,
-};
-
-static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_shm *shm = wl_container_of(listener, shm, display_destroy);
 
-    if (shm->remote) {
-        wl_shm_destroy(shm->remote);
-    }
     wl_global_destroy(shm->global);
 
-    wl_array_release(&shm->formats);
     free(shm);
 }
 
@@ -165,7 +144,7 @@ handle_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id)
     wl_resource_set_implementation(resource, &shm_impl, shm, shm_destroy);
 
     uint32_t *format;
-    wl_array_for_each(format, &shm->formats) {
+    wl_array_for_each(format, shm->formats) {
         wl_shm_send_format(resource, *format);
     }
 }
@@ -178,10 +157,8 @@ server_shm_create(struct server *server, struct wl_shm *remote) {
         return NULL;
     }
 
-    wl_array_init(&shm->formats);
-
     shm->remote = remote;
-    wl_shm_add_listener(shm->remote, &shm_listener, shm);
+    shm->formats = &server->remote.shm_formats;
 
     shm->global = wl_global_create(server->display, &wl_shm_interface, VERSION, shm, handle_bind);
 
