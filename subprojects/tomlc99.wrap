@@ -1,6 +1,0 @@
-[wrap-git]
-directory = tomlc99
-url = https://github.com/cktan/tomlc99.git
-revision = 5221b3d3d66c25a1dc6f0372b4f824f1202fe398
-
-diff_files = tomlc99-meson.patch
