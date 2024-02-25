@@ -23,4 +23,5 @@ wayland_scanner = dependency('wayland-scanner')
 wayland_server = dependency('wayland-server')
 
 subdir('protocol')
+subdir('test')
 subdir('waywall')
