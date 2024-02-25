@@ -52,7 +52,12 @@ struct server_surface {
         } apply;
     } pending;
 
-    // TODO: role objects
+    enum server_surface_role {
+        SURFACE_ROLE_NONE,
+        SURFACE_ROLE_CURSOR,
+        SURFACE_ROLE_XDG,
+    } role;
+    void *role_object;
 
     struct {
         struct wl_signal commit;  // data: struct server_surface_state *
