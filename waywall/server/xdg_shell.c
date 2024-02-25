@@ -71,6 +71,8 @@ static void
 xdg_toplevel_resource_destroy(struct wl_resource *resource) {
     struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
 
+    wl_signal_emit_mutable(&xdg_toplevel->events.destroy, NULL);
+
     xdg_toplevel->parent->child = NULL;
     xdg_toplevel->parent->parent->role_object = NULL;
 
@@ -281,6 +283,8 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
     xdg_surface->parent->role_object = xdg_toplevel;
     xdg_surface->child = xdg_toplevel;
     xdg_toplevel->parent = xdg_surface;
+
+    wl_signal_init(&xdg_toplevel->events.destroy);
 }
 
 static void

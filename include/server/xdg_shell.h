@@ -39,6 +39,10 @@ struct server_xdg_toplevel {
     struct server_xdg_surface *parent;
     char *title;
     int32_t width, height;
+
+    struct {
+        struct wl_signal destroy; // data: NULL
+    } events;
 };
 
 struct server_xdg_wm_base_g *server_xdg_wm_base_g_create(struct server *server);
