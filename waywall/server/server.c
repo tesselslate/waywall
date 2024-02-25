@@ -1,9 +1,11 @@
 #include "server/server.h"
+#include "linux-dmabuf-v1-client-protocol.h"
 #include "util.h"
 #include <string.h>
 #include <wayland-client.h>
 
 #define USE_COMPOSITOR_VERSION 5
+#define USE_LINUX_DMABUF_VERSION 4
 #define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
 
@@ -90,6 +92,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->compositor =
             wl_registry_bind(wl, name, &wl_compositor_interface, USE_COMPOSITOR_VERSION);
         ww_assert(backend->compositor);
+    } else if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0) {
+        if (version < USE_LINUX_DMABUF_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated zwp_linux_dmabuf (%d < %d)",
+                   version, USE_LINUX_DMABUF_VERSION);
+            return;
+        }
+
+        backend->linux_dmabuf =
+            wl_registry_bind(wl, name, &zwp_linux_dmabuf_v1_interface, USE_LINUX_DMABUF_VERSION);
+        ww_assert(backend->linux_dmabuf);
     } else if (strcmp(iface, wl_seat_interface.name) == 0) {
         if (version < USE_SEAT_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_seat (%d < %d)", version,
@@ -159,6 +171,10 @@ server_backend_create(struct server_backend *backend) {
 
     if (!backend->compositor) {
         ww_log(LOG_ERROR, "host compositor does not provide wl_compositor");
+        goto fail_registry;
+    }
+    if (!backend->linux_dmabuf) {
+        ww_log(LOG_ERROR, "host compositor does not provide zwp_linux_dmabuf");
         goto fail_registry;
     }
     if (!backend->shm) {

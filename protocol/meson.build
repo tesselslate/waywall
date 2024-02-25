@@ -7,7 +7,9 @@ wayland_protocols_dir = wayland_protocols.get_variable('pkgdatadir') + '/'
 protocol_headers = []
 protocol_sources = []
 
-protocol_xmls = []
+protocol_xmls = [
+  'stable/linux-dmabuf/linux-dmabuf-v1.xml',
+]
 
 foreach xml : protocol_xmls
   protocol_headers += custom_target(

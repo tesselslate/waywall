@@ -3,6 +3,7 @@ executable('waywall',
   'server/server.c',
   'server/wl_compositor.c',
   'server/wl_shm.c',
+  'server/wp_linux_dmabuf.c',
   'main.c',
   'util.c',
 

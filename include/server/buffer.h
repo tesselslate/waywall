@@ -15,7 +15,7 @@ struct server_buffer {
     } type;
     union {
         struct server_shm_buffer_data *shm;
-        // TODO: dmabuf data
+        struct server_dmabuf_buffer_data *dmabuf;
     } data;
 };
 

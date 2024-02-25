@@ -12,6 +12,7 @@ struct server_backend {
     struct wl_array shm_formats; // data: uint32_t
 
     struct wl_compositor *compositor;
+    struct zwp_linux_dmabuf_v1 *linux_dmabuf;
     struct wl_shm *shm;
 
     struct {
@@ -24,6 +25,7 @@ struct server {
     struct server_backend backend;
 
     struct server_compositor_g *compositor;
+    struct server_linux_dmabuf_g *linux_dmabuf;
     struct server_shm_g *shm;
 };
 
