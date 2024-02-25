@@ -1,4 +1,5 @@
 executable('waywall',
+  'server/buffer.c',
   'server/server.c',
   'main.c',
   'util.c',
