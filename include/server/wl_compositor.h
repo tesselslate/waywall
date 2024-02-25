@@ -53,6 +53,11 @@ struct server_surface {
     } pending;
 
     // TODO: role objects
+
+    struct {
+        struct wl_signal commit;  // data: struct server_surface_state *
+        struct wl_signal destroy; // data: NULL
+    } events;
 };
 
 struct server_compositor_g *server_compositor_g_create(struct server *server);

@@ -100,6 +100,8 @@ static void
 surface_resource_destroy(struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
+    wl_signal_emit_mutable(&surface->events.destroy, NULL);
+
     wl_surface_destroy(surface->remote);
     free(surface);
 }
@@ -135,6 +137,8 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
     struct server_surface_state *state = &surface->pending;
+    wl_signal_emit_mutable(&surface->events.commit, state);
+
     if (state->apply & SURFACE_STATE_ATTACH) {
         // TODO: If the provided buffer's size is not a multiple of the buffer scale, the host
         // compositor will raise a protocol error (wl_surface.invalid_size) and kill us. Need to add
@@ -358,6 +362,9 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     surface->parent = compositor;
     surface->current.buffer_scale = 1;
+
+    wl_signal_init(&surface->events.commit);
+    wl_signal_init(&surface->events.destroy);
 }
 
 static const struct wl_compositor_interface compositor_impl = {
