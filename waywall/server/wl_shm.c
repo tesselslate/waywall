@@ -58,14 +58,14 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     struct server_buffer *buffer = calloc(1, sizeof(*buffer));
     if (!buffer) {
         ww_log(LOG_WARN, "failed to allocate server_buffer");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
     struct server_shm_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
     if (!buffer_data) {
         ww_log(LOG_WARN, "failed to allocate server_shm_buffer_data");
         free(buffer);
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -140,7 +140,7 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     struct server_shm_pool *shm_pool = calloc(1, sizeof(*shm_pool));
     if (!shm_pool) {
         ww_log(LOG_WARN, "failed to allocate server_shm_pool");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 

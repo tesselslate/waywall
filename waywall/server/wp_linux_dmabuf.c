@@ -299,7 +299,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
     if (!dmabuf_data) {
         ww_log(LOG_WARN, "failed to allocate server_dmabuf_buffer_data");
         free(dmabuf_data);
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -307,7 +307,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
     if (!buffer_params) {
         ww_log(LOG_WARN, "failed to allocate server_linux_buffer_params");
         free(dmabuf_data);
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -339,7 +339,7 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
     struct server_linux_dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
     if (!feedback) {
         ww_log(LOG_WARN, "failed to allocate server_linux_dmabuf_feedback");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -365,7 +365,7 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
     struct server_linux_dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
     if (!feedback) {
         ww_log(LOG_WARN, "failed to allocate server_linux_dmabuf_feedback");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 

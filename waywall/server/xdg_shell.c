@@ -258,7 +258,7 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
     struct server_xdg_toplevel *xdg_toplevel = calloc(1, sizeof(*xdg_toplevel));
     if (!xdg_toplevel) {
         ww_log(LOG_WARN, "failed to allocate server_xdg_toplevel");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -336,7 +336,7 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     struct server_xdg_surface *xdg_surface = calloc(1, sizeof(*xdg_surface));
     if (!xdg_surface) {
         ww_log(LOG_WARN, "failed to allocate server_xdg_surface");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 

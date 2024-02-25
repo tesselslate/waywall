@@ -81,7 +81,7 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
         calloc(1, sizeof(*toplevel_decoration));
     if (!toplevel_decoration) {
         ww_log(LOG_WARN, "failed to allocate server_xdg_toplevel_decoration");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 

@@ -229,7 +229,7 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
 
     struct server_surface_frame *frame = calloc(1, sizeof(*frame));
     if (!frame) {
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -317,7 +317,7 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
     struct server_region *region = calloc(1, sizeof(*region));
     if (!region) {
         ww_log(LOG_WARN, "failed to allocate server_region");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 
@@ -340,7 +340,7 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     struct server_surface *surface = calloc(1, sizeof(*surface));
     if (!surface) {
         ww_log(LOG_WARN, "failed to allocate server_surface");
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return;
     }
 

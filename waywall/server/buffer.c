@@ -33,8 +33,7 @@ int
 server_buffer_create_invalid(struct wl_resource *resource) {
     struct server_buffer *buffer = calloc(1, sizeof(*buffer));
     if (!buffer) {
-        struct wl_client *client = wl_resource_get_client(resource);
-        wl_client_post_no_memory(client);
+        wl_resource_post_no_memory(resource);
         return 1;
     }
 
