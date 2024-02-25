@@ -11,7 +11,7 @@ struct serial_ring {
     size_t tail, len;
 };
 
-static int
+static inline int
 serial_ring_consume(struct serial_ring *ring, uint32_t serial) {
     for (size_t i = 0; i < ring->len; i++) {
         uint32_t datum = ring->data[(ring->tail + i) % STATIC_ARRLEN(ring->data)];
@@ -24,7 +24,7 @@ serial_ring_consume(struct serial_ring *ring, uint32_t serial) {
     return 1;
 }
 
-static int
+static inline int
 serial_ring_push(struct serial_ring *ring, uint32_t serial) {
     if (ring->len == STATIC_ARRLEN(ring->data)) {
         return 1;
