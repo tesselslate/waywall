@@ -240,7 +240,6 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
         return;
     }
     wl_resource_set_implementation(frame->resource, NULL, frame, surface_frame_resource_destroy);
-    wl_resource_set_user_data(frame->resource, frame);
 
     frame->remote = wl_surface_frame(surface->remote);
     ww_assert(frame->remote);
@@ -332,7 +331,6 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
         return;
     }
     wl_resource_set_implementation(region->resource, &region_impl, region, region_resource_destroy);
-    wl_resource_set_user_data(region->resource, region);
 
     region->remote = wl_compositor_create_region(compositor->remote);
     ww_assert(region->remote);
@@ -359,7 +357,6 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     }
     wl_resource_set_implementation(surface->resource, &surface_impl, surface,
                                    surface_resource_destroy);
-    wl_resource_set_user_data(surface->resource, surface);
 
     surface->remote = wl_compositor_create_surface(compositor->remote);
     ww_assert(surface->remote);
@@ -402,7 +399,6 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
     wl_resource_set_implementation(compositor->resource, &compositor_impl, compositor,
                                    compositor_resource_destroy);
-    wl_resource_set_user_data(compositor->resource, compositor);
 
     compositor->remote = compositor_g->remote;
 }

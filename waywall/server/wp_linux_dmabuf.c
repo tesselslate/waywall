@@ -324,7 +324,6 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
     }
     wl_resource_set_implementation(buffer_params->resource, &linux_buffer_params_impl,
                                    buffer_params, linux_buffer_params_resource_destroy);
-    wl_resource_set_user_data(buffer_params->resource, buffer_params);
 
     buffer_params->remote = zwp_linux_dmabuf_v1_create_params(linux_dmabuf->remote);
     ww_assert(buffer_params->remote);
@@ -359,7 +358,6 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
     }
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
-    wl_resource_set_user_data(feedback->resource, feedback);
 
     feedback->remote = zwp_linux_dmabuf_v1_get_default_feedback(linux_dmabuf->remote);
     ww_assert(feedback->remote);
@@ -388,7 +386,6 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
     }
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
-    wl_resource_set_user_data(feedback->resource, feedback);
 
     feedback->remote =
         zwp_linux_dmabuf_v1_get_surface_feedback(linux_dmabuf->remote, surface->remote);
@@ -433,7 +430,6 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
     wl_resource_set_implementation(linux_dmabuf->resource, &linux_dmabuf_impl, linux_dmabuf,
                                    linux_dmabuf_resource_destroy);
-    wl_resource_set_user_data(linux_dmabuf->resource, linux_dmabuf);
 
     linux_dmabuf->remote = linux_dmabuf_g->remote;
     linux_dmabuf->remote_display = linux_dmabuf_g->remote_display;

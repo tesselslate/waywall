@@ -270,7 +270,6 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
     }
     wl_resource_set_implementation(xdg_toplevel->resource, &xdg_toplevel_impl, xdg_toplevel,
                                    xdg_toplevel_resource_destroy);
-    wl_resource_set_user_data(xdg_toplevel->resource, xdg_toplevel);
 
     xdg_surface->parent->role = SURFACE_ROLE_XDG;
     xdg_surface->parent->role_object = xdg_toplevel;
@@ -351,7 +350,6 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     }
     wl_resource_set_implementation(xdg_surface->resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_resource_destroy);
-    wl_resource_set_user_data(xdg_surface->resource, xdg_surface);
 
     wl_list_insert(&xdg_wm_base->surfaces, &xdg_surface->link);
     xdg_surface->xdg_wm_base = xdg_wm_base;
@@ -394,7 +392,6 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
     wl_resource_set_implementation(xdg_wm_base->resource, &xdg_wm_base_impl, xdg_wm_base,
                                    xdg_wm_base_resource_destroy);
-    wl_resource_set_user_data(xdg_wm_base->resource, xdg_wm_base);
 
     wl_list_init(&xdg_wm_base->surfaces);
 }

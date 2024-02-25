@@ -90,7 +90,6 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     }
     wl_resource_set_implementation(buffer->resource, &server_buffer_impl, buffer,
                                    buffer_resource_destroy);
-    wl_resource_set_user_data(buffer->resource, buffer);
 
     buffer->type = SERVER_BUFFER_SHM;
     buffer->data.shm = buffer_data;
@@ -155,7 +154,6 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     }
     wl_resource_set_implementation(shm_pool->resource, &shm_pool_impl, shm_pool,
                                    shm_pool_resource_destroy);
-    wl_resource_set_user_data(shm_pool->resource, shm_pool);
 
     shm_pool->formats = shm->formats;
     shm_pool->fd = fd;
@@ -188,7 +186,6 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         return;
     }
     wl_resource_set_implementation(shm->resource, &shm_impl, shm, shm_resource_destroy);
-    wl_resource_set_user_data(shm->resource, shm);
 
     shm->formats = shm_g->formats;
     shm->remote = shm_g->remote;

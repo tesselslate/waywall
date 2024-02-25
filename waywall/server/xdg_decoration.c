@@ -93,7 +93,6 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
     }
     wl_resource_set_implementation(toplevel_decoration->resource, &xdg_toplevel_decoration_impl,
                                    toplevel_decoration, xdg_toplevel_decoration_resource_destroy);
-    wl_resource_set_user_data(toplevel_decoration->resource, toplevel_decoration);
 
     struct server_xdg_toplevel_decoration *elem;
     wl_list_for_each (elem, &xdg_decoration_manager_g->decorations, link) {
@@ -138,9 +137,8 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &xdg_decoration_manager_impl, NULL,
+    wl_resource_set_implementation(resource, &xdg_decoration_manager_impl, xdg_decoration_manager_g,
                                    xdg_decoration_manager_resource_destroy);
-    wl_resource_set_user_data(resource, xdg_decoration_manager_g);
 }
 
 static void
