@@ -3,6 +3,7 @@
 #include <string.h>
 #include <wayland-client.h>
 
+#define USE_COMPOSITOR_VERSION 5
 #define USE_SHM_VERSION 1
 
 static void
@@ -25,7 +26,17 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
                    uint32_t version) {
     struct server_backend *backend = data;
 
-    if (strcmp(iface, wl_shm_interface.name) == 0) {
+    if (strcmp(iface, wl_compositor_interface.name) == 0) {
+        if (version < USE_COMPOSITOR_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated wl_compositor (%d < %d)", version,
+                   USE_COMPOSITOR_VERSION);
+            return;
+        }
+
+        backend->compositor =
+            wl_registry_bind(wl, name, &wl_compositor_interface, USE_COMPOSITOR_VERSION);
+        ww_assert(backend->compositor);
+    } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
                    USE_SHM_VERSION);
@@ -65,6 +76,10 @@ server_backend_create(struct server_backend *backend) {
     wl_registry_add_listener(backend->registry, &registry_listener, backend);
     wl_display_roundtrip(backend->display);
 
+    if (!backend->compositor) {
+        ww_log(LOG_ERROR, "host compositor does not provide wl_compositor");
+        goto fail_registry;
+    }
     if (!backend->shm) {
         ww_log(LOG_ERROR, "host compositor does not provide wl_shm");
         goto fail_registry;

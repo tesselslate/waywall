@@ -10,6 +10,7 @@ struct server_backend {
 
     struct wl_array shm_formats; // data: uint32_t
 
+    struct wl_compositor *compositor;
     struct wl_shm *shm;
 
     struct {
@@ -21,6 +22,7 @@ struct server {
     struct wl_display *display;
     struct server_backend backend;
 
+    struct server_compositor_g *compositor;
     struct server_shm_g *shm;
 };
 
