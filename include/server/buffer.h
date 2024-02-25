@@ -14,7 +14,7 @@ struct server_buffer {
         SERVER_BUFFER_INVALID,
     } type;
     union {
-        // TODO: shm data
+        struct server_shm_buffer_data *shm;
         // TODO: dmabuf data
     } data;
 };
