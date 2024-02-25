@@ -42,6 +42,7 @@ server_buffer_create_invalid(struct wl_resource *resource) {
     buffer->type = SERVER_BUFFER_INVALID;
 
     wl_resource_set_implementation(resource, &server_buffer_impl, buffer, invalid_buffer_destroy);
+    wl_resource_set_user_data(buffer->resource, buffer);
 
     return 0;
 }
