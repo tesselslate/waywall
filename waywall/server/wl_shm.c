@@ -95,6 +95,7 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     buffer->remote =
         wl_shm_pool_create_buffer(shm_pool->remote, offset, width, height, stride, format);
     ww_assert(buffer->remote);
+    wl_buffer_add_listener(buffer->remote, &server_buffer_listener, buffer);
 }
 
 static void
