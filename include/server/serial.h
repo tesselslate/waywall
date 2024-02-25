@@ -4,6 +4,7 @@
 #include "util.h"
 #include <stddef.h>
 #include <stdint.h>
+#include <wayland-server-core.h>
 
 struct serial_ring {
     uint32_t data[64];
@@ -31,6 +32,11 @@ serial_ring_push(struct serial_ring *ring, uint32_t serial) {
     ring->data[(ring->tail + ring->len) % STATIC_ARRLEN(ring->data)] = serial;
     ring->len++;
     return 0;
+}
+
+static inline uint32_t
+next_serial(struct wl_resource *resource) {
+    return wl_display_next_serial(wl_client_get_display(wl_resource_get_client(resource)));
 }
 
 #endif
