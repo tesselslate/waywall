@@ -6,6 +6,9 @@ executable('waywall',
   'main.c',
   'util.c',
 
+  protocol_headers,
+  protocol_sources,
+
   dependencies: [
     wayland_client,
     wayland_server,
