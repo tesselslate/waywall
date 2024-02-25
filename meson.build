@@ -17,4 +17,7 @@ add_project_arguments(
 
 includes = include_directories('include')
 
+wayland_client = dependency('wayland-client')
+wayland_server = dependency('wayland-server')
+
 subdir('waywall')
