@@ -22,16 +22,6 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
 }
 
 static void
-send_surface_configure(struct server_xdg_surface *xdg_surface) {
-    uint32_t serial = next_serial(xdg_surface->resource);
-    if (serial_ring_push(&xdg_surface->serials, serial) != 0) {
-        wl_resource_post_no_memory(xdg_surface->resource);
-        return;
-    }
-    xdg_surface_send_configure(xdg_surface->resource, serial);
-}
-
-static void
 on_surface_commit(struct wl_listener *listener, void *data) {
     struct server_xdg_surface *xdg_surface = wl_container_of(listener, xdg_surface, on_commit);
     struct server_surface *surface = xdg_surface->parent;
@@ -55,7 +45,7 @@ on_surface_commit(struct wl_listener *listener, void *data) {
             xdg_toplevel_send_wm_capabilities(xdg_surface->child->resource, &capabilities);
             wl_array_release(&capabilities);
         }
-        send_surface_configure(xdg_surface);
+        server_xdg_surface_send_configure(xdg_surface);
     }
 }
 
@@ -112,7 +102,7 @@ xdg_toplevel_set_fullscreen(struct wl_client *client, struct wl_resource *resour
 
     // This is a no-op, but we need to send a configure anyway.
     send_toplevel_configure(xdg_toplevel);
-    send_surface_configure(xdg_toplevel->parent);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
 }
 
 static void
@@ -121,7 +111,7 @@ xdg_toplevel_set_maximized(struct wl_client *client, struct wl_resource *resourc
 
     // This is a no-op, but we need to send a configure anyway.
     send_toplevel_configure(xdg_toplevel);
-    send_surface_configure(xdg_toplevel->parent);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
 }
 
 static void
@@ -171,7 +161,7 @@ xdg_toplevel_unset_fullscreen(struct wl_client *client, struct wl_resource *reso
 
     // This is a no-op, but we need to send a configure anyway.
     send_toplevel_configure(xdg_toplevel);
-    send_surface_configure(xdg_toplevel->parent);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
 }
 
 static void
@@ -180,7 +170,7 @@ xdg_toplevel_unset_maximized(struct wl_client *client, struct wl_resource *resou
 
     // This is a no-op, but we need to send a configure anyway.
     send_toplevel_configure(xdg_toplevel);
-    send_surface_configure(xdg_toplevel->parent);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
 }
 
 static const struct xdg_toplevel_interface xdg_toplevel_impl = {
@@ -429,6 +419,16 @@ server_xdg_wm_base_g_create(struct server *server) {
     wl_display_add_destroy_listener(server->display, &xdg_wm_base_g->on_display_destroy);
 
     return xdg_wm_base_g;
+}
+
+void
+server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface) {
+    uint32_t serial = next_serial(xdg_surface->resource);
+    if (serial_ring_push(&xdg_surface->serials, serial) != 0) {
+        wl_resource_post_no_memory(xdg_surface->resource);
+        return;
+    }
+    xdg_surface_send_configure(xdg_surface->resource, serial);
 }
 
 struct server_xdg_surface *
