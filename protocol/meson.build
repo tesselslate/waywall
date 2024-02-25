@@ -9,6 +9,7 @@ protocol_sources = []
 
 protocol_xmls = [
   'stable/linux-dmabuf/linux-dmabuf-v1.xml',
+  'stable/xdg-shell/xdg-shell.xml',
 ]
 
 foreach xml : protocol_xmls
