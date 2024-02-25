@@ -8,6 +8,7 @@ struct server_backend {
     struct wl_display *display;
     struct wl_registry *registry;
 
+    struct wl_list seats;        // backend_seat.link
     struct wl_array shm_formats; // data: uint32_t
 
     struct wl_compositor *compositor;

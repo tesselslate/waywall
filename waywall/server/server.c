@@ -4,7 +4,61 @@
 #include <wayland-client.h>
 
 #define USE_COMPOSITOR_VERSION 5
+#define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
+
+struct backend_seat {
+    struct wl_list link; // server_backend.seats
+
+    struct wl_seat *wl;
+    uint32_t name;
+
+    struct wl_pointer *pointer;
+    struct wl_keyboard *keyboard;
+};
+
+static void
+seat_destroy(struct backend_seat *seat) {
+    wl_seat_release(seat->wl);
+
+    wl_list_remove(&seat->link);
+    free(seat);
+}
+
+static void
+on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t capabilities) {
+    struct backend_seat *seat = data;
+
+    bool has_ptr = !!seat->pointer;
+    bool cap_ptr = capabilities & WL_SEAT_CAPABILITY_POINTER;
+    if (!has_ptr && cap_ptr) {
+        seat->pointer = wl_seat_get_pointer(seat->wl);
+        ww_assert(seat->pointer);
+    } else if (has_ptr && !cap_ptr) {
+        wl_pointer_release(seat->pointer);
+        seat->pointer = NULL;
+    }
+
+    bool has_kb = !!seat->keyboard;
+    bool cap_kb = capabilities & WL_SEAT_CAPABILITY_KEYBOARD;
+    if (!has_kb && cap_kb) {
+        seat->keyboard = wl_seat_get_keyboard(seat->wl);
+        ww_assert(seat->keyboard);
+    } else if (has_kb && !cap_kb) {
+        wl_keyboard_release(seat->keyboard);
+        seat->keyboard = NULL;
+    }
+}
+
+static void
+on_seat_name(void *data, struct wl_seat *wl, const char *name) {
+    // Unused.
+}
+
+static const struct wl_seat_listener seat_listener = {
+    .capabilities = on_seat_capabilities,
+    .name = on_seat_name,
+};
 
 static void
 on_shm_format(void *data, struct wl_shm *wl, uint32_t format) {
@@ -36,6 +90,24 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->compositor =
             wl_registry_bind(wl, name, &wl_compositor_interface, USE_COMPOSITOR_VERSION);
         ww_assert(backend->compositor);
+    } else if (strcmp(iface, wl_seat_interface.name) == 0) {
+        if (version < USE_SEAT_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated wl_seat (%d < %d)", version,
+                   USE_SEAT_VERSION);
+            return;
+        }
+
+        struct backend_seat *seat = calloc(1, sizeof(*seat));
+        if (!seat) {
+            ww_log(LOG_ERROR, "failed to allocate backend_seat");
+            return;
+        }
+        seat->wl = wl_registry_bind(wl, name, &wl_seat_interface, USE_SEAT_VERSION);
+        ww_assert(seat->wl);
+        seat->name = name;
+
+        wl_seat_add_listener(seat->wl, &seat_listener, seat);
+        wl_list_insert(&backend->seats, &seat->link);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
@@ -53,6 +125,14 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 static void
 on_registry_global_remove(void *data, struct wl_registry *wl, uint32_t name) {
     struct server_backend *backend = data;
+
+    struct backend_seat *seat, *tmp_seat;
+    wl_list_for_each_safe (seat, tmp_seat, &backend->seats, link) {
+        if (seat->name == name) {
+            seat_destroy(seat);
+            return;
+        }
+    }
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -62,6 +142,7 @@ static const struct wl_registry_listener registry_listener = {
 
 int
 server_backend_create(struct server_backend *backend) {
+    wl_list_init(&backend->seats);
     wl_array_init(&backend->shm_formats);
 
     wl_signal_init(&backend->events.shm_format);
@@ -99,6 +180,11 @@ fail_display:
 static void
 server_backend_destroy(struct server_backend *backend) {
     wl_array_release(&backend->shm_formats);
+
+    struct backend_seat *seat, *seat_tmp;
+    wl_list_for_each_safe (seat, seat_tmp, &backend->seats, link) {
+        seat_destroy(seat);
+    }
 
     wl_registry_destroy(backend->registry);
     wl_display_disconnect(backend->display);
