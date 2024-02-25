@@ -53,15 +53,6 @@ server_buffer_free(struct server_buffer *buffer) {
         wl_buffer_destroy(buffer->remote);
     }
 
-    switch (buffer->type) {
-    case SERVER_BUFFER_SHM:
-        break;
-    case SERVER_BUFFER_DMABUF:
-        break;
-    case SERVER_BUFFER_INVALID:
-        return;
-    }
-
     free(buffer);
 }
 
