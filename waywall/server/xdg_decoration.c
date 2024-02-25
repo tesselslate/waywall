@@ -87,7 +87,11 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
 
     toplevel_decoration->resource = wl_resource_create(
         client, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(resource), id);
-    ww_assert(toplevel_decoration->resource);
+    if (!toplevel_decoration->resource) {
+        free(toplevel_decoration);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(toplevel_decoration->resource, &xdg_toplevel_decoration_impl,
                                    toplevel_decoration, xdg_toplevel_decoration_resource_destroy);
     wl_resource_set_user_data(toplevel_decoration->resource, toplevel_decoration);
@@ -131,7 +135,10 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct wl_resource *resource =
         wl_resource_create(client, &zxdg_decoration_manager_v1_interface, version, id);
-    ww_assert(resource);
+    if (!resource) {
+        wl_client_post_no_memory(client);
+        return;
+    }
     wl_resource_set_implementation(resource, &xdg_decoration_manager_impl, NULL,
                                    xdg_decoration_manager_resource_destroy);
     wl_resource_set_user_data(resource, xdg_decoration_manager_g);

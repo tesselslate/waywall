@@ -72,8 +72,8 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     buffer_data->fd = dup(shm_pool->fd);
     if (buffer_data->fd == -1) {
         ww_log(LOG_WARN, "failed to dup shm_pool fd");
-        free(buffer_data);
         free(buffer);
+        free(buffer_data);
         wl_client_post_implementation_error(client, "failed to dup shm_pool fd");
         return;
     }
@@ -84,7 +84,12 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     buffer_data->format = format;
 
     buffer->resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    ww_assert(buffer->resource);
+    if (!buffer->resource) {
+        free(buffer);
+        free(buffer_data);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(buffer->resource, &server_buffer_impl, buffer,
                                    buffer_resource_destroy);
     wl_resource_set_user_data(buffer->resource, buffer);
@@ -146,7 +151,11 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
 
     shm_pool->resource =
         wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
-    ww_assert(shm_pool->resource);
+    if (!shm_pool->resource) {
+        free(shm_pool);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(shm_pool->resource, &shm_pool_impl, shm_pool,
                                    shm_pool_resource_destroy);
     wl_resource_set_user_data(shm_pool->resource, shm_pool);
@@ -177,7 +186,11 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
 
     shm->resource = wl_resource_create(client, &wl_shm_interface, version, id);
-    ww_assert(shm->resource);
+    if (!shm->resource) {
+        free(shm);
+        wl_client_post_no_memory(client);
+        return;
+    }
     wl_resource_set_implementation(shm->resource, &shm_impl, shm, shm_resource_destroy);
     wl_resource_set_user_data(shm->resource, shm);
 

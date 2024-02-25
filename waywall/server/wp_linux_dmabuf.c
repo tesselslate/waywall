@@ -189,7 +189,10 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
     }
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, 0);
-    ww_assert(buffer_resource);
+    if (!buffer_resource) {
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     if (server_buffer_create_invalid(buffer_resource) == 0) {
         ww_log(LOG_ERROR, "failed to create invalid server_buffer");
         return;
@@ -228,7 +231,10 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
     }
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    ww_assert(buffer_resource);
+    if (!buffer_resource) {
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     if (server_buffer_create_invalid(buffer_resource) == 0) {
         ww_log(LOG_ERROR, "failed to create invalid server_buffer");
         return;
@@ -298,7 +304,6 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
     struct server_dmabuf_buffer_data *dmabuf_data = calloc(1, sizeof(*dmabuf_data));
     if (!dmabuf_data) {
         ww_log(LOG_WARN, "failed to allocate server_dmabuf_buffer_data");
-        free(dmabuf_data);
         wl_resource_post_no_memory(resource);
         return;
     }
@@ -313,7 +318,12 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 
     buffer_params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
                                                  wl_resource_get_version(resource), id);
-    ww_assert(buffer_params->resource);
+    if (!buffer_params->resource) {
+        free(dmabuf_data);
+        free(buffer_params);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(buffer_params->resource, &linux_buffer_params_impl,
                                    buffer_params, linux_buffer_params_resource_destroy);
     wl_resource_set_user_data(buffer_params->resource, buffer_params);
@@ -345,7 +355,11 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
 
     feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface,
                                             wl_resource_get_version(resource), id);
-    ww_assert(feedback->resource);
+    if (!feedback->resource) {
+        free(feedback);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
     wl_resource_set_user_data(feedback->resource, feedback);
@@ -371,7 +385,11 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
 
     feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface,
                                             wl_resource_get_version(resource), id);
-    ww_assert(feedback->resource);
+    if (!feedback->resource) {
+        free(feedback);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
     wl_resource_set_user_data(feedback->resource, feedback);
@@ -413,7 +431,11 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     linux_dmabuf->resource =
         wl_resource_create(client, &zwp_linux_dmabuf_v1_interface, version, id);
-    ww_assert(linux_dmabuf->resource);
+    if (!linux_dmabuf->resource) {
+        free(linux_dmabuf);
+        wl_client_post_no_memory(client);
+        return;
+    }
     wl_resource_set_implementation(linux_dmabuf->resource, &linux_dmabuf_impl, linux_dmabuf,
                                    linux_dmabuf_resource_destroy);
     wl_resource_set_user_data(linux_dmabuf->resource, linux_dmabuf);

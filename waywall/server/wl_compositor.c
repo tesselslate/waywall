@@ -234,7 +234,11 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
     }
 
     frame->resource = wl_resource_create(client, &wl_callback_interface, 1, id);
-    ww_assert(frame->resource);
+    if (!frame->resource) {
+        free(frame);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(frame->resource, NULL, frame, surface_frame_resource_destroy);
     wl_resource_set_user_data(frame->resource, frame);
 
@@ -323,7 +327,11 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
 
     region->resource =
         wl_resource_create(client, &wl_region_interface, wl_resource_get_version(resource), id);
-    ww_assert(region->resource);
+    if (!region->resource) {
+        free(region);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(region->resource, &region_impl, region, region_resource_destroy);
     wl_resource_set_user_data(region->resource, region);
 
@@ -346,7 +354,11 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     surface->resource =
         wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
-    ww_assert(surface->resource);
+    if (!surface->resource) {
+        free(surface);
+        wl_resource_post_no_memory(resource);
+        return;
+    }
     wl_resource_set_implementation(surface->resource, &surface_impl, surface,
                                    surface_resource_destroy);
     wl_resource_set_user_data(surface->resource, surface);
@@ -386,7 +398,11 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
 
     compositor->resource = wl_resource_create(client, &wl_compositor_interface, version, id);
-    ww_assert(compositor->resource);
+    if (!compositor->resource) {
+        free(compositor);
+        wl_client_post_no_memory(client);
+        return;
+    }
     wl_resource_set_implementation(compositor->resource, &compositor_impl, compositor,
                                    compositor_resource_destroy);
     wl_resource_set_user_data(compositor->resource, compositor);
