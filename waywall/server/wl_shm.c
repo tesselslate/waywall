@@ -253,7 +253,12 @@ server_shm_g_create(struct server *server) {
 
     shm_g->global = wl_global_create(server->display, &wl_shm_interface, SRV_SHM_VERSION, shm_g,
                                      on_global_bind);
-    ww_assert(shm_g->global);
+    if (!shm_g->global) {
+        ww_log(LOG_ERROR, "failed to allocate wl_shm global");
+        wl_shm_destroy(server->backend.shm);
+        free(shm_g);
+        return NULL;
+    }
 
     wl_list_init(&shm_g->objects);
     shm_g->remote = server->backend.shm;

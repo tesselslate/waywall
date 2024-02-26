@@ -426,7 +426,11 @@ server_compositor_g_create(struct server *server) {
 
     compositor_g->global = wl_global_create(server->display, &wl_compositor_interface,
                                             SRV_COMPOSITOR_VERSION, compositor_g, on_global_bind);
-    ww_assert(compositor_g->global);
+    if (!compositor_g->global) {
+        ww_log(LOG_ERROR, "failed to allocate wl_compositor global");
+        free(compositor_g);
+        return NULL;
+    }
 
     compositor_g->remote = server->backend.compositor;
 

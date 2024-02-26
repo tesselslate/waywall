@@ -419,7 +419,11 @@ server_xdg_wm_base_g_create(struct server *server) {
     xdg_wm_base_g->global =
         wl_global_create(server->display, &xdg_wm_base_interface, SRV_XDG_WM_BASE_VERSION,
                          xdg_wm_base_g, on_global_bind);
-    ww_assert(xdg_wm_base_g->global);
+    if (!xdg_wm_base_g->global) {
+        ww_log(LOG_ERROR, "failed to create xdg_wm_base global");
+        free(xdg_wm_base_g);
+        return NULL;
+    }
 
     xdg_wm_base_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &xdg_wm_base_g->on_display_destroy);
