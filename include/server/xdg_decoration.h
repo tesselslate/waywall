@@ -23,6 +23,6 @@ struct server_xdg_toplevel_decoration {
 };
 
 struct server_xdg_decoration_manager_g *
-server_xdg_decoration_manger_g_create(struct server *server);
+server_xdg_decoration_manager_g_create(struct server *server);
 
 #endif
