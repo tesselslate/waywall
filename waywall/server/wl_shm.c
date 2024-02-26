@@ -9,14 +9,34 @@
 
 #define SRV_SHM_VERSION 1
 
-static void
-buffer_resource_destroy(struct wl_resource *resource) {
-    struct server_buffer *buffer = server_buffer_from_resource(resource);
-    ww_assert(buffer->type == SERVER_BUFFER_SHM);
+struct shm_buffer_data {
+    int32_t fd;
+    int32_t offset, width, height, stride;
+    uint32_t format;
+};
 
-    free(buffer->data.shm);
-    server_buffer_free(buffer);
+static void
+shm_buffer_destroy(void *data) {
+    struct shm_buffer_data *buffer_data = data;
+
+    close(buffer_data->fd);
+    free(buffer_data);
 }
+
+static void
+shm_buffer_size(void *data, uint32_t *width, uint32_t *height) {
+    struct shm_buffer_data *buffer_data = data;
+
+    *width = buffer_data->width;
+    *height = buffer_data->height;
+}
+
+static const struct server_buffer_impl shm_buffer_impl = {
+    .name = "shm",
+
+    .destroy = shm_buffer_destroy,
+    .size = shm_buffer_size,
+};
 
 static void
 shm_pool_resource_destroy(struct wl_resource *resource) {
@@ -55,14 +75,8 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
         return;
     }
 
-    struct server_buffer *buffer = calloc(1, sizeof(*buffer));
-    if (!buffer) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
-    struct server_shm_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
+    struct shm_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
     if (!buffer_data) {
-        free(buffer);
         wl_resource_post_no_memory(resource);
         return;
     }
@@ -70,10 +84,8 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     buffer_data->fd = dup(shm_pool->fd);
     if (buffer_data->fd == -1) {
         ww_log(LOG_WARN, "failed to dup shm_pool fd");
-        free(buffer);
-        free(buffer_data);
         wl_client_post_implementation_error(client, "failed to dup shm_pool fd");
-        return;
+        goto fail_dup;
     }
     buffer_data->offset = offset;
     buffer_data->width = width;
@@ -81,23 +93,37 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     buffer_data->stride = stride;
     buffer_data->format = format;
 
-    buffer->resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    if (!buffer->resource) {
-        free(buffer);
-        free(buffer_data);
+    struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
+    if (!buffer_resource) {
         wl_resource_post_no_memory(resource);
-        return;
+        goto fail_resource;
     }
-    wl_resource_set_implementation(buffer->resource, &server_buffer_impl, buffer,
-                                   buffer_resource_destroy);
 
-    buffer->type = SERVER_BUFFER_SHM;
-    buffer->data.shm = buffer_data;
-
-    buffer->remote =
+    struct wl_buffer *remote =
         wl_shm_pool_create_buffer(shm_pool->remote, offset, width, height, stride, format);
-    ww_assert(buffer->remote);
-    wl_buffer_add_listener(buffer->remote, &server_buffer_listener, buffer);
+    if (!remote) {
+        wl_resource_post_no_memory(resource);
+        goto fail_remote;
+    }
+
+    struct server_buffer *buffer =
+        server_buffer_create(buffer_resource, remote, &shm_buffer_impl, buffer_data);
+    if (!buffer) {
+        wl_resource_post_no_memory(buffer_resource);
+        goto fail_buffer;
+    }
+
+    return;
+
+fail_buffer:
+    wl_buffer_destroy(remote);
+
+fail_remote:
+fail_resource:
+    close(buffer_data->fd);
+
+fail_dup:
+    free(buffer_data);
 }
 
 static void

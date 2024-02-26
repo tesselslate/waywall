@@ -15,41 +15,52 @@
 
 #define SRV_LINUX_DMABUF_VERSION 4
 
-static void
-buffer_resource_destroy(struct wl_resource *resource) {
-    struct server_buffer *buffer = server_buffer_from_resource(resource);
-    ww_assert(buffer->type == SERVER_BUFFER_DMABUF);
+struct dmabuf_buffer_data {
+    struct dmabuf_plane {
+        int32_t fd;
+        uint32_t offset, stride;
+        uint64_t modifier;
+    } planes[4];         // max of 4 DMABUF planes
+    uint32_t planes_set; // bitmask
 
-    for (size_t i = 0; i < STATIC_ARRLEN(buffer->data.dmabuf->planes); i++) {
+    int32_t width, height;
+    uint32_t format, flags;
+};
+
+static void
+dmabuf_buffer_destroy(void *data) {
+    struct dmabuf_buffer_data *buffer_data = data;
+
+    for (size_t i = 0; i < STATIC_ARRLEN(buffer_data->planes); i++) {
         uint32_t mask = (1 << i);
-        if (buffer->data.dmabuf->planes_set & mask) {
-            close(buffer->data.dmabuf->planes[i].fd);
+        if (mask & buffer_data->planes_set) {
+            close(buffer_data->planes[i].fd);
         }
     }
-
-    free(buffer->data.dmabuf);
-    server_buffer_free(buffer);
+    free(buffer_data);
 }
 
 static void
-validate_buffer(struct server_linux_buffer_params *buffer_params, struct server_buffer *buffer) {
-    buffer->type = SERVER_BUFFER_DMABUF;
-    buffer->data.dmabuf = buffer_params->data;
+dmabuf_buffer_size(void *data, uint32_t *width, uint32_t *height) {
+    struct dmabuf_buffer_data *buffer_data = data;
 
-    // Update the resource destroy function now that we have a valid buffer.
-    wl_resource_set_implementation(buffer->resource, &server_buffer_impl, buffer,
-                                   buffer_resource_destroy);
-
-    wl_buffer_add_listener(buffer->remote, &server_buffer_listener, buffer);
+    *width = buffer_data->width;
+    *height = buffer_data->height;
 }
+
+static const struct server_buffer_impl dmabuf_buffer_impl = {
+    .name = "dmabuf",
+
+    .destroy = dmabuf_buffer_destroy,
+    .size = dmabuf_buffer_size,
+};
 
 static void
 on_linux_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *wl,
                                struct wl_buffer *buffer) {
     struct server_linux_buffer_params *buffer_params = data;
 
-    buffer_params->buffer->remote = buffer;
-    validate_buffer(buffer_params, buffer_params->buffer);
+    server_buffer_validate(buffer_params->buffer, buffer, &dmabuf_buffer_impl, buffer_params->data);
     buffer_params->ok = true;
 }
 
@@ -193,11 +204,12 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
         wl_resource_post_no_memory(resource);
         return;
     }
-    if (server_buffer_create_invalid(buffer_resource) == 0) {
-        ww_log(LOG_ERROR, "failed to create invalid server_buffer");
+
+    buffer_params->buffer = server_buffer_create_invalid(buffer_resource);
+    if (!buffer_params->buffer) {
+        wl_resource_post_no_memory(resource);
         return;
     }
-    buffer_params->buffer = server_buffer_from_resource(buffer_resource);
 
     buffer_params->data->width = width;
     buffer_params->data->height = height;
@@ -235,11 +247,12 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
         wl_resource_post_no_memory(resource);
         return;
     }
-    if (server_buffer_create_invalid(buffer_resource) == 0) {
-        ww_log(LOG_ERROR, "failed to create invalid server_buffer");
+
+    buffer_params->buffer = server_buffer_create_invalid(buffer_resource);
+    if (!buffer_params->buffer) {
+        wl_resource_post_no_memory(resource);
         return;
     }
-    buffer_params->buffer = server_buffer_from_resource(buffer_resource);
 
     buffer_params->data->width = width;
     buffer_params->data->height = height;
@@ -250,12 +263,13 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
     // Mesa should get it right anyways.
     buffer_params->used = true;
     buffer_params->ok = true;
-    buffer_params->buffer->remote = zwp_linux_buffer_params_v1_create_immed(
-        buffer_params->remote, width, height, format, flags);
+    struct wl_buffer *remote = zwp_linux_buffer_params_v1_create_immed(buffer_params->remote, width,
+                                                                       height, format, flags);
     wl_display_roundtrip(buffer_params->remote_display);
 
     if (buffer_params->ok) {
-        validate_buffer(buffer_params, buffer_params->buffer);
+        server_buffer_validate(buffer_params->buffer, remote, &dmabuf_buffer_impl,
+                               buffer_params->data);
     } else {
         zwp_linux_buffer_params_v1_send_failed(buffer_params->resource);
     }
@@ -301,36 +315,46 @@ static void
 linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
 
-    struct server_dmabuf_buffer_data *dmabuf_data = calloc(1, sizeof(*dmabuf_data));
-    if (!dmabuf_data) {
+    struct dmabuf_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
+    if (!buffer_data) {
         wl_resource_post_no_memory(resource);
         return;
     }
 
     struct server_linux_buffer_params *buffer_params = calloc(1, sizeof(*buffer_params));
     if (!buffer_params) {
-        free(dmabuf_data);
         wl_resource_post_no_memory(resource);
-        return;
+        goto fail_params;
     }
 
     buffer_params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
                                                  wl_resource_get_version(resource), id);
     if (!buffer_params->resource) {
-        free(dmabuf_data);
-        free(buffer_params);
         wl_resource_post_no_memory(resource);
-        return;
+        goto fail_resource;
     }
     wl_resource_set_implementation(buffer_params->resource, &linux_buffer_params_impl,
                                    buffer_params, linux_buffer_params_resource_destroy);
 
     buffer_params->remote = zwp_linux_dmabuf_v1_create_params(linux_dmabuf->remote);
-    ww_assert(buffer_params->remote);
+    if (!buffer_params->remote) {
+        wl_resource_post_no_memory(buffer_params->resource);
+        goto fail_remote;
+    }
+
     zwp_linux_buffer_params_v1_add_listener(buffer_params->remote, &linux_buffer_params_listener,
                                             buffer_params);
 
     buffer_params->remote_display = linux_dmabuf->remote_display;
+
+    return;
+
+fail_remote:
+fail_resource:
+    free(buffer_params);
+
+fail_params:
+    free(buffer_data);
 }
 
 static void

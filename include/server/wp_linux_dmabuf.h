@@ -27,17 +27,7 @@ struct server_linux_buffer_params {
     struct zwp_linux_buffer_params_v1 *remote;
     struct wl_display *remote_display;
 
-    struct server_dmabuf_buffer_data {
-        struct server_dmabuf_buffer_plane {
-            int32_t fd;
-            uint32_t offset, stride;
-            uint64_t modifier;
-        } planes[4];         // max of 4 DMABUF planes
-        uint32_t planes_set; // bitmask
-
-        int32_t width, height;
-        uint32_t format, flags;
-    } *data;
+    struct dmabuf_buffer_data *data;
     bool used; // whether or not a create/create_immed request has been issued
     bool ok;   // whether or not the buffer creation succeeded
 

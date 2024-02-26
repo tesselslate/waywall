@@ -4,58 +4,106 @@
 #include <wayland-client.h>
 
 static void
+invalid_buffer_destroy(void *data) {
+    // Unused.
+}
+
+static void
+invalid_buffer_size(void *data, uint32_t *width, uint32_t *height) {
+    ww_panic("attempted to get size of invalid buffer");
+}
+
+static const struct server_buffer_impl invalid_buffer_impl = {
+    .name = "invalid",
+
+    .destroy = invalid_buffer_destroy,
+    .size = invalid_buffer_size,
+};
+
+static void
 on_buffer_release(void *data, struct wl_buffer *wl) {
     struct server_buffer *buffer = data;
 
     wl_buffer_send_release(buffer->resource);
 }
 
-const struct wl_buffer_listener server_buffer_listener = {
+static const struct wl_buffer_listener server_buffer_listener = {
     .release = on_buffer_release,
 };
+
+static void
+buffer_resource_destroy(struct wl_resource *resource) {
+    struct server_buffer *buffer = wl_resource_get_user_data(resource);
+
+    buffer->impl->destroy(buffer->data);
+    if (buffer->remote) {
+        wl_buffer_destroy(buffer->remote);
+    }
+    free(buffer);
+}
 
 static void
 buffer_destroy(struct wl_client *client, struct wl_resource *resource) {
     wl_resource_destroy(resource);
 }
 
-const struct wl_buffer_interface server_buffer_impl = {
+static const struct wl_buffer_interface server_buffer_impl = {
     .destroy = buffer_destroy,
 };
 
-static void
-invalid_buffer_destroy(struct wl_resource *resource) {
-    struct server_buffer *buffer = wl_resource_get_user_data(resource);
-    server_buffer_free(buffer);
-}
-
-int
-server_buffer_create_invalid(struct wl_resource *resource) {
+struct server_buffer *
+server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,
+                     const struct server_buffer_impl *impl, void *data) {
     struct server_buffer *buffer = calloc(1, sizeof(*buffer));
     if (!buffer) {
-        wl_resource_post_no_memory(resource);
-        return 1;
+        return NULL;
     }
 
     buffer->resource = resource;
-    buffer->type = SERVER_BUFFER_INVALID;
+    buffer->remote = remote;
+    buffer->impl = impl;
+    buffer->data = data;
 
-    wl_resource_set_implementation(resource, &server_buffer_impl, buffer, invalid_buffer_destroy);
+    wl_resource_set_implementation(resource, &server_buffer_impl, buffer, buffer_resource_destroy);
+    wl_buffer_add_listener(remote, &server_buffer_listener, buffer);
 
-    return 0;
+    return buffer;
 }
 
-void
-server_buffer_free(struct server_buffer *buffer) {
-    if (buffer->remote) {
-        wl_buffer_destroy(buffer->remote);
+struct server_buffer *
+server_buffer_create_invalid(struct wl_resource *resource) {
+    struct server_buffer *buffer = calloc(1, sizeof(*buffer));
+    if (!buffer) {
+        return NULL;
     }
 
-    free(buffer);
+    buffer->resource = resource;
+    buffer->impl = &invalid_buffer_impl;
+
+    wl_resource_set_implementation(resource, &invalid_buffer_impl, buffer, buffer_resource_destroy);
+
+    return buffer;
 }
 
 struct server_buffer *
 server_buffer_from_resource(struct wl_resource *resource) {
     ww_assert(wl_resource_instance_of(resource, &wl_buffer_interface, &server_buffer_impl));
     return wl_resource_get_user_data(resource);
+}
+
+void
+server_buffer_get_size(struct server_buffer *buffer, uint32_t *width, uint32_t *height) {
+    buffer->impl->size(buffer->data, width, height);
+}
+
+void
+server_buffer_validate(struct server_buffer *buffer, struct wl_buffer *remote,
+                       const struct server_buffer_impl *impl, void *data) {
+    ww_assert(buffer->impl == &invalid_buffer_impl);
+
+    buffer->remote = remote;
+    buffer->impl = impl;
+    buffer->data = data;
+
+    wl_buffer_add_listener(remote, &server_buffer_listener, buffer);
 }

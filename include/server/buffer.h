@@ -8,22 +8,23 @@ struct server_buffer {
     struct wl_resource *resource;
     struct wl_buffer *remote;
 
-    enum server_buffer_type {
-        SERVER_BUFFER_SHM,
-        SERVER_BUFFER_DMABUF,
-        SERVER_BUFFER_INVALID,
-    } type;
-    union {
-        struct server_shm_buffer_data *shm;
-        struct server_dmabuf_buffer_data *dmabuf;
-    } data;
+    const struct server_buffer_impl *impl;
+    void *data;
 };
 
-extern const struct wl_buffer_listener server_buffer_listener;
-extern const struct wl_buffer_interface server_buffer_impl;
+struct server_buffer_impl {
+    const char *name;
 
-int server_buffer_create_invalid(struct wl_resource *resource);
-void server_buffer_free(struct server_buffer *buffer);
+    void (*destroy)(void *data);
+    void (*size)(void *data, uint32_t *width, uint32_t *height);
+};
+
+struct server_buffer *server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,
+                                           const struct server_buffer_impl *impl, void *data);
+struct server_buffer *server_buffer_create_invalid(struct wl_resource *resource);
 struct server_buffer *server_buffer_from_resource(struct wl_resource *resource);
+void server_buffer_get_size(struct server_buffer *buffer, uint32_t *width, uint32_t *height);
+void server_buffer_validate(struct server_buffer *buffer, struct wl_buffer *remote,
+                            const struct server_buffer_impl *impl, void *data);
 
 #endif

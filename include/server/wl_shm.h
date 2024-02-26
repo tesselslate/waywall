@@ -32,12 +32,6 @@ struct server_shm_pool {
     int32_t fd, sz;
 };
 
-struct server_shm_buffer_data {
-    int32_t fd;
-    int32_t offset, width, height, stride;
-    uint32_t format;
-};
-
 struct server_shm_g *server_shm_g_create(struct server *server);
 
 #endif
