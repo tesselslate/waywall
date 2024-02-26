@@ -34,4 +34,6 @@ struct server {
 struct server *server_create();
 void server_destroy(struct server *server);
 
+void server_shutdown(struct server *server);
+
 #endif

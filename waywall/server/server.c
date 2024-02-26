@@ -270,3 +270,9 @@ server_destroy(struct server *server) {
     server_backend_destroy(&server->backend);
     free(server);
 }
+
+void
+server_shutdown(struct server *server) {
+    // TODO: make graceful (request window close, timeout)
+    wl_display_terminate(server->display);
+}
