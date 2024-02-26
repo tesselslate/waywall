@@ -27,6 +27,8 @@ struct server {
     struct server_compositor_g *compositor;
     struct server_linux_dmabuf_g *linux_dmabuf;
     struct server_shm_g *shm;
+    struct server_xdg_decoration_manager_g *xdg_decoration;
+    struct server_xdg_wm_base_g *xdg_shell;
 };
 
 struct server *server_create();

@@ -1,5 +1,10 @@
 #include "server/server.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "server/wl_compositor.h"
+#include "server/wl_shm.h"
+#include "server/wp_linux_dmabuf.h"
+#include "server/xdg_decoration.h"
+#include "server/xdg_shell.h"
 #include "util.h"
 #include <string.h>
 #include <wayland-client.h>
@@ -219,9 +224,38 @@ server_create() {
     }
 
     server->display = wl_display_create();
-    ww_assert(server->display);
+    if (!server->display) {
+        goto fail_display;
+    }
+
+    server->compositor = server_compositor_g_create(server);
+    if (!server->compositor) {
+        goto fail_globals;
+    }
+    server->linux_dmabuf = server_linux_dmabuf_g_create(server);
+    if (!server->linux_dmabuf) {
+        goto fail_globals;
+    }
+    server->shm = server_shm_g_create(server);
+    if (!server->shm) {
+        goto fail_globals;
+    }
+    server->xdg_shell = server_xdg_wm_base_g_create(server);
+    if (!server->xdg_shell) {
+        goto fail_globals;
+    }
+    server->xdg_decoration = server_xdg_decoration_manager_g_create(server);
+    if (!server->xdg_decoration) {
+        goto fail_globals;
+    }
 
     return server;
+
+fail_globals:
+    wl_display_destroy(server->display);
+
+fail_display:
+    server_backend_destroy(&server->backend);
 
 fail_backend:
     free(server);
