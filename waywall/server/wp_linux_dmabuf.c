@@ -441,6 +441,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
         wl_container_of(listener, linux_dmabuf_g, on_display_destroy);
 
     wl_global_destroy(linux_dmabuf_g->global);
+    zwp_linux_dmabuf_v1_destroy(linux_dmabuf_g->remote);
 
     wl_list_remove(&linux_dmabuf_g->on_display_destroy.link);
 

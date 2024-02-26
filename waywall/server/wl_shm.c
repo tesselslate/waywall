@@ -209,6 +209,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_shm_g *shm_g = wl_container_of(listener, shm_g, on_display_destroy);
 
     wl_global_destroy(shm_g->global);
+    wl_shm_destroy(shm_g->remote);
 
     wl_list_remove(&shm_g->on_shm_format.link);
     wl_list_remove(&shm_g->on_display_destroy.link);
