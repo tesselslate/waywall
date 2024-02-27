@@ -71,6 +71,8 @@ static void
 on_shm_format(void *data, struct wl_shm *wl, uint32_t format) {
     struct server_backend *backend = data;
 
+    // I think an assert for allocation failure here is alright because we can't do much about it
+    // and this event should only ever be received at startup.
     uint32_t *next = wl_array_add(&backend->shm_formats, sizeof(*next));
     ww_assert(next);
     *next = format;

@@ -102,7 +102,7 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     struct wl_buffer *remote =
         wl_shm_pool_create_buffer(shm_pool->remote, offset, width, height, stride, format);
     if (!remote) {
-        wl_resource_post_no_memory(resource);
+        wl_resource_post_no_memory(buffer_resource);
         goto fail_remote;
     }
 
@@ -174,8 +174,9 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     shm_pool->resource =
         wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
     if (!shm_pool->resource) {
-        free(shm_pool);
         wl_resource_post_no_memory(resource);
+        close(fd);
+        free(shm_pool);
         return;
     }
     wl_resource_set_implementation(shm_pool->resource, &shm_pool_impl, shm_pool,
@@ -186,7 +187,12 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     shm_pool->sz = size;
 
     shm_pool->remote = wl_shm_create_pool(shm->remote, fd, size);
-    ww_assert(shm_pool->remote);
+    if (!shm_pool->remote) {
+        wl_resource_post_no_memory(shm_pool->resource);
+        close(fd);
+        free(shm_pool);
+        return;
+    }
 }
 
 static const struct wl_shm_interface shm_impl = {
@@ -207,8 +213,8 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     shm->resource = wl_resource_create(client, &wl_shm_interface, version, id);
     if (!shm->resource) {
-        free(shm);
         wl_client_post_no_memory(client);
+        free(shm);
         return;
     }
     wl_resource_set_implementation(shm->resource, &shm_impl, shm, shm_resource_destroy);

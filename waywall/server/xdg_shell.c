@@ -264,8 +264,8 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
     xdg_toplevel->resource =
         wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
     if (!xdg_toplevel->resource) {
-        free(xdg_toplevel);
         wl_resource_post_no_memory(resource);
+        free(xdg_toplevel);
         return;
     }
     wl_resource_set_implementation(xdg_toplevel->resource, &xdg_toplevel_impl, xdg_toplevel,
@@ -344,8 +344,8 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     xdg_surface->resource =
         wl_resource_create(client, &xdg_surface_interface, wl_resource_get_version(resource), id);
     if (!xdg_surface->resource) {
-        free(xdg_surface);
         wl_resource_post_no_memory(resource);
+        free(xdg_surface);
         return;
     }
     wl_resource_set_implementation(xdg_surface->resource, &xdg_surface_impl, xdg_surface,
@@ -386,8 +386,8 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     xdg_wm_base->resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
     if (!xdg_wm_base->resource) {
-        free(xdg_wm_base);
         wl_client_post_no_memory(client);
+        free(xdg_wm_base);
         return;
     }
     wl_resource_set_implementation(xdg_wm_base->resource, &xdg_wm_base_impl, xdg_wm_base,

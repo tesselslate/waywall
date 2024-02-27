@@ -87,8 +87,8 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
     toplevel_decoration->resource = wl_resource_create(
         client, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(resource), id);
     if (!toplevel_decoration->resource) {
-        free(toplevel_decoration);
         wl_resource_post_no_memory(resource);
+        free(toplevel_decoration);
         return;
     }
     wl_resource_set_implementation(toplevel_decoration->resource, &xdg_toplevel_decoration_impl,
