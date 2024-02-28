@@ -28,9 +28,6 @@ struct server_xdg_surface {
     struct serial_ring serials;
     bool initial_commit;
     bool initial_ack;
-
-    struct wl_listener on_commit;
-    struct wl_listener on_destroy;
 };
 
 struct server_xdg_toplevel {

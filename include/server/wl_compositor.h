@@ -52,21 +52,21 @@ struct server_surface {
         } apply;
     } pending;
 
-    enum server_surface_role {
-        SURFACE_ROLE_NONE,
-        SURFACE_ROLE_CURSOR,
-        SURFACE_ROLE_XDG,
-    } role;
-    void *role_object;
+    const struct server_surface_role *role;
+    struct wl_resource *role_resource;
+};
 
-    struct {
-        struct wl_signal commit;  // data: struct server_surface_state *
-        struct wl_signal destroy; // data: NULL
-    } events;
+struct server_surface_role {
+    const char *name;
+
+    void (*commit)(struct wl_resource *role_resource);
+    void (*destroy)(struct wl_resource *role_resource);
 };
 
 struct server_compositor_g *server_compositor_g_create(struct server *server);
 struct server_region *server_region_from_resource(struct wl_resource *resource);
 struct server_surface *server_surface_from_resource(struct wl_resource *resource);
+int server_surface_set_role(struct server_surface *surface, const struct server_surface_role *role,
+                            struct wl_resource *role_resource);
 
 #endif

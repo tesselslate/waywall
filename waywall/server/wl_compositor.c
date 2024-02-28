@@ -106,7 +106,9 @@ static void
 surface_resource_destroy(struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
-    wl_signal_emit_mutable(&surface->events.destroy, NULL);
+    if (surface->role) {
+        surface->role->destroy(surface->role_resource);
+    }
 
     wl_surface_destroy(surface->remote);
     free(surface);
@@ -143,7 +145,9 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
     struct server_surface_state *state = &surface->pending;
-    wl_signal_emit_mutable(&surface->events.commit, state);
+    if (surface->role) {
+        surface->role->commit(surface->role_resource);
+    }
 
     if (state->apply & SURFACE_STATE_ATTACH) {
         // TODO: If the provided buffer's size is not a multiple of the buffer scale, the host
@@ -396,9 +400,6 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     surface->parent = compositor;
     surface->current.buffer_scale = 1;
-
-    wl_signal_init(&surface->events.commit);
-    wl_signal_init(&surface->events.destroy);
 }
 
 static const struct wl_compositor_interface compositor_impl = {
@@ -477,4 +478,19 @@ struct server_surface *
 server_surface_from_resource(struct wl_resource *resource) {
     ww_assert(wl_resource_instance_of(resource, &wl_surface_interface, &surface_impl));
     return wl_resource_get_user_data(resource);
+}
+
+int
+server_surface_set_role(struct server_surface *surface, const struct server_surface_role *role,
+                        struct wl_resource *role_resource) {
+    if (surface->role && surface->role != role) {
+        return 1;
+    }
+    if (surface->role_resource && role_resource) {
+        return 1;
+    }
+
+    surface->role = role;
+    surface->role_resource = role_resource;
+    return 0;
 }

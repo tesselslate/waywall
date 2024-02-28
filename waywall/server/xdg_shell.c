@@ -22,8 +22,8 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
 }
 
 static void
-on_surface_commit(struct wl_listener *listener, void *data) {
-    struct server_xdg_surface *xdg_surface = wl_container_of(listener, xdg_surface, on_commit);
+xdg_surface_role_commit(struct wl_resource *role_resource) {
+    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(role_resource);
     struct server_surface *surface = xdg_surface->parent;
 
     if (!xdg_surface->initial_ack) {
@@ -50,12 +50,21 @@ on_surface_commit(struct wl_listener *listener, void *data) {
 }
 
 static void
-on_surface_destroy(struct wl_listener *listener, void *data) {
-    struct server_xdg_surface *xdg_surface = wl_container_of(listener, xdg_surface, on_destroy);
+xdg_surface_role_destroy(struct wl_resource *role_resource) {
+    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(role_resource);
 
     wl_resource_post_error(xdg_surface->resource, XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT,
                            "wl_surface destroyed before associated xdg_surface");
+
+    wl_resource_destroy(xdg_surface->resource);
 }
+
+static const struct server_surface_role xdg_surface_role = {
+    .name = "xdg_surface",
+
+    .commit = xdg_surface_role_commit,
+    .destroy = xdg_surface_role_destroy,
+};
 
 static void
 xdg_toplevel_resource_destroy(struct wl_resource *resource) {
@@ -64,7 +73,6 @@ xdg_toplevel_resource_destroy(struct wl_resource *resource) {
     wl_signal_emit_mutable(&xdg_toplevel->events.destroy, NULL);
 
     xdg_toplevel->parent->child = NULL;
-    xdg_toplevel->parent->parent->role_object = NULL;
 
     if (xdg_toplevel->title) {
         free(xdg_toplevel->title);
@@ -197,11 +205,10 @@ xdg_surface_resource_destroy(struct wl_resource *resource) {
     if (xdg_surface->child) {
         wl_resource_post_error(xdg_surface->resource, XDG_SURFACE_ERROR_DEFUNCT_ROLE_OBJECT,
                                "xdg_surface destroyed before associated xdg_toplevel");
+        wl_resource_destroy(xdg_surface->child->resource);
     }
 
     wl_list_remove(&xdg_surface->link);
-    wl_list_remove(&xdg_surface->on_commit.link);
-    wl_list_remove(&xdg_surface->on_destroy.link);
 
     free(xdg_surface);
 }
@@ -239,20 +246,10 @@ static void
 xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_xdg_surface *xdg_surface = wl_resource_get_user_data(resource);
 
-    switch (xdg_surface->parent->role) {
-    case SURFACE_ROLE_NONE:
-        break;
-    case SURFACE_ROLE_CURSOR:
+    if (xdg_surface->child) {
         wl_resource_post_error(xdg_surface->xdg_wm_base->resource, XDG_WM_BASE_ERROR_ROLE,
-                               "cannot issue xdg_surface.get_toplevel on a surface with a role");
+                               "cannot have more than one xdg_toplevel per xdg_surface");
         return;
-    case SURFACE_ROLE_XDG:
-        if (xdg_surface->child) {
-            wl_resource_post_error(xdg_surface->xdg_wm_base->resource, XDG_WM_BASE_ERROR_ROLE,
-                                   "cannot have more than one xdg_toplevel per xdg_surface");
-            return;
-        }
-        break;
     }
 
     struct server_xdg_toplevel *xdg_toplevel = calloc(1, sizeof(*xdg_toplevel));
@@ -271,8 +268,6 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
     wl_resource_set_implementation(xdg_toplevel->resource, &xdg_toplevel_impl, xdg_toplevel,
                                    xdg_toplevel_resource_destroy);
 
-    xdg_surface->parent->role = SURFACE_ROLE_XDG;
-    xdg_surface->parent->role_object = xdg_toplevel;
     xdg_surface->child = xdg_toplevel;
     xdg_toplevel->parent = xdg_surface;
 
@@ -324,11 +319,6 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     struct server_xdg_wm_base *xdg_wm_base = wl_resource_get_user_data(resource);
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
-    if (surface->role != SURFACE_ROLE_NONE) {
-        wl_resource_post_error(resource, XDG_WM_BASE_ERROR_ROLE,
-                               "cannot create xdg_surface for wl_surface with a role");
-        return;
-    }
     if (surface->current.buffer || surface->pending.buffer) {
         wl_resource_post_error(resource, XDG_WM_BASE_ERROR_INVALID_SURFACE_STATE,
                                "cannot create xdg_surface for wl_surface with a buffer");
@@ -351,15 +341,17 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     wl_resource_set_implementation(xdg_surface->resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_resource_destroy);
 
+    if (!server_surface_set_role(xdg_surface->parent, &xdg_surface_role, xdg_surface->resource)) {
+        wl_resource_post_error(xdg_wm_base->resource, XDG_WM_BASE_ERROR_ROLE,
+                               "cannot create xdg_surface for surface with another role");
+        wl_resource_destroy(xdg_surface->resource);
+        free(xdg_surface);
+        return;
+    }
+
     wl_list_insert(&xdg_wm_base->surfaces, &xdg_surface->link);
     xdg_surface->xdg_wm_base = xdg_wm_base;
     xdg_surface->parent = surface;
-
-    xdg_surface->on_commit.notify = on_surface_commit;
-    wl_signal_add(&surface->events.commit, &xdg_surface->on_commit);
-
-    xdg_surface->on_destroy.notify = on_surface_destroy;
-    wl_signal_add(&surface->events.destroy, &xdg_surface->on_destroy);
 }
 
 static void
