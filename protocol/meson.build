@@ -9,6 +9,7 @@ protocol_sources = []
 
 protocol_xmls = [
   'stable/linux-dmabuf/linux-dmabuf-v1.xml',
+  'stable/viewporter/viewporter.xml',
   'stable/xdg-shell/xdg-shell.xml',
   'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
 ]

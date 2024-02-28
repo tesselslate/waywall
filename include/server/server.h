@@ -14,6 +14,8 @@ struct server_backend {
     struct wl_compositor *compositor;
     struct zwp_linux_dmabuf_v1 *linux_dmabuf;
     struct wl_shm *shm;
+    struct wl_subcompositor *subcompositor;
+    struct wp_viewporter *viewporter;
 
     struct {
         struct wl_signal shm_format; // data: uint32_t *

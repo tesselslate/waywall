@@ -6,6 +6,7 @@
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
 #include "util.h"
+#include "viewporter-client-protocol.h"
 #include <string.h>
 #include <wayland-client.h>
 
@@ -13,6 +14,8 @@
 #define USE_LINUX_DMABUF_VERSION 4
 #define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
+#define USE_SUBCOMPOSITOR_VERSION 1
+#define USE_VIEWPORTER_VERSION 1
 
 struct backend_seat {
     struct wl_list link; // server_backend.seats
@@ -138,6 +141,25 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         ww_assert(backend->shm);
 
         wl_shm_add_listener(backend->shm, &shm_listener, backend);
+    } else if (strcmp(iface, wl_subcompositor_interface.name) == 0) {
+        if (version < USE_SUBCOMPOSITOR_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated wl_subcompositor (%d < %d)",
+                   version, USE_SUBCOMPOSITOR_VERSION);
+            return;
+        }
+
+        backend->subcompositor =
+            wl_registry_bind(wl, name, &wl_subcompositor_interface, USE_SUBCOMPOSITOR_VERSION);
+    } else if (strcmp(iface, wp_viewporter_interface.name) == 0) {
+        if (version < USE_VIEWPORTER_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated wp_viewporter (%d < %d)", version,
+                   USE_VIEWPORTER_VERSION);
+            return;
+        }
+
+        backend->viewporter =
+            wl_registry_bind(wl, name, &wp_viewporter_interface, USE_VIEWPORTER_VERSION);
+        ww_assert(backend->viewporter);
     }
 }
 
@@ -188,6 +210,14 @@ server_backend_create(struct server_backend *backend) {
         ww_log(LOG_ERROR, "host compositor does not provide wl_shm");
         goto fail_registry;
     }
+    if (!backend->subcompositor) {
+        ww_log(LOG_ERROR, "host compositor does not provide wl_subcompositor");
+        goto fail_registry;
+    }
+    if (!backend->viewporter) {
+        ww_log(LOG_ERROR, "host compositor does not provide wp_viewporter");
+        goto fail_registry;
+    }
 
     return 0;
 
@@ -208,6 +238,9 @@ server_backend_destroy(struct server_backend *backend) {
     wl_list_for_each_safe (seat, seat_tmp, &backend->seats, link) {
         seat_destroy(seat);
     }
+
+    wl_subcompositor_destroy(backend->subcompositor);
+    wp_viewporter_destroy(backend->viewporter);
 
     wl_registry_destroy(backend->registry);
     wl_display_disconnect(backend->display);
