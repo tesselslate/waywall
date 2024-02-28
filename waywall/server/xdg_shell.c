@@ -370,6 +370,8 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_XDG_WM_BASE_VERSION);
 
+    struct server_xdg_wm_base_g *xdg_wm_base_g = data;
+
     struct server_xdg_wm_base *xdg_wm_base = calloc(1, sizeof(*xdg_wm_base));
     if (!xdg_wm_base) {
         wl_client_post_no_memory(client);
@@ -384,6 +386,8 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
     wl_resource_set_implementation(xdg_wm_base->resource, &xdg_wm_base_impl, xdg_wm_base,
                                    xdg_wm_base_resource_destroy);
+
+    xdg_wm_base->server = xdg_wm_base_g->server;
 
     wl_list_init(&xdg_wm_base->surfaces);
 }
@@ -416,6 +420,8 @@ server_xdg_wm_base_g_create(struct server *server) {
         free(xdg_wm_base_g);
         return NULL;
     }
+
+    xdg_wm_base_g->server = server;
 
     xdg_wm_base_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &xdg_wm_base_g->on_display_destroy);

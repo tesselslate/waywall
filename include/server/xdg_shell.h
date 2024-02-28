@@ -9,12 +9,15 @@ struct server;
 struct server_xdg_wm_base_g {
     struct wl_global *global;
 
+    struct server *server;
+
     struct wl_listener on_display_destroy;
 };
 
 struct server_xdg_wm_base {
     struct wl_resource *resource;
 
+    struct server *server;
     struct wl_list surfaces; // server_xdg_surface.link
 };
 
