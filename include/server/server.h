@@ -26,6 +26,8 @@ struct server {
     struct wl_display *display;
     struct server_backend backend;
 
+    struct remote_buffer_manager *remote_buf;
+
     struct server_compositor_g *compositor;
     struct server_linux_dmabuf_g *linux_dmabuf;
     struct server_shm_g *shm;

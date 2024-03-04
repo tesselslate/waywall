@@ -1,5 +1,6 @@
 #include "server/server.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "server/remote_buffer.h"
 #include "server/wl_compositor.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
@@ -267,6 +268,11 @@ server_create() {
         goto fail_display;
     }
 
+    server->remote_buf = remote_buffer_manager_create(server);
+    if (!server->remote_buf) {
+        goto fail_remote_buf;
+    }
+
     server->compositor = server_compositor_g_create(server);
     if (!server->compositor) {
         goto fail_globals;
@@ -291,6 +297,7 @@ server_create() {
     return server;
 
 fail_globals:
+fail_remote_buf:
     wl_display_destroy(server->display);
 
 fail_display:

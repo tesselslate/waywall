@@ -1,5 +1,6 @@
 executable('waywall',
   'server/buffer.c',
+  'server/remote_buffer.c',
   'server/server.c',
   'server/wl_compositor.c',
   'server/wl_shm.c',
