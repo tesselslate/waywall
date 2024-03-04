@@ -239,6 +239,7 @@ server_backend_destroy(struct server_backend *backend) {
         seat_destroy(seat);
     }
 
+    wl_shm_destroy(backend->shm);
     wl_subcompositor_destroy(backend->subcompositor);
     wp_viewporter_destroy(backend->viewporter);
 
