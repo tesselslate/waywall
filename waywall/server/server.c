@@ -129,6 +129,8 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         seat->name = name;
 
         wl_seat_add_listener(seat->wl, &seat_listener, seat);
+        wl_display_roundtrip(backend->display);
+
         wl_list_insert(&backend->seats, &seat->link);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
@@ -141,6 +143,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         ww_assert(backend->shm);
 
         wl_shm_add_listener(backend->shm, &shm_listener, backend);
+        wl_display_roundtrip(backend->display);
     } else if (strcmp(iface, wl_subcompositor_interface.name) == 0) {
         if (version < USE_SUBCOMPOSITOR_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_subcompositor (%d < %d)",
