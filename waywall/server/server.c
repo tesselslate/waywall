@@ -8,6 +8,7 @@
 #include "server/xdg_shell.h"
 #include "util.h"
 #include "viewporter-client-protocol.h"
+#include "xdg-shell-client-protocol.h"
 #include <string.h>
 #include <wayland-client.h>
 
@@ -17,6 +18,7 @@
 #define USE_SHM_VERSION 1
 #define USE_SUBCOMPOSITOR_VERSION 1
 #define USE_VIEWPORTER_VERSION 1
+#define USE_XDG_WM_BASE_VERSION 1
 
 struct backend_seat {
     struct wl_list link; // server_backend.seats
@@ -86,6 +88,15 @@ on_shm_format(void *data, struct wl_shm *wl, uint32_t format) {
 
 static const struct wl_shm_listener shm_listener = {
     .format = on_shm_format,
+};
+
+static void
+on_xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg_wm_base, uint32_t serial) {
+    xdg_wm_base_pong(xdg_wm_base, serial);
+}
+
+static const struct xdg_wm_base_listener xdg_wm_base_listener = {
+    .ping = on_xdg_wm_base_ping,
 };
 
 static void
@@ -164,6 +175,18 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->viewporter =
             wl_registry_bind(wl, name, &wp_viewporter_interface, USE_VIEWPORTER_VERSION);
         ww_assert(backend->viewporter);
+    } else if (strcmp(iface, xdg_wm_base_interface.name) == 0) {
+        if (version < USE_XDG_WM_BASE_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated xdg_wm_base (%d < %d)", version,
+                   USE_XDG_WM_BASE_VERSION);
+            return;
+        }
+
+        backend->xdg_wm_base =
+            wl_registry_bind(wl, name, &xdg_wm_base_interface, USE_XDG_WM_BASE_VERSION);
+        ww_assert(backend->xdg_wm_base);
+
+        xdg_wm_base_add_listener(backend->xdg_wm_base, &xdg_wm_base_listener, backend);
     }
 }
 
@@ -185,7 +208,7 @@ static const struct wl_registry_listener registry_listener = {
     .global_remove = on_registry_global_remove,
 };
 
-int
+static int
 server_backend_create(struct server_backend *backend) {
     wl_list_init(&backend->seats);
     wl_array_init(&backend->shm_formats);
@@ -222,6 +245,10 @@ server_backend_create(struct server_backend *backend) {
         ww_log(LOG_ERROR, "host compositor does not provide wp_viewporter");
         goto fail_registry;
     }
+    if (!backend->xdg_wm_base) {
+        ww_log(LOG_ERROR, "host compositor does not provide xdg_wm_base");
+        goto fail_registry;
+    }
 
     return 0;
 
@@ -246,6 +273,7 @@ server_backend_destroy(struct server_backend *backend) {
     wl_shm_destroy(backend->shm);
     wl_subcompositor_destroy(backend->subcompositor);
     wp_viewporter_destroy(backend->viewporter);
+    xdg_wm_base_destroy(backend->xdg_wm_base);
 
     wl_registry_destroy(backend->registry);
     wl_display_disconnect(backend->display);

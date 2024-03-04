@@ -16,6 +16,7 @@ struct server_backend {
     struct wl_shm *shm;
     struct wl_subcompositor *subcompositor;
     struct wp_viewporter *viewporter;
+    struct xdg_wm_base *xdg_wm_base;
 
     struct {
         struct wl_signal shm_format; // data: uint32_t *
