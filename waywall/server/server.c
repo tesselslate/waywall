@@ -222,6 +222,8 @@ static void
 server_backend_destroy(struct server_backend *backend) {
     wl_array_release(&backend->shm_formats);
 
+    wl_compositor_destroy(backend->compositor);
+    zwp_linux_dmabuf_v1_destroy(backend->linux_dmabuf);
     wl_shm_destroy(backend->shm);
     wl_subcompositor_destroy(backend->subcompositor);
     wp_viewporter_destroy(backend->viewporter);

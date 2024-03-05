@@ -260,7 +260,6 @@ server_shm_g_create(struct server *server) {
                                      on_global_bind);
     if (!shm_g->global) {
         ww_log(LOG_ERROR, "failed to allocate wl_shm global");
-        wl_shm_destroy(server->backend.shm);
         free(shm_g);
         return NULL;
     }
