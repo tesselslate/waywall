@@ -40,10 +40,13 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
         if (xdg_surface->child) {
             send_toplevel_configure(xdg_surface->child);
 
-            struct wl_array capabilities;
-            wl_array_init(&capabilities);
-            xdg_toplevel_send_wm_capabilities(xdg_surface->child->resource, &capabilities);
-            wl_array_release(&capabilities);
+            if (wl_resource_get_version(xdg_surface->child->resource) >=
+                XDG_TOPLEVEL_WM_CAPABILITIES_SINCE_VERSION) {
+                struct wl_array capabilities;
+                wl_array_init(&capabilities);
+                xdg_toplevel_send_wm_capabilities(xdg_surface->child->resource, &capabilities);
+                wl_array_release(&capabilities);
+            }
         }
         server_xdg_surface_send_configure(xdg_surface);
     }
@@ -208,6 +211,7 @@ xdg_surface_resource_destroy(struct wl_resource *resource) {
         wl_resource_destroy(xdg_surface->child->resource);
     }
 
+    server_surface_set_role(xdg_surface->parent, &xdg_surface_role, NULL);
     wl_list_remove(&xdg_surface->link);
 
     free(xdg_surface);
@@ -341,17 +345,17 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     wl_resource_set_implementation(xdg_surface->resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_resource_destroy);
 
-    if (!server_surface_set_role(xdg_surface->parent, &xdg_surface_role, xdg_surface->resource)) {
-        wl_resource_post_error(xdg_wm_base->resource, XDG_WM_BASE_ERROR_ROLE,
-                               "cannot create xdg_surface for surface with another role");
-        wl_resource_destroy(xdg_surface->resource);
-        free(xdg_surface);
-        return;
-    }
-
     wl_list_insert(&xdg_wm_base->surfaces, &xdg_surface->link);
     xdg_surface->xdg_wm_base = xdg_wm_base;
     xdg_surface->parent = surface;
+
+    if (server_surface_set_role(xdg_surface->parent, &xdg_surface_role, xdg_surface->resource) !=
+        0) {
+        wl_resource_post_error(xdg_wm_base->resource, XDG_WM_BASE_ERROR_ROLE,
+                               "cannot create xdg_surface for surface with another role");
+        wl_resource_destroy(xdg_surface->resource);
+        return;
+    }
 }
 
 static void
