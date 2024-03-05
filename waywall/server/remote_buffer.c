@@ -62,27 +62,6 @@ fail_truncate:
 }
 
 static void
-on_display_destroy(struct wl_listener *listener, void *data) {
-    struct remote_buffer_manager *manager = wl_container_of(listener, manager, on_display_destroy);
-
-    // All buffers should no longer be in use at this point.
-    for (size_t i = 0; i < STATIC_ARRLEN(manager->colors); i++) {
-        if (manager->colors[i].buf.rc > 0) {
-            ww_panic("remote buffer still in use");
-        }
-
-        if (manager->colors[i].buf.wl) {
-            wl_buffer_destroy(manager->colors[i].buf.wl);
-        }
-    }
-
-    wl_shm_pool_destroy(manager->pool);
-    munmap(manager->data, manager->size);
-    close(manager->fd);
-    free(manager);
-}
-
-static void
 make_color(struct remote_buffer_manager *manager, struct remote_buffer *buf,
            uint8_t rgba[static 4]) {
     static_assert(sizeof(uint32_t) == 4);
@@ -156,9 +135,6 @@ remote_buffer_manager_create(struct server *server) {
         goto fail_shm_pool;
     }
 
-    manager->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &manager->on_display_destroy);
-
     return manager;
 
 fail_mmap:
@@ -220,6 +196,25 @@ remote_buffer_manager_color(struct remote_buffer_manager *manager, uint8_t rgba[
     }
 
     return NULL;
+}
+
+void
+remote_buffer_manager_destroy(struct remote_buffer_manager *manager) {
+    // All buffers should no longer be in use at this point.
+    for (size_t i = 0; i < STATIC_ARRLEN(manager->colors); i++) {
+        if (manager->colors[i].buf.rc > 0) {
+            ww_panic("remote buffer still in use");
+        }
+
+        if (manager->colors[i].buf.wl) {
+            wl_buffer_destroy(manager->colors[i].buf.wl);
+        }
+    }
+
+    wl_shm_pool_destroy(manager->pool);
+    munmap(manager->data, manager->size);
+    close(manager->fd);
+    free(manager);
 }
 
 void

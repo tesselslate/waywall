@@ -388,6 +388,8 @@ server_destroy(struct server *server) {
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
 
+    remote_buffer_manager_destroy(server->remote_buf);
+
     wl_event_source_remove(server->backend_source);
     server_backend_destroy(&server->backend);
     free(server);
