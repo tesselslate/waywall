@@ -3,6 +3,7 @@
 #include "server/remote_buffer.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
+#include "server/wl_seat.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
 #include "server/xdg_decoration.h"
@@ -21,47 +22,12 @@
 #define USE_VIEWPORTER_VERSION 1
 #define USE_XDG_WM_BASE_VERSION 1
 
-struct backend_seat {
-    struct wl_list link; // server_backend.seats
-
-    struct wl_seat *wl;
-    uint32_t name;
-
-    struct wl_pointer *pointer;
-    struct wl_keyboard *keyboard;
-};
-
 static void
-seat_destroy(struct backend_seat *seat) {
-    wl_seat_release(seat->wl);
+on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
+    struct server_backend *backend = data;
 
-    wl_list_remove(&seat->link);
-    free(seat);
-}
-
-static void
-on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t capabilities) {
-    struct backend_seat *seat = data;
-
-    bool has_ptr = !!seat->pointer;
-    bool cap_ptr = capabilities & WL_SEAT_CAPABILITY_POINTER;
-    if (!has_ptr && cap_ptr) {
-        seat->pointer = wl_seat_get_pointer(seat->wl);
-        ww_assert(seat->pointer);
-    } else if (has_ptr && !cap_ptr) {
-        wl_pointer_release(seat->pointer);
-        seat->pointer = NULL;
-    }
-
-    bool has_kb = !!seat->keyboard;
-    bool cap_kb = capabilities & WL_SEAT_CAPABILITY_KEYBOARD;
-    if (!has_kb && cap_kb) {
-        seat->keyboard = wl_seat_get_keyboard(seat->wl);
-        ww_assert(seat->keyboard);
-    } else if (has_kb && !cap_kb) {
-        wl_keyboard_release(seat->keyboard);
-        seat->keyboard = NULL;
-    }
+    backend->seat_caps = caps;
+    wl_signal_emit_mutable(&backend->events.seat_caps, &caps);
 }
 
 static void
@@ -132,19 +98,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
             return;
         }
 
-        struct backend_seat *seat = calloc(1, sizeof(*seat));
-        if (!seat) {
-            ww_log(LOG_ERROR, "failed to allocate backend_seat");
+        if (backend->seat) {
+            ww_log(LOG_INFO, "received duplicate seat global");
             return;
         }
-        seat->wl = wl_registry_bind(wl, name, &wl_seat_interface, USE_SEAT_VERSION);
-        ww_assert(seat->wl);
-        seat->name = name;
 
-        wl_seat_add_listener(seat->wl, &seat_listener, seat);
+        backend->seat = wl_registry_bind(wl, name, &wl_seat_interface, USE_SEAT_VERSION);
+        ww_assert(backend->seat);
+
+        wl_seat_add_listener(backend->seat, &seat_listener, backend);
         wl_display_roundtrip(backend->display);
-
-        wl_list_insert(&backend->seats, &seat->link);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
@@ -193,15 +156,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
 static void
 on_registry_global_remove(void *data, struct wl_registry *wl, uint32_t name) {
-    struct server_backend *backend = data;
-
-    struct backend_seat *seat, *tmp_seat;
-    wl_list_for_each_safe (seat, tmp_seat, &backend->seats, link) {
-        if (seat->name == name) {
-            seat_destroy(seat);
-            return;
-        }
-    }
+    // TODO: ???
 }
 
 static const struct wl_registry_listener registry_listener = {
@@ -211,9 +166,9 @@ static const struct wl_registry_listener registry_listener = {
 
 static int
 server_backend_create(struct server_backend *backend) {
-    wl_list_init(&backend->seats);
     wl_array_init(&backend->shm_formats);
 
+    wl_signal_init(&backend->events.seat_caps);
     wl_signal_init(&backend->events.shm_format);
 
     backend->display = wl_display_connect(NULL);
@@ -266,11 +221,6 @@ fail_display:
 static void
 server_backend_destroy(struct server_backend *backend) {
     wl_array_release(&backend->shm_formats);
-
-    struct backend_seat *seat, *seat_tmp;
-    wl_list_for_each_safe (seat, seat_tmp, &backend->seats, link) {
-        seat_destroy(seat);
-    }
 
     wl_shm_destroy(backend->shm);
     wl_subcompositor_destroy(backend->subcompositor);
@@ -355,6 +305,10 @@ server_create() {
     }
     server->linux_dmabuf = server_linux_dmabuf_g_create(server);
     if (!server->linux_dmabuf) {
+        goto fail_globals;
+    }
+    server->seat = server_seat_g_create(server);
+    if (!server->seat) {
         goto fail_globals;
     }
     server->shm = server_shm_g_create(server);

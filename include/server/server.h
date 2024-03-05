@@ -9,7 +9,8 @@ struct server_backend {
     struct wl_display *display;
     struct wl_registry *registry;
 
-    struct wl_list seats;        // backend_seat.link
+    struct wl_seat *seat;
+    uint32_t seat_caps;
     struct wl_array shm_formats; // data: uint32_t
 
     struct wl_compositor *compositor;
@@ -20,6 +21,7 @@ struct server_backend {
     struct xdg_wm_base *xdg_wm_base;
 
     struct {
+        struct wl_signal seat_caps;  // data: uint32_t *
         struct wl_signal shm_format; // data: uint32_t *
     } events;
 };
@@ -35,6 +37,7 @@ struct server {
 
     struct server_compositor_g *compositor;
     struct server_linux_dmabuf_g *linux_dmabuf;
+    struct server_seat_g *seat;
     struct server_shm_g *shm;
     struct server_xdg_decoration_manager_g *xdg_decoration;
     struct server_xdg_wm_base_g *xdg_shell;
