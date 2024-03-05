@@ -373,6 +373,7 @@ server_create() {
 
 fail_globals:
 fail_remote_buf:
+    wl_event_source_remove(server->backend_source);
     wl_display_destroy(server->display);
 
 fail_display:
@@ -385,12 +386,13 @@ fail_backend:
 
 void
 server_destroy(struct server *server) {
+    wl_event_source_remove(server->backend_source);
+
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
 
     remote_buffer_manager_destroy(server->remote_buf);
 
-    wl_event_source_remove(server->backend_source);
     server_backend_destroy(&server->backend);
     free(server);
 }
