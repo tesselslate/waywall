@@ -21,6 +21,11 @@ main() {
     struct wl_event_source *src_sigint =
         wl_event_loop_add_signal(loop, SIGINT, handle_signal, server);
 
+    const char *socket_name = wl_display_add_socket_auto(server->display);
+    if (!socket_name) {
+        ww_log(LOG_ERROR, "failed to create wayland display socket");
+        goto fail_socket;
+    }
     wl_display_run(server->display);
 
     wl_event_source_remove(src_sigint);
@@ -28,4 +33,9 @@ main() {
 
     ww_log(LOG_INFO, "Done");
     return 0;
+
+fail_socket:
+    wl_event_source_remove(src_sigint);
+    server_destroy(server);
+    return 1;
 }
