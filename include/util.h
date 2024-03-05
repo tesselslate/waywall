@@ -15,6 +15,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdnoreturn.h>
 #include <string.h>
 #include <sys/types.h>
 
@@ -46,6 +47,6 @@ enum ww_log_level {
 };
 
 void _ww_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
-void _ww_panic(const char *file, int line, const char *msg);
+noreturn void _ww_panic(const char *file, int line, const char *msg);
 
 #endif

@@ -1,6 +1,7 @@
 #include "util.h"
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdnoreturn.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -48,7 +49,7 @@ _ww_log(enum ww_log_level level, const char *fmt, ...) {
     fprintf(stderr, "%s\n", color_reset);
 }
 
-void
+noreturn void
 _ww_panic(const char *file, int line, const char *msg) {
     fprintf(stderr, "[%s:%d] %s\n", file, line, msg);
     exit(1);
