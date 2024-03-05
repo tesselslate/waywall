@@ -1,6 +1,7 @@
 #include "server/ui.h"
 #include "server/remote_buffer.h"
 #include "server/server.h"
+#include "server/wl_compositor.h"
 #include "util.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
@@ -120,6 +121,8 @@ server_ui_init(struct server *server, struct server_ui *ui) {
     }
     xdg_toplevel_add_listener(ui->xdg_toplevel, &xdg_toplevel_listener, ui);
 
+    wl_list_init(&ui->views);
+
     return 0;
 
 fail_xdg_toplevel:
@@ -164,4 +167,81 @@ server_ui_show(struct server_ui *ui) {
     xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
 
     ui->mapped = true;
+}
+
+void
+server_view_set_crop(struct server_view *view, double x, double y, double width, double height) {
+    wp_viewport_set_source(view->viewport, wl_fixed_from_double(x), wl_fixed_from_double(y),
+                           wl_fixed_from_double(width), wl_fixed_from_double(height));
+    wl_surface_commit(view->surface->remote);
+}
+
+void
+server_view_set_dest_size(struct server_view *view, uint32_t width, uint32_t height) {
+    wp_viewport_set_destination(view->viewport, width, height);
+}
+
+void
+server_view_set_position(struct server_view *view, int32_t x, int32_t y) {
+    wl_subsurface_set_position(view->subsurface, x, y);
+    wl_surface_commit(view->surface->remote);
+
+    view->x = x;
+    view->y = y;
+}
+
+void
+server_view_set_size(struct server_view *view, uint32_t width, uint32_t height) {
+    view->impl->set_size(view->impl_resource, width, height);
+}
+
+void
+server_view_unset_crop(struct server_view *view) {
+    const wl_fixed_t minusone = wl_fixed_from_int(-1);
+    wp_viewport_set_source(view->viewport, minusone, minusone, minusone, minusone);
+    wl_surface_commit(view->surface->remote);
+}
+
+struct server_view *
+server_view_create(struct server_ui *ui, struct server_surface *surface,
+                   const struct server_view_impl *impl, struct wl_resource *impl_resource) {
+    struct server_view *view = calloc(1, sizeof(*view));
+    if (!view) {
+        return NULL;
+    }
+
+    view->surface = surface;
+    view->subsurface = wl_subcompositor_get_subsurface(ui->server->backend.subcompositor,
+                                                       surface->remote, ui->surface);
+    if (!view->subsurface) {
+        free(view);
+        return NULL;
+    }
+
+    view->viewport = wp_viewporter_get_viewport(ui->server->backend.viewporter, surface->remote);
+    if (!view->viewport) {
+        wl_subsurface_destroy(view->subsurface);
+        free(view);
+        return NULL;
+    }
+
+    view->impl = impl;
+    view->impl_resource = impl_resource;
+
+    wl_list_insert(&ui->views, &view->link);
+
+    return view;
+}
+
+void
+server_view_destroy(struct server_view *view) {
+    wl_subsurface_destroy(view->subsurface);
+    wp_viewport_destroy(view->viewport);
+    wl_list_remove(&view->link);
+    free(view);
+}
+
+struct server_view *
+server_view_from_surface(struct server_surface *surface) {
+    return surface->role->get_view(surface->role_resource);
 }
