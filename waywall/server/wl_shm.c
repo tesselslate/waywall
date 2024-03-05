@@ -53,7 +53,7 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
                        uint32_t format) {
     struct server_shm_pool *shm_pool = wl_resource_get_user_data(resource);
 
-    if (offset + (width * stride) >= shm_pool->sz) {
+    if (offset + (width * stride) > shm_pool->sz) {
         wl_resource_post_error(
             resource, WL_SHM_ERROR_INVALID_STRIDE,
             "create_buffer: invalid size: (%d + %dx%d, stride: %d) exceeds pool size (%d)",
