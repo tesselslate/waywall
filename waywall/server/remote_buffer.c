@@ -16,6 +16,14 @@
 
 #define POOL_INITIAL_SIZE 16384
 
+static inline void
+assign_rgba(char *dst, uint8_t src[static 4]) {
+    dst[0] = src[2];
+    dst[1] = src[1];
+    dst[2] = src[0];
+    dst[3] = src[3];
+}
+
 static int
 expand(struct remote_buffer_manager *manager, size_t min) {
     ww_assert(min < SIZE_MAX / 2);
@@ -75,7 +83,8 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 static void
-make_color(struct remote_buffer_manager *manager, struct remote_buffer *buf, uint32_t argb) {
+make_color(struct remote_buffer_manager *manager, struct remote_buffer *buf,
+           uint8_t rgba[static 4]) {
     static_assert(sizeof(uint32_t) == 4);
 
     // Ensure there is space to create a fresh buffer.
@@ -91,6 +100,8 @@ make_color(struct remote_buffer_manager *manager, struct remote_buffer *buf, uin
     buf->stride = 4;
     buf->offset = manager->ptr;
     manager->ptr += 4;
+
+    assign_rgba(manager->data + buf->offset, rgba);
 
     buf->wl =
         wl_shm_pool_create_buffer(manager->pool, buf->offset, 1, 1, 4, WL_SHM_FORMAT_ARGB8888);
@@ -174,7 +185,7 @@ remote_buffer_manager_color(struct remote_buffer_manager *manager, uint8_t rgba[
         // In the case that the provided RGBA value is #00000000, the buffer may not be prepared
         // yet.
         if (!manager->colors[i].buf.wl) {
-            make_color(manager, &manager->colors[i].buf, argb);
+            make_color(manager, &manager->colors[i].buf, rgba);
         }
         struct wl_buffer *buffer = manager->colors[i].buf.wl;
         if (buffer) {
@@ -193,17 +204,14 @@ remote_buffer_manager_color(struct remote_buffer_manager *manager, uint8_t rgba[
         // If there is existing backing storage, rewrite it.
         struct remote_buffer *buf = &manager->colors[i].buf;
         if (buf->wl) {
-            manager->data[buf->offset] = rgba[3];
-            manager->data[buf->offset + 1] = rgba[2];
-            manager->data[buf->offset + 2] = rgba[1];
-            manager->data[buf->offset + 3] = rgba[0];
+            assign_rgba(manager->data + buf->offset, rgba);
 
             manager->colors[i].buf.rc++;
             return buf->wl;
         }
 
         // Otherwise, create a new buffer.
-        make_color(manager, &manager->colors[i].buf, argb);
+        make_color(manager, &manager->colors[i].buf, rgba);
         struct wl_buffer *buffer = manager->colors[i].buf.wl;
         if (buffer) {
             manager->colors[i].buf.rc++;
