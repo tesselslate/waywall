@@ -1,5 +1,6 @@
 #include "server/xdg_shell.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "util.h"
 #include "xdg-shell-server-protocol.h"
@@ -20,6 +21,21 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
                                 &states);
     wl_array_release(&states);
 }
+
+static void
+xdg_toplevel_view_set_size(struct wl_resource *role_resource, uint32_t width, uint32_t height) {
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(role_resource);
+
+    xdg_toplevel->width = width;
+    xdg_toplevel->height = height;
+    send_toplevel_configure(xdg_toplevel);
+    server_xdg_surface_send_configure(xdg_toplevel->parent);
+}
+
+static const struct server_view_impl xdg_toplevel_view_impl = {
+    .name = "xdg_toplevel",
+    .set_size = xdg_toplevel_view_set_size,
+};
 
 static void
 xdg_surface_role_commit(struct wl_resource *role_resource) {
@@ -50,6 +66,35 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
         }
         server_xdg_surface_send_configure(xdg_surface);
     }
+
+    struct server_xdg_toplevel *xdg_toplevel = xdg_surface->child;
+    if (!xdg_toplevel) {
+        return;
+    }
+
+    bool had_buffer = surface->current.buffer;
+    bool has_buffer = had_buffer || surface->pending.buffer;
+    if (!surface->pending.buffer && (surface->pending.apply & SURFACE_STATE_ATTACH)) {
+        has_buffer = false;
+    }
+
+    if (had_buffer && !has_buffer) {
+        // Unmap the toplevel.
+        ww_assert(xdg_toplevel->view);
+
+        server_view_destroy(xdg_toplevel->view);
+        xdg_toplevel->view = NULL;
+    } else if (!had_buffer && has_buffer) {
+        // Map the toplevel.
+        ww_assert(!xdg_toplevel->view);
+
+        xdg_toplevel->view =
+            server_view_create(&xdg_surface->xdg_wm_base->server->ui, xdg_surface->parent,
+                               &xdg_toplevel_view_impl, xdg_toplevel->resource);
+        if (!xdg_toplevel->view) {
+            wl_resource_post_no_memory(role_resource);
+        }
+    }
 }
 
 static void
@@ -62,11 +107,22 @@ xdg_surface_role_destroy(struct wl_resource *role_resource) {
     wl_resource_destroy(xdg_surface->resource);
 }
 
+static struct server_view *
+xdg_surface_role_get_view(struct wl_resource *role_resource) {
+    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(role_resource);
+
+    if (!xdg_surface->child) {
+        return NULL;
+    }
+    return xdg_surface->child->view;
+}
+
 static const struct server_surface_role xdg_surface_role = {
     .name = "xdg_surface",
 
     .commit = xdg_surface_role_commit,
     .destroy = xdg_surface_role_destroy,
+    .get_view = xdg_surface_role_get_view,
 };
 
 static void
@@ -79,6 +135,9 @@ xdg_toplevel_resource_destroy(struct wl_resource *resource) {
 
     if (xdg_toplevel->title) {
         free(xdg_toplevel->title);
+    }
+    if (xdg_toplevel->view) {
+        server_view_destroy(xdg_toplevel->view);
     }
     free(xdg_toplevel);
 }

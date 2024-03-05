@@ -38,7 +38,9 @@ struct server_xdg_toplevel {
 
     struct server_xdg_surface *parent;
     char *title;
-    int32_t width, height;
+    uint32_t width, height;
+
+    struct server_view *view;
 
     struct {
         struct wl_signal destroy; // data: NULL
