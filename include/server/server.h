@@ -27,6 +27,8 @@ struct server {
     struct wl_display *display;
     struct server_backend backend;
 
+    struct wl_event_source *backend_source;
+
     struct remote_buffer_manager *remote_buf;
 
     struct server_compositor_g *compositor;

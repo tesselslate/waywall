@@ -220,6 +220,7 @@ server_backend_create(struct server_backend *backend) {
         ww_log(LOG_ERROR, "wl_display_connect failed");
         goto fail_display;
     }
+
     backend->registry = wl_display_get_registry(backend->display);
     ww_assert(backend->registry);
     wl_registry_add_listener(backend->registry, &registry_listener, backend);
@@ -279,6 +280,46 @@ server_backend_destroy(struct server_backend *backend) {
     wl_display_disconnect(backend->display);
 }
 
+static int
+server_backend_tick(int fd, uint32_t mask, void *data) {
+    struct server *server = data;
+
+    // Adapted from wlroots @ 31c842e5ece93145604c65be1b14c2f8cee24832
+    // backend/wayland/backend.c:54
+
+    if (mask & WL_EVENT_HANGUP) {
+        ww_log(LOG_ERROR, "remote display hung up");
+        wl_display_terminate(server->display);
+        return 0;
+    }
+
+    if (mask & WL_EVENT_ERROR) {
+        ww_log(LOG_ERROR, "failed to read events from remote display");
+        wl_display_terminate(server->display);
+        return 0;
+    }
+
+    if (mask & WL_EVENT_WRITABLE) {
+        wl_display_flush(server->backend.display);
+    }
+
+    int dispatched = 0;
+    if (mask & WL_EVENT_READABLE) {
+        dispatched = wl_display_dispatch(server->backend.display);
+    } else {
+        dispatched = wl_display_dispatch_pending(server->backend.display);
+        wl_display_flush(server->backend.display);
+    }
+
+    if (dispatched < 0) {
+        ww_log(LOG_ERROR, "failed to dispatch events on remote display");
+        wl_display_terminate(server->display);
+        return 0;
+    }
+
+    return dispatched > 0;
+}
+
 struct server *
 server_create() {
     struct server *server = calloc(1, sizeof(*server));
@@ -295,6 +336,12 @@ server_create() {
     if (!server->display) {
         goto fail_display;
     }
+
+    struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
+    server->backend_source = wl_event_loop_add_fd(loop, wl_display_get_fd(server->backend.display),
+                                                  WL_EVENT_READABLE, server_backend_tick, server);
+    ww_assert(server->backend_source);
+    wl_event_source_check(server->backend_source);
 
     server->remote_buf = remote_buffer_manager_create(server);
     if (!server->remote_buf) {
@@ -341,6 +388,7 @@ server_destroy(struct server *server) {
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
 
+    wl_event_source_remove(server->backend_source);
     server_backend_destroy(&server->backend);
     free(server);
 }
