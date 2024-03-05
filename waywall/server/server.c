@@ -1,6 +1,7 @@
 #include "server/server.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "server/remote_buffer.h"
+#include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
@@ -369,8 +370,15 @@ server_create() {
         goto fail_globals;
     }
 
+    if (server_ui_init(server, &server->ui) != 0) {
+        ww_log(LOG_ERROR, "failed to initialize server_ui");
+        goto fail_ui;
+    }
+    server_ui_show(&server->ui);
+
     return server;
 
+fail_ui:
 fail_globals:
 fail_remote_buf:
     wl_event_source_remove(server->backend_source);
@@ -391,6 +399,7 @@ server_destroy(struct server *server) {
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
 
+    server_ui_destroy(&server->ui);
     remote_buffer_manager_destroy(server->remote_buf);
 
     server_backend_destroy(&server->backend);
