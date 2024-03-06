@@ -475,10 +475,14 @@ process_seat_caps(struct server_seat_g *seat_g, uint32_t caps) {
     if (had_ptr && !has_ptr) {
         wl_pointer_release(seat_g->pointer);
         seat_g->pointer = NULL;
+
+        wl_signal_emit_mutable(&seat_g->events.pointer, NULL);
     } else if (!had_ptr && has_ptr) {
         seat_g->pointer = wl_seat_get_pointer(seat_g->remote);
         ww_assert(seat_g->pointer);
         wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
+
+        wl_signal_emit_mutable(&seat_g->events.pointer, seat_g->pointer);
     }
 }
 
@@ -683,6 +687,8 @@ server_seat_g_create(struct server *server) {
 
     wl_list_init(&seat_g->keyboards);
     wl_list_init(&seat_g->pointers);
+
+    wl_signal_init(&seat_g->events.pointer);
 
     ww_assert(server->backend.seat);
     init_seat(seat_g, server->backend.seat);

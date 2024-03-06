@@ -33,6 +33,10 @@ struct server_seat_g {
     struct wl_listener on_seat_caps;
 
     struct wl_listener on_display_destroy;
+
+    struct {
+        struct wl_signal pointer; // data: struct wl_pointer *
+    } events;
 };
 
 struct server_seat_g *server_seat_g_create(struct server *server);
