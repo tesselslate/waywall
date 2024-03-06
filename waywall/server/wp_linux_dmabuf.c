@@ -326,6 +326,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
         wl_resource_post_no_memory(resource);
         goto fail_params;
     }
+    buffer_params->data = buffer_data;
 
     buffer_params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
                                                  wl_resource_get_version(resource), id);
