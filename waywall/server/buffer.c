@@ -80,7 +80,7 @@ server_buffer_create_invalid(struct wl_resource *resource) {
     buffer->resource = resource;
     buffer->impl = &invalid_buffer_impl;
 
-    wl_resource_set_implementation(resource, &invalid_buffer_impl, buffer, buffer_resource_destroy);
+    wl_resource_set_implementation(resource, &server_buffer_impl, buffer, buffer_resource_destroy);
 
     return buffer;
 }
