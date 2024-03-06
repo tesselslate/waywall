@@ -344,6 +344,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 
     zwp_linux_buffer_params_v1_add_listener(buffer_params->remote, &linux_buffer_params_listener,
                                             buffer_params);
+    wl_display_roundtrip(linux_dmabuf->remote_display);
 
     buffer_params->remote_display = linux_dmabuf->remote_display;
 
@@ -392,6 +393,7 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
+    wl_display_roundtrip(linux_dmabuf->remote_display);
 }
 
 static void
@@ -426,6 +428,7 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
+    wl_display_roundtrip(linux_dmabuf->remote_display);
 }
 
 static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_impl = {
