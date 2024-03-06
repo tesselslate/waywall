@@ -106,7 +106,7 @@ static void
 surface_resource_destroy(struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
-    if (surface->role) {
+    if (surface->role && surface->role_resource) {
         surface->role->destroy(surface->role_resource);
     }
 
@@ -145,7 +145,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
     struct server_surface_state *state = &surface->pending;
-    if (surface->role) {
+    if (surface->role && surface->role_resource) {
         surface->role->commit(surface->role_resource);
     }
 
