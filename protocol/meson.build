@@ -11,6 +11,7 @@ protocol_xmls = [
   'stable/linux-dmabuf/linux-dmabuf-v1.xml',
   'stable/viewporter/viewporter.xml',
   'stable/xdg-shell/xdg-shell.xml',
+  'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
   'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
 ]
 

@@ -15,6 +15,7 @@ struct server_backend {
 
     struct wl_compositor *compositor;
     struct zwp_linux_dmabuf_v1 *linux_dmabuf;
+    struct zwp_relative_pointer_manager_v1 *relative_pointer_manager;
     struct wl_shm *shm;
     struct wl_subcompositor *subcompositor;
     struct wp_viewporter *viewporter;
@@ -37,6 +38,7 @@ struct server {
 
     struct server_compositor_g *compositor;
     struct server_linux_dmabuf_g *linux_dmabuf;
+    struct server_relative_pointer_g *relative_pointer;
     struct server_seat_g *seat;
     struct server_shm_g *shm;
     struct server_xdg_decoration_manager_g *xdg_decoration;

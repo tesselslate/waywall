@@ -1,11 +1,13 @@
 #include "server/server.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "relative-pointer-unstable-v1-client-protocol.h"
 #include "server/remote_buffer.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
+#include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
 #include "util.h"
@@ -16,6 +18,7 @@
 
 #define USE_COMPOSITOR_VERSION 5
 #define USE_LINUX_DMABUF_VERSION 4
+#define USE_RELATIVE_POINTER_MANAGER_VERSION 1
 #define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
 #define USE_SUBCOMPOSITOR_VERSION 1
@@ -91,6 +94,18 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->linux_dmabuf =
             wl_registry_bind(wl, name, &zwp_linux_dmabuf_v1_interface, USE_LINUX_DMABUF_VERSION);
         ww_assert(backend->linux_dmabuf);
+    } else if (strcmp(iface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
+        if (version < USE_RELATIVE_POINTER_MANAGER_VERSION) {
+            ww_log(LOG_ERROR,
+                   "host compositor provides outdated zwp_relative_pointer_manager (%d < %d)",
+                   version, USE_RELATIVE_POINTER_MANAGER_VERSION);
+            return;
+        }
+
+        backend->relative_pointer_manager =
+            wl_registry_bind(wl, name, &zwp_relative_pointer_manager_v1_interface,
+                             USE_RELATIVE_POINTER_MANAGER_VERSION);
+        ww_assert(backend->relative_pointer_manager);
     } else if (strcmp(iface, wl_seat_interface.name) == 0) {
         if (version < USE_SEAT_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_seat (%d < %d)", version,
@@ -224,6 +239,7 @@ server_backend_destroy(struct server_backend *backend) {
 
     wl_compositor_destroy(backend->compositor);
     zwp_linux_dmabuf_v1_destroy(backend->linux_dmabuf);
+    zwp_relative_pointer_manager_v1_destroy(backend->relative_pointer_manager);
     wl_shm_destroy(backend->shm);
     wl_subcompositor_destroy(backend->subcompositor);
     wp_viewporter_destroy(backend->viewporter);
@@ -311,6 +327,10 @@ server_create() {
     }
     server->seat = server_seat_g_create(server);
     if (!server->seat) {
+        goto fail_globals;
+    }
+    server->relative_pointer = server_relative_pointer_g_create(server);
+    if (!server->relative_pointer) {
         goto fail_globals;
     }
     server->shm = server_shm_g_create(server);
