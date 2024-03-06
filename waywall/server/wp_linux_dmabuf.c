@@ -439,7 +439,7 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_LINUX_DMABUF_VERSION);
 
-    if (version <= ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
+    if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
         // Supporting versions older than v4 would require us to send the `format` and `modifier`
         // events which would become a bit of a hassle.
         wl_client_post_implementation_error(client,
