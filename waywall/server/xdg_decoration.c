@@ -84,6 +84,8 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
         return;
     }
 
+    toplevel_decoration->xdg_toplevel = xdg_toplevel;
+
     toplevel_decoration->resource = wl_resource_create(
         client, &zxdg_toplevel_decoration_v1_interface, wl_resource_get_version(resource), id);
     if (!toplevel_decoration->resource) {
@@ -118,6 +120,10 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
     toplevel_decoration->on_toplevel_destroy.notify = on_toplevel_destroy;
     wl_list_insert(&xdg_decoration_manager_g->decorations, &toplevel_decoration->link);
     wl_signal_add(&xdg_toplevel->events.destroy, &toplevel_decoration->on_toplevel_destroy);
+
+    zxdg_toplevel_decoration_v1_send_configure(toplevel_decoration->resource,
+                                               ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+    server_xdg_surface_send_configure(toplevel_decoration->xdg_toplevel->parent);
 }
 
 static const struct zxdg_decoration_manager_v1_interface xdg_decoration_manager_impl = {
@@ -173,6 +179,8 @@ server_xdg_decoration_manager_g_create(struct server *server) {
 
     xdg_decoration_manager_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &xdg_decoration_manager_g->on_display_destroy);
+
+    wl_list_init(&xdg_decoration_manager_g->decorations);
 
     return xdg_decoration_manager_g;
 }

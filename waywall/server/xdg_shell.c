@@ -341,7 +341,6 @@ static void
 xdg_surface_set_window_geometry(struct wl_client *client, struct wl_resource *resource, int32_t x,
                                 int32_t y, int32_t width, int32_t height) {
     // Unused.
-    wl_client_post_implementation_error(client, "xdg_surface.set_window_geometry is not supported");
 }
 
 static const struct xdg_surface_interface xdg_surface_impl = {
