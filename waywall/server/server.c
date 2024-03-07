@@ -389,6 +389,11 @@ server_set_seat_listener(struct server *server, const struct server_seat_listene
 }
 
 void
+server_set_input_focus(struct server *server, struct server_view *view) {
+    server_seat_g_set_input_focus(server->seat, view);
+}
+
+void
 server_shutdown(struct server *server) {
     // TODO: make graceful (request window close, timeout)
     wl_display_terminate(server->display);

@@ -58,6 +58,7 @@ void server_destroy(struct server *server);
 
 void server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
                               void *data);
+void server_set_input_focus(struct server *server, struct server_view *view);
 void server_shutdown(struct server *server);
 
 #endif
