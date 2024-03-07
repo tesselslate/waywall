@@ -473,35 +473,6 @@ static const struct wl_pointer_listener pointer_listener = {
 };
 
 static void
-process_seat_caps(struct server_seat_g *seat_g, uint32_t caps) {
-    bool had_kb = !!seat_g->keyboard;
-    bool has_kb = caps & WL_SEAT_CAPABILITY_KEYBOARD;
-    if (had_kb && !has_kb) {
-        wl_keyboard_release(seat_g->keyboard);
-        seat_g->keyboard = NULL;
-    } else if (!had_kb && has_kb) {
-        seat_g->keyboard = wl_seat_get_keyboard(seat_g->remote);
-        ww_assert(seat_g->keyboard);
-        wl_keyboard_add_listener(seat_g->keyboard, &keyboard_listener, seat_g);
-    }
-
-    bool had_ptr = !!seat_g->pointer;
-    bool has_ptr = caps & WL_SEAT_CAPABILITY_POINTER;
-    if (had_ptr && !has_ptr) {
-        wl_pointer_release(seat_g->pointer);
-        seat_g->pointer = NULL;
-
-        wl_signal_emit_mutable(&seat_g->events.pointer, NULL);
-    } else if (!had_ptr && has_ptr) {
-        seat_g->pointer = wl_seat_get_pointer(seat_g->remote);
-        ww_assert(seat_g->pointer);
-        wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
-
-        wl_signal_emit_mutable(&seat_g->events.pointer, seat_g->pointer);
-    }
-}
-
-static void
 on_view_destroy(struct wl_listener *listener, void *data) {
     struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_view_destroy);
 
@@ -509,29 +480,23 @@ on_view_destroy(struct wl_listener *listener, void *data) {
 }
 
 static void
-on_seat_caps(struct wl_listener *listener, void *data) {
-    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_seat_caps);
-    uint32_t *caps = data;
+on_keyboard(struct wl_listener *listener, void *data) {
+    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_keyboard);
 
-    process_seat_caps(seat_g, *caps);
+    seat_g->keyboard = server_get_wl_keyboard(seat_g->server);
+    if (seat_g->keyboard) {
+        wl_keyboard_add_listener(seat_g->keyboard, &keyboard_listener, seat_g);
+    }
 }
 
 static void
-init_seat(struct server_seat_g *seat_g, struct wl_seat *remote) {
-    if (seat_g->remote) {
-        wl_seat_release(seat_g->remote);
-        if (seat_g->keyboard) {
-            wl_keyboard_release(seat_g->keyboard);
-        }
-        if (seat_g->pointer) {
-            wl_pointer_release(seat_g->pointer);
-        }
+on_pointer(struct wl_listener *listener, void *data) {
+    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_pointer);
 
-        send_keyboard_leave(seat_g);
-        send_pointer_leave(seat_g);
+    seat_g->pointer = server_get_wl_pointer(seat_g->server);
+    if (seat_g->pointer) {
+        wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
     }
-
-    seat_g->remote = remote;
 }
 
 static void
@@ -663,15 +628,6 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_global_destroy(seat_g->global);
 
-    if (seat_g->remote) {
-        if (seat_g->keyboard) {
-            wl_keyboard_release(seat_g->keyboard);
-        }
-        if (seat_g->pointer) {
-            wl_pointer_release(seat_g->pointer);
-        }
-        wl_seat_release(seat_g->remote);
-    }
     if (seat_g->kb_state.keymap_fd >= 0) {
         close(seat_g->kb_state.keymap_fd);
     }
@@ -679,7 +635,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
         free(seat_g->kb_state.pressed.data);
     }
 
-    wl_list_remove(&seat_g->on_seat_caps.link);
+    wl_list_remove(&seat_g->on_keyboard.link);
+    wl_list_remove(&seat_g->on_pointer.link);
+
     wl_list_remove(&seat_g->on_display_destroy.link);
 
     free(seat_g);
@@ -692,6 +650,8 @@ server_seat_g_create(struct server *server) {
         ww_log(LOG_ERROR, "failed to allocate server_seat_g");
         return NULL;
     }
+
+    seat_g->server = server;
 
     seat_g->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat_g,
                                       on_global_bind);
@@ -714,16 +674,21 @@ server_seat_g_create(struct server *server) {
     wl_list_init(&seat_g->keyboards);
     wl_list_init(&seat_g->pointers);
 
-    wl_signal_init(&seat_g->events.pointer);
-
-    ww_assert(server->backend.seat);
-    init_seat(seat_g, server->backend.seat);
-    process_seat_caps(seat_g, server->backend.seat_caps);
-
     seat_g->on_view_destroy.notify = on_view_destroy;
 
-    seat_g->on_seat_caps.notify = on_seat_caps;
-    wl_signal_add(&server->backend.events.seat_caps, &seat_g->on_seat_caps);
+    seat_g->keyboard = server_get_wl_keyboard(server);
+    if (seat_g->keyboard) {
+        wl_keyboard_add_listener(seat_g->keyboard, &keyboard_listener, seat_g);
+    }
+    seat_g->on_keyboard.notify = on_keyboard;
+    wl_signal_add(&server->backend.events.seat_keyboard, &seat_g->on_keyboard);
+
+    seat_g->pointer = server_get_wl_pointer(server);
+    if (seat_g->pointer) {
+        wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
+    }
+    seat_g->on_pointer.notify = on_pointer;
+    wl_signal_add(&server->backend.events.seat_pointer, &seat_g->on_pointer);
 
     seat_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &seat_g->on_display_destroy);

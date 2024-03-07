@@ -28,12 +28,38 @@
 #define USE_VIEWPORTER_VERSION 1
 #define USE_XDG_WM_BASE_VERSION 1
 
+struct seat_name {
+    struct wl_list link; // server_backend.seat.names
+    uint32_t name;
+};
+
 static void
 on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
     struct server_backend *backend = data;
 
-    backend->seat_caps = caps;
-    wl_signal_emit_mutable(&backend->events.seat_caps, &caps);
+    backend->seat.caps = caps;
+
+    bool had_kb = !!backend->seat.keyboard;
+    bool has_kb = caps & WL_SEAT_CAPABILITY_KEYBOARD;
+    if (had_kb != has_kb) {
+        if (backend->seat.keyboard) {
+            wl_keyboard_release(backend->seat.keyboard);
+            backend->seat.keyboard = NULL;
+        }
+
+        wl_signal_emit_mutable(&backend->events.seat_keyboard, NULL);
+    }
+
+    bool had_ptr = !!backend->seat.pointer;
+    bool has_ptr = caps & WL_SEAT_CAPABILITY_POINTER;
+    if (had_ptr != has_ptr) {
+        if (backend->seat.pointer) {
+            wl_pointer_release(backend->seat.pointer);
+            backend->seat.pointer = NULL;
+        }
+
+        wl_signal_emit_mutable(&backend->events.seat_pointer, NULL);
+    }
 }
 
 static void
@@ -126,16 +152,24 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
             return;
         }
 
-        if (backend->seat) {
-            ww_log(LOG_INFO, "received duplicate seat global");
+        struct seat_name *seat_name = calloc(1, sizeof(*seat_name));
+        if (!seat_name) {
+            ww_log(LOG_ERROR, "failed to allocate seat_name");
             return;
         }
+        seat_name->name = name;
 
-        backend->seat = wl_registry_bind(wl, name, &wl_seat_interface, USE_SEAT_VERSION);
-        ww_assert(backend->seat);
+        if (wl_list_empty(&backend->seat.names)) {
+            backend->seat.remote = wl_registry_bind(wl, name, &wl_seat_interface, USE_SEAT_VERSION);
+            ww_assert(backend->seat.remote);
 
-        wl_seat_add_listener(backend->seat, &seat_listener, backend);
-        wl_display_roundtrip(backend->display);
+            wl_seat_add_listener(backend->seat.remote, &seat_listener, backend);
+            wl_display_roundtrip(backend->display);
+        } else {
+            ww_log(LOG_INFO, "received duplicate wl_seat");
+        }
+
+        wl_list_insert(&backend->seat.names, &seat_name->link);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
@@ -194,9 +228,11 @@ static const struct wl_registry_listener registry_listener = {
 
 static int
 server_backend_create(struct server_backend *backend) {
+    wl_list_init(&backend->seat.names);
     wl_array_init(&backend->shm_formats);
 
-    wl_signal_init(&backend->events.seat_caps);
+    wl_signal_init(&backend->events.seat_keyboard);
+    wl_signal_init(&backend->events.seat_pointer);
     wl_signal_init(&backend->events.shm_format);
 
     backend->display = wl_display_connect(NULL);
@@ -248,7 +284,23 @@ fail_display:
 
 static void
 server_backend_destroy(struct server_backend *backend) {
+    struct seat_name *name, *tmp;
+    wl_list_for_each_safe (name, tmp, &backend->seat.names, link) {
+        wl_list_remove(&name->link);
+        free(name);
+    }
+
     wl_array_release(&backend->shm_formats);
+
+    if (backend->seat.remote) {
+        if (backend->seat.keyboard) {
+            wl_keyboard_release(backend->seat.keyboard);
+        }
+        if (backend->seat.pointer) {
+            wl_pointer_release(backend->seat.pointer);
+        }
+        wl_seat_release(backend->seat.remote);
+    }
 
     wl_compositor_destroy(backend->compositor);
     zwp_linux_dmabuf_v1_destroy(backend->linux_dmabuf);
@@ -400,6 +452,44 @@ server_destroy(struct server *server) {
 
     server_backend_destroy(&server->backend);
     free(server);
+}
+
+struct wl_keyboard *
+server_get_wl_keyboard(struct server *server) {
+    if (server->backend.seat.keyboard) {
+        return server->backend.seat.keyboard;
+    }
+
+    if (!server->backend.seat.remote) {
+        return NULL;
+    }
+
+    if (!(server->backend.seat.caps & WL_SEAT_CAPABILITY_KEYBOARD)) {
+        return NULL;
+    }
+
+    server->backend.seat.keyboard = wl_seat_get_keyboard(server->backend.seat.remote);
+    ww_assert(server->backend.seat.keyboard);
+    return server->backend.seat.keyboard;
+}
+
+struct wl_pointer *
+server_get_wl_pointer(struct server *server) {
+    if (server->backend.seat.pointer) {
+        return server->backend.seat.pointer;
+    }
+
+    if (!server->backend.seat.remote) {
+        return NULL;
+    }
+
+    if (!(server->backend.seat.caps & WL_SEAT_CAPABILITY_POINTER)) {
+        return NULL;
+    }
+
+    server->backend.seat.pointer = wl_seat_get_pointer(server->backend.seat.remote);
+    ww_assert(server->backend.seat.pointer);
+    return server->backend.seat.pointer;
 }
 
 void

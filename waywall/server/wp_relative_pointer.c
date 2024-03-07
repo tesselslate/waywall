@@ -122,8 +122,7 @@ on_pointer(struct wl_listener *listener, void *data) {
     struct server_relative_pointer_g *relative_pointer_g =
         wl_container_of(listener, relative_pointer_g, on_pointer);
 
-    struct wl_pointer *pointer = data;
-    process_pointer(relative_pointer_g, pointer);
+    process_pointer(relative_pointer_g, server_get_wl_pointer(relative_pointer_g->server));
 }
 
 static void
@@ -151,6 +150,8 @@ server_relative_pointer_g_create(struct server *server) {
         return NULL;
     }
 
+    relative_pointer_g->server = server;
+
     relative_pointer_g->global =
         wl_global_create(server->display, &zwp_relative_pointer_manager_v1_interface,
                          SRV_RELATIVE_POINTER_VERSION, relative_pointer_g, on_global_bind);
@@ -165,10 +166,10 @@ server_relative_pointer_g_create(struct server *server) {
     relative_pointer_g->seat_g = server->seat;
 
     relative_pointer_g->remote = server->backend.relative_pointer_manager;
-    process_pointer(relative_pointer_g, server->seat->pointer);
+    process_pointer(relative_pointer_g, server_get_wl_pointer(server));
 
     relative_pointer_g->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->seat->events.pointer, &relative_pointer_g->on_pointer);
+    wl_signal_add(&server->backend.events.seat_pointer, &relative_pointer_g->on_pointer);
 
     relative_pointer_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &relative_pointer_g->on_display_destroy);

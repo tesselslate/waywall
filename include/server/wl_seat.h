@@ -9,7 +9,8 @@ struct server_surface;
 struct server_seat_g {
     struct wl_global *global;
 
-    struct wl_seat *remote;
+    struct server *server;
+
     struct wl_keyboard *keyboard;
     struct wl_pointer *pointer;
     struct {
@@ -36,13 +37,10 @@ struct server_seat_g {
     struct wl_list keyboards; // wl_resource link
     struct wl_list pointers;  // wl_resource link
 
-    struct wl_listener on_seat_caps;
+    struct wl_listener on_keyboard;
+    struct wl_listener on_pointer;
 
     struct wl_listener on_display_destroy;
-
-    struct {
-        struct wl_signal pointer; // data: struct wl_pointer *
-    } events;
 };
 
 struct server_seat_g *server_seat_g_create(struct server *server);

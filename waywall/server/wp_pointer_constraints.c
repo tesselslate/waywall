@@ -111,8 +111,7 @@ on_pointer(struct wl_listener *listener, void *data) {
     struct server_pointer_constraints_g *pointer_constraints_g =
         wl_container_of(listener, pointer_constraints_g, on_pointer);
 
-    struct wl_pointer *pointer = data;
-    process_pointer(pointer_constraints_g, pointer);
+#warning TODO
 }
 
 static void
@@ -158,7 +157,7 @@ server_pointer_constraints_g_create(struct server *server) {
     process_pointer(pointer_constraints_g, server->seat->pointer);
 
     pointer_constraints_g->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->seat->events.pointer, &pointer_constraints_g->on_pointer);
+    wl_signal_add(&server->backend.events.seat_pointer, &pointer_constraints_g->on_pointer);
 
     pointer_constraints_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &pointer_constraints_g->on_display_destroy);

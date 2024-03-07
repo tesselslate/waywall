@@ -9,6 +9,7 @@ struct server_relative_pointer_g {
     struct wl_global *global;
     struct wl_list objects; // wl_resource (zwp_relative_pointer_v1) link
 
+    struct server *server;
     struct server_seat_g *seat_g;
 
     struct zwp_relative_pointer_manager_v1 *remote;

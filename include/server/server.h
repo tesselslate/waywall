@@ -9,8 +9,15 @@ struct server_backend {
     struct wl_display *display;
     struct wl_registry *registry;
 
-    struct wl_seat *seat;
-    uint32_t seat_caps;
+    struct {
+        struct wl_list names; // seat_name.link
+
+        struct wl_seat *remote;
+        uint32_t caps;
+
+        struct wl_keyboard *keyboard;
+        struct wl_pointer *pointer;
+    } seat;
     struct wl_array shm_formats; // data: uint32_t
 
     struct wl_compositor *compositor;
@@ -23,8 +30,9 @@ struct server_backend {
     struct xdg_wm_base *xdg_wm_base;
 
     struct {
-        struct wl_signal seat_caps;  // data: uint32_t *
-        struct wl_signal shm_format; // data: uint32_t *
+        struct wl_signal seat_keyboard; // data: NULL
+        struct wl_signal seat_pointer;  // data: NULL
+        struct wl_signal shm_format;    // data: uint32_t *
     } events;
 };
 
@@ -58,6 +66,8 @@ struct server_seat_listener {
 struct server *server_create();
 void server_destroy(struct server *server);
 
+struct wl_keyboard *server_get_wl_keyboard(struct server *server);
+struct wl_pointer *server_get_wl_pointer(struct server *server);
 void server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
                               void *data);
 void server_set_input_focus(struct server *server, struct server_view *view);
