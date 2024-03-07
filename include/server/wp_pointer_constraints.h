@@ -9,11 +9,13 @@ struct server_pointer_constraints_g {
     struct wl_global *global;
     struct wl_list objects; // wl_resource (zwp_locked_pointer_v1 object) link
 
-    struct server_seat_g *seat_g;
+    struct server *server;
+    struct server_view *input_focus;
 
     struct zwp_pointer_constraints_v1 *remote;
     struct zwp_locked_pointer_v1 *remote_pointer;
 
+    struct wl_listener on_input_focus;
     struct wl_listener on_pointer;
 
     struct wl_listener on_display_destroy;
