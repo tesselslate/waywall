@@ -45,9 +45,19 @@ struct server {
     struct server_xdg_wm_base_g *xdg_shell;
 };
 
+struct server_seat_listener {
+    bool (*button)(void *data, uint32_t button, bool state);
+    bool (*key)(void *data, uint32_t key, bool state);
+    void (*motion)(void *data, double x, double y);
+
+    void (*keymap)(void *data, int fd, uint32_t size);
+};
+
 struct server *server_create();
 void server_destroy(struct server *server);
 
+void server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
+                              void *data);
 void server_shutdown(struct server *server);
 
 #endif

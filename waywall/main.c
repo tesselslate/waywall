@@ -22,6 +22,36 @@ on_view_destroy(struct wl_listener *listener, void *data) {
     ww_log(LOG_INFO, "destroy %p", view);
 }
 
+static bool
+on_button(void *data, uint32_t button, bool pressed) {
+    ww_log(LOG_INFO, "button %d\t%d", button, pressed);
+    return false;
+}
+
+static bool
+on_key(void *data, uint32_t key, bool pressed) {
+    ww_log(LOG_INFO, "key %d\t%d", key, pressed);
+    return false;
+}
+
+static void
+on_motion(void *data, double x, double y) {
+    ww_log(LOG_INFO, "motion %lf\t%lf", x, y);
+}
+
+static void
+on_keymap(void *data, int fd, uint32_t size) {
+    ww_log(LOG_INFO, "keymap %d\t%u", fd, size);
+}
+
+static const struct server_seat_listener seat_listener = {
+    .button = on_button,
+    .key = on_key,
+    .motion = on_motion,
+
+    .keymap = on_keymap,
+};
+
 int
 main() {
     struct server *server = server_create();
@@ -35,6 +65,8 @@ main() {
 
     view_destroy.notify = on_view_destroy;
     wl_signal_add(&server->ui.events.view_destroy, &view_destroy);
+
+    server_set_seat_listener(server, &seat_listener, NULL);
 
     struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
     struct wl_event_source *src_sigint =

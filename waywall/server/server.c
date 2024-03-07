@@ -383,6 +383,12 @@ server_destroy(struct server *server) {
 }
 
 void
+server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
+                         void *data) {
+    server_seat_g_set_listener(server->seat, listener, data);
+}
+
+void
 server_shutdown(struct server *server) {
     // TODO: make graceful (request window close, timeout)
     wl_display_terminate(server->display);

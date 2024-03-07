@@ -177,6 +177,7 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
                 uint32_t state) {
     struct server_seat_g *seat_g = data;
 
+    // Update the pressed keys array.
     switch ((enum wl_keyboard_key_state)state) {
     case WL_KEYBOARD_KEY_STATE_PRESSED:
         for (size_t i = 0; i < seat_g->kb_state.pressed.len; i++) {
@@ -199,7 +200,6 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         }
 
         seat_g->kb_state.pressed.data[seat_g->kb_state.pressed.len++] = key;
-        send_keyboard_key(seat_g, key, WL_KEYBOARD_KEY_STATE_PRESSED);
         break;
     case WL_KEYBOARD_KEY_STATE_RELEASED:
         for (size_t i = 0; i < seat_g->kb_state.pressed.len; i++) {
@@ -210,14 +210,19 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
             memmove(seat_g->kb_state.pressed.data + i, seat_g->kb_state.pressed.data + i + 1,
                     sizeof(uint32_t) * (seat_g->kb_state.pressed.len - i - 1));
             seat_g->kb_state.pressed.len--;
-
-            send_keyboard_key(seat_g, key, WL_KEYBOARD_KEY_STATE_RELEASED);
-            return;
+            break;
         }
-
-        ww_log(LOG_WARN, "spurious key release event received");
         break;
     }
+
+    if (seat_g->listener) {
+        bool consumed = seat_g->listener->key(seat_g->listener_data, key,
+                                              state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        if (consumed) {
+            return;
+        }
+    }
+    send_keyboard_key(seat_g, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 }
 
 static void
@@ -234,6 +239,10 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     }
     seat_g->kb_state.keymap_fd = fd;
     seat_g->kb_state.keymap_size = size;
+
+    if (seat_g->listener) {
+        seat_g->listener->keymap(seat_g->listener_data, fd, size);
+    }
 }
 
 static void
@@ -368,6 +377,14 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
                   uint32_t button, uint32_t state) {
     struct server_seat_g *seat_g = data;
 
+    if (seat_g->listener) {
+        bool consumed = seat_g->listener->button(seat_g->listener_data, button,
+                                                 state == WL_POINTER_BUTTON_STATE_PRESSED);
+        if (consumed) {
+            return;
+        }
+    }
+
     if (!seat_g->input_focus) {
         return;
     }
@@ -422,6 +439,10 @@ on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t s
 
     seat_g->ptr_state.x = wl_fixed_to_double(surface_x);
     seat_g->ptr_state.y = wl_fixed_to_double(surface_y);
+
+    if (seat_g->listener) {
+        seat_g->listener->motion(seat_g->listener_data, seat_g->ptr_state.x, seat_g->ptr_state.y);
+    }
 
     if (!seat_g->input_focus) {
         return;
@@ -715,5 +736,18 @@ server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_surfac
     if (seat_g->input_focus) {
         send_keyboard_enter(seat_g);
         send_pointer_enter(seat_g);
+    }
+}
+
+void
+server_seat_g_set_listener(struct server_seat_g *seat_g,
+                           const struct server_seat_listener *listener, void *data) {
+    ww_assert(!seat_g->listener);
+
+    seat_g->listener = listener;
+    seat_g->listener_data = data;
+    if (seat_g->kb_state.keymap_fd >= 0) {
+        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.keymap_fd,
+                                 seat_g->kb_state.keymap_size);
     }
 }
