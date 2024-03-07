@@ -574,7 +574,9 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
 
     wl_list_insert(&seat_g->keyboards, wl_resource_get_link(keyboard_resource));
 
-    // TODO: send keymap, repeat info
+    // TODO: allow customizing keymap and repeat info
+    wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, seat_g->kb_state.keymap_fd, seat_g->kb_state.keymap_size);
+    wl_keyboard_send_repeat_info(keyboard_resource, 40, 300);
 }
 
 static void
