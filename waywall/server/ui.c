@@ -217,6 +217,9 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
         free(view);
         return NULL;
     }
+    wl_subsurface_set_desync(view->subsurface);
+    wl_surface_commit(surface->remote);
+    wl_surface_commit(ui->surface);
 
     view->viewport = wp_viewporter_get_viewport(ui->server->backend.viewporter, surface->remote);
     if (!view->viewport) {
