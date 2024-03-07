@@ -1,5 +1,6 @@
 #include "server/server.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "server/remote_buffer.h"
 #include "server/ui.h"
@@ -7,6 +8,7 @@
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
+#include "server/wp_pointer_constraints.h"
 #include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
@@ -18,6 +20,7 @@
 
 #define USE_COMPOSITOR_VERSION 5
 #define USE_LINUX_DMABUF_VERSION 4
+#define USE_POINTER_CONSTRAINTS_VERSION 1
 #define USE_RELATIVE_POINTER_MANAGER_VERSION 1
 #define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
@@ -94,6 +97,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->linux_dmabuf =
             wl_registry_bind(wl, name, &zwp_linux_dmabuf_v1_interface, USE_LINUX_DMABUF_VERSION);
         ww_assert(backend->linux_dmabuf);
+    } else if (strcmp(iface, zwp_pointer_constraints_v1_interface.name) == 0) {
+        if (version < USE_POINTER_CONSTRAINTS_VERSION) {
+            ww_log(LOG_ERROR, "host compositor provides outdated zwp_pointer_constraints (%d < %d)",
+                   version, USE_POINTER_CONSTRAINTS_VERSION);
+            return;
+        }
+
+        backend->pointer_constraints = wl_registry_bind(
+            wl, name, &zwp_pointer_constraints_v1_interface, USE_POINTER_CONSTRAINTS_VERSION);
+        ww_assert(backend->pointer_constraints);
     } else if (strcmp(iface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
         if (version < USE_RELATIVE_POINTER_MANAGER_VERSION) {
             ww_log(LOG_ERROR,
@@ -239,6 +252,7 @@ server_backend_destroy(struct server_backend *backend) {
 
     wl_compositor_destroy(backend->compositor);
     zwp_linux_dmabuf_v1_destroy(backend->linux_dmabuf);
+    zwp_pointer_constraints_v1_destroy(backend->pointer_constraints);
     zwp_relative_pointer_manager_v1_destroy(backend->relative_pointer_manager);
     wl_shm_destroy(backend->shm);
     wl_subcompositor_destroy(backend->subcompositor);
@@ -317,16 +331,22 @@ server_create() {
         goto fail_remote_buf;
     }
 
+    // These globals are required by others.
     server->compositor = server_compositor_g_create(server);
     if (!server->compositor) {
         goto fail_globals;
     }
+    server->seat = server_seat_g_create(server);
+    if (!server->seat) {
+        goto fail_globals;
+    }
+
     server->linux_dmabuf = server_linux_dmabuf_g_create(server);
     if (!server->linux_dmabuf) {
         goto fail_globals;
     }
-    server->seat = server_seat_g_create(server);
-    if (!server->seat) {
+    server->pointer_constraints = server_pointer_constraints_g_create(server);
+    if (!server->pointer_constraints) {
         goto fail_globals;
     }
     server->relative_pointer = server_relative_pointer_g_create(server);
@@ -337,12 +357,12 @@ server_create() {
     if (!server->shm) {
         goto fail_globals;
     }
-    server->xdg_shell = server_xdg_wm_base_g_create(server);
-    if (!server->xdg_shell) {
-        goto fail_globals;
-    }
     server->xdg_decoration = server_xdg_decoration_manager_g_create(server);
     if (!server->xdg_decoration) {
+        goto fail_globals;
+    }
+    server->xdg_shell = server_xdg_wm_base_g_create(server);
+    if (!server->xdg_shell) {
         goto fail_globals;
     }
 
