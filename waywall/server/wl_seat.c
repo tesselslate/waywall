@@ -561,6 +561,10 @@ pointer_release(struct wl_client *client, struct wl_resource *resource) {
 static void
 pointer_set_cursor(struct wl_client *client, struct wl_resource *resource, uint32_t serial,
                    struct wl_resource *surface_resource, int32_t hotspot_x, int32_t hotspot_y) {
+    if (!surface_resource) {
+        return;
+    }
+
     // We do not care about what clients want to set the cursor to. However, we will mark surfaces
     // with the correct roles anyway.
     struct server_surface *surface = server_surface_from_resource(surface_resource);
