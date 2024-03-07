@@ -238,6 +238,8 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
     wl_list_insert(&ui->views, &view->link);
 
+    wl_signal_init(&view->events.destroy);
+
     wl_signal_emit_mutable(&ui->events.view_create, view);
 
     return view;
@@ -245,6 +247,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
 void
 server_view_destroy(struct server_view *view) {
+    wl_signal_emit_mutable(&view->events.destroy, NULL);
     wl_signal_emit_mutable(&view->ui->events.view_destroy, view);
 
     wl_subsurface_destroy(view->subsurface);

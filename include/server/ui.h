@@ -39,6 +39,10 @@ struct server_view {
 
     const struct server_view_impl *impl;
     struct wl_resource *impl_resource;
+
+    struct {
+        struct wl_signal destroy; // data: NULL
+    } events;
 };
 
 struct server_view_impl {

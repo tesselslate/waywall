@@ -502,6 +502,13 @@ process_seat_caps(struct server_seat_g *seat_g, uint32_t caps) {
 }
 
 static void
+on_view_destroy(struct wl_listener *listener, void *data) {
+    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_view_destroy);
+
+    server_seat_g_set_input_focus(seat_g, NULL);
+}
+
+static void
 on_seat_caps(struct wl_listener *listener, void *data) {
     struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_seat_caps);
     uint32_t *caps = data;
@@ -709,6 +716,8 @@ server_seat_g_create(struct server *server) {
     init_seat(seat_g, server->backend.seat);
     process_seat_caps(seat_g, server->backend.seat_caps);
 
+    seat_g->on_view_destroy.notify = on_view_destroy;
+
     seat_g->on_seat_caps.notify = on_seat_caps;
     wl_signal_add(&server->backend.events.seat_caps, &seat_g->on_seat_caps);
 
@@ -724,12 +733,17 @@ server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_view *
         return;
     }
 
+    if (seat_g->input_focus) {
+        wl_list_remove(&seat_g->on_view_destroy.link);
+    }
+
     send_keyboard_leave(seat_g);
     send_pointer_leave(seat_g);
     seat_g->input_focus = view;
     if (seat_g->input_focus) {
         send_keyboard_enter(seat_g);
         send_pointer_enter(seat_g);
+        wl_signal_add(&view->events.destroy, &seat_g->on_view_destroy);
     }
 }
 

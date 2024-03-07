@@ -26,7 +26,9 @@ struct server_seat_g {
     struct {
         double x, y;
     } ptr_state;
+
     struct server_view *input_focus;
+    struct wl_listener on_view_destroy;
 
     const struct server_seat_listener *listener;
     void *listener_data;
