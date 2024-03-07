@@ -19,9 +19,15 @@ struct server_ui {
     bool mapped;
 
     struct wl_list views;
+
+    struct {
+        struct wl_signal view_create;  // data: struct server_view *
+        struct wl_signal view_destroy; // data: struct server_view *
+    } events;
 };
 
 struct server_view {
+    struct server_ui *ui;
     struct wl_list link; // server_ui.views
 
     struct server_surface *surface;

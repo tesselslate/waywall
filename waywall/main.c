@@ -10,12 +10,31 @@ handle_signal(int signal, void *data) {
     return 0;
 }
 
+static void
+on_view_create(struct wl_listener *listener, void *data) {
+    struct server_view *view = data;
+    ww_log(LOG_INFO, "create %p", view);
+}
+
+static void
+on_view_destroy(struct wl_listener *listener, void *data) {
+    struct server_view *view = data;
+    ww_log(LOG_INFO, "destroy %p", view);
+}
+
 int
 main() {
     struct server *server = server_create();
     if (!server) {
         return 1;
     }
+
+    struct wl_listener view_create, view_destroy;
+    view_create.notify = on_view_create;
+    wl_signal_add(&server->ui.events.view_create, &view_create);
+
+    view_destroy.notify = on_view_destroy;
+    wl_signal_add(&server->ui.events.view_destroy, &view_destroy);
 
     struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
     struct wl_event_source *src_sigint =

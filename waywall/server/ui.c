@@ -123,6 +123,9 @@ server_ui_init(struct server *server, struct server_ui *ui) {
 
     wl_list_init(&ui->views);
 
+    wl_signal_init(&ui->events.view_create);
+    wl_signal_init(&ui->events.view_destroy);
+
     return 0;
 
 fail_xdg_toplevel:
@@ -210,6 +213,8 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
         return NULL;
     }
 
+    view->ui = ui;
+
     view->surface = surface;
     view->subsurface = wl_subcompositor_get_subsurface(ui->server->backend.subcompositor,
                                                        surface->remote, ui->surface);
@@ -233,11 +238,15 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
     wl_list_insert(&ui->views, &view->link);
 
+    wl_signal_emit_mutable(&ui->events.view_create, view);
+
     return view;
 }
 
 void
 server_view_destroy(struct server_view *view) {
+    wl_signal_emit_mutable(&view->ui->events.view_destroy, view);
+
     wl_subsurface_destroy(view->subsurface);
     wp_viewport_destroy(view->viewport);
     wl_list_remove(&view->link);
