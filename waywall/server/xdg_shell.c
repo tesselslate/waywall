@@ -107,22 +107,11 @@ xdg_surface_role_destroy(struct wl_resource *role_resource) {
     wl_resource_destroy(xdg_surface->resource);
 }
 
-static struct server_view *
-xdg_surface_role_get_view(struct wl_resource *role_resource) {
-    struct server_xdg_surface *xdg_surface = server_xdg_surface_from_resource(role_resource);
-
-    if (!xdg_surface->child) {
-        return NULL;
-    }
-    return xdg_surface->child->view;
-}
-
 static const struct server_surface_role xdg_surface_role = {
     .name = "xdg_surface",
 
     .commit = xdg_surface_role_commit,
     .destroy = xdg_surface_role_destroy,
-    .get_view = xdg_surface_role_get_view,
 };
 
 static void

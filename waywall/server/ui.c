@@ -252,8 +252,3 @@ server_view_destroy(struct server_view *view) {
     wl_list_remove(&view->link);
     free(view);
 }
-
-struct server_view *
-server_view_from_surface(struct server_surface *surface) {
-    return surface->role->get_view(surface->role_resource);
-}

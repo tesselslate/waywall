@@ -19,7 +19,7 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
     }
 
     struct wl_client *client =
-        wl_resource_get_client(relative_pointer_g->seat_g->input_focus->resource);
+        wl_resource_get_client(relative_pointer_g->seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &relative_pointer_g->objects) {
         if (wl_resource_get_client(resource) != client) {

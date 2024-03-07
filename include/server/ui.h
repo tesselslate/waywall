@@ -63,6 +63,5 @@ struct server_view *server_view_create(struct server_ui *ui, struct server_surfa
                                        const struct server_view_impl *impl,
                                        struct wl_resource *impl_resource);
 void server_view_destroy(struct server_view *view);
-struct server_view *server_view_from_surface(struct server_surface *surface);
 
 #endif

@@ -20,17 +20,11 @@ cursor_role_destroy(struct wl_resource *resource) {
     // Unused.
 }
 
-static struct server_view *
-cursor_role_get_view(struct wl_resource *resource) {
-    ww_panic("get_view was called on a surface with cursor role");
-}
-
 static const struct server_surface_role cursor_role = {
     .name = "cursor",
 
     .commit = cursor_role_commit,
     .destroy = cursor_role_destroy,
-    .get_view = cursor_role_get_view,
 };
 
 static uint32_t
@@ -44,11 +38,8 @@ static void
 get_pointer_offset(struct server_seat_g *seat_g, double *x, double *y) {
     ww_assert(seat_g->input_focus);
 
-    struct server_view *view = server_view_from_surface(seat_g->input_focus);
-    ww_assert(view);
-
-    *x = seat_g->ptr_state.x - (double)view->x;
-    *y = seat_g->ptr_state.y - (double)view->y;
+    *x = seat_g->ptr_state.x - (double)seat_g->input_focus->x;
+    *y = seat_g->ptr_state.y - (double)seat_g->input_focus->y;
 }
 
 static void
@@ -63,15 +54,15 @@ send_keyboard_enter(struct server_seat_g *seat_g) {
         data[i] = seat_g->kb_state.pressed.data[i];
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
-        wl_keyboard_send_enter(resource, next_serial(resource), seat_g->input_focus->resource,
-                               &keys);
+        wl_keyboard_send_enter(resource, next_serial(resource),
+                               seat_g->input_focus->surface->resource, &keys);
     }
 
     wl_array_release(&keys);
@@ -83,7 +74,7 @@ send_keyboard_key(struct server_seat_g *seat_g, uint32_t key, enum wl_keyboard_k
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->keyboards) {
         if (wl_resource_get_client(resource) != client) {
@@ -100,14 +91,15 @@ send_keyboard_leave(struct server_seat_g *seat_g) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
-        wl_keyboard_send_leave(resource, next_serial(resource), seat_g->input_focus->resource);
+        wl_keyboard_send_leave(resource, next_serial(resource),
+                               seat_g->input_focus->surface->resource);
     }
 }
 
@@ -117,7 +109,7 @@ send_keyboard_modifiers(struct server_seat_g *seat_g) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->keyboards) {
         if (wl_resource_get_client(resource) != client) {
@@ -137,15 +129,16 @@ send_pointer_enter(struct server_seat_g *seat_g) {
     double x, y;
     get_pointer_offset(seat_g, &x, &y);
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
-        wl_pointer_send_enter(resource, next_serial(resource), seat_g->input_focus->resource,
-                              wl_fixed_from_double(x), wl_fixed_from_double(y));
+        wl_pointer_send_enter(resource, next_serial(resource),
+                              seat_g->input_focus->surface->resource, wl_fixed_from_double(x),
+                              wl_fixed_from_double(y));
     }
 }
 
@@ -155,14 +148,15 @@ send_pointer_leave(struct server_seat_g *seat_g) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
-        wl_pointer_send_leave(resource, next_serial(resource), seat_g->input_focus->resource);
+        wl_pointer_send_leave(resource, next_serial(resource),
+                              seat_g->input_focus->surface->resource);
     }
 }
 
@@ -298,7 +292,7 @@ on_pointer_axis(void *data, struct wl_pointer *wl, uint32_t time, uint32_t axis,
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -317,7 +311,7 @@ on_pointer_axis_discrete(void *data, struct wl_pointer *wl, uint32_t axis, int32
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -338,7 +332,7 @@ on_pointer_axis_source(void *data, struct wl_pointer *wl, uint32_t source) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -359,7 +353,7 @@ on_pointer_axis_stop(void *data, struct wl_pointer *wl, uint32_t time, uint32_t 
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -389,7 +383,7 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -414,7 +408,7 @@ on_pointer_frame(void *data, struct wl_pointer *wl) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -451,7 +445,7 @@ on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t s
     double x, y;
     get_pointer_offset(seat_g, &x, &y);
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->resource);
+    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat_g->pointers) {
         if (wl_resource_get_client(resource) != client) {
@@ -725,14 +719,14 @@ server_seat_g_create(struct server *server) {
 }
 
 void
-server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_surface *surface) {
-    if (seat_g->input_focus == surface) {
+server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_view *view) {
+    if (seat_g->input_focus == view) {
         return;
     }
 
     send_keyboard_leave(seat_g);
     send_pointer_leave(seat_g);
-    seat_g->input_focus = surface;
+    seat_g->input_focus = view;
     if (seat_g->input_focus) {
         send_keyboard_enter(seat_g);
         send_pointer_enter(seat_g);

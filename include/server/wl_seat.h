@@ -4,6 +4,7 @@
 #include <wayland-server-core.h>
 
 struct server;
+struct server_surface;
 
 struct server_seat_g {
     struct wl_global *global;
@@ -25,7 +26,7 @@ struct server_seat_g {
     struct {
         double x, y;
     } ptr_state;
-    struct server_surface *input_focus;
+    struct server_view *input_focus;
 
     const struct server_seat_listener *listener;
     void *listener_data;
@@ -43,7 +44,7 @@ struct server_seat_g {
 };
 
 struct server_seat_g *server_seat_g_create(struct server *server);
-void server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_surface *surface);
+void server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_view *view);
 void server_seat_g_set_listener(struct server_seat_g *seat_g,
                                 const struct server_seat_listener *listener, void *data);
 

@@ -61,7 +61,6 @@ struct server_surface_role {
 
     void (*commit)(struct wl_resource *role_resource);
     void (*destroy)(struct wl_resource *role_resource);
-    struct server_view *(*get_view)(struct wl_resource *role_resource);
 };
 
 struct server_compositor_g *server_compositor_g_create(struct server *server);
