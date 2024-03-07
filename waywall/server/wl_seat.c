@@ -473,10 +473,17 @@ static const struct wl_pointer_listener pointer_listener = {
 };
 
 static void
-on_view_destroy(struct wl_listener *listener, void *data) {
-    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_view_destroy);
+on_input_focus(struct wl_listener *listener, void *data) {
+    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_input_focus);
+    struct server_view *view = data;
 
-    server_seat_g_set_input_focus(seat_g, NULL);
+    send_keyboard_leave(seat_g);
+    send_pointer_leave(seat_g);
+    seat_g->input_focus = view;
+    if (seat_g->input_focus) {
+        send_keyboard_enter(seat_g);
+        send_pointer_enter(seat_g);
+    }
 }
 
 static void
@@ -635,6 +642,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
         free(seat_g->kb_state.pressed.data);
     }
 
+    wl_list_remove(&seat_g->on_input_focus.link);
     wl_list_remove(&seat_g->on_keyboard.link);
     wl_list_remove(&seat_g->on_pointer.link);
 
@@ -674,46 +682,29 @@ server_seat_g_create(struct server *server) {
     wl_list_init(&seat_g->keyboards);
     wl_list_init(&seat_g->pointers);
 
-    seat_g->on_view_destroy.notify = on_view_destroy;
+    seat_g->on_input_focus.notify = on_input_focus;
+    wl_signal_add(&server->events.input_focus, &seat_g->on_input_focus);
+
+    seat_g->on_keyboard.notify = on_keyboard;
+    wl_signal_add(&server->backend.events.seat_keyboard, &seat_g->on_keyboard);
+
+    seat_g->on_pointer.notify = on_pointer;
+    wl_signal_add(&server->backend.events.seat_pointer, &seat_g->on_pointer);
 
     seat_g->keyboard = server_get_wl_keyboard(server);
     if (seat_g->keyboard) {
         wl_keyboard_add_listener(seat_g->keyboard, &keyboard_listener, seat_g);
     }
-    seat_g->on_keyboard.notify = on_keyboard;
-    wl_signal_add(&server->backend.events.seat_keyboard, &seat_g->on_keyboard);
 
     seat_g->pointer = server_get_wl_pointer(server);
     if (seat_g->pointer) {
         wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
     }
-    seat_g->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->backend.events.seat_pointer, &seat_g->on_pointer);
 
     seat_g->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &seat_g->on_display_destroy);
 
     return seat_g;
-}
-
-void
-server_seat_g_set_input_focus(struct server_seat_g *seat_g, struct server_view *view) {
-    if (seat_g->input_focus == view) {
-        return;
-    }
-
-    if (seat_g->input_focus) {
-        wl_list_remove(&seat_g->on_view_destroy.link);
-    }
-
-    send_keyboard_leave(seat_g);
-    send_pointer_leave(seat_g);
-    seat_g->input_focus = view;
-    if (seat_g->input_focus) {
-        send_keyboard_enter(seat_g);
-        send_pointer_enter(seat_g);
-        wl_signal_add(&view->events.destroy, &seat_g->on_view_destroy);
-    }
 }
 
 void

@@ -3,7 +3,6 @@
 #include "relative-pointer-unstable-v1-server-protocol.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
-#include "server/wl_seat.h"
 #include "util.h"
 
 #define SRV_RELATIVE_POINTER_VERSION 1
@@ -14,12 +13,12 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
                                     wl_fixed_t dy, wl_fixed_t dx_unaccel, wl_fixed_t dy_unaccel) {
     struct server_relative_pointer_g *relative_pointer_g = data;
 
-    if (!relative_pointer_g->seat_g->input_focus) {
+    if (!relative_pointer_g->input_focus) {
         return;
     }
 
     struct wl_client *client =
-        wl_resource_get_client(relative_pointer_g->seat_g->input_focus->surface->resource);
+        wl_resource_get_client(relative_pointer_g->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &relative_pointer_g->objects) {
         if (wl_resource_get_client(resource) != client) {
@@ -118,6 +117,15 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 }
 
 static void
+on_input_focus(struct wl_listener *listener, void *data) {
+    struct server_relative_pointer_g *relative_pointer_g =
+        wl_container_of(listener, relative_pointer_g, on_input_focus);
+    struct server_view *view = data;
+
+    relative_pointer_g->input_focus = view;
+}
+
+static void
 on_pointer(struct wl_listener *listener, void *data) {
     struct server_relative_pointer_g *relative_pointer_g =
         wl_container_of(listener, relative_pointer_g, on_pointer);
@@ -136,6 +144,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
         zwp_relative_pointer_v1_destroy(relative_pointer_g->remote_pointer);
     }
 
+    wl_list_remove(&relative_pointer_g->on_input_focus.link);
     wl_list_remove(&relative_pointer_g->on_pointer.link);
     wl_list_remove(&relative_pointer_g->on_display_destroy.link);
 
@@ -163,10 +172,11 @@ server_relative_pointer_g_create(struct server *server) {
 
     wl_list_init(&relative_pointer_g->objects);
 
-    relative_pointer_g->seat_g = server->seat;
-
     relative_pointer_g->remote = server->backend.relative_pointer_manager;
     process_pointer(relative_pointer_g, server_get_wl_pointer(server));
+
+    relative_pointer_g->on_input_focus.notify = on_input_focus;
+    wl_signal_add(&server->events.input_focus, &relative_pointer_g->on_input_focus);
 
     relative_pointer_g->on_pointer.notify = on_pointer;
     wl_signal_add(&server->backend.events.seat_pointer, &relative_pointer_g->on_pointer);

@@ -10,11 +10,12 @@ struct server_relative_pointer_g {
     struct wl_list objects; // wl_resource (zwp_relative_pointer_v1) link
 
     struct server *server;
-    struct server_seat_g *seat_g;
+    struct server_view *input_focus;
 
     struct zwp_relative_pointer_manager_v1 *remote;
     struct zwp_relative_pointer_v1 *remote_pointer;
 
+    struct wl_listener on_input_focus;
     struct wl_listener on_pointer;
 
     struct wl_listener on_display_destroy;

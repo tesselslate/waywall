@@ -41,6 +41,9 @@ struct server {
     struct server_backend backend;
     struct server_ui ui;
 
+    struct server_view *input_focus;
+    struct wl_listener on_view_destroy;
+
     struct wl_event_source *backend_source;
 
     struct remote_buffer_manager *remote_buf;
@@ -53,6 +56,10 @@ struct server {
     struct server_shm_g *shm;
     struct server_xdg_decoration_manager_g *xdg_decoration;
     struct server_xdg_wm_base_g *xdg_shell;
+
+    struct {
+        struct wl_signal input_focus; // data: struct server_view *
+    } events;
 };
 
 struct server_seat_listener {

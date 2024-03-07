@@ -355,6 +355,16 @@ server_backend_tick(int fd, uint32_t mask, void *data) {
     return dispatched > 0;
 }
 
+static void
+on_view_destroy(struct wl_listener *listener, void *data) {
+    struct server *server = wl_container_of(listener, server, on_view_destroy);
+
+    server->input_focus = NULL;
+    wl_signal_emit_mutable(&server->events.input_focus, NULL);
+
+    wl_list_remove(&server->on_view_destroy.link);
+}
+
 struct server *
 server_create() {
     struct server *server = calloc(1, sizeof(*server));
@@ -362,6 +372,10 @@ server_create() {
         ww_log(LOG_ERROR, "failed to allocate server");
         return NULL;
     }
+
+    wl_signal_init(&server->events.input_focus);
+
+    server->on_view_destroy.notify = on_view_destroy;
 
     if (server_backend_create(&server->backend) != 0) {
         goto fail_backend;
@@ -500,7 +514,20 @@ server_set_seat_listener(struct server *server, const struct server_seat_listene
 
 void
 server_set_input_focus(struct server *server, struct server_view *view) {
-    server_seat_g_set_input_focus(server->seat, view);
+    if (server->input_focus == view) {
+        return;
+    }
+
+    if (server->input_focus) {
+        wl_list_remove(&server->on_view_destroy.link);
+    }
+
+    server->input_focus = view;
+    wl_signal_emit_mutable(&server->events.input_focus, server->input_focus);
+
+    if (server->input_focus) {
+        wl_signal_add(&view->events.destroy, &server->on_view_destroy);
+    }
 }
 
 void
