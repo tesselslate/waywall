@@ -22,6 +22,15 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
     wl_array_release(&states);
 }
 
+static pid_t
+xdg_toplevel_view_get_pid(struct wl_resource *role_resource) {
+    struct wl_client *client = wl_resource_get_client(role_resource);
+
+    pid_t pid;
+    wl_client_get_credentials(client, &pid, NULL, NULL);
+    return pid;
+}
+
 static void
 xdg_toplevel_view_set_size(struct wl_resource *role_resource, uint32_t width, uint32_t height) {
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(role_resource);
@@ -34,6 +43,8 @@ xdg_toplevel_view_set_size(struct wl_resource *role_resource, uint32_t width, ui
 
 static const struct server_view_impl xdg_toplevel_view_impl = {
     .name = "xdg_toplevel",
+
+    .get_pid = xdg_toplevel_view_get_pid,
     .set_size = xdg_toplevel_view_set_size,
 };
 
