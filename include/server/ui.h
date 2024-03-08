@@ -49,6 +49,7 @@ struct server_view_impl {
     const char *name;
 
     pid_t (*get_pid)(struct wl_resource *impl_resource);
+    char *(*get_title)(struct wl_resource *impl_resource);
     void (*set_size)(struct wl_resource *impl_resource, uint32_t width, uint32_t height);
 };
 
@@ -58,6 +59,7 @@ void server_ui_hide(struct server_ui *ui);
 void server_ui_show(struct server_ui *ui);
 
 pid_t server_view_get_pid(struct server_view *view);
+char *server_view_get_title(struct server_view *view);
 void server_view_set_crop(struct server_view *view, double x, double y, double width,
                           double height);
 void server_view_set_dest_size(struct server_view *view, uint32_t width, uint32_t height);

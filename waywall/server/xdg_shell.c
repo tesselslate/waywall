@@ -31,6 +31,17 @@ xdg_toplevel_view_get_pid(struct wl_resource *role_resource) {
     return pid;
 }
 
+static char *
+xdg_toplevel_view_get_title(struct wl_resource *role_resource) {
+    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(role_resource);
+
+    if (xdg_toplevel->title) {
+        return strdup(xdg_toplevel->title);
+    } else {
+        return NULL;
+    }
+}
+
 static void
 xdg_toplevel_view_set_size(struct wl_resource *role_resource, uint32_t width, uint32_t height) {
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(role_resource);
@@ -45,6 +56,7 @@ static const struct server_view_impl xdg_toplevel_view_impl = {
     .name = "xdg_toplevel",
 
     .get_pid = xdg_toplevel_view_get_pid,
+    .get_title = xdg_toplevel_view_get_title,
     .set_size = xdg_toplevel_view_set_size,
 };
 

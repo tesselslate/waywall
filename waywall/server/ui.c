@@ -177,6 +177,11 @@ server_view_get_pid(struct server_view *view) {
     return view->impl->get_pid(view->impl_resource);
 }
 
+char *
+server_view_get_title(struct server_view *view) {
+    return view->impl->get_title(view->impl_resource);
+}
+
 void
 server_view_set_crop(struct server_view *view, double x, double y, double width, double height) {
     wp_viewport_set_source(view->viewport, wl_fixed_from_double(x), wl_fixed_from_double(y),
