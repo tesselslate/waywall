@@ -24,6 +24,7 @@ on_view_create(struct wl_listener *listener, void *data) {
     ww_log(LOG_INFO, "create %p", view);
 
     server_set_input_focus(ww->server, view);
+    server_view_show(view);
 }
 
 static void

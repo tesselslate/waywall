@@ -60,11 +60,13 @@ void server_ui_show(struct server_ui *ui);
 
 pid_t server_view_get_pid(struct server_view *view);
 char *server_view_get_title(struct server_view *view);
+void server_view_hide(struct server_view *view);
 void server_view_set_crop(struct server_view *view, double x, double y, double width,
                           double height);
 void server_view_set_dest_size(struct server_view *view, uint32_t width, uint32_t height);
 void server_view_set_position(struct server_view *view, int32_t x, int32_t y);
 void server_view_set_size(struct server_view *view, uint32_t width, uint32_t height);
+void server_view_show(struct server_view *view);
 void server_view_unset_crop(struct server_view *view);
 
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,

@@ -183,6 +183,16 @@ server_view_get_title(struct server_view *view) {
 }
 
 void
+server_view_hide(struct server_view *view) {
+    ww_assert(view->subsurface);
+
+    wl_subsurface_destroy(view->subsurface);
+    wl_surface_commit(view->surface->remote);
+    wl_surface_commit(view->ui->surface);
+    view->subsurface = NULL;
+}
+
+void
 server_view_set_crop(struct server_view *view, double x, double y, double width, double height) {
     wp_viewport_set_source(view->viewport, wl_fixed_from_double(x), wl_fixed_from_double(y),
                            wl_fixed_from_double(width), wl_fixed_from_double(height));
@@ -196,8 +206,10 @@ server_view_set_dest_size(struct server_view *view, uint32_t width, uint32_t hei
 
 void
 server_view_set_position(struct server_view *view, int32_t x, int32_t y) {
-    wl_subsurface_set_position(view->subsurface, x, y);
-    wl_surface_commit(view->surface->remote);
+    if (view->subsurface) {
+        wl_subsurface_set_position(view->subsurface, x, y);
+        wl_surface_commit(view->surface->remote);
+    }
 
     view->x = x;
     view->y = y;
@@ -206,6 +218,23 @@ server_view_set_position(struct server_view *view, int32_t x, int32_t y) {
 void
 server_view_set_size(struct server_view *view, uint32_t width, uint32_t height) {
     view->impl->set_size(view->impl_resource, width, height);
+}
+
+void
+server_view_show(struct server_view *view) {
+    ww_assert(!view->subsurface);
+
+    view->subsurface = wl_subcompositor_get_subsurface(view->ui->server->backend.subcompositor,
+                                                       view->surface->remote, view->ui->surface);
+    if (!view->subsurface) {
+        ww_log(LOG_ERROR, "failed to allocate view subsurface");
+        return;
+    }
+
+    wl_subsurface_set_position(view->subsurface, view->x, view->y);
+    wl_subsurface_set_desync(view->subsurface);
+    wl_surface_commit(view->surface->remote);
+    wl_surface_commit(view->ui->surface);
 }
 
 void
@@ -226,15 +255,6 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     view->ui = ui;
 
     view->surface = surface;
-    view->subsurface = wl_subcompositor_get_subsurface(ui->server->backend.subcompositor,
-                                                       surface->remote, ui->surface);
-    if (!view->subsurface) {
-        free(view);
-        return NULL;
-    }
-    wl_subsurface_set_desync(view->subsurface);
-    wl_surface_commit(surface->remote);
-    wl_surface_commit(ui->surface);
 
     view->viewport = wp_viewporter_get_viewport(ui->server->backend.viewporter, surface->remote);
     if (!view->viewport) {
@@ -260,7 +280,9 @@ server_view_destroy(struct server_view *view) {
     wl_signal_emit_mutable(&view->events.destroy, NULL);
     wl_signal_emit_mutable(&view->ui->events.view_destroy, view);
 
-    wl_subsurface_destroy(view->subsurface);
+    if (view->subsurface) {
+        wl_subsurface_destroy(view->subsurface);
+    }
     wp_viewport_destroy(view->viewport);
     wl_list_remove(&view->link);
     free(view);
