@@ -12,6 +12,7 @@ executable('waywall',
   'server/xdg_decoration.c',
   'server/xdg_shell.c',
   'main.c',
+  'inotify.c',
   'instance.c',
   'util.c',
 
