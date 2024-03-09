@@ -39,6 +39,8 @@ on_xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
     } else if (ui->height == 0) {
         ui->height = DEFAULT_HEIGHT;
     }
+
+    wl_signal_emit(&ui->events.resize, NULL);
 }
 
 static void
@@ -123,6 +125,7 @@ server_ui_init(struct server *server, struct server_ui *ui) {
 
     wl_list_init(&ui->views);
 
+    wl_signal_init(&ui->events.resize);
     wl_signal_init(&ui->events.view_create);
     wl_signal_init(&ui->events.view_destroy);
 
