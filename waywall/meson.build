@@ -12,12 +12,14 @@ executable('waywall',
   'server/xdg_decoration.c',
   'server/xdg_shell.c',
   'main.c',
+  'instance.c',
   'util.c',
 
   protocol_headers,
   protocol_sources,
 
   dependencies: [
+    libzip,
     wayland_client,
     wayland_server,
   ],

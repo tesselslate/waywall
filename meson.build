@@ -17,6 +17,7 @@ add_project_arguments(
 
 includes = include_directories('include')
 
+libzip = dependency('libzip')
 wayland_client = dependency('wayland-client')
 wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner')
