@@ -18,6 +18,8 @@ struct wall {
     bool buttons[16];
     double mx, my;
 
+    struct wl_listener on_pointer_lock;
+    struct wl_listener on_pointer_unlock;
     struct wl_listener on_resize;
     struct wl_listener on_view_create;
     struct wl_listener on_view_destroy;

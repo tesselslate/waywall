@@ -1,6 +1,7 @@
 #include "wall.h"
 #include "inotify.h"
 #include "instance.h"
+#include "server/cursor.h"
 #include "server/server.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
@@ -168,6 +169,18 @@ play_instance(struct wall *wall, int id) {
 }
 
 static void
+on_pointer_lock(struct wl_listener *listener, void *data) {
+    struct wall *wall = wl_container_of(listener, wall, on_pointer_lock);
+    server_cursor_hide(wall->server->cursor);
+}
+
+static void
+on_pointer_unlock(struct wl_listener *listener, void *data) {
+    struct wall *wall = wl_container_of(listener, wall, on_pointer_unlock);
+    server_cursor_show(wall->server->cursor);
+}
+
+static void
 on_resize(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_resize);
 
@@ -301,6 +314,12 @@ wall_create(struct server *server, struct inotify *inotify) {
 
     wall->active_instance = -1;
 
+    wall->on_pointer_lock.notify = on_pointer_lock;
+    wl_signal_add(&server->events.pointer_lock, &wall->on_pointer_lock);
+
+    wall->on_pointer_unlock.notify = on_pointer_unlock;
+    wl_signal_add(&server->events.pointer_unlock, &wall->on_pointer_unlock);
+
     wall->on_resize.notify = on_resize;
     wl_signal_add(&server->ui.events.resize, &wall->on_resize);
 
@@ -323,6 +342,8 @@ wall_destroy(struct wall *wall) {
     }
     wall->num_instances = 0;
 
+    wl_list_remove(&wall->on_pointer_lock.link);
+    wl_list_remove(&wall->on_pointer_unlock.link);
     wl_list_remove(&wall->on_resize.link);
     wl_list_remove(&wall->on_view_create.link);
     wl_list_remove(&wall->on_view_destroy.link);
