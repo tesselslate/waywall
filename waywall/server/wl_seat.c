@@ -735,7 +735,7 @@ server_seat_g_send_click(struct server_seat_g *seat_g, struct server_view *view)
 
 void
 server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
-                        struct syn_key *keys, size_t num_keys) {
+                        const struct syn_key *keys, size_t num_keys) {
     struct wl_client *client = wl_resource_get_client(view->surface->resource);
     struct wl_resource *resource;
 

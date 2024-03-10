@@ -87,6 +87,6 @@ void server_shutdown(struct server *server);
 
 bool server_view_has_focus(struct server_view *view);
 void server_view_send_click(struct server_view *view);
-void server_view_send_keys(struct server_view *view, struct syn_key *keys, size_t num_keys);
+void server_view_send_keys(struct server_view *view, const struct syn_key *keys, size_t num_keys);
 
 #endif

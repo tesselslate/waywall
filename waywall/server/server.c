@@ -548,7 +548,7 @@ server_view_send_click(struct server_view *view) {
 }
 
 void
-server_view_send_keys(struct server_view *view, struct syn_key *keys, size_t num_keys) {
+server_view_send_keys(struct server_view *view, const struct syn_key *keys, size_t num_keys) {
     struct server_seat_g *seat_g = view->ui->server->seat;
     server_seat_g_send_keys(seat_g, view, keys, num_keys);
 }
