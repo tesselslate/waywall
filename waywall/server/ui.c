@@ -187,7 +187,9 @@ server_view_get_title(struct server_view *view) {
 
 void
 server_view_hide(struct server_view *view) {
-    ww_assert(view->subsurface);
+    if (!view->subsurface) {
+        return;
+    }
 
     wl_subsurface_destroy(view->subsurface);
     wl_surface_commit(view->surface->remote);
@@ -204,6 +206,7 @@ server_view_set_crop(struct server_view *view, double x, double y, double width,
 
 void
 server_view_set_dest_size(struct server_view *view, uint32_t width, uint32_t height) {
+    // TODO: handle invalid size (zero)
     wp_viewport_set_destination(view->viewport, width, height);
 }
 
@@ -225,7 +228,9 @@ server_view_set_size(struct server_view *view, uint32_t width, uint32_t height) 
 
 void
 server_view_show(struct server_view *view) {
-    ww_assert(!view->subsurface);
+    if (view->subsurface) {
+        return;
+    }
 
     view->subsurface = wl_subcompositor_get_subsurface(view->ui->server->backend.subcompositor,
                                                        view->surface->remote, view->ui->surface);
