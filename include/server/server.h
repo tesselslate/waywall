@@ -44,6 +44,8 @@ struct server {
     struct server_view *input_focus;
     struct wl_listener on_view_destroy;
 
+    struct server_cursor *cursor;
+
     struct wl_event_source *backend_source;
 
     struct remote_buffer_manager *remote_buf;

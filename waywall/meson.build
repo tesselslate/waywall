@@ -1,5 +1,6 @@
 executable('waywall',
   'server/buffer.c',
+  'server/cursor.c',
   'server/remote_buffer.c',
   'server/server.c',
   'server/ui.c',
@@ -23,6 +24,7 @@ executable('waywall',
   dependencies: [
     libzip,
     wayland_client,
+    wayland_cursor,
     wayland_server,
   ],
 

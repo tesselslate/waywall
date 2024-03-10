@@ -2,6 +2,7 @@
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
+#include "server/cursor.h"
 #include "server/remote_buffer.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -17,6 +18,7 @@
 #include "xdg-shell-client-protocol.h"
 #include <string.h>
 #include <wayland-client.h>
+#include <wayland-cursor.h>
 
 #define USE_COMPOSITOR_VERSION 5
 #define USE_LINUX_DMABUF_VERSION 4
@@ -440,10 +442,29 @@ server_create() {
     }
     server_ui_show(&server->ui);
 
+    server->cursor = server_cursor_create(server);
+    if (!server->cursor) {
+        ww_log(LOG_ERROR, "failed to initialize cursor");
+        goto fail_cursor;
+    }
+    if (server_cursor_use_theme(server->cursor, "default", 16) != 0) {
+        ww_log(LOG_ERROR, "failed to initialize cursor theme");
+        goto fail_cursor_theme;
+    }
+    server_cursor_show(server->cursor);
+
     return server;
+
+fail_cursor_theme:
+    server_cursor_destroy(server->cursor);
+
+fail_cursor:
+    server_ui_destroy(&server->ui);
 
 fail_ui:
 fail_globals:
+    remote_buffer_manager_destroy(server->remote_buf);
+
 fail_remote_buf:
     wl_event_source_remove(server->backend_source);
     wl_display_destroy(server->display);
@@ -465,6 +486,8 @@ server_destroy(struct server *server) {
 
     server_ui_destroy(&server->ui);
     remote_buffer_manager_destroy(server->remote_buf);
+
+    server_cursor_destroy(server->cursor);
 
     server_backend_destroy(&server->backend);
     free(server);

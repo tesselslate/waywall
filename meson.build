@@ -19,6 +19,7 @@ includes = include_directories('include')
 
 libzip = dependency('libzip')
 wayland_client = dependency('wayland-client')
+wayland_cursor = dependency('wayland-cursor')
 wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner')
 wayland_server = dependency('wayland-server')
