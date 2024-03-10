@@ -70,6 +70,11 @@ struct server_seat_listener {
     void (*keymap)(void *data, int fd, uint32_t size);
 };
 
+struct syn_key {
+    uint32_t keycode;
+    bool press;
+};
+
 struct server *server_create();
 void server_destroy(struct server *server);
 
@@ -79,5 +84,8 @@ void server_set_seat_listener(struct server *server, const struct server_seat_li
                               void *data);
 void server_set_input_focus(struct server *server, struct server_view *view);
 void server_shutdown(struct server *server);
+
+void server_view_send_click(struct server_view *view);
+void server_view_send_keys(struct server_view *view, struct syn_key *keys, size_t num_keys);
 
 #endif

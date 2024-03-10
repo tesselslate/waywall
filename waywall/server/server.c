@@ -535,3 +535,15 @@ server_shutdown(struct server *server) {
     // TODO: make graceful (request window close, timeout)
     wl_display_terminate(server->display);
 }
+
+void
+server_view_send_click(struct server_view *view) {
+    struct server_seat_g *seat_g = view->ui->server->seat;
+    server_seat_g_send_click(seat_g, view);
+}
+
+void
+server_view_send_keys(struct server_view *view, struct syn_key *keys, size_t num_keys) {
+    struct server_seat_g *seat_g = view->ui->server->seat;
+    server_seat_g_send_keys(seat_g, view, keys, num_keys);
+}

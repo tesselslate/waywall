@@ -3,6 +3,7 @@
 #include "server/server.h"
 #include "server/wl_compositor.h"
 #include "util.h"
+#include <linux/input-event-codes.h>
 #include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>
@@ -575,7 +576,8 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
     wl_list_insert(&seat_g->keyboards, wl_resource_get_link(keyboard_resource));
 
     // TODO: allow customizing keymap and repeat info
-    wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, seat_g->kb_state.keymap_fd, seat_g->kb_state.keymap_size);
+    wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
+                            seat_g->kb_state.keymap_fd, seat_g->kb_state.keymap_size);
     wl_keyboard_send_repeat_info(keyboard_resource, 40, 300);
 }
 
@@ -707,6 +709,63 @@ server_seat_g_create(struct server *server) {
     wl_display_add_destroy_listener(server->display, &seat_g->on_display_destroy);
 
     return seat_g;
+}
+
+void
+server_seat_g_send_click(struct server_seat_g *seat_g, struct server_view *view) {
+    ww_assert(seat_g->input_focus != view);
+
+    uint32_t time = current_time();
+
+    struct wl_client *client = wl_resource_get_client(view->surface->resource);
+    struct wl_resource *resource;
+    wl_resource_for_each(resource, &seat_g->pointers) {
+        if (wl_resource_get_client(resource) != client) {
+            continue;
+        }
+
+        wl_pointer_send_enter(resource, next_serial(resource), view->surface->resource, 0, 0);
+        wl_pointer_send_button(resource, next_serial(resource), time, BTN_LEFT,
+                               WL_POINTER_BUTTON_STATE_PRESSED);
+        wl_pointer_send_button(resource, next_serial(resource), time, BTN_LEFT,
+                               WL_POINTER_BUTTON_STATE_RELEASED);
+        wl_pointer_send_leave(resource, next_serial(resource), view->surface->resource);
+    }
+}
+
+void
+server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
+                        struct syn_key *keys, size_t num_keys) {
+    struct wl_client *client = wl_resource_get_client(view->surface->resource);
+    struct wl_resource *resource;
+
+    struct wl_array wl_keys;
+    wl_array_init(&wl_keys);
+
+    uint32_t time = current_time();
+
+    wl_resource_for_each(resource, &seat_g->keyboards) {
+        if (wl_resource_get_client(resource) != client) {
+            continue;
+        }
+
+        if (seat_g->input_focus != view) {
+            wl_keyboard_send_enter(resource, next_serial(resource), view->surface->resource,
+                                   &wl_keys);
+        }
+
+        for (size_t i = 0; i < num_keys; i++) {
+            wl_keyboard_send_key(resource, next_serial(resource), time, keys[i].keycode,
+                                 keys[i].press ? WL_KEYBOARD_KEY_STATE_PRESSED
+                                               : WL_KEYBOARD_KEY_STATE_RELEASED);
+        }
+
+        if (seat_g->input_focus != view) {
+            wl_keyboard_send_leave(resource, next_serial(resource), view->surface->resource);
+        }
+    }
+
+    wl_array_release(&wl_keys);
 }
 
 void
