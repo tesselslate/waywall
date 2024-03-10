@@ -536,6 +536,11 @@ server_shutdown(struct server *server) {
     wl_display_terminate(server->display);
 }
 
+bool
+server_view_has_focus(struct server_view *view) {
+    return view->ui->server->input_focus == view;
+}
+
 void
 server_view_send_click(struct server_view *view) {
     struct server_seat_g *seat_g = view->ui->server->seat;

@@ -85,6 +85,7 @@ void server_set_seat_listener(struct server *server, const struct server_seat_li
 void server_set_input_focus(struct server *server, struct server_view *view);
 void server_shutdown(struct server *server);
 
+bool server_view_has_focus(struct server_view *view);
 void server_view_send_click(struct server_view *view);
 void server_view_send_keys(struct server_view *view, struct syn_key *keys, size_t num_keys);
 
