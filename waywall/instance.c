@@ -1,11 +1,19 @@
 #include "instance.h"
+#include "inotify.h"
+#include "server/server.h"
 #include "server/ui.h"
 #include "util.h"
 #include <dirent.h>
+#include <fcntl.h>
 #include <limits.h>
+#include <linux/input-event-codes.h>
 #include <stdio.h>
+#include <sys/inotify.h>
 #include <unistd.h>
 #include <zip.h>
+
+// TODO: configurable
+#define RESET_KEY KEY_F12
 
 struct str {
     char data[PATH_MAX];
@@ -24,6 +32,87 @@ str_append(struct str *dst, const char *src) {
     dst->data[dst->len + len] = '\0';
     dst->len += len;
     return true;
+}
+
+static inline int
+parse_percent(char data[static 3]) {
+    int x = data[0] - '0';
+    if (x < 0 || x > 9) {
+        return 0;
+    }
+
+    int y = data[1] - '0';
+    if (y < 0 || y > 9) {
+        return x;
+    }
+
+    int z = data[2] - '0';
+    if (z < 0 || z > 9) {
+        return x * 10 + y;
+    }
+
+    return 100;
+}
+
+static void
+parse_state_output(struct instance *instance) {
+    // The longest state which can currently be held by wpstateout.txt is 22 characters long:
+    // "inworld,gamescreenopen"
+    char buf[24];
+
+    if (lseek(instance->state_fd, 0, SEEK_SET) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to seek wpstateout.txt in '%s'", instance->dir);
+        return;
+    }
+
+    ssize_t n = read(instance->state_fd, buf, STATIC_STRLEN(buf));
+    if (n == 0) {
+        return;
+    } else if (n == -1) {
+        ww_log_errno(LOG_ERROR, "failed to read wpstateout.txt in '%s'", instance->dir);
+        return;
+    }
+    buf[n] = '\0';
+
+    struct instance_state next = instance->state;
+    switch (buf[0]) {
+    case 't': // title
+        next.screen = SCREEN_TITLE;
+        break;
+    case 'w': // waiting
+        next.screen = SCREEN_WAITING;
+        break;
+    case 'g': // generating,PERCENT
+        next.screen = SCREEN_GENERATING;
+        next.data.percent = parse_percent(buf + STATIC_STRLEN("generating,"));
+        break;
+    case 'p': // previewing,PERCENT
+        next.screen = SCREEN_PREVIEWING;
+        next.data.percent = parse_percent(buf + STATIC_STRLEN("previewing,"));
+        if (instance->state.screen != SCREEN_PREVIEWING) {
+            clock_gettime(CLOCK_MONOTONIC, &next.last_preview);
+        }
+        break;
+    case 'i': // inworld,DATA
+        next.screen = SCREEN_INWORLD;
+        switch (buf[STATIC_STRLEN("inworld,")]) {
+        case 'u': // unpaused
+            next.data.inworld = INWORLD_UNPAUSED;
+            break;
+        case 'p': // paused
+            next.data.inworld = INWORLD_PAUSED;
+            break;
+        case 'g': // gamescreenopen (menu)
+            next.data.inworld = INWORLD_MENU;
+            break;
+        }
+        break;
+    default:
+        ww_log(LOG_ERROR, "cannot parse wpstateout.txt: '%s'", buf);
+        return;
+    }
+
+    instance->state = next;
 }
 
 static int
@@ -54,7 +143,7 @@ check_subdirs(const char *dirname) {
 
     closedir(dir);
     if (found != STATIC_ARRLEN(should_exist)) {
-        ww_log(LOG_ERROR, "potential instance dir at '%s' is missing directories", dirname);
+        ww_log(LOG_ERROR, "potential instance dir '%s' is missing directories", dirname);
         return 1;
     }
     return 0;
@@ -192,8 +281,43 @@ get_version(struct server_view *view) {
     return version[1];
 }
 
+static int
+open_state_file(const char *dir, struct instance_mods mods) {
+    struct str pathbuf = {0};
+    if (!str_append(&pathbuf, dir)) {
+        ww_log(LOG_ERROR, "instance path too long");
+        return -1;
+    }
+
+    const char *file = mods.state_output ? "/wpstateout.txt" : "/logs/latest.log";
+    if (!str_append(&pathbuf, file)) {
+        ww_log(LOG_ERROR, "instance path too long");
+        return -1;
+    }
+
+    int fd = open(pathbuf.data, O_RDONLY | O_CLOEXEC);
+    if (fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to open state file '%s'", pathbuf.data);
+        return -1;
+    }
+
+    return fd;
+}
+
+static void
+pause_instance(struct instance *instance) {
+    static const struct syn_key keys[] = {
+        {KEY_F3, true},
+        {KEY_ESC, true},
+        {KEY_ESC, false},
+        {KEY_F3, false},
+    };
+
+    server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
+}
+
 struct instance *
-instance_create(struct server_view *view) {
+instance_create(struct server_view *view, struct inotify *inotify) {
     static_assert(sizeof(pid_t) <= sizeof(int));
 
     pid_t pid = server_view_get_pid(view);
@@ -204,7 +328,7 @@ instance_create(struct server_view *view) {
 
     char dir[PATH_MAX];
     n = readlink(buf, dir, STATIC_ARRLEN(dir));
-    if (n < 0) {
+    if (n == -1) {
         ww_log_errno(LOG_ERROR, "failed to readlink instance dir (pid=%d)", (int)pid);
         return NULL;
     } else if (n >= (ssize_t)STATIC_ARRLEN(dir) - 1) {
@@ -224,9 +348,19 @@ instance_create(struct server_view *view) {
     if (get_mods(dir, &mods) != 0) {
         return NULL;
     }
+    // TODO: support instances without state output
+    if (!mods.state_output) {
+        ww_log(LOG_ERROR, "instance '%s' has no state output", dir);
+        return NULL;
+    }
 
     int version = get_version(view);
-    if (version < 0) {
+    if (version == -1) {
+        return NULL;
+    }
+
+    int state_fd = open_state_file(dir, mods);
+    if (state_fd == -1) {
         return NULL;
     }
 
@@ -240,7 +374,11 @@ instance_create(struct server_view *view) {
     instance->pid = pid;
     instance->mods = mods;
     instance->version = version;
+    instance->state_fd = state_fd;
+    instance->state_wd = -1;
     instance->view = view;
+
+    instance->state.screen = SCREEN_TITLE;
 
     return instance;
 }
@@ -249,4 +387,69 @@ void
 instance_destroy(struct instance *instance) {
     free(instance->dir);
     free(instance);
+}
+
+char *
+instance_get_state_path(struct instance *instance) {
+    struct str pathbuf = {0};
+    if (!str_append(&pathbuf, instance->dir)) {
+        ww_log(LOG_ERROR, "instance path too long");
+        return NULL;
+    }
+
+    const char *file = instance->mods.state_output ? "/wpstateout.txt" : "/logs/latest.log";
+    if (!str_append(&pathbuf, file)) {
+        ww_log(LOG_ERROR, "instance path too long");
+        return NULL;
+    }
+
+    return strdup(pathbuf.data);
+}
+
+bool
+instance_reset(struct instance *instance) {
+    int screen = instance->state.screen;
+
+    if (!server_view_has_focus(instance->view)) {
+        // Resetting on the dirt screen can cause a reset to occur after the dirt screen ends.
+        if (screen == SCREEN_WAITING || screen == SCREEN_GENERATING) {
+            return false;
+        }
+    }
+
+    // TODO: atum click fix is only necessary on older atum versions?
+
+    const struct syn_key keys[] = {
+        {RESET_KEY, true},
+        {RESET_KEY, false},
+    };
+    server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
+
+    instance->state.screen = SCREEN_WAITING;
+    instance->state.data.percent = 0;
+    return true;
+}
+
+void
+instance_state_update(struct instance *instance) {
+    int prev = instance->state.screen;
+
+    if (instance->mods.state_output) {
+        parse_state_output(instance);
+    } else {
+        // TODO
+    }
+
+    int current = instance->state.screen;
+
+    if (current == SCREEN_PREVIEWING && prev != SCREEN_PREVIEWING) {
+        pause_instance(instance);
+    } else if (current == SCREEN_INWORLD && prev != SCREEN_INWORLD) {
+        // TODO: only pause if no f3EscOnWorldLoad from standardsettings
+        if (!server_view_has_focus(instance->view)) {
+            pause_instance(instance);
+        } else {
+            // TODO: F1
+        }
+    }
 }
