@@ -1,6 +1,7 @@
 #include "inotify.h"
 #include "server/server.h"
 #include "util.h"
+#include "wall.h"
 #include <signal.h>
 #include <wayland-server-core.h>
 
@@ -27,6 +28,11 @@ main() {
         goto fail_inotify;
     }
 
+    struct wall *wall = wall_create(server, inotify);
+    if (!wall) {
+        goto fail_wall;
+    }
+
     const char *socket_name = wl_display_add_socket_auto(server->display);
     if (!socket_name) {
         ww_log(LOG_ERROR, "failed to create wayland display socket");
@@ -34,6 +40,7 @@ main() {
     }
     wl_display_run(server->display);
 
+    wall_destroy(wall);
     inotify_destroy(inotify);
     wl_event_source_remove(src_sigint);
     server_destroy(server);
@@ -41,11 +48,14 @@ main() {
     ww_log(LOG_INFO, "Done");
     return 0;
 
+fail_wall:
+    inotify_destroy(inotify);
+
+fail_socket:
+    wall_destroy(wall);
+
 fail_inotify:
     wl_event_source_remove(src_sigint);
     server_destroy(server);
-
-fail_socket:
-    inotify_destroy(inotify);
     return 1;
 }
