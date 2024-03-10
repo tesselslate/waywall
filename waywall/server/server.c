@@ -374,6 +374,8 @@ server_create() {
     }
 
     wl_signal_init(&server->events.input_focus);
+    wl_signal_init(&server->events.pointer_lock);   // used by pointer constraints
+    wl_signal_init(&server->events.pointer_unlock); // used by pointer constraints
 
     server->on_view_destroy.notify = on_view_destroy;
 

@@ -27,6 +27,8 @@ locked_pointer_resource_destroy(struct wl_resource *resource) {
         if (wl_resource_get_client(resource) == focus_client) {
             zwp_locked_pointer_v1_destroy(pointer_constraints_g->remote_pointer);
             pointer_constraints_g->remote_pointer = NULL;
+
+            wl_signal_emit_mutable(&pointer_constraints_g->server->events.pointer_unlock, NULL);
         }
     }
 }
@@ -100,6 +102,8 @@ pointer_constraints_lock_pointer(struct wl_client *client, struct wl_resource *r
                 server_get_wl_pointer(pointer_constraints_g->server), NULL,
                 ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             ww_assert(pointer_constraints_g->remote_pointer);
+
+            wl_signal_emit_mutable(&pointer_constraints_g->server->events.pointer_lock, NULL);
         }
     }
 
@@ -156,6 +160,8 @@ on_input_focus(struct wl_listener *listener, void *data) {
 
         zwp_locked_pointer_v1_destroy(pointer_constraints_g->remote_pointer);
         pointer_constraints_g->remote_pointer = NULL;
+
+        wl_signal_emit_mutable(&pointer_constraints_g->server->events.pointer_unlock, NULL);
     } else if (!was_locked && is_locked) {
         ww_assert(!pointer_constraints_g->remote_pointer);
 
@@ -164,6 +170,8 @@ on_input_focus(struct wl_listener *listener, void *data) {
             server_get_wl_pointer(pointer_constraints_g->server), NULL,
             ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         ww_assert(pointer_constraints_g->remote_pointer);
+
+        wl_signal_emit_mutable(&pointer_constraints_g->server->events.pointer_lock, NULL);
     }
 
     pointer_constraints_g->input_focus = view;

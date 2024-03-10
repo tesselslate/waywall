@@ -58,7 +58,9 @@ struct server {
     struct server_xdg_wm_base_g *xdg_shell;
 
     struct {
-        struct wl_signal input_focus; // data: struct server_view *
+        struct wl_signal input_focus;    // data: struct server_view *
+        struct wl_signal pointer_lock;   // data: NULL
+        struct wl_signal pointer_unlock; // data: NULL
     } events;
 };
 
