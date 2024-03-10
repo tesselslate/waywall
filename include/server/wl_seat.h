@@ -42,6 +42,10 @@ struct server_seat_g {
     struct wl_listener on_pointer;
 
     struct wl_listener on_display_destroy;
+
+    struct {
+        struct wl_signal pointer_enter; // data: uint32_t *
+    } events;
 };
 
 struct server_seat_g *server_seat_g_create(struct server *server);

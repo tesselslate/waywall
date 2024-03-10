@@ -398,7 +398,14 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
 static void
 on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_surface *surface,
                  wl_fixed_t surface_x, wl_fixed_t surface_y) {
-    // Unused.
+    struct server_seat_g *seat_g = data;
+
+    if (surface != seat_g->server->ui.surface) {
+        ww_log(LOG_WARN, "received wl_pointer.enter for unknown surface");
+        return;
+    }
+
+    wl_signal_emit_mutable(&seat_g->events.pointer_enter, &serial);
 }
 
 static void
@@ -685,6 +692,8 @@ server_seat_g_create(struct server *server) {
 
     wl_list_init(&seat_g->keyboards);
     wl_list_init(&seat_g->pointers);
+
+    wl_signal_init(&seat_g->events.pointer_enter);
 
     seat_g->on_input_focus.notify = on_input_focus;
     wl_signal_add(&server->events.input_focus, &seat_g->on_input_focus);
