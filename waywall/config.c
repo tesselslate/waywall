@@ -40,103 +40,95 @@ dump_stack(struct config *cfg) {
 }
 
 static int
-process_config_cursor(struct config *cfg) {
-    // waywall.cursor.theme
-    lua_pushstring(cfg->vm.L, "theme");
+get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->vm.L, key);
     lua_gettable(cfg->vm.L, -2);
-    switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TSTRING: {
-        free(cfg->cursor.theme);
-        cfg->cursor.theme = strdup(lua_tostring(cfg->vm.L, -1));
-        if (!cfg->cursor.theme) {
-            ww_log(LOG_ERROR, "failed to allocate 'cfg->cursor.theme'");
-            return 1;
-        }
-        break;
-    }
-    case LUA_TNIL:
-        break;
-    default:
-        ww_log(LOG_ERROR, "expected 'waywall.cursor.theme' to be of type 'string', was '%s'",
-               luaL_typename(cfg->vm.L, -1));
-        return 1;
-    }
-    lua_pop(cfg->vm.L, 1);
 
-    // waywall.cursor.icon
-    lua_pushstring(cfg->vm.L, "icon");
-    lua_gettable(cfg->vm.L, -2);
     switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TSTRING: {
-        free(cfg->cursor.icon);
-        cfg->cursor.icon = strdup(lua_tostring(cfg->vm.L, -1));
-        if (!cfg->cursor.icon) {
-            ww_log(LOG_ERROR, "failed to allocate 'cfg->cursor.icon'");
+    case LUA_TNUMBER: {
+        double x = lua_tonumber(cfg->vm.L, -1);
+        int ix = (int)x;
+        if (ix != x) {
+            ww_log(LOG_ERROR, "expected '%s' to be an integer, got '%lf'", full_name, x);
             return 1;
         }
+        *dst = ix;
         break;
     }
     case LUA_TNIL:
+        if (required) {
+            ww_log(LOG_ERROR, "config property '%s' is required", full_name);
+            return 1;
+        }
         break;
     default:
-        ww_log(LOG_ERROR, "expected 'waywall.cursor.icon' to be of type 'string', was '%s'",
+        ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
                luaL_typename(cfg->vm.L, -1));
         return 1;
     }
+
     lua_pop(cfg->vm.L, 1);
+    return 0;
+}
+
+static int
+get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->vm.L, key);
+    lua_gettable(cfg->vm.L, -2);
+
+    switch (lua_type(cfg->vm.L, -1)) {
+    case LUA_TSTRING:
+        free(*dst);
+        *dst = strdup(lua_tostring(cfg->vm.L, -1));
+        if (!*dst) {
+            ww_log(LOG_ERROR, "failed to allocate string for '%s'", full_name);
+            return 1;
+        }
+        break;
+    case LUA_TNIL:
+        if (required) {
+            ww_log(LOG_ERROR, "config property '%s' is required", full_name);
+            return 1;
+        }
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected '%s' to be of type 'string', was '%s'", full_name,
+               luaL_typename(cfg->vm.L, -1));
+        return 1;
+    }
+
+    lua_pop(cfg->vm.L, 1);
+    return 0;
+}
+
+static int
+process_config_cursor(struct config *cfg) {
+    if (get_string(cfg, "theme", &cfg->cursor.theme, "cursor.theme", false) != 0) {
+        return 1;
+    }
+    if (get_string(cfg, "icon", &cfg->cursor.icon, "cursor.icon", false) != 0) {
+        return 1;
+    }
 
     return 0;
 }
 
 static int
 process_config_wall(struct config *cfg) {
-    // waywall.wall.width
-    lua_pushstring(cfg->vm.L, "width");
-    lua_gettable(cfg->vm.L, -2);
-    switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TNUMBER: {
-        double width = lua_tonumber(cfg->vm.L, -1);
-        int i_width = (int)width;
-        if (i_width != width) {
-            ww_log(LOG_ERROR, "expected 'waywall.wall.width' to be a whole number, got '%lf'",
-                   width);
-            return 1;
-        }
-        cfg->wall.width = i_width;
-        break;
-    }
-    case LUA_TNIL:
-        break;
-    default:
-        ww_log(LOG_ERROR, "expected 'waywall.wall.width' to be of type 'number', was '%s'",
-               luaL_typename(cfg->vm.L, -1));
+    if (get_int(cfg, "width", &cfg->wall.width, "wall.width", true) != 0) {
         return 1;
     }
-    lua_pop(cfg->vm.L, 1);
-
-    // waywall.wall.height
-    lua_pushstring(cfg->vm.L, "height");
-    lua_gettable(cfg->vm.L, -2);
-    switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TNUMBER: {
-        double height = lua_tonumber(cfg->vm.L, -1);
-        int i_height = (int)height;
-        if (i_height != height) {
-            ww_log(LOG_ERROR, "expected 'waywall.wall.height' to be a whole number, got '%lf'",
-                   height);
-            return 1;
-        }
-        cfg->wall.height = i_height;
-        break;
-    }
-    case LUA_TNIL:
-        break;
-    default:
-        ww_log(LOG_ERROR, "expected 'waywall.wall.height' to be of type 'number', was '%s'",
-               luaL_typename(cfg->vm.L, -1));
+    if (cfg->wall.width <= 0) {
+        ww_log(LOG_ERROR, "'wall.width' must be a positive, non-zero integer");
         return 1;
     }
-    lua_pop(cfg->vm.L, 1);
+    if (get_int(cfg, "height", &cfg->wall.height, "wall.height", true) != 0) {
+        return 1;
+    }
+    if (cfg->wall.height <= 0) {
+        ww_log(LOG_ERROR, "'wall.height' must be a positive, non-zero integer");
+        return 1;
+    }
 
     return 0;
 }
