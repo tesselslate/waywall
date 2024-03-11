@@ -29,6 +29,7 @@ struct instance {
 
         // StandardSettings
         bool f3_pause;
+        bool f1;
     } opts;
     int version;
 

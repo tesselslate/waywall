@@ -109,6 +109,15 @@ read_options(FILE *file, struct instance_options *opts) {
                 ww_log(LOG_ERROR, "invalid boolean in options file: '%s'", val);
                 return 1;
             }
+        } else if (strcmp(key, "f1") == 0) {
+            if (strcmp(val, "false") == 0) {
+                opts->f1 = false;
+            } else if (strcmp(val, "true") == 0) {
+                opts->f1 = true;
+            } else {
+                ww_log(LOG_ERROR, "invalid boolean in options file: '%s'", val);
+                return 1;
+            }
         }
     }
 
@@ -625,7 +634,13 @@ instance_state_update(struct instance *instance) {
                 pause_instance(instance);
             }
         } else {
-            // TODO: F1
+            if (instance->opts.f1) {
+                static const struct syn_key keys[] = {
+                    {KEY_F1, true},
+                    {KEY_F1, false},
+                };
+                server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
+            }
         }
     }
 }
