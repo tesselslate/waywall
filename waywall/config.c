@@ -10,6 +10,7 @@ static const struct config defaults = {
         {
             .repeat_rate = -1,
             .repeat_delay = -1,
+            .sens = 1.0,
         },
     .theme =
         {
@@ -47,6 +48,33 @@ dump_stack(struct config *cfg) {
             break;
         }
     }
+}
+
+static int
+get_double(struct config *cfg, const char *key, double *dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->vm.L, key);
+    lua_gettable(cfg->vm.L, -2);
+
+    switch (lua_type(cfg->vm.L, -1)) {
+    case LUA_TNUMBER: {
+        double x = lua_tonumber(cfg->vm.L, -1);
+        *dst = x;
+        break;
+    }
+    case LUA_TNIL:
+        if (required) {
+            ww_log(LOG_ERROR, "config property '%s' is required", full_name);
+            return 1;
+        }
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
+               luaL_typename(cfg->vm.L, -1));
+        return 1;
+    }
+
+    lua_pop(cfg->vm.L, 1);
+    return 0;
 }
 
 static int
@@ -260,6 +288,14 @@ process_config_input(struct config *cfg) {
     }
 
     if (get_int(cfg, "repeat_delay", &cfg->input.repeat_delay, "input.repeat_delay", false) != 0) {
+        return 1;
+    }
+
+    if (get_double(cfg, "sensitivity", &cfg->input.sens, "input.sensitivity", false) != 0) {
+        return 1;
+    }
+    if (cfg->input.sens <= 0) {
+        ww_log(LOG_ERROR, "'input.sensitivity' must be a positive, non-zero number");
         return 1;
     }
 

@@ -15,6 +15,7 @@ struct config {
         bool custom_keymap;
 
         int repeat_rate, repeat_delay;
+        double sens;
     } input;
     struct {
         uint8_t background[4];

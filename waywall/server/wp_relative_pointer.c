@@ -1,4 +1,5 @@
 #include "server/wp_relative_pointer.h"
+#include "config.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-server-protocol.h"
 #include "server/server.h"
@@ -17,6 +18,20 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
         return;
     }
 
+    // Boat eye relies on precise cursor positioning. Sending relative pointer motion events with
+    // non-whole number values will cause boat eye to not work correctly.
+    //
+    // TODO: Do we need to accumulate unaccel movement as well? I don't know if any compositors send
+    // non-whole number values
+    relative_pointer_g->acc_x += wl_fixed_to_double(dx) * relative_pointer_g->cfg->input.sens;
+    relative_pointer_g->acc_y += wl_fixed_to_double(dy) * relative_pointer_g->cfg->input.sens;
+
+    double x = trunc(relative_pointer_g->acc_x);
+    relative_pointer_g->acc_x -= x;
+
+    double y = trunc(relative_pointer_g->acc_y);
+    relative_pointer_g->acc_y -= y;
+
     struct wl_client *client =
         wl_resource_get_client(relative_pointer_g->input_focus->surface->resource);
     struct wl_resource *resource;
@@ -26,8 +41,9 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
         }
 
         // TODO: allow configuring mouse sensitivity
-        zwp_relative_pointer_v1_send_relative_motion(resource, utime_hi, utime_lo, dx, dy,
-                                                     dx_unaccel, dy_unaccel);
+        zwp_relative_pointer_v1_send_relative_motion(
+            resource, utime_hi, utime_lo, wl_fixed_from_double(x), wl_fixed_from_double(y),
+            dx_unaccel, dy_unaccel);
     }
 }
 
@@ -152,13 +168,14 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct server_relative_pointer_g *
-server_relative_pointer_g_create(struct server *server) {
+server_relative_pointer_g_create(struct server *server, struct config *cfg) {
     struct server_relative_pointer_g *relative_pointer_g = calloc(1, sizeof(*relative_pointer_g));
     if (!relative_pointer_g) {
         ww_log(LOG_ERROR, "failed to allocate server_relative_pointer_g");
         return NULL;
     }
 
+    relative_pointer_g->cfg = cfg;
     relative_pointer_g->server = server;
 
     relative_pointer_g->global =

@@ -23,6 +23,7 @@ executable('waywall',
   protocol_sources,
 
   dependencies: [
+    libm,
     libzip,
     luajit,
     wayland_client,

@@ -17,6 +17,9 @@ add_project_arguments(
 
 includes = include_directories('include')
 
+cc = meson.get_compiler('c')
+
+libm = cc.find_library('m')
 libzip = dependency('libzip')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
