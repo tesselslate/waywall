@@ -37,6 +37,7 @@ struct server_backend {
 };
 
 struct server {
+    struct config *cfg;
     struct wl_display *display;
     struct server_backend backend;
     struct server_ui ui;
@@ -79,7 +80,7 @@ struct syn_key {
     bool press;
 };
 
-struct server *server_create();
+struct server *server_create(struct config *cfg);
 void server_destroy(struct server *server);
 
 struct wl_keyboard *server_get_wl_keyboard(struct server *server);

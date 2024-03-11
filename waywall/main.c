@@ -23,7 +23,7 @@ main() {
         goto fail_config_populate;
     }
 
-    struct server *server = server_create();
+    struct server *server = server_create(cfg);
     if (!server) {
         goto fail_server;
     }

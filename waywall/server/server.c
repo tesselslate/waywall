@@ -1,4 +1,5 @@
 #include "server/server.h"
+#include "config.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
@@ -368,12 +369,14 @@ on_view_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct server *
-server_create() {
+server_create(struct config *cfg) {
     struct server *server = calloc(1, sizeof(*server));
     if (!server) {
         ww_log(LOG_ERROR, "failed to allocate server");
         return NULL;
     }
+
+    server->cfg = cfg;
 
     wl_signal_init(&server->events.input_focus);
     wl_signal_init(&server->events.pointer_lock);   // used by pointer constraints
@@ -447,8 +450,8 @@ server_create() {
         ww_log(LOG_ERROR, "failed to initialize cursor");
         goto fail_cursor;
     }
-    if (server_cursor_use_theme(server->cursor, "default", 16) != 0) {
-        ww_log(LOG_ERROR, "failed to initialize cursor theme");
+    if (server_cursor_use_theme(server->cursor, server->cfg->cursor.theme, 16) != 0) {
+        ww_log(LOG_ERROR, "failed to initialize cursor theme '%s'", server->cfg->cursor.theme);
         goto fail_cursor_theme;
     }
     server_cursor_show(server->cursor);

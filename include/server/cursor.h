@@ -7,6 +7,7 @@
 struct server;
 
 struct server_cursor {
+    struct config *cfg;
     struct server *server;
 
     struct wl_cursor_theme *theme;

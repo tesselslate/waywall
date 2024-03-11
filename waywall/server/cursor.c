@@ -1,4 +1,5 @@
 #include "server/cursor.h"
+#include "config.h"
 #include "server/server.h"
 #include "server/wl_seat.h"
 #include "util.h"
@@ -25,6 +26,7 @@ server_cursor_create(struct server *server) {
         return NULL;
     }
 
+    cursor->cfg = server->cfg;
     cursor->server = server;
 
     cursor->surface = wl_compositor_create_surface(server->backend.compositor);
@@ -90,9 +92,11 @@ server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size
         return 1;
     }
 
-    struct wl_cursor *wl_cursor = wl_cursor_theme_get_cursor(cursor->theme, "left_ptr");
+    struct wl_cursor *wl_cursor =
+        wl_cursor_theme_get_cursor(cursor->theme, cursor->cfg->cursor.icon);
     if (!wl_cursor) {
-        ww_log(LOG_ERROR, "cursor theme '%s' does not contain 'left_ptr' cursor", name);
+        ww_log(LOG_ERROR, "cursor theme '%s' does not contain '%s' cursor icon", name,
+               cursor->cfg->cursor.icon);
         goto fail_get_cursor;
     }
     ww_assert(wl_cursor->image_count > 0); // TODO: valid?
