@@ -11,8 +11,8 @@ struct config {
         char *icon;
     } cursor;
     struct {
-        int width;
-        int height;
+        int width, height;
+        int stretch_width, stretch_height;
     } wall;
 
     struct config_vm vm;

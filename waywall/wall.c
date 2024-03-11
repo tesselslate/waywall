@@ -10,10 +10,6 @@
 
 static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.buttons));
 
-// TODO: config options
-#define WALL_INST_WIDTH 640
-#define WALL_INST_HEIGHT 216
-
 #define ON_WALL(w) ((w)->active_instance == -1)
 
 struct box {
@@ -251,8 +247,8 @@ on_key(void *data, uint32_t key, bool pressed) {
         case KEY_U: // ingame reset
             if (!ON_WALL(wall)) {
                 instance_reset(wall->instances[wall->active_instance]);
-                server_view_set_size(wall->instances[wall->active_instance]->view, WALL_INST_WIDTH,
-                                     WALL_INST_HEIGHT);
+                server_view_set_size(wall->instances[wall->active_instance]->view,
+                                     wall->cfg->wall.stretch_width, wall->cfg->wall.stretch_height);
                 focus_wall(wall);
             }
             break;
