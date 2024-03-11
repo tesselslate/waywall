@@ -3,6 +3,7 @@
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
+#include <xkbcommon/xkbcommon.h>
 
 static const struct config defaults = {
     .input =
@@ -173,7 +174,87 @@ fail:
 }
 
 static int
+get_keymap(struct config *cfg) {
+    char *layout = NULL;
+    char *model = NULL;
+    char *rules = NULL;
+    char *variant = NULL;
+    char *options = NULL;
+
+    if (get_string(cfg, "layout", &layout, "input.layout", false) != 0) {
+        return 1;
+    }
+    if (get_string(cfg, "model", &model, "input.model", false) != 0) {
+        goto fail_model;
+    }
+    if (get_string(cfg, "rules", &rules, "input.rules", false) != 0) {
+        goto fail_rules;
+    }
+    if (get_string(cfg, "variant", &variant, "input.variant", false) != 0) {
+        goto fail_variant;
+    }
+    if (get_string(cfg, "options", &variant, "input.options", false) != 0) {
+        goto fail_options;
+    }
+
+    if (layout || model || rules || variant || options) {
+        cfg->input.custom_keymap = true;
+    }
+
+    struct xkb_rule_names rule_names = {
+        .layout = layout,
+        .model = model,
+        .rules = rules,
+        .variant = variant,
+        .options = options,
+    };
+
+    cfg->input.xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
+    if (!cfg->input.xkb_ctx) {
+        goto fail_xkb_ctx;
+    }
+
+    // TODO: This leaks memory somehow, even though we later call xkb_keymap_unref
+    cfg->input.xkb_keymap =
+        xkb_keymap_new_from_names(cfg->input.xkb_ctx, &rule_names, XKB_KEYMAP_COMPILE_NO_FLAGS);
+    if (!cfg->input.xkb_keymap) {
+        goto fail_xkb_keymap;
+    }
+
+    free(options);
+    free(variant);
+    free(rules);
+    free(model);
+    free(layout);
+    return 0;
+
+fail_xkb_keymap:
+    xkb_context_unref(cfg->input.xkb_ctx);
+    cfg->input.xkb_ctx = NULL;
+
+fail_xkb_ctx:
+    free(options);
+
+fail_options:
+    free(variant);
+
+fail_variant:
+    free(rules);
+
+fail_rules:
+    free(model);
+
+fail_model:
+    free(layout);
+    return 1;
+}
+
+static int
 process_config_input(struct config *cfg) {
+    if (get_keymap(cfg) != 0) {
+        return 1;
+    }
+
     if (get_int(cfg, "repeat_rate", &cfg->input.repeat_rate, "input.repeat_rate", false) != 0) {
         return 1;
     }
@@ -309,6 +390,13 @@ fail_cursor_theme:
 
 void
 config_destroy(struct config *cfg) {
+    if (cfg->input.xkb_keymap) {
+        xkb_keymap_unref(cfg->input.xkb_keymap);
+    }
+    if (cfg->input.xkb_ctx) {
+        xkb_context_unref(cfg->input.xkb_ctx);
+    }
+
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
 

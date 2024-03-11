@@ -1,14 +1,19 @@
-#include "server/wl_seat.h"
+#define _GNU_SOURCE
+#include <sys/mman.h>
+#undef _GNU_SOURCE
+
 #include "config.h"
 #include "server/serial.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
+#include "server/wl_seat.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
 #include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>
 #include <wayland-server.h>
+#include <xkbcommon/xkbcommon.h>
 
 #define SRV_SEAT_VERSION 6
 
@@ -42,6 +47,50 @@ get_pointer_offset(struct server_seat_g *seat_g, double *x, double *y) {
 
     *x = seat_g->ptr_state.x - (double)seat_g->input_focus->x;
     *y = seat_g->ptr_state.y - (double)seat_g->input_focus->y;
+}
+
+static int
+prepare_keymap(struct server_seat_g *seat_g) {
+    char *keymap =
+        xkb_keymap_get_as_string(seat_g->cfg->input.xkb_keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
+    if (!keymap) {
+        ww_log(LOG_ERROR, "failed to get XKB keymap as string");
+        return 1;
+    }
+
+    seat_g->kb_state.local_keymap_size = strlen(keymap) + 1;
+    seat_g->kb_state.local_keymap_fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
+    if (seat_g->kb_state.local_keymap_fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to create keymap memfd");
+        goto fail_memfd;
+    }
+
+    if (ftruncate(seat_g->kb_state.local_keymap_fd, seat_g->kb_state.local_keymap_size) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to expand keymap memfd");
+        goto fail_truncate;
+    }
+
+    char *data = mmap(NULL, seat_g->kb_state.local_keymap_size + 1, PROT_READ | PROT_WRITE,
+                      MAP_SHARED, seat_g->kb_state.local_keymap_fd, 0);
+    if (data == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to mmap keymap memfd");
+        goto fail_mmap;
+    }
+
+    memcpy(data, keymap, seat_g->kb_state.local_keymap_size + 1);
+    munmap(data, seat_g->kb_state.local_keymap_size + 1);
+
+    free(keymap);
+    return 0;
+
+fail_mmap:
+fail_truncate:
+    close(seat_g->kb_state.local_keymap_fd);
+    seat_g->kb_state.local_keymap_fd = -1;
+
+fail_memfd:
+    free(keymap);
+    return 1;
 }
 
 static void
@@ -230,11 +279,11 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
         return;
     }
 
-    if (seat_g->kb_state.keymap_fd >= 0) {
-        close(seat_g->kb_state.keymap_fd);
+    if (seat_g->kb_state.remote_keymap_fd >= 0) {
+        close(seat_g->kb_state.remote_keymap_fd);
     }
-    seat_g->kb_state.keymap_fd = fd;
-    seat_g->kb_state.keymap_size = size;
+    seat_g->kb_state.remote_keymap_fd = fd;
+    seat_g->kb_state.remote_keymap_size = size;
 
     if (seat_g->listener) {
         seat_g->listener->keymap(seat_g->listener_data, fd, size);
@@ -583,9 +632,15 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
 
     wl_list_insert(&seat_g->keyboards, wl_resource_get_link(keyboard_resource));
 
-    // TODO: allow customizing keymap and repeat info
-    wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                            seat_g->kb_state.keymap_fd, seat_g->kb_state.keymap_size);
+    if (seat_g->cfg->input.custom_keymap) {
+        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
+                                seat_g->kb_state.local_keymap_fd,
+                                seat_g->kb_state.local_keymap_size);
+    } else {
+        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
+                                seat_g->kb_state.remote_keymap_fd,
+                                seat_g->kb_state.remote_keymap_size);
+    }
 
     int32_t rate = seat_g->cfg->input.repeat_rate >= 0 ? seat_g->cfg->input.repeat_rate
                                                        : seat_g->kb_state.repeat_rate;
@@ -652,8 +707,11 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_global_destroy(seat_g->global);
 
-    if (seat_g->kb_state.keymap_fd >= 0) {
-        close(seat_g->kb_state.keymap_fd);
+    if (seat_g->kb_state.local_keymap_fd >= 0) {
+        close(seat_g->kb_state.local_keymap_fd);
+    }
+    if (seat_g->kb_state.remote_keymap_fd >= 0) {
+        close(seat_g->kb_state.remote_keymap_fd);
     }
     if (seat_g->kb_state.pressed.data) {
         free(seat_g->kb_state.pressed.data);
@@ -679,22 +737,24 @@ server_seat_g_create(struct server *server, struct config *cfg) {
     seat_g->cfg = cfg;
     seat_g->server = server;
 
+    seat_g->kb_state.local_keymap_fd = -1;
+    if (prepare_keymap(seat_g) != 0) {
+        goto fail_keymap;
+    }
+
     seat_g->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat_g,
                                       on_global_bind);
     if (!seat_g->global) {
         ww_log(LOG_ERROR, "failed to allocate seat global");
-        free(seat_g);
-        return NULL;
+        goto fail_global;
     }
 
-    seat_g->kb_state.keymap_fd = -1;
+    seat_g->kb_state.remote_keymap_fd = -1;
     seat_g->kb_state.pressed.cap = 8;
     seat_g->kb_state.pressed.data = calloc(seat_g->kb_state.pressed.cap, sizeof(uint32_t));
     if (!seat_g->kb_state.pressed.data) {
         ww_log(LOG_ERROR, "failed to allocate pressed keys array");
-        wl_global_destroy(seat_g->global);
-        free(seat_g);
-        return NULL;
+        goto fail_pressed_keys;
     }
 
     wl_list_init(&seat_g->keyboards);
@@ -725,6 +785,16 @@ server_seat_g_create(struct server *server, struct config *cfg) {
     wl_display_add_destroy_listener(server->display, &seat_g->on_display_destroy);
 
     return seat_g;
+
+fail_pressed_keys:
+    wl_global_destroy(seat_g->global);
+
+fail_global:
+    close(seat_g->kb_state.local_keymap_fd);
+
+fail_keymap:
+    free(seat_g);
+    return NULL;
 }
 
 void
@@ -791,8 +861,8 @@ server_seat_g_set_listener(struct server_seat_g *seat_g,
 
     seat_g->listener = listener;
     seat_g->listener_data = data;
-    if (seat_g->kb_state.keymap_fd >= 0) {
-        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.keymap_fd,
-                                 seat_g->kb_state.keymap_size);
+    if (seat_g->kb_state.remote_keymap_fd >= 0) {
+        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.remote_keymap_fd,
+                                 seat_g->kb_state.remote_keymap_size);
     }
 }

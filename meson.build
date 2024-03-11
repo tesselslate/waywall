@@ -24,6 +24,7 @@ wayland_cursor = dependency('wayland-cursor')
 wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner')
 wayland_server = dependency('wayland-server')
+xkbcommon = dependency('xkbcommon')
 
 subdir('protocol')
 subdir('test')

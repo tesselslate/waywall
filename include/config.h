@@ -1,6 +1,7 @@
 #ifndef WAYWALL_CONFIG_H
 #define WAYWALL_CONFIG_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 struct config_vm {
@@ -9,6 +10,10 @@ struct config_vm {
 
 struct config {
     struct {
+        struct xkb_context *xkb_ctx;
+        struct xkb_keymap *xkb_keymap;
+        bool custom_keymap;
+
         int repeat_rate, repeat_delay;
     } input;
     struct {

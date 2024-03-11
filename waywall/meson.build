@@ -28,6 +28,7 @@ executable('waywall',
     wayland_client,
     wayland_cursor,
     wayland_server,
+    xkbcommon,
   ],
 
   include_directories: includes,
