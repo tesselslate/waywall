@@ -93,10 +93,10 @@ server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size
     }
 
     struct wl_cursor *wl_cursor =
-        wl_cursor_theme_get_cursor(cursor->theme, cursor->cfg->cursor.icon);
+        wl_cursor_theme_get_cursor(cursor->theme, cursor->cfg->theme.cursor_icon);
     if (!wl_cursor) {
         ww_log(LOG_ERROR, "cursor theme '%s' does not contain '%s' cursor icon", name,
-               cursor->cfg->cursor.icon);
+               cursor->cfg->theme.cursor_icon);
         goto fail_get_cursor;
     }
     ww_assert(wl_cursor->image_count > 0); // TODO: valid?

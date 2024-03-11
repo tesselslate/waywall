@@ -5,11 +5,11 @@
 #include <stdlib.h>
 
 static const struct config defaults = {
-    .cursor =
+    .theme =
         {
-            .theme = "default",
-            .icon = "left_ptr",
-            .size = 16,
+            .cursor_theme = "default",
+            .cursor_icon = "left_ptr",
+            .cursor_size = 16,
         },
 };
 
@@ -133,20 +133,20 @@ get_table(struct config *cfg, const char *key, table_func func, const char *full
 }
 
 static int
-process_config_cursor(struct config *cfg) {
-    if (get_string(cfg, "theme", &cfg->cursor.theme, "cursor.theme", false) != 0) {
+process_config_theme(struct config *cfg) {
+    if (get_string(cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg, "icon", &cfg->cursor.icon, "cursor.icon", false) != 0) {
+    if (get_string(cfg, "cursor_icon", &cfg->theme.cursor_icon, "theme.cursor_icon", false) != 0) {
         return 1;
     }
 
-    if (get_int(cfg, "size", &cfg->cursor.size, "cursor.size", false) != 0) {
+    if (get_int(cfg, "cursor_size", &cfg->theme.cursor_size, "theme.cursor_size", false) != 0) {
         return 1;
     }
-    if (cfg->cursor.size <= 0) {
-        ww_log(LOG_ERROR, "'cursor.size' must be a positive, non-zero integer");
+    if (cfg->theme.cursor_size <= 0) {
+        ww_log(LOG_ERROR, "'theme.cursor_size' must be a positive, non-zero integer");
         return 1;
     }
 
@@ -193,7 +193,7 @@ process_config_wall(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
-    if (get_table(cfg, "cursor", process_config_cursor, "cursor", false) != 0) {
+    if (get_table(cfg, "theme", process_config_theme, "theme", false) != 0) {
         return 1;
     }
 
@@ -215,16 +215,16 @@ config_create() {
     // Copy the default configuration, and then heap allocate any strings as needed.
     *cfg = defaults;
 
-    cfg->cursor.theme = strdup(cfg->cursor.theme);
-    if (!cfg->cursor.theme) {
-        ww_log(LOG_ERROR, "failed to allocate config->cursor.theme");
+    cfg->theme.cursor_theme = strdup(cfg->theme.cursor_theme);
+    if (!cfg->theme.cursor_theme) {
+        ww_log(LOG_ERROR, "failed to allocate config->theme.cursor_theme");
         goto fail_cursor_theme;
         return NULL;
     }
 
-    cfg->cursor.icon = strdup(cfg->cursor.icon);
-    if (!cfg->cursor.icon) {
-        ww_log(LOG_ERROR, "failed to allocate config->cursor.icon");
+    cfg->theme.cursor_icon = strdup(cfg->theme.cursor_icon);
+    if (!cfg->theme.cursor_icon) {
+        ww_log(LOG_ERROR, "failed to allocate config->theme.cursor_icon");
         goto fail_cursor_icon;
         return NULL;
     }
@@ -232,7 +232,7 @@ config_create() {
     return cfg;
 
 fail_cursor_icon:
-    free(cfg->cursor.theme);
+    free(cfg->theme.cursor_icon);
 
 fail_cursor_theme:
     free(cfg);
@@ -241,8 +241,8 @@ fail_cursor_theme:
 
 void
 config_destroy(struct config *cfg) {
-    free(cfg->cursor.theme);
-    free(cfg->cursor.icon);
+    free(cfg->theme.cursor_theme);
+    free(cfg->theme.cursor_icon);
 
     if (cfg->vm.L) {
         lua_close(cfg->vm.L);

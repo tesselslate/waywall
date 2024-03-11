@@ -7,10 +7,10 @@ struct config_vm {
 
 struct config {
     struct {
-        char *theme;
-        char *icon;
-        int size;
-    } cursor;
+        char *cursor_theme;
+        char *cursor_icon;
+        int cursor_size;
+    } theme;
     struct {
         int width, height;
         int stretch_width, stretch_height;
