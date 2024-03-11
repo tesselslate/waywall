@@ -85,6 +85,7 @@ void server_destroy(struct server *server);
 
 struct wl_keyboard *server_get_wl_keyboard(struct server *server);
 struct wl_pointer *server_get_wl_pointer(struct server *server);
+void server_set_pointer_pos(struct server *server, double x, double y);
 void server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
                               void *data);
 void server_set_input_focus(struct server *server, struct server_view *view);

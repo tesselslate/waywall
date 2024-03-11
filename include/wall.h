@@ -17,6 +17,7 @@ struct wall {
     int active_instance; // -1 on wall
 
     bool buttons[16];
+    bool pointer_locked;
     double mx, my;
 
     struct wl_listener on_pointer_lock;

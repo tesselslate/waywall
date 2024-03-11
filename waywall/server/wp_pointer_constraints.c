@@ -245,3 +245,12 @@ server_pointer_constraints_g_create(struct server *server) {
 
     return pointer_constraints_g;
 }
+
+void
+server_pointer_constraints_g_set_hint(struct server_pointer_constraints_g *pointer_constraints_g,
+                                      double x, double y) {
+    ww_assert(pointer_constraints_g->remote_pointer);
+
+    zwp_locked_pointer_v1_set_cursor_position_hint(
+        pointer_constraints_g->remote_pointer, wl_fixed_from_double(x), wl_fixed_from_double(y));
+}

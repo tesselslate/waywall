@@ -22,5 +22,8 @@ struct server_pointer_constraints_g {
 };
 
 struct server_pointer_constraints_g *server_pointer_constraints_g_create(struct server *server);
+void
+server_pointer_constraints_g_set_hint(struct server_pointer_constraints_g *pointer_constraints_g,
+                                      double x, double y);
 
 #endif

@@ -174,12 +174,17 @@ static void
 on_pointer_lock(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_pointer_lock);
     server_cursor_hide(wall->server->cursor);
+    wall->pointer_locked = true;
+
+    server_set_pointer_pos(wall->server, wall->server->ui.width / 2.0,
+                           wall->server->ui.height / 2.0);
 }
 
 static void
 on_pointer_unlock(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_pointer_unlock);
     server_cursor_show(wall->server->cursor);
+    wall->pointer_locked = false;
 }
 
 static void
@@ -192,6 +197,11 @@ on_resize(struct wl_listener *listener, void *data) {
         struct server_view *view = wall->instances[wall->active_instance]->view;
         server_view_set_dest_size(view, wall->server->ui.width, wall->server->ui.height);
         server_view_set_size(view, wall->server->ui.width, wall->server->ui.height);
+    }
+
+    if (wall->pointer_locked) {
+        server_set_pointer_pos(wall->server, wall->server->ui.width / 2.0,
+                               wall->server->ui.height / 2.0);
     }
 }
 

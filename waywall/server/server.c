@@ -535,6 +535,12 @@ server_get_wl_pointer(struct server *server) {
 }
 
 void
+server_set_pointer_pos(struct server *server, double x, double y) {
+    server_pointer_constraints_g_set_hint(server->pointer_constraints, x, y);
+    wl_surface_commit(server->ui.surface);
+}
+
+void
 server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
                          void *data) {
     server_seat_g_set_listener(server->seat, listener, data);
