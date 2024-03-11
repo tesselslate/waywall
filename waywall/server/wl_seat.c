@@ -1,4 +1,5 @@
 #include "server/wl_seat.h"
+#include "config.h"
 #include "server/serial.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
@@ -585,7 +586,12 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
     // TODO: allow customizing keymap and repeat info
     wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
                             seat_g->kb_state.keymap_fd, seat_g->kb_state.keymap_size);
-    wl_keyboard_send_repeat_info(keyboard_resource, 40, 300);
+
+    int32_t rate = seat_g->cfg->input.repeat_rate >= 0 ? seat_g->cfg->input.repeat_rate
+                                                       : seat_g->kb_state.repeat_rate;
+    int32_t delay = seat_g->cfg->input.repeat_delay >= 0 ? seat_g->cfg->input.repeat_delay
+                                                         : seat_g->kb_state.repeat_delay;
+    wl_keyboard_send_repeat_info(keyboard_resource, rate, delay);
 }
 
 static void
@@ -663,13 +669,14 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct server_seat_g *
-server_seat_g_create(struct server *server) {
+server_seat_g_create(struct server *server, struct config *cfg) {
     struct server_seat_g *seat_g = calloc(1, sizeof(*seat_g));
     if (!seat_g) {
         ww_log(LOG_ERROR, "failed to allocate server_seat_g");
         return NULL;
     }
 
+    seat_g->cfg = cfg;
     seat_g->server = server;
 
     seat_g->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat_g,

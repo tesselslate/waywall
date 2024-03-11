@@ -9,6 +9,9 @@ struct config_vm {
 
 struct config {
     struct {
+        int repeat_rate, repeat_delay;
+    } input;
+    struct {
         uint8_t background[4];
         char *cursor_theme;
         char *cursor_icon;

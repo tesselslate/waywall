@@ -10,6 +10,7 @@ struct syn_key;
 struct server_seat_g {
     struct wl_global *global;
 
+    struct config *cfg;
     struct server *server;
 
     struct wl_keyboard *keyboard;
@@ -48,7 +49,7 @@ struct server_seat_g {
     } events;
 };
 
-struct server_seat_g *server_seat_g_create(struct server *server);
+struct server_seat_g *server_seat_g_create(struct server *server, struct config *cfg);
 void server_seat_g_send_click(struct server_seat_g *seat_g, struct server_view *view);
 void server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
                              const struct syn_key *keys, size_t num_keys);

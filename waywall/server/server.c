@@ -409,7 +409,7 @@ server_create(struct config *cfg) {
     if (!server->compositor) {
         goto fail_globals;
     }
-    server->seat = server_seat_g_create(server);
+    server->seat = server_seat_g_create(server, server->cfg);
     if (!server->seat) {
         goto fail_globals;
     }

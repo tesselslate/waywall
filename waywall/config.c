@@ -5,6 +5,11 @@
 #include <stdlib.h>
 
 static const struct config defaults = {
+    .input =
+        {
+            .repeat_rate = -1,
+            .repeat_delay = -1,
+        },
     .theme =
         {
             .background = {0, 0, 0, 255},
@@ -168,6 +173,19 @@ fail:
 }
 
 static int
+process_config_input(struct config *cfg) {
+    if (get_int(cfg, "repeat_rate", &cfg->input.repeat_rate, "input.repeat_rate", false) != 0) {
+        return 1;
+    }
+
+    if (get_int(cfg, "repeat_delay", &cfg->input.repeat_delay, "input.repeat_delay", false) != 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 process_config_theme(struct config *cfg) {
     char *raw_background = NULL;
     if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
@@ -241,6 +259,10 @@ process_config_wall(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
+    if (get_table(cfg, "input", process_config_input, "input", false) != 0) {
+        return 1;
+    }
+
     if (get_table(cfg, "theme", process_config_theme, "theme", false) != 0) {
         return 1;
     }
