@@ -11,6 +11,7 @@
 #endif
 
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -48,5 +49,24 @@ enum ww_log_level {
 
 void _ww_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 noreturn void _ww_panic(const char *file, int line, const char *msg);
+
+struct str {
+    char data[PATH_MAX];
+    size_t len;
+};
+
+static inline bool
+str_append(struct str *dst, const char *src) {
+    size_t len = strlen(src);
+
+    if (dst->len + len >= PATH_MAX - 1) {
+        return false;
+    }
+
+    strcpy(dst->data + dst->len, src);
+    dst->data[dst->len + len] = '\0';
+    dst->len += len;
+    return true;
+}
 
 #endif

@@ -15,25 +15,6 @@
 // TODO: configurable
 #define RESET_KEY KEY_F12
 
-struct str {
-    char data[PATH_MAX];
-    size_t len;
-};
-
-static bool
-str_append(struct str *dst, const char *src) {
-    size_t len = strlen(src);
-
-    if (dst->len + len >= PATH_MAX - 1) {
-        return false;
-    }
-
-    strcpy(dst->data + dst->len, src);
-    dst->data[dst->len + len] = '\0';
-    dst->len += len;
-    return true;
-}
-
 static inline int
 parse_percent(char data[static 3]) {
     int x = data[0] - '0';
