@@ -11,6 +11,7 @@
 #include <string.h>
 #include <strings.h>
 #include <sys/inotify.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <zip.h>
 
@@ -97,6 +98,16 @@ read_options(FILE *file, struct instance_options *opts) {
                 opts->auto_pause = true;
             } else {
                 ww_log(LOG_ERROR, "invalid boolean in options file: '%s'", val);
+                return 1;
+            }
+        } else if (strcmp(key, "f3PauseOnWorldLoad") == 0) {
+            if (strcmp(val, "false") == 0) {
+                opts->f3_pause = false;
+            } else if (strcmp(val, "true") == 0) {
+                opts->f3_pause = true;
+            } else {
+                ww_log(LOG_ERROR, "invalid boolean in options file: '%s'", val);
+                return 1;
             }
         }
     }
@@ -325,7 +336,7 @@ get_mods(const char *dirname, struct instance_mods *mods) {
 }
 
 static int
-get_options(const char *dirname, struct instance_options *opts) {
+get_options(const char *dirname, struct instance_mods mods, struct instance_options *opts) {
     struct str pathbuf = {0};
     if (!str_append(&pathbuf, dirname)) {
         ww_log(LOG_ERROR, "instance path too long");
@@ -342,9 +353,69 @@ get_options(const char *dirname, struct instance_options *opts) {
         return 1;
     }
 
-    int ret = read_options(file, opts);
+    if (read_options(file, opts) != 0) {
+        fclose(file);
+        return 1;
+    }
     fclose(file);
-    return ret;
+
+    if (mods.standard_settings) {
+        pathbuf = (struct str){0};
+        ww_assert(str_append(&pathbuf, dirname));
+        if (!str_append(&pathbuf, "/config/standardoptions.txt")) {
+            ww_log(LOG_ERROR, "instance path too long");
+            return 1;
+        }
+
+        // Follow the StandardSettings file chain, if there is one.
+        file = fopen(pathbuf.data, "r");
+        if (!file) {
+            ww_log_errno(LOG_ERROR, "failed to open '%s'", pathbuf.data);
+            return 1;
+        }
+
+        for (;;) {
+            char buf[4096];
+            if (fgets(buf, STATIC_ARRLEN(buf), file) == NULL) {
+                if (feof(file)) {
+                    ww_log(LOG_ERROR, "nothing to read from '%s'", pathbuf.data);
+                    return 1;
+                } else {
+                    ww_log_errno(LOG_ERROR, "failed to read '%s'", pathbuf.data);
+                    return 1;
+                }
+            }
+
+            char *newline = strrchr(buf, '\n');
+            if (newline) {
+                *newline = '\0';
+            }
+
+            struct stat fstat;
+            if (stat(buf, &fstat) != 0) {
+                if (fseek(file, 0, SEEK_SET) == -1) {
+                    ww_log_errno(LOG_ERROR, "failed to seek to start of '%s'", pathbuf.data);
+                    return 1;
+                }
+                break;
+            }
+
+            fclose(file);
+            file = fopen(buf, "r");
+            if (!file) {
+                ww_log_errno(LOG_ERROR, "failed to open '%s'", buf);
+                return 1;
+            }
+        }
+
+        if (read_options(file, opts) != 0) {
+            fclose(file);
+            return 1;
+        }
+        fclose(file);
+    }
+
+    return 0;
 }
 
 static int
@@ -448,7 +519,7 @@ instance_create(struct server_view *view, struct inotify *inotify) {
     }
 
     struct instance_options opts = default_options;
-    if (get_options(dir, &opts) != 0) {
+    if (get_options(dir, mods, &opts) != 0) {
         return NULL;
     }
 
@@ -545,11 +616,14 @@ instance_state_update(struct instance *instance) {
     int current = instance->state.screen;
 
     if (current == SCREEN_PREVIEWING && prev != SCREEN_PREVIEWING) {
-        pause_instance(instance);
-    } else if (current == SCREEN_INWORLD && prev != SCREEN_INWORLD) {
-        // TODO: only pause if no f3EscOnWorldLoad from standardsettings
-        if (!server_view_has_focus(instance->view)) {
+        if (!instance->opts.f3_pause) {
             pause_instance(instance);
+        }
+    } else if (current == SCREEN_INWORLD && prev != SCREEN_INWORLD) {
+        if (!server_view_has_focus(instance->view)) {
+            if (!instance->opts.f3_pause) {
+                pause_instance(instance);
+            }
         } else {
             // TODO: F1
         }

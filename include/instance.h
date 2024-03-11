@@ -20,11 +20,15 @@ struct instance {
         bool world_preview : 1;
     } mods;
     struct instance_options {
+        // Vanilla
         struct {
             uint8_t atum_reset;
             uint8_t leave_preview;
         } keys;
         bool auto_pause;
+
+        // StandardSettings
+        bool f3_pause;
     } opts;
     int version;
 
