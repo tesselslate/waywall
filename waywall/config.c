@@ -12,6 +12,8 @@ static const struct config defaults = {
         },
 };
 
+typedef int (*table_func)(struct config *cfg);
+
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
 __attribute__((unused)) static inline void
@@ -102,6 +104,34 @@ get_string(struct config *cfg, const char *key, char **dst, const char *full_nam
 }
 
 static int
+get_table(struct config *cfg, const char *key, table_func func, const char *full_name,
+          bool required) {
+    lua_pushstring(cfg->vm.L, key);
+    lua_gettable(cfg->vm.L, -2);
+
+    switch (lua_type(cfg->vm.L, -1)) {
+    case LUA_TTABLE:
+        if (func(cfg) != 0) {
+            return 1;
+        }
+        break;
+    case LUA_TNIL:
+        if (required) {
+            ww_log(LOG_ERROR, "config property '%s' is required", full_name);
+            return 1;
+        }
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected '%s' to be of type 'table', was '%s'", full_name,
+               luaL_typename(cfg->vm.L, -1));
+        return 1;
+    }
+
+    lua_pop(cfg->vm.L, 1);
+    return 0;
+}
+
+static int
 process_config_cursor(struct config *cfg) {
     if (get_string(cfg, "theme", &cfg->cursor.theme, "cursor.theme", false) != 0) {
         return 1;
@@ -135,41 +165,12 @@ process_config_wall(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
-    // waywall.cursor
-    lua_pushstring(cfg->vm.L, "cursor");
-    lua_gettable(cfg->vm.L, -2);
-    switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TTABLE:
-        if (process_config_cursor(cfg) != 0) {
-            return 1;
-        }
-        break;
-    case LUA_TNIL:
-        break;
-    default:
-        ww_log(LOG_ERROR, "expected 'waywall.cursor' to be of type 'table', was '%s'",
-               luaL_typename(cfg->vm.L, -1));
+    if (get_table(cfg, "cursor", process_config_cursor, "cursor", false) != 0) {
         return 1;
     }
-    lua_pop(cfg->vm.L, 1);
-
-    // waywall.wall
-    lua_pushstring(cfg->vm.L, "wall");
-    lua_gettable(cfg->vm.L, -2);
-    switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TTABLE:
-        if (process_config_wall(cfg) != 0) {
-            return 1;
-        }
-        break;
-    case LUA_TNIL:
-        break;
-    default:
-        ww_log(LOG_ERROR, "expected 'waywall.wall' to be of type 'table', was '%s'",
-               luaL_typename(cfg->vm.L, -1));
+    if (get_table(cfg, "wall", process_config_wall, "wall", true) != 0) {
         return 1;
     }
-    lua_pop(cfg->vm.L, 1);
 
     return 0;
 }
