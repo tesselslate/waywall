@@ -1,3 +1,4 @@
+#include "config.h"
 #include "inotify.h"
 #include "server/server.h"
 #include "util.h"
@@ -14,9 +15,17 @@ handle_signal(int signal, void *data) {
 
 int
 main() {
+    struct config *cfg = config_create();
+    if (!cfg) {
+        return 1;
+    }
+    if (config_populate(cfg) != 0) {
+        goto fail_config_populate;
+    }
+
     struct server *server = server_create();
     if (!server) {
-        return 1;
+        goto fail_server;
     }
 
     struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
@@ -44,6 +53,7 @@ main() {
     inotify_destroy(inotify);
     wl_event_source_remove(src_sigint);
     server_destroy(server);
+    config_destroy(cfg);
 
     ww_log(LOG_INFO, "Done");
     return 0;
@@ -57,5 +67,9 @@ fail_socket:
 fail_inotify:
     wl_event_source_remove(src_sigint);
     server_destroy(server);
+
+fail_server:
+fail_config_populate:
+    config_destroy(cfg);
     return 1;
 }
