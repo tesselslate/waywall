@@ -154,10 +154,10 @@ play_instance(struct wall *wall, int id) {
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
     server_view_set_position(wall->instances[id]->view, 0, 0);
-    server_view_set_size(wall->instances[id]->view, wall->server->ui.width,
-                         wall->server->ui.height);
     server_view_set_dest_size(wall->instances[id]->view, wall->server->ui.width,
                               wall->server->ui.height);
+    server_view_set_size(wall->instances[id]->view, wall->server->ui.width,
+                         wall->server->ui.height);
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (i == id) {
@@ -187,7 +187,9 @@ on_resize(struct wl_listener *listener, void *data) {
     if (ON_WALL(wall)) {
         layout_wall(wall);
     } else {
-#warning TODO
+        struct server_view *view = wall->instances[wall->active_instance]->view;
+        server_view_set_dest_size(view, wall->server->ui.width, wall->server->ui.height);
+        server_view_set_size(view, wall->server->ui.width, wall->server->ui.height);
     }
 }
 
