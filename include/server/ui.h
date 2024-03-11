@@ -6,6 +6,7 @@
 #include <wayland-server-core.h>
 
 struct server_ui {
+    struct config *cfg;
     struct server *server;
 
     struct wl_buffer *background;
@@ -55,7 +56,7 @@ struct server_view_impl {
 };
 
 void server_ui_destroy(struct server_ui *ui);
-int server_ui_init(struct server *server, struct server_ui *ui);
+int server_ui_init(struct server *server, struct server_ui *ui, struct config *cfg);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_show(struct server_ui *ui);
 

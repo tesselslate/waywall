@@ -1,4 +1,5 @@
 #include "server/ui.h"
+#include "config.h"
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
@@ -87,11 +88,11 @@ server_ui_destroy(struct server_ui *ui) {
 }
 
 int
-server_ui_init(struct server *server, struct server_ui *ui) {
+server_ui_init(struct server *server, struct server_ui *ui, struct config *cfg) {
+    ui->cfg = cfg;
     ui->server = server;
 
-    // TODO: configurable background
-    ui->background = remote_buffer_manager_color(server->remote_buf, (uint8_t[4]){0, 0, 0, 255});
+    ui->background = remote_buffer_manager_color(server->remote_buf, ui->cfg->theme.background);
     if (!ui->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
         return 1;

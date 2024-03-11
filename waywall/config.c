@@ -7,6 +7,7 @@
 static const struct config defaults = {
     .theme =
         {
+            .background = {0, 0, 0, 255},
             .cursor_theme = "default",
             .cursor_icon = "left_ptr",
             .cursor_size = 16,
@@ -133,8 +134,55 @@ get_table(struct config *cfg, const char *key, table_func func, const char *full
 }
 
 static int
+parse_theme_background(struct config *cfg, const char *raw) {
+    ssize_t len = strlen(raw);
+    bool maybe_valid_rgb = (len == 6) || (len == 7 && raw[0] == '#');
+    bool maybe_valid_rgba = (len == 8) || (len == 9 && raw[0] == '#');
+    if (!maybe_valid_rgb && !maybe_valid_rgba) {
+        goto fail;
+    }
+
+    int r = 0, g = 0, b = 0, a = 255;
+    if (maybe_valid_rgb) {
+        ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x", &r, &g, &b);
+        if (n != 3) {
+            goto fail;
+        }
+    } else {
+        ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x%02x", &r, &g, &b, &a);
+        if (n != 4) {
+            goto fail;
+        }
+    }
+
+    cfg->theme.background[0] = r;
+    cfg->theme.background[1] = g;
+    cfg->theme.background[2] = b;
+    cfg->theme.background[3] = a;
+
+    return 0;
+
+fail:
+    ww_log(LOG_ERROR, "expected 'theme.background' to have a valid hex color, got '%s'", raw);
+    return 1;
+}
+
+static int
 process_config_theme(struct config *cfg) {
-    if (get_string(cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme", false) != 0) {
+    char *raw_background = NULL;
+    if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
+        return 1;
+    }
+    if (raw_background) {
+        if (parse_theme_background(cfg, raw_background) != 0) {
+            free(raw_background);
+            return 1;
+        }
+        free(raw_background);
+    }
+
+    if (get_string(cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme", false) !=
+        0) {
         return 1;
     }
 
@@ -219,14 +267,12 @@ config_create() {
     if (!cfg->theme.cursor_theme) {
         ww_log(LOG_ERROR, "failed to allocate config->theme.cursor_theme");
         goto fail_cursor_theme;
-        return NULL;
     }
 
     cfg->theme.cursor_icon = strdup(cfg->theme.cursor_icon);
     if (!cfg->theme.cursor_icon) {
         ww_log(LOG_ERROR, "failed to allocate config->theme.cursor_icon");
         goto fail_cursor_icon;
-        return NULL;
     }
 
     return cfg;

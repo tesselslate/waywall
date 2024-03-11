@@ -452,7 +452,7 @@ server_create(struct config *cfg) {
     }
     server_cursor_show(server->cursor);
 
-    if (server_ui_init(server, &server->ui) != 0) {
+    if (server_ui_init(server, &server->ui, server->cfg) != 0) {
         ww_log(LOG_ERROR, "failed to initialize server_ui");
         goto fail_ui;
     }
