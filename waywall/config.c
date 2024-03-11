@@ -9,6 +9,7 @@ static const struct config defaults = {
         {
             .theme = "default",
             .icon = "left_ptr",
+            .size = 16,
         },
 };
 
@@ -138,6 +139,14 @@ process_config_cursor(struct config *cfg) {
     }
 
     if (get_string(cfg, "icon", &cfg->cursor.icon, "cursor.icon", false) != 0) {
+        return 1;
+    }
+
+    if (get_int(cfg, "size", &cfg->cursor.size, "cursor.size", false) != 0) {
+        return 1;
+    }
+    if (cfg->cursor.size <= 0) {
+        ww_log(LOG_ERROR, "'cursor.size' must be a positive, non-zero integer");
         return 1;
     }
 

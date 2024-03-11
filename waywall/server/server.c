@@ -444,7 +444,7 @@ server_create(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to initialize cursor");
         goto fail_cursor;
     }
-    if (server_cursor_use_theme(server->cursor, server->cfg->cursor.theme, 16) != 0) {
+    if (server_cursor_use_theme(server->cursor, server->cfg->cursor.theme, server->cfg->cursor.size) != 0) {
         ww_log(LOG_ERROR, "failed to initialize cursor theme '%s'", server->cfg->cursor.theme);
         goto fail_cursor_theme;
     }

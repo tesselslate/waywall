@@ -9,6 +9,7 @@ struct config {
     struct {
         char *theme;
         char *icon;
+        int size;
     } cursor;
     struct {
         int width, height;
