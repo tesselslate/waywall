@@ -8,12 +8,101 @@
 #include <limits.h>
 #include <linux/input-event-codes.h>
 #include <stdio.h>
+#include <string.h>
+#include <strings.h>
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <zip.h>
 
-// TODO: configurable
-#define RESET_KEY KEY_F12
+#define K(x)                                                                                       \
+    { #x, KEY_##x }
+
+// TODO: This does not cover all possible keycodes.
+static struct {
+    const char *name;
+    uint8_t code;
+} key_mapping[] = {
+    K(0),  K(1),  K(2),  K(3),  K(4),  K(5),  K(6),  K(7),  K(8),  K(9),   K(A),   K(B),
+    K(C),  K(D),  K(E),  K(F),  K(G),  K(H),  K(I),  K(J),  K(K),  K(L),   K(M),   K(N),
+    K(O),  K(P),  K(Q),  K(R),  K(S),  K(T),  K(U),  K(V),  K(W),  K(X),   K(Y),   K(Z),
+    K(F1), K(F2), K(F3), K(F4), K(F5), K(F6), K(F7), K(F8), K(F9), K(F10), K(F11), K(F12),
+};
+
+#undef K
+
+static const struct instance_options default_options = {
+    .keys.atum_reset = KEY_F6,
+    .keys.leave_preview = KEY_H,
+    .auto_pause = false,
+};
+
+static inline uint8_t *
+read_keycode(const char *name) {
+    static const char prefix[] = "key.keyboard.";
+    if (strlen(name) <= STATIC_STRLEN(prefix)) {
+        return NULL;
+    }
+
+    for (size_t i = 0; i < STATIC_ARRLEN(key_mapping); i++) {
+        if (strcasecmp(key_mapping[i].name, name + STATIC_STRLEN(prefix)) == 0) {
+            return &key_mapping[i].code;
+        }
+    }
+
+    return NULL;
+}
+
+static int
+read_options(FILE *file, struct instance_options *opts) {
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        ww_log_errno(LOG_ERROR, "failed to seek to start of options file");
+        return 1;
+    }
+
+    char buf[4096];
+    while (fgets(buf, STATIC_ARRLEN(buf), file)) {
+        char *newline = strrchr(buf, '\n');
+        if (newline) {
+            *newline = '\0';
+        }
+
+        char *sep = strchr(buf, ':');
+        if (!sep) {
+            continue;
+        }
+        *sep = '\0';
+
+        char *key = buf, *val = sep + 1;
+        if (!*val) {
+            continue;
+        }
+        if (strcmp(key, "key_Create New World") == 0) {
+            uint8_t *code = read_keycode(val);
+            if (!code) {
+                ww_log(LOG_ERROR, "failed to read atum reset key: '%s'", val);
+                return 1;
+            }
+            opts->keys.atum_reset = *code;
+        } else if (strcmp(key, "key_Leave Preview") == 0) {
+            uint8_t *code = read_keycode(val);
+            if (!code) {
+                ww_log(LOG_ERROR, "failed to read leave preview key: '%s'", val);
+                return 1;
+            }
+            opts->keys.leave_preview = *code;
+        } else if (strcmp(key, "pauseOnLostFocus") == 0) {
+            if (strcmp(val, "false") == 0) {
+                opts->auto_pause = false;
+            } else if (strcmp(val, "true") == 0) {
+                opts->auto_pause = true;
+            } else {
+                ww_log(LOG_ERROR, "invalid boolean in options file: '%s'", val);
+            }
+        }
+    }
+
+    return ferror(file);
+}
 
 static inline int
 parse_percent(char data[static 3]) {
@@ -236,6 +325,29 @@ get_mods(const char *dirname, struct instance_mods *mods) {
 }
 
 static int
+get_options(const char *dirname, struct instance_options *opts) {
+    struct str pathbuf = {0};
+    if (!str_append(&pathbuf, dirname)) {
+        ww_log(LOG_ERROR, "instance path too long");
+        return 1;
+    }
+    if (!str_append(&pathbuf, "/options.txt")) {
+        ww_log(LOG_ERROR, "instance path too long");
+        return 1;
+    }
+
+    FILE *file = fopen(pathbuf.data, "r");
+    if (!file) {
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", pathbuf.data);
+        return 1;
+    }
+
+    int ret = read_options(file, opts);
+    fclose(file);
+    return ret;
+}
+
+static int
 get_version(struct server_view *view) {
     char *title = server_view_get_title(view);
 
@@ -335,6 +447,11 @@ instance_create(struct server_view *view, struct inotify *inotify) {
         return NULL;
     }
 
+    struct instance_options opts = default_options;
+    if (get_options(dir, &opts) != 0) {
+        return NULL;
+    }
+
     int version = get_version(view);
     if (version == -1) {
         return NULL;
@@ -354,6 +471,7 @@ instance_create(struct server_view *view, struct inotify *inotify) {
     instance->dir = strdup(dir);
     instance->pid = pid;
     instance->mods = mods;
+    instance->opts = opts;
     instance->version = version;
     instance->state_fd = state_fd;
     instance->state_wd = -1;
@@ -400,9 +518,12 @@ instance_reset(struct instance *instance) {
 
     // TODO: atum click fix is only necessary on older atum versions?
 
+    uint8_t reset_key = instance->state.screen == SCREEN_PREVIEWING
+                            ? instance->opts.keys.leave_preview
+                            : instance->opts.keys.atum_reset;
     const struct syn_key keys[] = {
-        {RESET_KEY, true},
-        {RESET_KEY, false},
+        {reset_key, true},
+        {reset_key, false},
     };
     server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
 

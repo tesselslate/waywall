@@ -2,6 +2,7 @@
 #define WAYWALL_INSTANCE_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/time.h>
 #include <sys/types.h>
 
@@ -18,6 +19,13 @@ struct instance {
         bool state_output : 1;
         bool world_preview : 1;
     } mods;
+    struct instance_options {
+        struct {
+            uint8_t atum_reset;
+            uint8_t leave_preview;
+        } keys;
+        bool auto_pause;
+    } opts;
     int version;
 
     int state_wd, state_fd;
