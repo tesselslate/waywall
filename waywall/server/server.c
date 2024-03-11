@@ -439,12 +439,6 @@ server_create(struct config *cfg) {
         goto fail_globals;
     }
 
-    if (server_ui_init(server, &server->ui) != 0) {
-        ww_log(LOG_ERROR, "failed to initialize server_ui");
-        goto fail_ui;
-    }
-    server_ui_show(&server->ui);
-
     server->cursor = server_cursor_create(server);
     if (!server->cursor) {
         ww_log(LOG_ERROR, "failed to initialize cursor");
@@ -456,15 +450,19 @@ server_create(struct config *cfg) {
     }
     server_cursor_show(server->cursor);
 
+    if (server_ui_init(server, &server->ui) != 0) {
+        ww_log(LOG_ERROR, "failed to initialize server_ui");
+        goto fail_ui;
+    }
+    server_ui_show(&server->ui);
+
     return server;
 
+fail_ui:
 fail_cursor_theme:
     server_cursor_destroy(server->cursor);
 
 fail_cursor:
-    server_ui_destroy(&server->ui);
-
-fail_ui:
 fail_globals:
     remote_buffer_manager_destroy(server->remote_buf);
 
