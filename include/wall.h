@@ -7,6 +7,7 @@
 #define MAX_INSTANCES 128
 
 struct wall {
+    struct config *cfg;
     struct server *server;
     struct inotify *inotify;
 
@@ -25,7 +26,7 @@ struct wall {
     struct wl_listener on_view_destroy;
 };
 
-struct wall *wall_create(struct server *server, struct inotify *inotify);
+struct wall *wall_create(struct server *server, struct inotify *inotify, struct config *cfg);
 void wall_destroy(struct wall *wall);
 
 #endif

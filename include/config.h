@@ -10,6 +10,10 @@ struct config {
         char *theme;
         char *icon;
     } cursor;
+    struct {
+        int width;
+        int height;
+    } wall;
 
     struct config_vm vm;
 };

@@ -1,4 +1,5 @@
 #include "wall.h"
+#include "config.h"
 #include "inotify.h"
 #include "instance.h"
 #include "server/cursor.h"
@@ -10,8 +11,6 @@
 static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.buttons));
 
 // TODO: config options
-#define WALL_WIDTH 3
-#define WALL_HEIGHT 5
 #define WALL_INST_WIDTH 640
 #define WALL_INST_HEIGHT 216
 
@@ -24,12 +23,12 @@ struct box {
 
 static struct box
 get_hitbox(struct wall *wall, int id) {
-    int inst_width = wall->server->ui.width / WALL_WIDTH;
-    int inst_height = wall->server->ui.height / WALL_HEIGHT;
+    int inst_width = wall->server->ui.width / wall->cfg->wall.width;
+    int inst_height = wall->server->ui.height / wall->cfg->wall.height;
 
     struct box box;
-    box.x = (id % WALL_WIDTH) * inst_width;
-    box.y = (id / WALL_WIDTH) * inst_height;
+    box.x = (id % wall->cfg->wall.width) * inst_width;
+    box.y = (id / wall->cfg->wall.width) * inst_height;
     box.w = inst_width;
     box.h = inst_height;
     return box;
@@ -44,12 +43,12 @@ get_hovered(struct wall *wall) {
         return -1;
     }
 
-    int inst_width = wall->server->ui.width / WALL_WIDTH;
-    int inst_height = wall->server->ui.height / WALL_HEIGHT;
+    int inst_width = wall->server->ui.width / wall->cfg->wall.width;
+    int inst_height = wall->server->ui.height / wall->cfg->wall.height;
 
     int x = wall->mx / inst_width;
     int y = wall->my / inst_height;
-    int id = y * WALL_WIDTH + x;
+    int id = y * wall->cfg->wall.width + x;
     return (id < wall->num_instances) ? id : -1;
 }
 
@@ -306,13 +305,14 @@ static const struct server_seat_listener seat_listener = {
 };
 
 struct wall *
-wall_create(struct server *server, struct inotify *inotify) {
+wall_create(struct server *server, struct inotify *inotify, struct config *cfg) {
     struct wall *wall = calloc(1, sizeof(*wall));
     if (!wall) {
         ww_log(LOG_ERROR, "failed to allocate wall");
         return NULL;
     }
 
+    wall->cfg = cfg;
     wall->server = server;
     wall->inotify = inotify;
 

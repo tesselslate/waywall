@@ -89,6 +89,59 @@ process_config_cursor(struct config *cfg) {
 }
 
 static int
+process_config_wall(struct config *cfg) {
+    // waywall.wall.width
+    lua_pushstring(cfg->vm.L, "width");
+    lua_gettable(cfg->vm.L, -2);
+    switch (lua_type(cfg->vm.L, -1)) {
+    case LUA_TNUMBER: {
+        double width = lua_tonumber(cfg->vm.L, -1);
+        int i_width = (int)width;
+        if (i_width != width) {
+            ww_log(LOG_ERROR, "expected 'waywall.wall.width' to be a whole number, got '%lf'",
+                   width);
+            return 1;
+        }
+        cfg->wall.width = i_width;
+        break;
+    }
+    case LUA_TNIL:
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected 'waywall.wall.width' to be of type 'number', was '%s'",
+               luaL_typename(cfg->vm.L, -1));
+        return 1;
+    }
+    lua_pop(cfg->vm.L, 1);
+
+    // waywall.wall.height
+    lua_pushstring(cfg->vm.L, "height");
+    lua_gettable(cfg->vm.L, -2);
+    switch (lua_type(cfg->vm.L, -1)) {
+    case LUA_TNUMBER: {
+        double height = lua_tonumber(cfg->vm.L, -1);
+        int i_height = (int)height;
+        if (i_height != height) {
+            ww_log(LOG_ERROR, "expected 'waywall.wall.height' to be a whole number, got '%lf'",
+                   height);
+            return 1;
+        }
+        cfg->wall.height = i_height;
+        break;
+    }
+    case LUA_TNIL:
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected 'waywall.wall.height' to be of type 'number', was '%s'",
+               luaL_typename(cfg->vm.L, -1));
+        return 1;
+    }
+    lua_pop(cfg->vm.L, 1);
+
+    return 0;
+}
+
+static int
 process_config(struct config *cfg) {
     // waywall.cursor
     lua_pushstring(cfg->vm.L, "cursor");
@@ -103,6 +156,24 @@ process_config(struct config *cfg) {
         break;
     default:
         ww_log(LOG_ERROR, "expected 'waywall.cursor' to be of type 'table', was '%s'",
+               luaL_typename(cfg->vm.L, -1));
+        return 1;
+    }
+    lua_pop(cfg->vm.L, 1);
+
+    // waywall.wall
+    lua_pushstring(cfg->vm.L, "wall");
+    lua_gettable(cfg->vm.L, -2);
+    switch (lua_type(cfg->vm.L, -1)) {
+    case LUA_TTABLE:
+        if (process_config_wall(cfg) != 0) {
+            return 1;
+        }
+        break;
+    case LUA_TNIL:
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected 'waywall.wall' to be of type 'table', was '%s'",
                luaL_typename(cfg->vm.L, -1));
         return 1;
     }

@@ -37,7 +37,7 @@ main() {
         goto fail_inotify;
     }
 
-    struct wall *wall = wall_create(server, inotify);
+    struct wall *wall = wall_create(server, inotify, cfg);
     if (!wall) {
         goto fail_wall;
     }
