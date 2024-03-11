@@ -123,19 +123,6 @@ fail_state_path:
 }
 
 static void
-remove_instance(struct wall *wall, int index) {
-    memmove(wall + index, wall + index + 1,
-            sizeof(struct instance *) * (wall->num_instances - index - 1));
-    wall->num_instances--;
-
-    if (ON_WALL(wall)) {
-        layout_wall(wall);
-    } else if (wall->active_instance == index) {
-#warning TODO
-    }
-}
-
-static void
 focus_wall(struct wall *wall) {
     ww_assert(!ON_WALL(wall));
 
@@ -145,6 +132,21 @@ focus_wall(struct wall *wall) {
 
     for (int i = 0; i < wall->num_instances; i++) {
         server_view_show(wall->instances[i]->view);
+    }
+}
+
+static void
+remove_instance(struct wall *wall, int index) {
+    instance_destroy(wall->instances[index]);
+
+    memmove(wall + index, wall + index + 1,
+            sizeof(struct instance *) * (wall->num_instances - index - 1));
+    wall->num_instances--;
+
+    if (ON_WALL(wall)) {
+        layout_wall(wall);
+    } else if (wall->active_instance == index) {
+        focus_wall(wall);
     }
 }
 
