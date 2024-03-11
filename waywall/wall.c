@@ -102,6 +102,9 @@ add_instance(struct wall *wall, struct instance *instance) {
     int id = wall->num_instances;
     wall->instances[wall->num_instances++] = instance;
 
+    server_view_set_size(instance->view, wall->cfg->wall.stretch_width,
+                         wall->cfg->wall.stretch_height);
+
     if (ON_WALL(wall)) {
         layout_instance(wall, id);
         server_view_show(instance->view);
