@@ -644,3 +644,15 @@ instance_state_update(struct instance *instance) {
         }
     }
 }
+
+void
+instance_unpause(struct instance *instance) {
+    static const struct syn_key keys[] = {
+        {KEY_ESC, true},
+        {KEY_ESC, false},
+        {KEY_F1, true},
+        {KEY_F1, false},
+    };
+
+    server_view_send_keys(instance->view, keys, instance->opts.f1 ? 4 : 2);
+}

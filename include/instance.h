@@ -62,5 +62,6 @@ void instance_destroy(struct instance *instance);
 char *instance_get_state_path(struct instance *instance);
 bool instance_reset(struct instance *instance);
 void instance_state_update(struct instance *instance);
+void instance_unpause(struct instance *instance);
 
 #endif

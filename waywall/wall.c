@@ -151,6 +151,8 @@ remove_instance(struct wall *wall, int index) {
 static void
 play_instance(struct wall *wall, int id) {
     wall->active_instance = id;
+
+    instance_unpause(wall->instances[id]);
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
     server_view_set_position(wall->instances[id]->view, 0, 0);
