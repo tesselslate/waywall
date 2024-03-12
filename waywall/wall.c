@@ -293,6 +293,14 @@ on_key(void *data, uint32_t key, bool pressed) {
 }
 
 static void
+on_modifiers(void *data, uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group) {
+    // TODO: use an xkb_state and properly handle all of the modifiers
+    struct wall *wall = data;
+
+    wall->modifiers = depressed;
+}
+
+static void
 on_motion(void *data, double x, double y) {
     struct wall *wall = data;
 
@@ -310,6 +318,7 @@ on_keymap(void *data, int fd, uint32_t size) {
 static const struct server_seat_listener seat_listener = {
     .button = on_button,
     .key = on_key,
+    .modifiers = on_modifiers,
     .motion = on_motion,
 
     .keymap = on_keymap,

@@ -304,6 +304,8 @@ on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     seat_g->kb_state.mods_locked = 0;
     seat_g->kb_state.group = 0;
     send_keyboard_modifiers(seat_g);
+
+    // TODO: send 0 modifiers, all key releases to listener
 }
 
 static void
@@ -316,6 +318,11 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
     seat_g->kb_state.mods_locked = mods_locked;
     seat_g->kb_state.group = group;
     send_keyboard_modifiers(seat_g);
+
+    if (seat_g->listener) {
+        seat_g->listener->modifiers(seat_g->listener_data, mods_depressed, mods_latched,
+                                    mods_locked, group);
+    }
 }
 
 static void

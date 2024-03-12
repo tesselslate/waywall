@@ -16,6 +16,7 @@ struct wall {
 
     int active_instance; // -1 on wall
 
+    uint32_t modifiers;
     bool buttons[16];
     bool pointer_locked;
     double mx, my;
