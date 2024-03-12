@@ -1,4 +1,5 @@
 #include "config.h"
+#include "init.lua.h"
 #include "util.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
@@ -22,6 +23,17 @@ static const struct config defaults = {
 };
 
 typedef int (*table_func)(struct config *cfg);
+
+static int
+lua_lib_log(lua_State *L) {
+    ww_log(LOG_INFO, "lua: %s", lua_tostring(L, 1));
+    return 0;
+}
+
+static const struct luaL_Reg lua_lib[] = {
+    {"log", lua_lib_log},
+    {NULL, NULL},
+};
 
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
@@ -443,50 +455,9 @@ config_destroy(struct config *cfg) {
     free(cfg);
 }
 
-char *
-config_get_path() {
-    struct str pathbuf = {0};
-
-    char *xdg = getenv("XDG_CONFIG_HOME");
-    if (xdg) {
-        if (!str_append(&pathbuf, xdg)) {
-            ww_log(LOG_ERROR, "config path too long");
-            return NULL;
-        }
-    } else {
-        char *home = getenv("HOME");
-        if (!home) {
-            ww_log(LOG_ERROR, "no $XDG_CONFIG_HOME or $HOME variables present");
-            return NULL;
-        }
-
-        if (!str_append(&pathbuf, home)) {
-            ww_log(LOG_ERROR, "config path too long");
-            return NULL;
-        }
-        if (!str_append(&pathbuf, "/.config/")) {
-            ww_log(LOG_ERROR, "config path too long");
-            return NULL;
-        }
-    }
-
-    if (!str_append(&pathbuf, "/waywall/init.lua")) {
-        ww_log(LOG_ERROR, "config path too long");
-        return NULL;
-    }
-
-    return strdup(pathbuf.data);
-}
-
 int
 config_populate(struct config *cfg) {
     ww_assert(!cfg->vm.L);
-
-    char *path = config_get_path();
-    if (!path) {
-        ww_log(LOG_ERROR, "failed to get config path");
-        return 1;
-    }
 
     cfg->vm.L = luaL_newstate();
     if (!cfg->vm.L) {
@@ -494,19 +465,26 @@ config_populate(struct config *cfg) {
         goto fail_lua_newstate;
     }
 
-    lua_newtable(cfg->vm.L);
-    lua_setglobal(cfg->vm.L, "waywall");
-    if (luaL_dofile(cfg->vm.L, path) != 0) {
-        ww_log(LOG_ERROR, "failed to load config: %s", lua_tostring(cfg->vm.L, -1));
-        goto fail_dofile;
+    luaL_openlibs(cfg->vm.L);
+    lua_getglobal(cfg->vm.L, "_G");
+    luaL_register(cfg->vm.L, "priv_waywall", lua_lib);
+    lua_pop(cfg->vm.L, 2);
+
+    if (luaL_loadbuffer(cfg->vm.L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE, "__init") !=
+        0) {
+        ww_log(LOG_ERROR, "failed to load internal init chunk");
+        goto fail_loadbuffer;
+    }
+    if (lua_pcall(cfg->vm.L, 0, 1, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->vm.L, -1));
+        goto fail_pcall;
     }
 
-    lua_getglobal(cfg->vm.L, "waywall");
     int type = lua_type(cfg->vm.L, -1);
     if (type != LUA_TTABLE) {
-        ww_log(LOG_ERROR, "expected global value 'waywall' to be of type 'table', got '%s'",
+        ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
                lua_typename(cfg->vm.L, -1));
-        goto fail_global;
+        goto fail_table;
     }
 
     if (!lua_checkstack(cfg->vm.L, 16)) {
@@ -521,15 +499,14 @@ config_populate(struct config *cfg) {
     lua_pop(cfg->vm.L, 1);
     ww_assert(lua_gettop(cfg->vm.L) == 0);
 
-    free(path);
     return 0;
 
 fail_load:
     lua_settop(cfg->vm.L, 0);
 
-fail_global:
-fail_dofile:
+fail_table:
+fail_pcall:
+fail_loadbuffer:
 fail_lua_newstate:
-    free(path);
     return 1;
 }

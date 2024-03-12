@@ -33,7 +33,6 @@ struct config {
 
 struct config *config_create();
 void config_destroy(struct config *cfg);
-char *config_get_path();
 int config_populate(struct config *cfg);
 
 #endif
