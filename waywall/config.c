@@ -53,7 +53,7 @@ dump_stack(struct config *cfg) {
 static int
 get_double(struct config *cfg, const char *key, double *dst, const char *full_name, bool required) {
     lua_pushstring(cfg->vm.L, key);
-    lua_gettable(cfg->vm.L, -2);
+    lua_rawget(cfg->vm.L, -2);
 
     switch (lua_type(cfg->vm.L, -1)) {
     case LUA_TNUMBER: {
@@ -80,7 +80,7 @@ get_double(struct config *cfg, const char *key, double *dst, const char *full_na
 static int
 get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bool required) {
     lua_pushstring(cfg->vm.L, key);
-    lua_gettable(cfg->vm.L, -2);
+    lua_rawget(cfg->vm.L, -2);
 
     switch (lua_type(cfg->vm.L, -1)) {
     case LUA_TNUMBER: {
@@ -112,7 +112,7 @@ get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bo
 static int
 get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
     lua_pushstring(cfg->vm.L, key);
-    lua_gettable(cfg->vm.L, -2);
+    lua_rawget(cfg->vm.L, -2);
 
     switch (lua_type(cfg->vm.L, -1)) {
     case LUA_TSTRING:
@@ -143,7 +143,7 @@ static int
 get_table(struct config *cfg, const char *key, table_func func, const char *full_name,
           bool required) {
     lua_pushstring(cfg->vm.L, key);
-    lua_gettable(cfg->vm.L, -2);
+    lua_rawget(cfg->vm.L, -2);
 
     switch (lua_type(cfg->vm.L, -1)) {
     case LUA_TTABLE:
