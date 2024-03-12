@@ -54,10 +54,11 @@ package.path = package.path .. ";" .. path .. "?.lua"
 
 -- Run the user's configuration file.
 local user_config = require("init")
+
+-- If the user's configuration does not return a table, then `require` will
+-- return a boolean to say whether or not the call was successful.
 if type(user_config) ~= "table" then
-    error(string.format(
-        "expected config to be of type 'table', was '%s'",
-        type(user_config)
-    ))
+    return {}
 end
+
 return user_config
