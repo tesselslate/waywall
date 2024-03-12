@@ -35,6 +35,8 @@ static const struct luaL_Reg lua_lib[] = {
     {NULL, NULL},
 };
 
+static char registry_key = 'w';
+
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
 __attribute__((unused)) static inline void
@@ -495,6 +497,11 @@ config_populate(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to load config table");
         goto fail_load;
     }
+
+    // Store the config table in the Lua registry for later access.
+    lua_pushlightuserdata(cfg->vm.L, &registry_key);
+    lua_pushvalue(cfg->vm.L, -2);
+    lua_settable(cfg->vm.L, LUA_REGISTRYINDEX);
 
     lua_pop(cfg->vm.L, 1);
     ww_assert(lua_gettop(cfg->vm.L) == 0);
