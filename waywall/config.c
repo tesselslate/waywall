@@ -405,6 +405,53 @@ process_config(struct config *cfg) {
     return 0;
 }
 
+static int
+run_config(struct config *cfg) {
+    if (luaL_loadbuffer(cfg->vm.L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE, "__init") !=
+        0) {
+        ww_log(LOG_ERROR, "failed to load internal init chunk");
+        goto fail_loadbuffer;
+    }
+    if (lua_pcall(cfg->vm.L, 0, 1, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->vm.L, -1));
+        goto fail_pcall;
+    }
+
+    int type = lua_type(cfg->vm.L, -1);
+    if (type != LUA_TTABLE) {
+        ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
+               lua_typename(cfg->vm.L, -1));
+        goto fail_table;
+    }
+
+    if (!lua_checkstack(cfg->vm.L, 16)) {
+        ww_log(LOG_ERROR, "not enough lua stack space");
+        goto fail_load;
+    }
+    if (process_config(cfg) != 0) {
+        ww_log(LOG_ERROR, "failed to load config table");
+        goto fail_load;
+    }
+
+    // Store the config table in the Lua registry for later access.
+    lua_pushlightuserdata(cfg->vm.L, &registry_key);
+    lua_pushvalue(cfg->vm.L, -2);
+    lua_settable(cfg->vm.L, LUA_REGISTRYINDEX);
+
+    lua_pop(cfg->vm.L, 1);
+    ww_assert(lua_gettop(cfg->vm.L) == 0);
+
+    return 0;
+
+fail_load:
+fail_table:
+    lua_settop(cfg->vm.L, 0);
+
+fail_pcall:
+fail_loadbuffer:
+    return 1;
+}
+
 struct config *
 config_create() {
     struct config *cfg = calloc(1, sizeof(*cfg));
@@ -464,7 +511,7 @@ config_populate(struct config *cfg) {
     cfg->vm.L = luaL_newstate();
     if (!cfg->vm.L) {
         ww_log(LOG_ERROR, "failed to create lua VM");
-        goto fail_lua_newstate;
+        return 1;
     }
 
     luaL_openlibs(cfg->vm.L);
@@ -472,48 +519,9 @@ config_populate(struct config *cfg) {
     luaL_register(cfg->vm.L, "priv_waywall", lua_lib);
     lua_pop(cfg->vm.L, 2);
 
-    if (luaL_loadbuffer(cfg->vm.L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE, "__init") !=
-        0) {
-        ww_log(LOG_ERROR, "failed to load internal init chunk");
-        goto fail_loadbuffer;
+    if (run_config(cfg) != 0) {
+        return 1;
     }
-    if (lua_pcall(cfg->vm.L, 0, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->vm.L, -1));
-        goto fail_pcall;
-    }
-
-    int type = lua_type(cfg->vm.L, -1);
-    if (type != LUA_TTABLE) {
-        ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
-               lua_typename(cfg->vm.L, -1));
-        goto fail_table;
-    }
-
-    if (!lua_checkstack(cfg->vm.L, 16)) {
-        ww_log(LOG_ERROR, "not enough lua stack space");
-        goto fail_load;
-    }
-    if (process_config(cfg) != 0) {
-        ww_log(LOG_ERROR, "failed to load config table");
-        goto fail_load;
-    }
-
-    // Store the config table in the Lua registry for later access.
-    lua_pushlightuserdata(cfg->vm.L, &registry_key);
-    lua_pushvalue(cfg->vm.L, -2);
-    lua_settable(cfg->vm.L, LUA_REGISTRYINDEX);
-
-    lua_pop(cfg->vm.L, 1);
-    ww_assert(lua_gettop(cfg->vm.L) == 0);
 
     return 0;
-
-fail_load:
-    lua_settop(cfg->vm.L, 0);
-
-fail_table:
-fail_pcall:
-fail_loadbuffer:
-fail_lua_newstate:
-    return 1;
 }
