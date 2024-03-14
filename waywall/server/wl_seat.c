@@ -276,7 +276,8 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     }
 
     if (seat_g->listener) {
-        bool consumed = seat_g->listener->key(seat_g->listener_data, key,
+        // Add 8 to convert from libinput to XKB keycodes.
+        bool consumed = seat_g->listener->key(seat_g->listener_data, key + 8,
                                               state == WL_KEYBOARD_KEY_STATE_PRESSED);
         if (consumed) {
             return;
