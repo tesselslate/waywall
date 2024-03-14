@@ -241,12 +241,15 @@ static bool
 on_button(void *data, uint32_t button, bool pressed) {
     struct wall *wall = data;
 
-    button -= BTN_MOUSE;
-    if (button >= STATIC_ARRLEN(wall->buttons)) {
+    if (button - BTN_MOUSE >= STATIC_ARRLEN(wall->buttons)) {
         return false;
     }
 
-    wall->buttons[button] = pressed;
+    wall->buttons[button - BTN_MOUSE] = pressed;
+
+    if (!ON_WALL(wall)) {
+        return false;
+    }
 
     if (pressed) {
         struct config_action action = {0};

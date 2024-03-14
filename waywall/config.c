@@ -2,10 +2,12 @@
 #include "init.lua.h"
 #include "util.h"
 #include "wall.h"
+#include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <xkbcommon/xkbcommon.h>
 
 // TODO: slightly better sandboxing (at least enough that bad lua code cannot crash or otherwise
@@ -29,6 +31,18 @@ static const struct config defaults = {
             .cursor_icon = "left_ptr",
             .cursor_size = 16,
         },
+};
+
+static const struct {
+    const char *name;
+    uint32_t value;
+} button_mappings[] = {
+    {"lmb", BTN_LEFT},   {"m1", BTN_LEFT},      {"mouse1", BTN_LEFT},   {"leftmouse", BTN_LEFT},
+    {"rmb", BTN_RIGHT},  {"m2", BTN_RIGHT},     {"mouse2", BTN_RIGHT},  {"rightmouse", BTN_RIGHT},
+    {"mmb", BTN_MIDDLE}, {"m3", BTN_MIDDLE},    {"mouse3", BTN_MIDDLE}, {"middlemouse", BTN_MIDDLE},
+
+    {"m4", BTN_SIDE},    {"mb4", BTN_SIDE},     {"mouse4", BTN_SIDE},   {"m5", BTN_EXTRA},
+    {"mb5", BTN_EXTRA},  {"mouse5", BTN_EXTRA},
 };
 
 static const struct {
@@ -631,7 +645,10 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
 
     lua_pushnil(cfg->vm.L);
     while (lua_next(cfg->vm.L, -2)) {
-        char *bind = strdup(lua_tostring(cfg->vm.L, -2));
+        const char *orig_bind = lua_tostring(cfg->vm.L, -2);
+        ww_assert(orig_bind);
+
+        char *bind = strdup(orig_bind);
         if (!bind) {
             ww_log(LOG_ERROR, "failed to allocate keybind string");
             return 1;
@@ -655,7 +672,8 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
             xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
             if (sym != XKB_KEY_NoSymbol) {
                 if (action.type == CONFIG_ACTION_BUTTON) {
-                    ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button", bind);
+                    ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button",
+                           orig_bind);
                     free(bind);
                     return 1;
                 }
@@ -668,7 +686,7 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
             if (mod != XKB_MOD_INVALID) {
                 uint32_t mask = 1 << mod;
                 if (mask & action.modifiers) {
-                    ww_log(LOG_ERROR, "duplicate modifier '%s' in keybind '%s'", elem, bind);
+                    ww_log(LOG_ERROR, "duplicate modifier '%s' in keybind '%s'", elem, orig_bind);
                     free(bind);
                     return 1;
                 }
@@ -676,13 +694,32 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
                 continue;
             }
 
-            ww_log(LOG_ERROR, "unknown component '%s' of keybind '%s'", elem, bind);
+            bool button_ok = false;
+            for (size_t i = 0; i < STATIC_ARRLEN(button_mappings); i++) {
+                if (strcasecmp(button_mappings[i].name, elem) == 0) {
+                    if (action.type == CONFIG_ACTION_KEY) {
+                        ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button",
+                               orig_bind);
+                        free(bind);
+                        return 1;
+                    }
+                    action.data = button_mappings[i].value;
+                    action.type = CONFIG_ACTION_BUTTON;
+                    button_ok = true;
+                    break;
+                }
+            }
+            if (button_ok) {
+                continue;
+            }
+
+            ww_log(LOG_ERROR, "unknown component '%s' of keybind '%s'", elem, orig_bind);
             free(bind);
             return 1;
         }
 
         if (action.type == CONFIG_ACTION_NONE) {
-            ww_log(LOG_ERROR, "keybind '%s' has no key or button", bind);
+            ww_log(LOG_ERROR, "keybind '%s' has no key or button", orig_bind);
             free(bind);
             return 1;
         }
