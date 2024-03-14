@@ -304,7 +304,20 @@ on_motion(void *data, double x, double y) {
     wall->mx = x;
     wall->my = y;
 
-    // TODO: process input on wall
+    if (!ON_WALL(wall)) {
+        return;
+    }
+
+    for (size_t i = 0; i < STATIC_ARRLEN(wall->buttons); i++) {
+        if (wall->buttons[i]) {
+            struct config_action action = {0};
+            action.type = CONFIG_ACTION_BUTTON;
+            action.data = i + BTN_MOUSE;
+            action.modifiers = wall->modifiers;
+
+            config_do_action(wall->cfg, wall, action);
+        }
+    }
 }
 
 static void
