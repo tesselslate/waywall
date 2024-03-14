@@ -10,16 +10,13 @@
 #define SRV_SHM_VERSION 1
 
 struct shm_buffer_data {
-    int32_t fd;
-    int32_t offset, width, height, stride;
-    uint32_t format;
+    int32_t width, height;
 };
 
 static void
 shm_buffer_destroy(void *data) {
     struct shm_buffer_data *buffer_data = data;
 
-    close(buffer_data->fd);
     free(buffer_data);
 }
 
@@ -81,17 +78,8 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
         return;
     }
 
-    buffer_data->fd = dup(shm_pool->fd);
-    if (buffer_data->fd == -1) {
-        ww_log(LOG_WARN, "failed to dup shm_pool fd");
-        wl_client_post_implementation_error(client, "failed to dup shm_pool fd");
-        goto fail_dup;
-    }
-    buffer_data->offset = offset;
     buffer_data->width = width;
     buffer_data->height = height;
-    buffer_data->stride = stride;
-    buffer_data->format = format;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
     if (!buffer_resource) {
@@ -120,9 +108,6 @@ fail_buffer:
 
 fail_remote:
 fail_resource:
-    close(buffer_data->fd);
-
-fail_dup:
     free(buffer_data);
 }
 
