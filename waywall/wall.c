@@ -7,6 +7,7 @@
 #include "util.h"
 #include <linux/input-event-codes.h>
 #include <sys/inotify.h>
+#include <xkbcommon/xkbcommon.h>
 
 static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.buttons));
 
@@ -298,6 +299,7 @@ on_modifiers(void *data, uint32_t depressed, uint32_t latched, uint32_t locked, 
     struct wall *wall = data;
 
     wall->modifiers = depressed;
+    wall->group = group;
 }
 
 static void
@@ -312,7 +314,13 @@ on_motion(void *data, double x, double y) {
 
 static void
 on_keymap(void *data, struct xkb_keymap *keymap) {
-    // TODO: use the keymap to parse the user's config keybinds
+    struct wall *wall = data;
+
+    if (config_build_actions(wall->cfg, keymap) != 0) {
+        ww_log(LOG_ERROR, "failed to build config actions table");
+        ww_panic("TODO");
+    }
+    wall->keymap = keymap;
 }
 
 static const struct server_seat_listener seat_listener = {
