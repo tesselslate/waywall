@@ -374,3 +374,37 @@ wall_destroy(struct wall *wall) {
 
     free(wall);
 }
+
+int
+wall_get_hovered(struct wall *wall) {
+    return get_hovered(wall);
+}
+
+int
+wall_play(struct wall *wall, int id) {
+    ww_assert(id >= 0 && id < wall->num_instances);
+
+    if (wall->active_instance == id) {
+        return 1;
+    }
+
+    play_instance(wall, id);
+    return 0;
+}
+
+int
+wall_reset(struct wall *wall, int id) {
+    ww_assert(id >= 0 && id < wall->num_instances);
+
+    return instance_reset(wall->instances[id]) != true;
+}
+
+int
+wall_return(struct wall *wall) {
+    if (ON_WALL(wall)) {
+        return 1;
+    }
+
+    focus_wall(wall);
+    return 0;
+}

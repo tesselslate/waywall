@@ -31,4 +31,9 @@ struct wall {
 struct wall *wall_create(struct server *server, struct inotify *inotify, struct config *cfg);
 void wall_destroy(struct wall *wall);
 
+int wall_get_hovered(struct wall *wall);
+int wall_play(struct wall *wall, int id);
+int wall_reset(struct wall *wall, int id);
+int wall_return(struct wall *wall);
+
 #endif
