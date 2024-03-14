@@ -31,6 +31,7 @@ struct config {
 
 struct config_action {
     enum config_action_type {
+        CONFIG_ACTION_NONE,
         CONFIG_ACTION_BUTTON,
         CONFIG_ACTION_KEY,
     } type;
@@ -39,6 +40,7 @@ struct config_action {
     uint32_t modifiers;
 };
 
+int config_build_actions(struct config *cfg, struct xkb_keymap *keymap);
 struct config *config_create();
 void config_destroy(struct config *cfg);
 int config_populate(struct config *cfg);

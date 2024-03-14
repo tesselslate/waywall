@@ -4,6 +4,7 @@
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
+#include <string.h>
 #include <xkbcommon/xkbcommon.h>
 
 // TODO: slightly better sandboxing (at least enough that bad lua code cannot crash or otherwise
@@ -40,6 +41,7 @@ static const struct luaL_Reg lua_lib[] = {
 };
 
 static const struct {
+    char actions;
     char orig_actions;
 } registry_keys;
 
@@ -297,6 +299,16 @@ fail_model:
     return 1;
 }
 
+static void
+encode_bind(char buf[static 17], struct config_action action) {
+    uint64_t data = ((uint64_t)action.data << 32) | (uint64_t)action.modifiers;
+
+    buf[0] = (action.type == CONFIG_ACTION_BUTTON) ? 'm' : 'k';
+    for (size_t i = 0; i < 16; i++) {
+        buf[i + 1] = "0123456789abcdef"[(data >> i) & 0xF];
+    }
+}
+
 static int
 process_config_actions(struct config *cfg) {
     ssize_t stack_start = lua_gettop(cfg->vm.L);
@@ -506,6 +518,86 @@ fail_table:
 fail_pcall:
 fail_loadbuffer:
     return 1;
+}
+
+int
+config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
+    lua_newtable(cfg->vm.L);
+    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.orig_actions);
+    lua_rawget(cfg->vm.L, LUA_REGISTRYINDEX);
+    ww_assert(lua_istable(cfg->vm.L, -1));
+
+    lua_pushnil(cfg->vm.L);
+    while (lua_next(cfg->vm.L, -2)) {
+        char *bind = strdup(lua_tostring(cfg->vm.L, -2));
+        if (!bind) {
+            ww_log(LOG_ERROR, "failed to allocate keybind string");
+            return 1;
+        }
+        char *needle = bind;
+
+        struct config_action action = {0};
+
+        char *elem = needle;
+        bool ok = true;
+        while (ok) {
+            while (*needle && *needle != '-') {
+                needle++;
+            }
+            ok = !!*needle;
+            *needle = '\0';
+            needle++;
+
+            xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
+            if (sym != XKB_KEY_NoSymbol) {
+                if (action.type == CONFIG_ACTION_BUTTON) {
+                    ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button", bind);
+                    free(bind);
+                    return 1;
+                }
+                action.data = sym;
+                action.type = CONFIG_ACTION_KEY;
+                continue;
+            }
+
+            xkb_mod_index_t mod = xkb_keymap_mod_get_index(keymap, elem);
+            if (mod != XKB_MOD_INVALID) {
+                uint32_t mask = 1 << mod;
+                if (mask & action.modifiers) {
+                    ww_log(LOG_ERROR, "duplicate modifier '%s' in keybind '%s'", elem, bind);
+                    free(bind);
+                    return 1;
+                }
+                action.modifiers |= mask;
+                continue;
+            }
+
+            ww_log(LOG_ERROR, "unknown component '%s' of keybind '%s'", elem, bind);
+            free(bind);
+            return 1;
+        }
+
+        if (action.type == CONFIG_ACTION_NONE) {
+            ww_log(LOG_ERROR, "keybind '%s' has no key or button", bind);
+            free(bind);
+            return 1;
+        }
+        free(bind);
+
+        char buf[17];
+        encode_bind(buf, action);
+
+        lua_pushlstring(cfg->vm.L, buf, STATIC_ARRLEN(buf));
+        lua_pushvalue(cfg->vm.L, -2);
+        lua_rawset(cfg->vm.L, -6);
+
+        lua_pop(cfg->vm.L, 1);
+    }
+
+    lua_pop(cfg->vm.L, 2);
+    ww_assert(lua_gettop(cfg->vm.L) == 0);
+
+    return 0;
 }
 
 struct config *
