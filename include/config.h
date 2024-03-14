@@ -4,6 +4,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+struct wall;
+
 struct config {
     struct {
         struct xkb_context *xkb_ctx;
@@ -43,6 +45,7 @@ struct config_action {
 int config_build_actions(struct config *cfg, struct xkb_keymap *keymap);
 struct config *config_create();
 void config_destroy(struct config *cfg);
+int config_do_action(struct config *cfg, struct wall *wall, struct config_action action);
 int config_populate(struct config *cfg);
 
 #endif

@@ -247,50 +247,42 @@ on_button(void *data, uint32_t button, bool pressed) {
     }
 
     wall->buttons[button] = pressed;
-    return false;
 
-    // TODO: process input on wall
+    if (pressed) {
+        struct config_action action = {0};
+        action.type = CONFIG_ACTION_BUTTON;
+        action.data = button;
+        action.modifiers = wall->modifiers;
+
+        int ret = config_do_action(wall->cfg, wall, action);
+        return ret > 0;
+    } else {
+        return false;
+    }
 }
 
 static bool
 on_key(void *data, uint32_t key, bool pressed) {
     struct wall *wall = data;
 
-    // TODO: proper keybind handling
-    int id = get_hovered(wall);
     if (pressed) {
-        switch (key) {
-        case KEY_U: // ingame reset
-            if (!ON_WALL(wall)) {
-                instance_reset(wall->instances[wall->active_instance]);
-                server_view_set_size(wall->instances[wall->active_instance]->view,
-                                     wall->cfg->wall.stretch_width, wall->cfg->wall.stretch_height);
-                focus_wall(wall);
-            }
-            break;
-        case KEY_T: // wall reset all
-            if (ON_WALL(wall)) {
-                for (int i = 0; i < wall->num_instances; i++) {
-                    instance_reset(wall->instances[i]);
-                }
-            }
-            break;
-        case KEY_E: // wall reset
-            if (id != -1) {
-                instance_reset(wall->instances[id]);
-            }
-            break;
-        case KEY_R: // wall play
-            if (id != -1) {
-                play_instance(wall, id);
-            }
-            break;
-        default:
-            break;
-        }
-    }
+        const xkb_keysym_t *syms;
+        int nsyms = xkb_keymap_key_get_syms_by_level(wall->keymap, key, wall->group, 0, &syms);
 
-    return false;
+        if (nsyms >= 1) {
+            struct config_action action = {0};
+            action.type = CONFIG_ACTION_KEY;
+            action.data = syms[0];
+            action.modifiers = wall->modifiers;
+
+            int ret = config_do_action(wall->cfg, wall, action);
+            return ret > 0;
+        } else {
+            return false;
+        }
+    } else {
+        return false;
+    }
 }
 
 static void
