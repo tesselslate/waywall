@@ -99,7 +99,9 @@ server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size
                cursor->cfg->theme.cursor_icon);
         goto fail_get_cursor;
     }
-    ww_assert(wl_cursor->image_count > 0); // TODO: valid?
+
+    // As of libwayland commit aa2a6d5, this should always be true.
+    ww_assert(wl_cursor->image_count > 0);
 
     cursor->image = wl_cursor->images[0];
     cursor->buffer = wl_cursor_image_get_buffer(cursor->image);

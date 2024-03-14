@@ -40,7 +40,6 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
             continue;
         }
 
-        // TODO: allow configuring mouse sensitivity
         zwp_relative_pointer_v1_send_relative_motion(
             resource, utime_hi, utime_lo, wl_fixed_from_double(x), wl_fixed_from_double(y),
             dx_unaccel, dy_unaccel);

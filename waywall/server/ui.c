@@ -207,7 +207,7 @@ server_view_set_crop(struct server_view *view, double x, double y, double width,
 
 void
 server_view_set_dest_size(struct server_view *view, uint32_t width, uint32_t height) {
-    // TODO: handle invalid size (zero)
+    ww_assert(width > 0 && height > 0);
     wp_viewport_set_destination(view->viewport, width, height);
 }
 

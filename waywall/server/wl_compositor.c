@@ -121,6 +121,10 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
     struct server_buffer *buffer = server_buffer_from_resource(buffer_resource);
 
     // TODO: handle (reject?) invalid buffers from dmabuf
+    if (strcmp(buffer->impl->name, "invalid") == 0) {
+        wl_client_post_implementation_error(client, "cannot attach invalid buffer");
+        return;
+    }
 
     if (x != 0 || y != 0) {
         int version = wl_resource_get_version(resource);
@@ -151,10 +155,24 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         surface->role->commit(surface->role_resource);
     }
 
+    // Check that the buffer size matches the buffer scale.
+    {
+        struct server_buffer *buffer = state->buffer ? state->buffer : surface->current.buffer;
+        if (buffer) {
+            int32_t scale = state->scale > 0 ? state->scale : surface->current.buffer_scale;
+            uint32_t width, height;
+            server_buffer_get_size(buffer, &width, &height);
+            if (width % scale != 0 || height % scale != 0) {
+                wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SIZE,
+                                       "buffer size of (%" PRIu32 ", %" PRIu32
+                                       ") is not multiple of buffer scale %" PRIi32,
+                                       width, height, scale);
+                return;
+            }
+        }
+    }
+
     if (state->apply & SURFACE_STATE_ATTACH) {
-        // TODO: If the provided buffer's size is not a multiple of the buffer scale, the host
-        // compositor will raise a protocol error (wl_surface.invalid_size) and kill us. Need to add
-        // some functions to server_buffer that allow for getting width/height to check this.
         wl_surface_attach(surface->remote, state->buffer->remote, 0, 0);
         surface->current.buffer = state->buffer;
     }
