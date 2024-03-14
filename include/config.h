@@ -4,10 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-struct config_vm {
-    struct lua_State *L;
-};
-
 struct config {
     struct {
         struct xkb_context *xkb_ctx;
@@ -28,7 +24,19 @@ struct config {
         int stretch_width, stretch_height;
     } wall;
 
-    struct config_vm vm;
+    struct config_vm {
+        struct lua_State *L;
+    } vm;
+};
+
+struct config_action {
+    enum config_action_type {
+        CONFIG_ACTION_BUTTON,
+        CONFIG_ACTION_KEY,
+    } type;
+
+    uint32_t data;
+    uint32_t modifiers;
 };
 
 struct config *config_create();

@@ -6,6 +6,10 @@
 #include <stdlib.h>
 #include <xkbcommon/xkbcommon.h>
 
+// TODO: slightly better sandboxing (at least enough that bad lua code cannot crash or otherwise
+// make very bad things happen)
+// - prevent lua code from messing with the registry
+
 static const struct config defaults = {
     .input =
         {
@@ -35,7 +39,9 @@ static const struct luaL_Reg lua_lib[] = {
     {NULL, NULL},
 };
 
-static char registry_key = 'w';
+static const struct {
+    char orig_actions;
+} registry_keys;
 
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
@@ -292,6 +298,57 @@ fail_model:
 }
 
 static int
+process_config_actions(struct config *cfg) {
+    ssize_t stack_start = lua_gettop(cfg->vm.L);
+
+    lua_newtable(cfg->vm.L);
+
+    lua_pushnil(cfg->vm.L);
+    while (lua_next(cfg->vm.L, -3)) {
+        // stack:
+        // - value (should be function)
+        // - key (should be string)
+        // - registry actions table
+        // - config.actions
+        // - config
+
+        if (!lua_isstring(cfg->vm.L, -2)) {
+            ww_log(LOG_ERROR, "non-string key '%s' found in actions table",
+                   lua_tostring(cfg->vm.L, -2));
+            return 1;
+        }
+        if (!lua_isfunction(cfg->vm.L, -1)) {
+            ww_log(LOG_ERROR, "non-function value for key '%s' found in actions table",
+                   lua_tostring(cfg->vm.L, -2));
+            return 1;
+        }
+
+        // Push a copy of both the key and value to the top of the stack, since the rawset call will
+        // consume both.
+        lua_pushvalue(cfg->vm.L, -2);
+        lua_pushvalue(cfg->vm.L, -2);
+        lua_rawset(cfg->vm.L, -5);
+
+        // Pop the value from the top of the stack.
+        lua_pop(cfg->vm.L, 1);
+    }
+
+    // stack:
+    // - registry actions table
+    // - config.actions
+    // - config
+    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.orig_actions);
+    lua_pushvalue(cfg->vm.L, -2);
+    lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
+
+    // Pop the registry actions table which was created at the start of this function.
+    lua_pop(cfg->vm.L, 1);
+    ww_assert(lua_gettop(cfg->vm.L) == stack_start);
+
+    return 0;
+}
+
+static int
 process_config_input(struct config *cfg) {
     if (get_keymap(cfg) != 0) {
         return 1;
@@ -390,6 +447,10 @@ process_config_wall(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
+    if (get_table(cfg, "actions", process_config_actions, "actions", false) != 0) {
+        return 1;
+    }
+
     if (get_table(cfg, "input", process_config_input, "input", false) != 0) {
         return 1;
     }
@@ -432,11 +493,6 @@ run_config(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to load config table");
         goto fail_load;
     }
-
-    // Store the config table in the Lua registry for later access.
-    lua_pushlightuserdata(cfg->vm.L, &registry_key);
-    lua_pushvalue(cfg->vm.L, -2);
-    lua_settable(cfg->vm.L, LUA_REGISTRYINDEX);
 
     lua_pop(cfg->vm.L, 1);
     ww_assert(lua_gettop(cfg->vm.L) == 0);
