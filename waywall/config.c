@@ -1,6 +1,7 @@
 #include "config.h"
 #include "init.lua.h"
 #include "util.h"
+#include "wall.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
@@ -12,6 +13,7 @@
 // - prevent lua code from messing with the registry
 
 #define BIND_BUFLEN 17
+#define METATABLE_WALL "waywall.wall"
 
 static const struct config defaults = {
     .input =
@@ -29,7 +31,104 @@ static const struct config defaults = {
         },
 };
 
+static const struct {
+    char actions;
+    char orig_actions;
+    char wall;
+} registry_keys;
+
 typedef int (*table_func)(struct config *cfg);
+
+static struct wall *
+get_wall(lua_State *L) {
+    lua_pushlightuserdata(L, (void *)&registry_keys.wall);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    luaL_checkudata(L, -1, METATABLE_WALL);
+
+    struct wall **wall = lua_touserdata(L, -1);
+    return *wall;
+}
+
+static void
+set_wall(struct config *cfg, struct wall *wall) {
+    ssize_t stack_start = lua_gettop(cfg->vm.L);
+
+    struct wall **udata = lua_newuserdata(cfg->vm.L, sizeof(*udata));
+    luaL_getmetatable(cfg->vm.L, METATABLE_WALL);
+    lua_setmetatable(cfg->vm.L, -2);
+    *udata = wall;
+
+    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.wall);
+    lua_pushvalue(cfg->vm.L, -2);
+    lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
+
+    lua_pop(cfg->vm.L, 1);
+    ww_assert(lua_gettop(cfg->vm.L) == stack_start);
+}
+
+static int
+lua_lib_active_instance(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int id = wall->active_instance;
+
+    if (id >= 0) {
+        lua_pushinteger(L, id + 1);
+    } else {
+        lua_pushnil(L);
+    }
+
+    return 1;
+}
+
+static int
+lua_lib_goto_wall(lua_State *L) {
+    struct wall *wall = get_wall(L);
+
+    bool ok = wall_return(wall) == 0;
+    if (!ok) {
+        return luaL_error(L, "wall already active");
+    }
+
+    return 0;
+}
+
+static int
+lua_lib_hovered(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int id = wall_get_hovered(wall);
+
+    if (id >= 0) {
+        lua_pushinteger(L, id + 1);
+    } else {
+        lua_pushnil(L);
+    }
+
+    return 1;
+}
+
+static int
+lua_lib_play(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int id = luaL_checkint(L, 1);
+    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+
+    bool ok = wall_play(wall, id - 1) == 0;
+    if (!ok) {
+        return luaL_error(L, "instance %d already active", id);
+    }
+
+    return 0;
+}
+
+static int
+lua_lib_reset(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int id = luaL_checkint(L, 1);
+    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+
+    lua_pushboolean(L, wall_reset(wall, id - 1) == 0);
+    return 1;
+}
 
 static int
 lua_lib_log(lua_State *L) {
@@ -38,14 +137,15 @@ lua_lib_log(lua_State *L) {
 }
 
 static const struct luaL_Reg lua_lib[] = {
+    {"active_instance", lua_lib_active_instance},
+    {"goto_wall", lua_lib_goto_wall},
+    {"hovered", lua_lib_hovered},
+    {"play", lua_lib_play},
+    {"reset", lua_lib_reset},
+
     {"log", lua_lib_log},
     {NULL, NULL},
 };
-
-static const struct {
-    char actions;
-    char orig_actions;
-} registry_keys;
 
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
@@ -702,6 +802,9 @@ config_populate(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to create lua VM");
         return 1;
     }
+
+    luaL_newmetatable(cfg->vm.L, METATABLE_WALL);
+    lua_pop(cfg->vm.L, 1);
 
     luaL_openlibs(cfg->vm.L);
     lua_getglobal(cfg->vm.L, "_G");
