@@ -377,7 +377,7 @@ wall_destroy(struct wall *wall) {
 
 int
 wall_get_hovered(struct wall *wall) {
-    return get_hovered(wall);
+    return ON_WALL(wall) ? get_hovered(wall) : -1;
 }
 
 int
