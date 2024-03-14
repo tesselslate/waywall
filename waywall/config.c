@@ -11,6 +11,8 @@
 // make very bad things happen)
 // - prevent lua code from messing with the registry
 
+#define BIND_BUFLEN 17
+
 static const struct config defaults = {
     .input =
         {
@@ -300,12 +302,12 @@ fail_model:
 }
 
 static void
-encode_bind(char buf[static 17], struct config_action action) {
-    uint64_t data = ((uint64_t)action.data << 32) | (uint64_t)action.modifiers;
+encode_bind(char buf[static BIND_BUFLEN], struct config_action action) {
+    uint64_t data = (((uint64_t)action.data) << 32) | (uint64_t)action.modifiers;
 
     buf[0] = (action.type == CONFIG_ACTION_BUTTON) ? 'm' : 'k';
     for (size_t i = 0; i < 16; i++) {
-        buf[i + 1] = "0123456789abcdef"[(data >> i) & 0xF];
+        buf[i + 1] = "0123456789abcdef"[(data >> (i * 4)) & 0xF];
     }
 }
 
@@ -538,9 +540,11 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
 
         struct config_action action = {0};
 
-        char *elem = needle;
+        char *elem;
         bool ok = true;
         while (ok) {
+            elem = needle;
+
             while (*needle && *needle != '-') {
                 needle++;
             }
@@ -584,7 +588,7 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
         }
         free(bind);
 
-        char buf[17];
+        char buf[BIND_BUFLEN];
         encode_bind(buf, action);
 
         lua_pushlstring(cfg->vm.L, buf, STATIC_ARRLEN(buf));
@@ -594,7 +598,13 @@ config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
         lua_pop(cfg->vm.L, 1);
     }
 
-    lua_pop(cfg->vm.L, 2);
+    lua_pop(cfg->vm.L, 1);
+
+    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.actions);
+    lua_pushvalue(cfg->vm.L, -2);
+    lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
+
+    lua_pop(cfg->vm.L, 1);
     ww_assert(lua_gettop(cfg->vm.L) == 0);
 
     return 0;
