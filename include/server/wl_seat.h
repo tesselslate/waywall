@@ -21,6 +21,7 @@ struct server_seat_g {
 
         int32_t remote_keymap_fd;
         uint32_t remote_keymap_size;
+        struct xkb_keymap *remote_keymap;
         int32_t repeat_rate, repeat_delay;
 
         uint32_t mods_depressed, mods_latched, mods_locked, group;

@@ -93,6 +93,21 @@ fail_memfd:
     return 1;
 }
 
+static struct xkb_keymap *
+prepare_remote_keymap(struct xkb_context *ctx, int32_t fd, int32_t size) {
+    char *data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (data == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to mmap keymap data");
+        return NULL;
+    }
+
+    struct xkb_keymap *keymap =
+        xkb_keymap_new_from_string(ctx, data, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
+
+    munmap(data, size);
+    return keymap;
+}
+
 static void
 send_keyboard_enter(struct server_seat_g *seat_g) {
     ww_assert(seat_g->input_focus);
@@ -282,11 +297,22 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     if (seat_g->kb_state.remote_keymap_fd >= 0) {
         close(seat_g->kb_state.remote_keymap_fd);
     }
+    if (seat_g->kb_state.remote_keymap) {
+        xkb_keymap_unref(seat_g->kb_state.remote_keymap);
+    }
     seat_g->kb_state.remote_keymap_fd = fd;
     seat_g->kb_state.remote_keymap_size = size;
 
+    seat_g->kb_state.remote_keymap = prepare_remote_keymap(seat_g->cfg->input.xkb_ctx, fd, size);
+    if (!seat_g->kb_state.remote_keymap) {
+        ww_log(LOG_ERROR, "failed to create remote keymap");
+        return;
+    }
+
     if (seat_g->listener) {
-        seat_g->listener->keymap(seat_g->listener_data, fd, size);
+        if (seat_g->kb_state.remote_keymap) {
+            seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.remote_keymap);
+        }
     }
 }
 
@@ -602,8 +628,8 @@ pointer_set_cursor(struct wl_client *client, struct wl_resource *resource, uint3
         return;
     }
 
-    // We do not care about what clients want to set the cursor to. However, we will mark surfaces
-    // with the correct roles anyway.
+    // We do not care about what clients want to set the cursor to. However, we will mark
+    // surfaces with the correct roles anyway.
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
     if (server_surface_set_role(surface, &cursor_role, NULL) != 0) {
@@ -719,6 +745,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     }
     if (seat_g->kb_state.remote_keymap_fd >= 0) {
         close(seat_g->kb_state.remote_keymap_fd);
+    }
+    if (seat_g->kb_state.remote_keymap) {
+        xkb_keymap_unref(seat_g->kb_state.remote_keymap);
     }
     if (seat_g->kb_state.pressed.data) {
         free(seat_g->kb_state.pressed.data);
@@ -868,8 +897,7 @@ server_seat_g_set_listener(struct server_seat_g *seat_g,
 
     seat_g->listener = listener;
     seat_g->listener_data = data;
-    if (seat_g->kb_state.remote_keymap_fd >= 0) {
-        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.remote_keymap_fd,
-                                 seat_g->kb_state.remote_keymap_size);
+    if (seat_g->kb_state.remote_keymap) {
+        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.remote_keymap);
     }
 }

@@ -311,7 +311,7 @@ on_motion(void *data, double x, double y) {
 }
 
 static void
-on_keymap(void *data, int fd, uint32_t size) {
+on_keymap(void *data, struct xkb_keymap *keymap) {
     // TODO: use the keymap to parse the user's config keybinds
 }
 

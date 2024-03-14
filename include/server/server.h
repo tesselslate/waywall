@@ -5,6 +5,8 @@
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
+struct xkb_keymap;
+
 struct server_backend {
     struct wl_display *display;
     struct wl_registry *registry;
@@ -74,7 +76,7 @@ struct server_seat_listener {
                       uint32_t group);
     void (*motion)(void *data, double x, double y);
 
-    void (*keymap)(void *data, int fd, uint32_t size);
+    void (*keymap)(void *data, struct xkb_keymap *keymap);
 };
 
 struct syn_key {
