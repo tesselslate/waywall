@@ -1,5 +1,6 @@
 #include "config.h"
 #include "init.lua.h"
+#include "server/wl_seat.h"
 #include "util.h"
 #include "wall.h"
 #include <linux/input-event-codes.h>
@@ -47,8 +48,18 @@ static const struct {
 };
 
 static const struct {
+    const char *name;
+    enum kb_modifier value;
+} modifier_mappings[] = {
+    {"shift", KB_MOD_SHIFT},   {"caps", KB_MOD_CAPS},    {"lock", KB_MOD_CAPS},
+    {"capslock", KB_MOD_CAPS}, {"control", KB_MOD_CTRL}, {"ctrl", KB_MOD_CTRL},
+    {"alt", KB_MOD_ALT},       {"mod1", KB_MOD_ALT},     {"mod2", KB_MOD_MOD2},
+    {"mod3", KB_MOD_MOD3},     {"super", KB_MOD_LOGO},   {"win", KB_MOD_LOGO},
+    {"mod4", KB_MOD_LOGO},     {"mod5", KB_MOD_MOD5},
+};
+
+static const struct {
     char actions;
-    char orig_actions;
     char wall;
 } registry_keys;
 
@@ -441,6 +452,90 @@ encode_bind(char buf[static BIND_BUFLEN], struct config_action action) {
 }
 
 static int
+parse_bind(const char *orig, struct config_action *action) {
+    char *bind = strdup(orig);
+    if (!bind) {
+        ww_log(LOG_ERROR, "failed to allocate keybind string");
+        return 1;
+    }
+
+    char *needle = bind;
+    char *elem;
+
+    bool ok = true;
+    while (ok) {
+        elem = needle;
+
+        while (*needle && *needle != '-') {
+            needle++;
+        }
+        ok = !!*needle;
+        *needle = '\0';
+        needle++;
+
+        xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
+        if (sym != XKB_KEY_NoSymbol) {
+            if (action->type == CONFIG_ACTION_BUTTON) {
+                ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button", orig);
+                goto fail;
+            }
+            action->data = sym;
+            action->type = CONFIG_ACTION_KEY;
+            continue;
+        }
+
+        bool mod_ok = false;
+        for (size_t i = 0; i < STATIC_ARRLEN(modifier_mappings); i++) {
+            if (strcasecmp(modifier_mappings[i].name, elem) == 0) {
+                uint32_t mask = modifier_mappings[i].value;
+                if (mask & action->modifiers) {
+                    ww_log(LOG_ERROR, "duplicate modifier '%s' in keybind '%s'", elem, orig);
+                    goto fail;
+                }
+                action->modifiers |= mask;
+                mod_ok = true;
+                break;
+            }
+        }
+        if (mod_ok) {
+            continue;
+        }
+
+        bool button_ok = false;
+        for (size_t i = 0; i < STATIC_ARRLEN(button_mappings); i++) {
+            if (strcasecmp(button_mappings[i].name, elem) == 0) {
+                if (action->type == CONFIG_ACTION_KEY) {
+                    ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button", orig);
+                    goto fail;
+                }
+                action->data = button_mappings[i].value;
+                action->type = CONFIG_ACTION_BUTTON;
+                button_ok = true;
+                break;
+            }
+        }
+        if (button_ok) {
+            continue;
+        }
+
+        ww_log(LOG_ERROR, "unknown component '%s' of keybind '%s'", elem, orig);
+        goto fail;
+    }
+
+    if (action->type == CONFIG_ACTION_NONE) {
+        ww_log(LOG_ERROR, "keybind '%s' has no key or button", orig);
+        goto fail;
+    }
+
+    free(bind);
+    return 0;
+
+fail:
+    free(bind);
+    return 1;
+}
+
+static int
 process_config_actions(struct config *cfg) {
     ssize_t stack_start = lua_gettop(cfg->vm.L);
 
@@ -466,9 +561,16 @@ process_config_actions(struct config *cfg) {
             return 1;
         }
 
-        // Push a copy of both the key and value to the top of the stack, since the rawset call will
-        // consume both.
-        lua_pushvalue(cfg->vm.L, -2);
+        const char *bind = lua_tostring(cfg->vm.L, -2);
+        struct config_action action = {0};
+        if (parse_bind(bind, &action) != 0) {
+            return 1;
+        }
+
+        char buf[BIND_BUFLEN];
+        encode_bind(buf, action);
+
+        lua_pushlstring(cfg->vm.L, buf, STATIC_ARRLEN(buf));
         lua_pushvalue(cfg->vm.L, -2);
         lua_rawset(cfg->vm.L, -5);
 
@@ -480,7 +582,7 @@ process_config_actions(struct config *cfg) {
     // - registry actions table
     // - config.actions
     // - config
-    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.orig_actions);
+    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.actions);
     lua_pushvalue(cfg->vm.L, -2);
     lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
 
@@ -649,117 +751,6 @@ fail_table:
 fail_pcall:
 fail_loadbuffer:
     return 1;
-}
-
-int
-config_build_actions(struct config *cfg, struct xkb_keymap *keymap) {
-    lua_newtable(cfg->vm.L);
-    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.orig_actions);
-    lua_rawget(cfg->vm.L, LUA_REGISTRYINDEX);
-    ww_assert(lua_istable(cfg->vm.L, -1));
-
-    lua_pushnil(cfg->vm.L);
-    while (lua_next(cfg->vm.L, -2)) {
-        const char *orig_bind = lua_tostring(cfg->vm.L, -2);
-        ww_assert(orig_bind);
-
-        char *bind = strdup(orig_bind);
-        if (!bind) {
-            ww_log(LOG_ERROR, "failed to allocate keybind string");
-            return 1;
-        }
-        char *needle = bind;
-
-        struct config_action action = {0};
-
-        char *elem;
-        bool ok = true;
-        while (ok) {
-            elem = needle;
-
-            while (*needle && *needle != '-') {
-                needle++;
-            }
-            ok = !!*needle;
-            *needle = '\0';
-            needle++;
-
-            xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
-            if (sym != XKB_KEY_NoSymbol) {
-                if (action.type == CONFIG_ACTION_BUTTON) {
-                    ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button",
-                           orig_bind);
-                    free(bind);
-                    return 1;
-                }
-                action.data = sym;
-                action.type = CONFIG_ACTION_KEY;
-                continue;
-            }
-
-            xkb_mod_index_t mod = xkb_keymap_mod_get_index(keymap, elem);
-            if (mod != XKB_MOD_INVALID) {
-                uint32_t mask = 1 << mod;
-                if (mask & action.modifiers) {
-                    ww_log(LOG_ERROR, "duplicate modifier '%s' in keybind '%s'", elem, orig_bind);
-                    free(bind);
-                    return 1;
-                }
-                action.modifiers |= mask;
-                continue;
-            }
-
-            bool button_ok = false;
-            for (size_t i = 0; i < STATIC_ARRLEN(button_mappings); i++) {
-                if (strcasecmp(button_mappings[i].name, elem) == 0) {
-                    if (action.type == CONFIG_ACTION_KEY) {
-                        ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button",
-                               orig_bind);
-                        free(bind);
-                        return 1;
-                    }
-                    action.data = button_mappings[i].value;
-                    action.type = CONFIG_ACTION_BUTTON;
-                    button_ok = true;
-                    break;
-                }
-            }
-            if (button_ok) {
-                continue;
-            }
-
-            ww_log(LOG_ERROR, "unknown component '%s' of keybind '%s'", elem, orig_bind);
-            free(bind);
-            return 1;
-        }
-
-        if (action.type == CONFIG_ACTION_NONE) {
-            ww_log(LOG_ERROR, "keybind '%s' has no key or button", orig_bind);
-            free(bind);
-            return 1;
-        }
-        free(bind);
-
-        char buf[BIND_BUFLEN];
-        encode_bind(buf, action);
-
-        lua_pushlstring(cfg->vm.L, buf, STATIC_ARRLEN(buf));
-        lua_pushvalue(cfg->vm.L, -2);
-        lua_rawset(cfg->vm.L, -6);
-
-        lua_pop(cfg->vm.L, 1);
-    }
-
-    lua_pop(cfg->vm.L, 1);
-
-    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.actions);
-    lua_pushvalue(cfg->vm.L, -2);
-    lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
-
-    lua_pop(cfg->vm.L, 1);
-    ww_assert(lua_gettop(cfg->vm.L) == 0);
-
-    return 0;
 }
 
 struct config *
