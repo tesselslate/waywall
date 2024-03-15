@@ -85,7 +85,7 @@ prepare_keymap(struct server_seat_g *seat_g) {
     }
 
     memcpy(data, keymap, seat_g->kb_state.local_keymap.size + 1);
-    munmap(data, seat_g->kb_state.local_keymap.size + 1);
+    ww_assert(munmap(data, seat_g->kb_state.local_keymap.size + 1) == 0);
 
     free(keymap);
     return 0;
@@ -111,7 +111,7 @@ prepare_remote_keymap(struct xkb_context *ctx, int32_t fd, int32_t size) {
     struct xkb_keymap *keymap =
         xkb_keymap_new_from_string(ctx, data, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
 
-    munmap(data, size);
+    ww_assert(munmap(data, size) == 0);
     return keymap;
 }
 

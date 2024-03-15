@@ -44,16 +44,10 @@ expand(struct remote_buffer_manager *manager, size_t min) {
         goto fail_mmap;
     }
 
-    if (munmap(manager->pool, prev) == -1) {
-        ww_log_errno(LOG_ERROR, "failed to unmap shm pool");
-        goto fail_munmap;
-    }
+    ww_assert(munmap(manager->pool, prev) == 0);
     manager->data = new_data;
 
     return 0;
-
-fail_munmap:
-    munmap(new_data, manager->size);
 
 fail_mmap:
 fail_truncate:
@@ -212,7 +206,7 @@ remote_buffer_manager_destroy(struct remote_buffer_manager *manager) {
     }
 
     wl_shm_pool_destroy(manager->pool);
-    munmap(manager->data, manager->size);
+    ww_assert(munmap(manager->data, manager->size) == 0);
     close(manager->fd);
     free(manager);
 }
