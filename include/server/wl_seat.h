@@ -16,15 +16,23 @@ struct server_seat_g {
     struct wl_keyboard *keyboard;
     struct wl_pointer *pointer;
     struct {
-        int32_t local_keymap_fd;
-        uint32_t local_keymap_size;
+        struct {
+            int32_t fd;
+            uint32_t size;
+        } local_keymap;
 
-        int32_t remote_keymap_fd;
-        uint32_t remote_keymap_size;
-        struct xkb_keymap *remote_keymap;
+        struct {
+            int32_t fd;
+            uint32_t size;
+            struct xkb_keymap *xkb;
+        } remote_keymap;
+
         int32_t repeat_rate, repeat_delay;
 
-        uint32_t mods_depressed, mods_latched, mods_locked, group;
+        struct {
+            uint32_t depressed, latched, locked;
+            uint32_t group;
+        } mods;
         struct {
             uint32_t *data;
             size_t cap, len;
