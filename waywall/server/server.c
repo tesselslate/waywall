@@ -418,7 +418,7 @@ server_create(struct config *cfg) {
     if (!server->linux_dmabuf) {
         goto fail_globals;
     }
-    server->pointer_constraints = server_pointer_constraints_g_create(server);
+    server->pointer_constraints = server_pointer_constraints_create(server);
     if (!server->pointer_constraints) {
         goto fail_globals;
     }
@@ -536,7 +536,7 @@ server_get_wl_pointer(struct server *server) {
 
 void
 server_set_pointer_pos(struct server *server, double x, double y) {
-    server_pointer_constraints_g_set_hint(server->pointer_constraints, x, y);
+    server_pointer_constraints_set_hint(server->pointer_constraints, x, y);
     wl_surface_commit(server->ui.surface);
 }
 

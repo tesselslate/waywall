@@ -55,7 +55,7 @@ struct server {
 
     struct server_compositor *compositor;
     struct server_linux_dmabuf *linux_dmabuf;
-    struct server_pointer_constraints_g *pointer_constraints;
+    struct server_pointer_constraints *pointer_constraints;
     struct server_relative_pointer_g *relative_pointer;
     struct server_seat *seat;
     struct server_shm *shm;
