@@ -15,28 +15,17 @@
 
 #define SRV_LINUX_DMABUF_VERSION 4
 
-struct dmabuf_buffer_data {
-    struct dmabuf_plane {
-        int32_t fd;
-        uint32_t offset, stride;
-        uint64_t modifier;
-    } planes[4];         // max of 4 DMABUF planes
-    uint32_t planes_set; // bitmask
+#define MAX_PLANES 4
 
+struct dmabuf_buffer_data {
+    uint32_t planes_set; // bitmask
     int32_t width, height;
-    uint32_t format, flags;
 };
 
 static void
 dmabuf_buffer_destroy(void *data) {
     struct dmabuf_buffer_data *buffer_data = data;
 
-    for (size_t i = 0; i < STATIC_ARRLEN(buffer_data->planes); i++) {
-        uint32_t mask = (1 << i);
-        if (mask & buffer_data->planes_set) {
-            close(buffer_data->planes[i].fd);
-        }
-    }
     free(buffer_data);
 }
 
@@ -146,14 +135,9 @@ linux_buffer_params_resource_destroy(struct wl_resource *resource) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
     if (!buffer_params->ok) {
-        for (size_t i = 0; i < STATIC_ARRLEN(buffer_params->data->planes); i++) {
-            uint32_t mask = (1 << i);
-            if (mask & buffer_params->data->planes_set) {
-                close(buffer_params->data->planes[i].fd);
-            }
-        }
         free(buffer_params->data);
     }
+
     zwp_linux_buffer_params_v1_destroy(buffer_params->remote);
     free(buffer_params);
 }
@@ -164,9 +148,9 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
                         uint32_t modifier_lo) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
-    if (plane_idx >= STATIC_ARRLEN(buffer_params->data->planes)) {
+    if (plane_idx >= MAX_PLANES) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX,
-                               "plane %" PRIu32 " exceeds max of 4", plane_idx);
+                               "plane %" PRIu32 " exceeds max of %d", plane_idx, MAX_PLANES);
         return;
     }
 
@@ -177,11 +161,6 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
         return;
     }
 
-    uint64_t modifier = ((uint64_t)modifier_hi << 32) + (uint64_t)modifier_lo;
-    buffer_params->data->planes[plane_idx].fd = fd;
-    buffer_params->data->planes[plane_idx].offset = offset;
-    buffer_params->data->planes[plane_idx].stride = stride;
-    buffer_params->data->planes[plane_idx].modifier = modifier;
     buffer_params->data->planes_set |= mask;
 
     zwp_linux_buffer_params_v1_add(buffer_params->remote, fd, plane_idx, offset, stride,
@@ -213,8 +192,6 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
 
     buffer_params->data->width = width;
     buffer_params->data->height = height;
-    buffer_params->data->format = format;
-    buffer_params->data->flags = flags;
 
     // There are a lot of ways this request can fail, many of which are too annoying to check for.
     // Mesa should get it right anyways.
@@ -256,8 +233,6 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
 
     buffer_params->data->width = width;
     buffer_params->data->height = height;
-    buffer_params->data->format = format;
-    buffer_params->data->flags = flags;
 
     // There are a lot of ways this request can fail, many of which are too annoying to check for.
     // Mesa should get it right anyways.
