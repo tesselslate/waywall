@@ -4,6 +4,7 @@
 #include "wall.h"
 #include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
+#include <luajit-2.1/luajit.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
 #include <string.h>
@@ -145,6 +146,19 @@ lua_lib_reset(lua_State *L) {
 }
 
 static int
+lua_lib_getenv(lua_State *L) {
+    const char *var = luaL_checkstring(L, 1);
+    const char *result = getenv(var);
+    if (result) {
+        lua_pushstring(L, result);
+    } else {
+        lua_pushnil(L);
+    }
+
+    return 1;
+}
+
+static int
 lua_lib_log(lua_State *L) {
     ww_log(LOG_INFO, "lua: %s", lua_tostring(L, 1));
     return 0;
@@ -157,6 +171,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"play", lua_lib_play},
     {"reset", lua_lib_reset},
 
+    {"getenv", lua_lib_getenv},
     {"log", lua_lib_log},
     {NULL, NULL},
 };
@@ -843,7 +858,17 @@ config_populate(struct config *cfg) {
     luaL_newmetatable(cfg->vm.L, METATABLE_WALL);
     lua_pop(cfg->vm.L, 1);
 
-    luaL_openlibs(cfg->vm.L);
+    static const struct luaL_Reg base_lib[] = {
+        {"", luaopen_base},         {"package", luaopen_package}, {"table", luaopen_table},
+        {"string", luaopen_string}, {"math", luaopen_math},
+    };
+
+    for (size_t i = 0; i < STATIC_ARRLEN(base_lib); i++) {
+        lua_pushcfunction(cfg->vm.L, base_lib[i].func);
+        lua_pushstring(cfg->vm.L, base_lib[i].name);
+        lua_call(cfg->vm.L, 1, 0);
+    }
+
     lua_getglobal(cfg->vm.L, "_G");
     luaL_register(cfg->vm.L, "priv_waywall", lua_lib);
     lua_pop(cfg->vm.L, 2);

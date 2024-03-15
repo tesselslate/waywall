@@ -11,7 +11,11 @@
 
 -- Setup the environment for the user's configuration.
 local priv = _G.priv_waywall
+
 _G.priv_waywall = nil
+_G.load = nil
+_G.loadfile = nil
+_G.loadstring = nil
 
 _G.print = function(...)
     local str = nil
@@ -38,7 +42,7 @@ setmetatable(_G.waywall, {
 })
 
 -- Setup the package path to include the waywall configuration directory.
-local getenv = require("os").getenv
+local getenv = priv.getenv
 local xdg_config_home = getenv("XDG_CONFIG_HOME")
 local path = nil
 if xdg_config_home then
