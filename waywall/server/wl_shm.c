@@ -145,7 +145,7 @@ shm_resource_destroy(struct wl_resource *resource) {
 static void
 shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t id, int32_t fd,
                 int32_t size) {
-    struct server_shm_g *shm_g = wl_resource_get_user_data(resource);
+    struct server_shm *shm = wl_resource_get_user_data(resource);
 
     struct server_shm_pool *shm_pool = calloc(1, sizeof(*shm_pool));
     if (!shm_pool) {
@@ -164,11 +164,11 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     wl_resource_set_implementation(shm_pool->resource, &shm_pool_impl, shm_pool,
                                    shm_pool_resource_destroy);
 
-    shm_pool->formats = shm_g->formats;
+    shm_pool->formats = shm->formats;
     shm_pool->fd = fd;
     shm_pool->sz = size;
 
-    shm_pool->remote = wl_shm_create_pool(shm_g->remote, fd, size);
+    shm_pool->remote = wl_shm_create_pool(shm->remote, fd, size);
     if (!shm_pool->remote) {
         wl_resource_post_no_memory(shm_pool->resource);
         close(fd);
@@ -185,66 +185,66 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_SHM_VERSION);
 
-    struct server_shm_g *shm_g = data;
+    struct server_shm *shm = data;
 
     struct wl_resource *resource = wl_resource_create(client, &wl_shm_interface, version, id);
     if (!resource) {
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &shm_impl, shm_g, shm_resource_destroy);
+    wl_resource_set_implementation(resource, &shm_impl, shm, shm_resource_destroy);
 
-    wl_list_insert(&shm_g->objects, wl_resource_get_link(resource));
+    wl_list_insert(&shm->objects, wl_resource_get_link(resource));
 }
 
 static void
 on_shm_format(struct wl_listener *listener, void *data) {
-    struct server_shm_g *shm_g = wl_container_of(listener, shm_g, on_shm_format);
+    struct server_shm *shm = wl_container_of(listener, shm, on_shm_format);
     uint32_t *format = data;
 
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &shm_g->objects) {
+    wl_resource_for_each(resource, &shm->objects) {
         wl_shm_send_format(resource, *format);
     }
 }
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_shm_g *shm_g = wl_container_of(listener, shm_g, on_display_destroy);
+    struct server_shm *shm = wl_container_of(listener, shm, on_display_destroy);
 
-    wl_global_destroy(shm_g->global);
+    wl_global_destroy(shm->global);
 
-    wl_list_remove(&shm_g->on_shm_format.link);
-    wl_list_remove(&shm_g->on_display_destroy.link);
+    wl_list_remove(&shm->on_shm_format.link);
+    wl_list_remove(&shm->on_display_destroy.link);
 
-    free(shm_g);
+    free(shm);
 }
 
-struct server_shm_g *
-server_shm_g_create(struct server *server) {
-    struct server_shm_g *shm_g = calloc(1, sizeof(*shm_g));
-    if (!shm_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_shm_g");
+struct server_shm *
+server_shm_create(struct server *server) {
+    struct server_shm *shm = calloc(1, sizeof(*shm));
+    if (!shm) {
+        ww_log(LOG_ERROR, "failed to allocate server_shm");
         return NULL;
     }
 
-    shm_g->global = wl_global_create(server->display, &wl_shm_interface, SRV_SHM_VERSION, shm_g,
+    shm->global = wl_global_create(server->display, &wl_shm_interface, SRV_SHM_VERSION, shm,
                                      on_global_bind);
-    if (!shm_g->global) {
+    if (!shm->global) {
         ww_log(LOG_ERROR, "failed to allocate wl_shm global");
-        free(shm_g);
+        free(shm);
         return NULL;
     }
 
-    wl_list_init(&shm_g->objects);
-    shm_g->remote = server->backend.shm;
-    shm_g->formats = &server->backend.shm_formats;
+    wl_list_init(&shm->objects);
+    shm->remote = server->backend.shm;
+    shm->formats = &server->backend.shm_formats;
 
-    shm_g->on_shm_format.notify = on_shm_format;
-    wl_signal_add(&server->backend.events.shm_format, &shm_g->on_shm_format);
+    shm->on_shm_format.notify = on_shm_format;
+    wl_signal_add(&server->backend.events.shm_format, &shm->on_shm_format);
 
-    shm_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &shm_g->on_display_destroy);
+    shm->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &shm->on_display_destroy);
 
-    return shm_g;
+    return shm;
 }

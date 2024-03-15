@@ -426,7 +426,7 @@ server_create(struct config *cfg) {
     if (!server->relative_pointer) {
         goto fail_globals;
     }
-    server->shm = server_shm_g_create(server);
+    server->shm = server_shm_create(server);
     if (!server->shm) {
         goto fail_globals;
     }

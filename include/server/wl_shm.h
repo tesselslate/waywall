@@ -5,7 +5,7 @@
 
 struct server;
 
-struct server_shm_g {
+struct server_shm {
     struct wl_global *global;
     struct wl_list objects; // wl_resource link
 
@@ -24,6 +24,6 @@ struct server_shm_pool {
     int32_t fd, sz;
 };
 
-struct server_shm_g *server_shm_g_create(struct server *server);
+struct server_shm *server_shm_create(struct server *server);
 
 #endif
