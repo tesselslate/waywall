@@ -13,12 +13,6 @@ struct server_compositor_g {
     struct wl_listener on_display_destroy;
 };
 
-struct server_compositor {
-    struct wl_resource *resource;
-
-    struct wl_compositor *remote;
-};
-
 struct server_region {
     struct wl_resource *resource;
 
@@ -29,7 +23,7 @@ struct server_region {
 struct server_surface {
     struct wl_resource *resource;
 
-    struct server_compositor *parent;
+    struct server_compositor_g *parent;
     struct wl_surface *remote;
 
     struct {
