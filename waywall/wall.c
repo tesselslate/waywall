@@ -320,24 +320,11 @@ on_motion(void *data, double x, double y) {
     }
 }
 
-static void
-on_keymap(void *data, struct xkb_keymap *keymap) {
-    struct wall *wall = data;
-
-    if (config_build_actions(wall->cfg, keymap) != 0) {
-        ww_log(LOG_ERROR, "failed to build config actions table");
-        ww_panic("TODO");
-    }
-    wall->keymap = keymap;
-}
-
 static const struct server_seat_listener seat_listener = {
     .button = on_button,
     .key = on_key,
     .modifiers = on_modifiers,
     .motion = on_motion,
-
-    .keymap = on_keymap,
 };
 
 struct wall *

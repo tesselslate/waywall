@@ -310,10 +310,6 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
         ww_log(LOG_ERROR, "failed to create remote keymap");
         return;
     }
-
-    if (seat_g->listener) {
-        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.remote_keymap.xkb);
-    }
 }
 
 static void
@@ -895,7 +891,4 @@ server_seat_g_set_listener(struct server_seat_g *seat_g,
 
     seat_g->listener = listener;
     seat_g->listener_data = data;
-    if (seat_g->kb_state.remote_keymap.xkb) {
-        seat_g->listener->keymap(seat_g->listener_data, seat_g->kb_state.remote_keymap.xkb);
-    }
 }

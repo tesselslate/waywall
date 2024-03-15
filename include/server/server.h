@@ -71,12 +71,10 @@ struct server {
 
 struct server_seat_listener {
     bool (*button)(void *data, uint32_t button, bool state);
-    bool (*key)(void *data, uint32_t key, bool state);
+    bool (*key)(void *data, uint32_t sym, bool state);
     void (*modifiers)(void *data, uint32_t depressed, uint32_t latched, uint32_t locked,
                       uint32_t group);
     void (*motion)(void *data, double x, double y);
-
-    void (*keymap)(void *data, struct xkb_keymap *keymap);
 };
 
 struct syn_key {
