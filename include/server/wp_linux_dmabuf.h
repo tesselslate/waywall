@@ -14,13 +14,6 @@ struct server_linux_dmabuf_g {
     struct wl_listener on_display_destroy;
 };
 
-struct server_linux_dmabuf {
-    struct wl_resource *resource;
-
-    struct zwp_linux_dmabuf_v1 *remote;
-    struct wl_display *remote_display;
-};
-
 struct server_linux_buffer_params {
     struct wl_resource *resource;
 
