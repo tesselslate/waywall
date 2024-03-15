@@ -5,7 +5,7 @@
 
 struct server;
 
-struct server_relative_pointer_g {
+struct server_relative_pointer {
     struct wl_global *global;
     struct wl_list objects; // wl_resource (zwp_relative_pointer_v1) link
 
@@ -24,6 +24,6 @@ struct server_relative_pointer_g {
     struct wl_listener on_display_destroy;
 };
 
-struct server_relative_pointer_g *server_relative_pointer_g_create(struct server *server, struct config *cfg);
+struct server_relative_pointer *server_relative_pointer_create(struct server *server, struct config *cfg);
 
 #endif

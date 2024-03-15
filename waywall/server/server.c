@@ -422,7 +422,7 @@ server_create(struct config *cfg) {
     if (!server->pointer_constraints) {
         goto fail_globals;
     }
-    server->relative_pointer = server_relative_pointer_g_create(server, server->cfg);
+    server->relative_pointer = server_relative_pointer_create(server, server->cfg);
     if (!server->relative_pointer) {
         goto fail_globals;
     }

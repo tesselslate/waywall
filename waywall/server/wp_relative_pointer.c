@@ -9,12 +9,12 @@
 #define SRV_RELATIVE_POINTER_VERSION 1
 
 static void
-on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *relative_pointer,
+on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *wl,
                                     uint32_t utime_hi, uint32_t utime_lo, wl_fixed_t dx,
                                     wl_fixed_t dy, wl_fixed_t dx_unaccel, wl_fixed_t dy_unaccel) {
-    struct server_relative_pointer_g *relative_pointer_g = data;
+    struct server_relative_pointer *relative_pointer = data;
 
-    if (!relative_pointer_g->input_focus) {
+    if (!relative_pointer->input_focus) {
         return;
     }
 
@@ -23,19 +23,19 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
     //
     // TODO: Do we need to accumulate unaccel movement as well? I don't know if any compositors send
     // non-whole number values
-    relative_pointer_g->acc_x += wl_fixed_to_double(dx) * relative_pointer_g->cfg->input.sens;
-    relative_pointer_g->acc_y += wl_fixed_to_double(dy) * relative_pointer_g->cfg->input.sens;
+    relative_pointer->acc_x += wl_fixed_to_double(dx) * relative_pointer->cfg->input.sens;
+    relative_pointer->acc_y += wl_fixed_to_double(dy) * relative_pointer->cfg->input.sens;
 
-    double x = trunc(relative_pointer_g->acc_x);
-    relative_pointer_g->acc_x -= x;
+    double x = trunc(relative_pointer->acc_x);
+    relative_pointer->acc_x -= x;
 
-    double y = trunc(relative_pointer_g->acc_y);
-    relative_pointer_g->acc_y -= y;
+    double y = trunc(relative_pointer->acc_y);
+    relative_pointer->acc_y -= y;
 
     struct wl_client *client =
-        wl_resource_get_client(relative_pointer_g->input_focus->surface->resource);
+        wl_resource_get_client(relative_pointer->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &relative_pointer_g->objects) {
+    wl_resource_for_each(resource, &relative_pointer->objects) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -51,20 +51,20 @@ static const struct zwp_relative_pointer_v1_listener relative_pointer_listener =
 };
 
 static void
-process_pointer(struct server_relative_pointer_g *relative_pointer_g, struct wl_pointer *pointer) {
-    if (relative_pointer_g->remote_pointer) {
-        zwp_relative_pointer_v1_destroy(relative_pointer_g->remote_pointer);
+process_pointer(struct server_relative_pointer *relative_pointer, struct wl_pointer *pointer) {
+    if (relative_pointer->remote_pointer) {
+        zwp_relative_pointer_v1_destroy(relative_pointer->remote_pointer);
     }
     if (pointer) {
-        relative_pointer_g->remote_pointer = zwp_relative_pointer_manager_v1_get_relative_pointer(
-            relative_pointer_g->remote, pointer);
-        if (!relative_pointer_g->remote_pointer) {
+        relative_pointer->remote_pointer =
+            zwp_relative_pointer_manager_v1_get_relative_pointer(relative_pointer->remote, pointer);
+        if (!relative_pointer->remote_pointer) {
             ww_log(LOG_ERROR, "failed to get remote relative pointer");
             return;
         }
 
-        zwp_relative_pointer_v1_add_listener(relative_pointer_g->remote_pointer,
-                                             &relative_pointer_listener, relative_pointer_g);
+        zwp_relative_pointer_v1_add_listener(relative_pointer->remote_pointer,
+                                             &relative_pointer_listener, relative_pointer);
     }
 }
 
@@ -96,7 +96,7 @@ static void
 relative_pointer_manager_get_relative_pointer(struct wl_client *client,
                                               struct wl_resource *resource, uint32_t id,
                                               struct wl_resource *pointer_resource) {
-    struct server_relative_pointer_g *relative_pointer_g = wl_resource_get_user_data(resource);
+    struct server_relative_pointer *relative_pointer = wl_resource_get_user_data(resource);
 
     struct wl_resource *relative_pointer_resource = wl_resource_create(
         client, &zwp_relative_pointer_v1_interface, wl_resource_get_version(resource), id);
@@ -105,9 +105,9 @@ relative_pointer_manager_get_relative_pointer(struct wl_client *client,
         return;
     }
     wl_resource_set_implementation(relative_pointer_resource, &relative_pointer_impl,
-                                   relative_pointer_g, relative_pointer_resource_destroy);
+                                   relative_pointer, relative_pointer_resource_destroy);
 
-    wl_list_insert(&relative_pointer_g->objects, wl_resource_get_link(relative_pointer_resource));
+    wl_list_insert(&relative_pointer->objects, wl_resource_get_link(relative_pointer_resource));
 }
 
 static const struct zwp_relative_pointer_manager_v1_interface relative_pointer_manager_impl = {
@@ -119,7 +119,7 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_RELATIVE_POINTER_VERSION);
 
-    struct server_relative_pointer_g *relative_pointer_g = data;
+    struct server_relative_pointer *relative_pointer = data;
 
     struct wl_resource *resource =
         wl_resource_create(client, &zwp_relative_pointer_manager_v1_interface, version, id);
@@ -127,78 +127,78 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &relative_pointer_manager_impl, relative_pointer_g,
+    wl_resource_set_implementation(resource, &relative_pointer_manager_impl, relative_pointer,
                                    relative_pointer_manager_resource_destroy);
 }
 
 static void
 on_input_focus(struct wl_listener *listener, void *data) {
-    struct server_relative_pointer_g *relative_pointer_g =
-        wl_container_of(listener, relative_pointer_g, on_input_focus);
+    struct server_relative_pointer *relative_pointer =
+        wl_container_of(listener, relative_pointer, on_input_focus);
     struct server_view *view = data;
 
-    relative_pointer_g->input_focus = view;
+    relative_pointer->input_focus = view;
 }
 
 static void
 on_pointer(struct wl_listener *listener, void *data) {
-    struct server_relative_pointer_g *relative_pointer_g =
-        wl_container_of(listener, relative_pointer_g, on_pointer);
+    struct server_relative_pointer *relative_pointer =
+        wl_container_of(listener, relative_pointer, on_pointer);
 
-    process_pointer(relative_pointer_g, server_get_wl_pointer(relative_pointer_g->server));
+    process_pointer(relative_pointer, server_get_wl_pointer(relative_pointer->server));
 }
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_relative_pointer_g *relative_pointer_g =
-        wl_container_of(listener, relative_pointer_g, on_display_destroy);
+    struct server_relative_pointer *relative_pointer =
+        wl_container_of(listener, relative_pointer, on_display_destroy);
 
-    wl_global_destroy(relative_pointer_g->global);
+    wl_global_destroy(relative_pointer->global);
 
-    if (relative_pointer_g->remote_pointer) {
-        zwp_relative_pointer_v1_destroy(relative_pointer_g->remote_pointer);
+    if (relative_pointer->remote_pointer) {
+        zwp_relative_pointer_v1_destroy(relative_pointer->remote_pointer);
     }
 
-    wl_list_remove(&relative_pointer_g->on_input_focus.link);
-    wl_list_remove(&relative_pointer_g->on_pointer.link);
-    wl_list_remove(&relative_pointer_g->on_display_destroy.link);
+    wl_list_remove(&relative_pointer->on_input_focus.link);
+    wl_list_remove(&relative_pointer->on_pointer.link);
+    wl_list_remove(&relative_pointer->on_display_destroy.link);
 
-    free(relative_pointer_g);
+    free(relative_pointer);
 }
 
-struct server_relative_pointer_g *
-server_relative_pointer_g_create(struct server *server, struct config *cfg) {
-    struct server_relative_pointer_g *relative_pointer_g = calloc(1, sizeof(*relative_pointer_g));
-    if (!relative_pointer_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_relative_pointer_g");
+struct server_relative_pointer *
+server_relative_pointer_create(struct server *server, struct config *cfg) {
+    struct server_relative_pointer *relative_pointer = calloc(1, sizeof(*relative_pointer));
+    if (!relative_pointer) {
+        ww_log(LOG_ERROR, "failed to allocate server_relative_pointer");
         return NULL;
     }
 
-    relative_pointer_g->cfg = cfg;
-    relative_pointer_g->server = server;
+    relative_pointer->cfg = cfg;
+    relative_pointer->server = server;
 
-    relative_pointer_g->global =
+    relative_pointer->global =
         wl_global_create(server->display, &zwp_relative_pointer_manager_v1_interface,
-                         SRV_RELATIVE_POINTER_VERSION, relative_pointer_g, on_global_bind);
-    if (!relative_pointer_g->global) {
+                         SRV_RELATIVE_POINTER_VERSION, relative_pointer, on_global_bind);
+    if (!relative_pointer->global) {
         ww_log(LOG_ERROR, "failed to allocate wl_relative_pointer global");
-        free(relative_pointer_g);
+        free(relative_pointer);
         return NULL;
     }
 
-    wl_list_init(&relative_pointer_g->objects);
+    wl_list_init(&relative_pointer->objects);
 
-    relative_pointer_g->remote = server->backend.relative_pointer_manager;
-    process_pointer(relative_pointer_g, server_get_wl_pointer(server));
+    relative_pointer->remote = server->backend.relative_pointer_manager;
+    process_pointer(relative_pointer, server_get_wl_pointer(server));
 
-    relative_pointer_g->on_input_focus.notify = on_input_focus;
-    wl_signal_add(&server->events.input_focus, &relative_pointer_g->on_input_focus);
+    relative_pointer->on_input_focus.notify = on_input_focus;
+    wl_signal_add(&server->events.input_focus, &relative_pointer->on_input_focus);
 
-    relative_pointer_g->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->backend.events.seat_pointer, &relative_pointer_g->on_pointer);
+    relative_pointer->on_pointer.notify = on_pointer;
+    wl_signal_add(&server->backend.events.seat_pointer, &relative_pointer->on_pointer);
 
-    relative_pointer_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &relative_pointer_g->on_display_destroy);
+    relative_pointer->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &relative_pointer->on_display_destroy);
 
-    return relative_pointer_g;
+    return relative_pointer;
 }
