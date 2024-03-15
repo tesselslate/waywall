@@ -356,7 +356,7 @@ compositor_resource_destroy(struct wl_resource *resource) {
 
 static void
 compositor_create_region(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_compositor_g *compositor_g = wl_resource_get_user_data(resource);
+    struct server_compositor *compositor = wl_resource_get_user_data(resource);
 
     struct server_region *region = calloc(1, sizeof(*region));
     if (!region) {
@@ -373,7 +373,7 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
     }
     wl_resource_set_implementation(region->resource, &region_impl, region, region_resource_destroy);
 
-    region->remote = wl_compositor_create_region(compositor_g->remote);
+    region->remote = wl_compositor_create_region(compositor->remote);
     if (!region->remote) {
         wl_resource_post_no_memory(region->resource);
         free(region);
@@ -385,7 +385,7 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
 
 static void
 compositor_create_surface(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_compositor_g *compositor_g = wl_resource_get_user_data(resource);
+    struct server_compositor *compositor = wl_resource_get_user_data(resource);
 
     struct server_surface *surface = calloc(1, sizeof(*surface));
     if (!surface) {
@@ -403,7 +403,7 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     wl_resource_set_implementation(surface->resource, &surface_impl, surface,
                                    surface_resource_destroy);
 
-    surface->remote = wl_compositor_create_surface(compositor_g->remote);
+    surface->remote = wl_compositor_create_surface(compositor->remote);
     if (!surface->remote) {
         wl_resource_post_no_memory(surface->resource);
         free(surface);
@@ -412,11 +412,11 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     // We need to ensure that input events are never given to a child surface. See
     // `surface_set_input_region` for more details.
-    struct wl_region *region = wl_compositor_create_region(compositor_g->remote);
+    struct wl_region *region = wl_compositor_create_region(compositor->remote);
     wl_surface_set_input_region(surface->remote, region);
     wl_region_destroy(region);
 
-    surface->parent = compositor_g;
+    surface->parent = compositor;
     surface->current.buffer_scale = 1;
 }
 
@@ -429,7 +429,7 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_COMPOSITOR_VERSION);
 
-    struct server_compositor_g *compositor_g = data;
+    struct server_compositor *compositor = data;
 
     struct wl_resource *resource =
         wl_resource_create(client, &wl_compositor_interface, version, id);
@@ -437,44 +437,44 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &compositor_impl, compositor_g,
+    wl_resource_set_implementation(resource, &compositor_impl, compositor,
                                    compositor_resource_destroy);
 }
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_compositor_g *compositor_g =
-        wl_container_of(listener, compositor_g, on_display_destroy);
+    struct server_compositor *compositor =
+        wl_container_of(listener, compositor, on_display_destroy);
 
-    wl_global_destroy(compositor_g->global);
+    wl_global_destroy(compositor->global);
 
-    wl_list_remove(&compositor_g->on_display_destroy.link);
+    wl_list_remove(&compositor->on_display_destroy.link);
 
-    free(compositor_g);
+    free(compositor);
 }
 
-struct server_compositor_g *
-server_compositor_g_create(struct server *server) {
-    struct server_compositor_g *compositor_g = calloc(1, sizeof(*compositor_g));
-    if (!compositor_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_compositor_g");
+struct server_compositor *
+server_compositor_create(struct server *server) {
+    struct server_compositor *compositor = calloc(1, sizeof(*compositor));
+    if (!compositor) {
+        ww_log(LOG_ERROR, "failed to allocate server_compositor");
         return NULL;
     }
 
-    compositor_g->global = wl_global_create(server->display, &wl_compositor_interface,
-                                            SRV_COMPOSITOR_VERSION, compositor_g, on_global_bind);
-    if (!compositor_g->global) {
+    compositor->global = wl_global_create(server->display, &wl_compositor_interface,
+                                          SRV_COMPOSITOR_VERSION, compositor, on_global_bind);
+    if (!compositor->global) {
         ww_log(LOG_ERROR, "failed to allocate wl_compositor global");
-        free(compositor_g);
+        free(compositor);
         return NULL;
     }
 
-    compositor_g->remote = server->backend.compositor;
+    compositor->remote = server->backend.compositor;
 
-    compositor_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &compositor_g->on_display_destroy);
+    compositor->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &compositor->on_display_destroy);
 
-    return compositor_g;
+    return compositor;
 }
 
 struct server_region *

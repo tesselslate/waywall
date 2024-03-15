@@ -405,7 +405,7 @@ server_create(struct config *cfg) {
     }
 
     // These globals are required by others.
-    server->compositor = server_compositor_g_create(server);
+    server->compositor = server_compositor_create(server);
     if (!server->compositor) {
         goto fail_globals;
     }
