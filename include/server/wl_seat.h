@@ -22,7 +22,7 @@ struct kb_modifiers {
     uint8_t indices[8];
 };
 
-struct server_seat_g {
+struct server_seat {
     struct wl_global *global;
 
     struct config *cfg;
@@ -79,11 +79,11 @@ struct server_seat_g {
     } events;
 };
 
-struct server_seat_g *server_seat_g_create(struct server *server, struct config *cfg);
-void server_seat_g_send_click(struct server_seat_g *seat_g, struct server_view *view);
-void server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
-                             const struct syn_key *keys, size_t num_keys);
-void server_seat_g_set_listener(struct server_seat_g *seat_g,
-                                const struct server_seat_listener *listener, void *data);
+struct server_seat *server_seat_create(struct server *server, struct config *cfg);
+void server_seat_send_click(struct server_seat *seat, struct server_view *view);
+void server_seat_send_keys(struct server_seat *seat, struct server_view *view,
+                           const struct syn_key *keys, size_t num_keys);
+void server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
+                              void *data);
 
 #endif

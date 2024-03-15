@@ -49,51 +49,51 @@ current_time() {
 }
 
 static void
-get_pointer_offset(struct server_seat_g *seat_g, double *x, double *y) {
-    ww_assert(seat_g->input_focus);
+get_pointer_offset(struct server_seat *seat, double *x, double *y) {
+    ww_assert(seat->input_focus);
 
-    *x = seat_g->ptr_state.x - (double)seat_g->input_focus->x;
-    *y = seat_g->ptr_state.y - (double)seat_g->input_focus->y;
+    *x = seat->ptr_state.x - (double)seat->input_focus->x;
+    *y = seat->ptr_state.y - (double)seat->input_focus->y;
 }
 
 static int
-prepare_keymap(struct server_seat_g *seat_g) {
+prepare_keymap(struct server_seat *seat) {
     char *keymap =
-        xkb_keymap_get_as_string(seat_g->cfg->input.xkb_keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
+        xkb_keymap_get_as_string(seat->cfg->input.xkb_keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
     if (!keymap) {
         ww_log(LOG_ERROR, "failed to get XKB keymap as string");
         return 1;
     }
 
-    seat_g->kb_state.local_keymap.size = strlen(keymap) + 1;
-    seat_g->kb_state.local_keymap.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
-    if (seat_g->kb_state.local_keymap.fd == -1) {
+    seat->kb_state.local_keymap.size = strlen(keymap) + 1;
+    seat->kb_state.local_keymap.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
+    if (seat->kb_state.local_keymap.fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to create keymap memfd");
         goto fail_memfd;
     }
 
-    if (ftruncate(seat_g->kb_state.local_keymap.fd, seat_g->kb_state.local_keymap.size) == -1) {
+    if (ftruncate(seat->kb_state.local_keymap.fd, seat->kb_state.local_keymap.size) == -1) {
         ww_log_errno(LOG_ERROR, "failed to expand keymap memfd");
         goto fail_truncate;
     }
 
-    char *data = mmap(NULL, seat_g->kb_state.local_keymap.size + 1, PROT_READ | PROT_WRITE,
-                      MAP_SHARED, seat_g->kb_state.local_keymap.fd, 0);
+    char *data = mmap(NULL, seat->kb_state.local_keymap.size + 1, PROT_READ | PROT_WRITE,
+                      MAP_SHARED, seat->kb_state.local_keymap.fd, 0);
     if (data == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap keymap memfd");
         goto fail_mmap;
     }
 
-    memcpy(data, keymap, seat_g->kb_state.local_keymap.size + 1);
-    ww_assert(munmap(data, seat_g->kb_state.local_keymap.size + 1) == 0);
+    memcpy(data, keymap, seat->kb_state.local_keymap.size + 1);
+    ww_assert(munmap(data, seat->kb_state.local_keymap.size + 1) == 0);
 
     free(keymap);
     return 0;
 
 fail_mmap:
 fail_truncate:
-    close(seat_g->kb_state.local_keymap.fd);
-    seat_g->kb_state.local_keymap.fd = -1;
+    close(seat->kb_state.local_keymap.fd);
+    seat->kb_state.local_keymap.fd = -1;
 
 fail_memfd:
     free(keymap);
@@ -116,40 +116,40 @@ prepare_remote_keymap(struct xkb_context *ctx, int32_t fd, int32_t size) {
 }
 
 static void
-send_keyboard_enter(struct server_seat_g *seat_g) {
-    ww_assert(seat_g->input_focus);
+send_keyboard_enter(struct server_seat *seat) {
+    ww_assert(seat->input_focus);
 
     struct wl_array keys;
     wl_array_init(&keys);
-    uint32_t *data = wl_array_add(&keys, sizeof(uint32_t) * seat_g->kb_state.pressed.len);
+    uint32_t *data = wl_array_add(&keys, sizeof(uint32_t) * seat->kb_state.pressed.len);
     ww_assert(data);
-    for (size_t i = 0; i < seat_g->kb_state.pressed.len; i++) {
-        data[i] = seat_g->kb_state.pressed.data[i];
+    for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
+        data[i] = seat->kb_state.pressed.data[i];
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->keyboards) {
+    wl_resource_for_each(resource, &seat->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
         wl_keyboard_send_enter(resource, next_serial(resource),
-                               seat_g->input_focus->surface->resource, &keys);
+                               seat->input_focus->surface->resource, &keys);
     }
 
     wl_array_release(&keys);
 }
 
 static void
-send_keyboard_key(struct server_seat_g *seat_g, uint32_t key, enum wl_keyboard_key_state state) {
-    if (!seat_g->input_focus) {
+send_keyboard_key(struct server_seat *seat, uint32_t key, enum wl_keyboard_key_state state) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->keyboards) {
+    wl_resource_for_each(resource, &seat->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -159,77 +159,77 @@ send_keyboard_key(struct server_seat_g *seat_g, uint32_t key, enum wl_keyboard_k
 }
 
 static void
-send_keyboard_leave(struct server_seat_g *seat_g) {
-    if (!seat_g->input_focus) {
+send_keyboard_leave(struct server_seat *seat) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->keyboards) {
+    wl_resource_for_each(resource, &seat->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
         wl_keyboard_send_leave(resource, next_serial(resource),
-                               seat_g->input_focus->surface->resource);
+                               seat->input_focus->surface->resource);
     }
 }
 
 static void
-send_keyboard_modifiers(struct server_seat_g *seat_g) {
-    if (!seat_g->input_focus) {
+send_keyboard_modifiers(struct server_seat *seat) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->keyboards) {
+    wl_resource_for_each(resource, &seat->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
-        wl_keyboard_send_modifiers(resource, next_serial(resource), seat_g->kb_state.mods.depressed,
-                                   seat_g->kb_state.mods.latched, seat_g->kb_state.mods.locked,
-                                   seat_g->kb_state.mods.group);
+        wl_keyboard_send_modifiers(resource, next_serial(resource), seat->kb_state.mods.depressed,
+                                   seat->kb_state.mods.latched, seat->kb_state.mods.locked,
+                                   seat->kb_state.mods.group);
     }
 }
 
 static void
-send_pointer_enter(struct server_seat_g *seat_g) {
-    ww_assert(seat_g->input_focus);
+send_pointer_enter(struct server_seat *seat) {
+    ww_assert(seat->input_focus);
 
     double x, y;
-    get_pointer_offset(seat_g, &x, &y);
+    get_pointer_offset(seat, &x, &y);
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
         wl_pointer_send_enter(resource, next_serial(resource),
-                              seat_g->input_focus->surface->resource, wl_fixed_from_double(x),
+                              seat->input_focus->surface->resource, wl_fixed_from_double(x),
                               wl_fixed_from_double(y));
     }
 }
 
 static void
-send_pointer_leave(struct server_seat_g *seat_g) {
-    if (!seat_g->input_focus) {
+send_pointer_leave(struct server_seat *seat) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
         wl_pointer_send_leave(resource, next_serial(resource),
-                              seat_g->input_focus->surface->resource);
+                              seat->input_focus->surface->resource);
     }
 }
 
@@ -242,60 +242,60 @@ on_keyboard_enter(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
 static void
 on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t time, uint32_t key,
                 uint32_t state) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
     // Update the pressed keys array.
     switch ((enum wl_keyboard_key_state)state) {
     case WL_KEYBOARD_KEY_STATE_PRESSED:
-        for (size_t i = 0; i < seat_g->kb_state.pressed.len; i++) {
-            if (seat_g->kb_state.pressed.data[i] == key) {
+        for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
+            if (seat->kb_state.pressed.data[i] == key) {
                 ww_log(LOG_WARN, "duplicate key press event received");
                 return;
             }
         }
 
-        if (seat_g->kb_state.pressed.len == seat_g->kb_state.pressed.cap) {
-            uint32_t *new_data = realloc(seat_g->kb_state.pressed.data,
-                                         sizeof(uint32_t) * seat_g->kb_state.pressed.cap * 2);
+        if (seat->kb_state.pressed.len == seat->kb_state.pressed.cap) {
+            uint32_t *new_data = realloc(seat->kb_state.pressed.data,
+                                         sizeof(uint32_t) * seat->kb_state.pressed.cap * 2);
             if (!new_data) {
                 ww_log(LOG_WARN, "failed to reallocate pressed keys buffer - input dropped");
                 return;
             }
 
-            seat_g->kb_state.pressed.data = new_data;
-            seat_g->kb_state.pressed.cap *= 2;
+            seat->kb_state.pressed.data = new_data;
+            seat->kb_state.pressed.cap *= 2;
         }
 
-        seat_g->kb_state.pressed.data[seat_g->kb_state.pressed.len++] = key;
+        seat->kb_state.pressed.data[seat->kb_state.pressed.len++] = key;
         break;
     case WL_KEYBOARD_KEY_STATE_RELEASED:
-        for (size_t i = 0; i < seat_g->kb_state.pressed.len; i++) {
-            if (seat_g->kb_state.pressed.data[i] != key) {
+        for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
+            if (seat->kb_state.pressed.data[i] != key) {
                 continue;
             }
 
-            memmove(seat_g->kb_state.pressed.data + i, seat_g->kb_state.pressed.data + i + 1,
-                    sizeof(uint32_t) * (seat_g->kb_state.pressed.len - i - 1));
-            seat_g->kb_state.pressed.len--;
+            memmove(seat->kb_state.pressed.data + i, seat->kb_state.pressed.data + i + 1,
+                    sizeof(uint32_t) * (seat->kb_state.pressed.len - i - 1));
+            seat->kb_state.pressed.len--;
             break;
         }
         break;
     }
 
-    if (seat_g->listener) {
+    if (seat->listener) {
         // Add 8 to convert from libinput to XKB keycodes.
-        bool consumed = seat_g->listener->key(seat_g->listener_data, key + 8,
+        bool consumed = seat->listener->key(seat->listener_data, key + 8,
                                               state == WL_KEYBOARD_KEY_STATE_PRESSED);
         if (consumed) {
             return;
         }
     }
-    send_keyboard_key(seat_g, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+    send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 }
 
 static void
 on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t fd, uint32_t size) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
     if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
         ww_log(LOG_WARN, "received keymap of unknown type %" PRIu32, format);
@@ -304,98 +304,98 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
 
     // TODO: handle errors somehow (not sure how to be honest)
 
-    if (seat_g->kb_state.remote_keymap.fd >= 0) {
-        close(seat_g->kb_state.remote_keymap.fd);
+    if (seat->kb_state.remote_keymap.fd >= 0) {
+        close(seat->kb_state.remote_keymap.fd);
     }
-    if (seat_g->kb_state.remote_keymap.xkb_state) {
-        xkb_state_unref(seat_g->kb_state.remote_keymap.xkb_state);
-        seat_g->kb_state.remote_keymap.xkb_state = NULL;
+    if (seat->kb_state.remote_keymap.xkb_state) {
+        xkb_state_unref(seat->kb_state.remote_keymap.xkb_state);
+        seat->kb_state.remote_keymap.xkb_state = NULL;
     }
-    if (seat_g->kb_state.remote_keymap.xkb) {
-        xkb_keymap_unref(seat_g->kb_state.remote_keymap.xkb);
+    if (seat->kb_state.remote_keymap.xkb) {
+        xkb_keymap_unref(seat->kb_state.remote_keymap.xkb);
     }
-    seat_g->kb_state.remote_keymap.fd = fd;
-    seat_g->kb_state.remote_keymap.size = size;
+    seat->kb_state.remote_keymap.fd = fd;
+    seat->kb_state.remote_keymap.size = size;
 
-    seat_g->kb_state.remote_keymap.xkb =
-        prepare_remote_keymap(seat_g->cfg->input.xkb_ctx, fd, size);
-    if (!seat_g->kb_state.remote_keymap.xkb) {
+    seat->kb_state.remote_keymap.xkb =
+        prepare_remote_keymap(seat->cfg->input.xkb_ctx, fd, size);
+    if (!seat->kb_state.remote_keymap.xkb) {
         ww_log(LOG_ERROR, "failed to create remote keymap");
         return;
     }
 
-    seat_g->kb_state.remote_keymap.xkb_state = xkb_state_new(seat_g->kb_state.remote_keymap.xkb);
-    ww_assert(seat_g->kb_state.remote_keymap.xkb_state);
+    seat->kb_state.remote_keymap.xkb_state = xkb_state_new(seat->kb_state.remote_keymap.xkb);
+    ww_assert(seat->kb_state.remote_keymap.xkb_state);
 
-    for (size_t i = 0; i < STATIC_ARRLEN(seat_g->kb_state.remote_keymap.mods.indices); i++) {
-        size_t mod = xkb_keymap_mod_get_index(seat_g->kb_state.remote_keymap.xkb, mod_names[i]);
+    for (size_t i = 0; i < STATIC_ARRLEN(seat->kb_state.remote_keymap.mods.indices); i++) {
+        size_t mod = xkb_keymap_mod_get_index(seat->kb_state.remote_keymap.xkb, mod_names[i]);
         ww_assert(mod != XKB_MOD_INVALID);
 
-        seat_g->kb_state.remote_keymap.mods.indices[i] = mod;
+        seat->kb_state.remote_keymap.mods.indices[i] = mod;
     }
 }
 
 static void
 on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    for (size_t i = 0; i < seat_g->kb_state.pressed.len; i++) {
-        send_keyboard_key(seat_g, seat_g->kb_state.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
+    for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
+        send_keyboard_key(seat, seat->kb_state.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
     }
-    seat_g->kb_state.pressed.len = 0;
+    seat->kb_state.pressed.len = 0;
 
-    seat_g->kb_state.mods.depressed = 0;
-    seat_g->kb_state.mods.latched = 0;
-    seat_g->kb_state.mods.locked = 0;
-    seat_g->kb_state.mods.group = 0;
-    send_keyboard_modifiers(seat_g);
+    seat->kb_state.mods.depressed = 0;
+    seat->kb_state.mods.latched = 0;
+    seat->kb_state.mods.locked = 0;
+    seat->kb_state.mods.group = 0;
+    send_keyboard_modifiers(seat);
 }
 
 static void
 on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t mods_depressed,
                       uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
     // TODO: I don't think it's valid to just send the same modifiers here if there are two
     // different keymaps at play.
 
-    seat_g->kb_state.mods.depressed = mods_depressed;
-    seat_g->kb_state.mods.latched = mods_latched;
-    seat_g->kb_state.mods.locked = mods_locked;
-    seat_g->kb_state.mods.group = group;
-    send_keyboard_modifiers(seat_g);
+    seat->kb_state.mods.depressed = mods_depressed;
+    seat->kb_state.mods.latched = mods_latched;
+    seat->kb_state.mods.locked = mods_locked;
+    seat->kb_state.mods.group = group;
+    send_keyboard_modifiers(seat);
 
-    if (seat_g->listener) {
-        if (!seat_g->kb_state.remote_keymap.xkb_state) {
+    if (seat->listener) {
+        if (!seat->kb_state.remote_keymap.xkb_state) {
             return;
         }
 
-        xkb_state_update_mask(seat_g->kb_state.remote_keymap.xkb_state, mods_depressed,
+        xkb_state_update_mask(seat->kb_state.remote_keymap.xkb_state, mods_depressed,
                               mods_latched, mods_locked, 0, 0, group);
 
-        xkb_mod_mask_t xkb_mods = xkb_state_serialize_mods(seat_g->kb_state.remote_keymap.xkb_state,
+        xkb_mod_mask_t xkb_mods = xkb_state_serialize_mods(seat->kb_state.remote_keymap.xkb_state,
                                                            XKB_STATE_MODS_EFFECTIVE);
         xkb_layout_index_t group = xkb_state_serialize_layout(
-            seat_g->kb_state.remote_keymap.xkb_state, XKB_STATE_LAYOUT_EFFECTIVE);
+            seat->kb_state.remote_keymap.xkb_state, XKB_STATE_LAYOUT_EFFECTIVE);
 
         uint32_t mods = 0;
-        for (size_t i = 0; i < STATIC_ARRLEN(seat_g->kb_state.remote_keymap.mods.indices); i++) {
-            uint8_t index = seat_g->kb_state.remote_keymap.mods.indices[i];
+        for (size_t i = 0; i < STATIC_ARRLEN(seat->kb_state.remote_keymap.mods.indices); i++) {
+            uint8_t index = seat->kb_state.remote_keymap.mods.indices[i];
             if (xkb_mods & (1 << index)) {
                 mods |= (1 << i);
             }
         }
 
-        seat_g->listener->modifiers(seat_g->listener_data, mods, group);
+        seat->listener->modifiers(seat->listener_data, mods, group);
     }
 }
 
 static void
 on_keyboard_repeat_info(void *data, struct wl_keyboard *wl, int32_t rate, int32_t delay) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    seat_g->kb_state.repeat_rate = rate;
-    seat_g->kb_state.repeat_delay = delay;
+    seat->kb_state.repeat_rate = rate;
+    seat->kb_state.repeat_delay = delay;
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
@@ -409,15 +409,15 @@ static const struct wl_keyboard_listener keyboard_listener = {
 
 static void
 on_pointer_axis(void *data, struct wl_pointer *wl, uint32_t time, uint32_t axis, wl_fixed_t value) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -428,15 +428,15 @@ on_pointer_axis(void *data, struct wl_pointer *wl, uint32_t time, uint32_t axis,
 
 static void
 on_pointer_axis_discrete(void *data, struct wl_pointer *wl, uint32_t axis, int32_t discrete) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -449,15 +449,15 @@ on_pointer_axis_discrete(void *data, struct wl_pointer *wl, uint32_t axis, int32
 
 static void
 on_pointer_axis_source(void *data, struct wl_pointer *wl, uint32_t source) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -470,15 +470,15 @@ on_pointer_axis_source(void *data, struct wl_pointer *wl, uint32_t source) {
 
 static void
 on_pointer_axis_stop(void *data, struct wl_pointer *wl, uint32_t time, uint32_t axis) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -492,23 +492,23 @@ on_pointer_axis_stop(void *data, struct wl_pointer *wl, uint32_t time, uint32_t 
 static void
 on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t time,
                   uint32_t button, uint32_t state) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (seat_g->listener) {
-        bool consumed = seat_g->listener->button(seat_g->listener_data, button,
+    if (seat->listener) {
+        bool consumed = seat->listener->button(seat->listener_data, button,
                                                  state == WL_POINTER_BUTTON_STATE_PRESSED);
         if (consumed) {
             return;
         }
     }
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -520,27 +520,27 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
 static void
 on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_surface *surface,
                  wl_fixed_t surface_x, wl_fixed_t surface_y) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (surface != seat_g->server->ui.surface) {
+    if (surface != seat->server->ui.surface) {
         ww_log(LOG_WARN, "received wl_pointer.enter for unknown surface");
         return;
     }
 
-    wl_signal_emit_mutable(&seat_g->events.pointer_enter, &serial);
+    wl_signal_emit_mutable(&seat->events.pointer_enter, &serial);
 }
 
 static void
 on_pointer_frame(void *data, struct wl_pointer *wl) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -559,25 +559,25 @@ on_pointer_leave(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_s
 static void
 on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t surface_x,
                   wl_fixed_t surface_y) {
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
-    seat_g->ptr_state.x = wl_fixed_to_double(surface_x);
-    seat_g->ptr_state.y = wl_fixed_to_double(surface_y);
+    seat->ptr_state.x = wl_fixed_to_double(surface_x);
+    seat->ptr_state.y = wl_fixed_to_double(surface_y);
 
-    if (seat_g->listener) {
-        seat_g->listener->motion(seat_g->listener_data, seat_g->ptr_state.x, seat_g->ptr_state.y);
+    if (seat->listener) {
+        seat->listener->motion(seat->listener_data, seat->ptr_state.x, seat->ptr_state.y);
     }
 
-    if (!seat_g->input_focus) {
+    if (!seat->input_focus) {
         return;
     }
 
     double x, y;
-    get_pointer_offset(seat_g, &x, &y);
+    get_pointer_offset(seat, &x, &y);
 
-    struct wl_client *client = wl_resource_get_client(seat_g->input_focus->surface->resource);
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -604,35 +604,35 @@ static const struct wl_pointer_listener pointer_listener = {
 
 static void
 on_input_focus(struct wl_listener *listener, void *data) {
-    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_input_focus);
+    struct server_seat *seat = wl_container_of(listener, seat, on_input_focus);
     struct server_view *view = data;
 
-    send_keyboard_leave(seat_g);
-    send_pointer_leave(seat_g);
-    seat_g->input_focus = view;
-    if (seat_g->input_focus) {
-        send_keyboard_enter(seat_g);
-        send_pointer_enter(seat_g);
+    send_keyboard_leave(seat);
+    send_pointer_leave(seat);
+    seat->input_focus = view;
+    if (seat->input_focus) {
+        send_keyboard_enter(seat);
+        send_pointer_enter(seat);
     }
 }
 
 static void
 on_keyboard(struct wl_listener *listener, void *data) {
-    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_keyboard);
+    struct server_seat *seat = wl_container_of(listener, seat, on_keyboard);
 
-    seat_g->keyboard = server_get_wl_keyboard(seat_g->server);
-    if (seat_g->keyboard) {
-        wl_keyboard_add_listener(seat_g->keyboard, &keyboard_listener, seat_g);
+    seat->keyboard = server_get_wl_keyboard(seat->server);
+    if (seat->keyboard) {
+        wl_keyboard_add_listener(seat->keyboard, &keyboard_listener, seat);
     }
 }
 
 static void
 on_pointer(struct wl_listener *listener, void *data) {
-    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_pointer);
+    struct server_seat *seat = wl_container_of(listener, seat, on_pointer);
 
-    seat_g->pointer = server_get_wl_pointer(seat_g->server);
-    if (seat_g->pointer) {
-        wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
+    seat->pointer = server_get_wl_pointer(seat->server);
+    if (seat->pointer) {
+        wl_pointer_add_listener(seat->pointer, &pointer_listener, seat);
     }
 }
 
@@ -691,7 +691,7 @@ seat_resource_destroy(struct wl_resource *resource) {
 
 static void
 seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_seat_g *seat_g = wl_resource_get_user_data(resource);
+    struct server_seat *seat = wl_resource_get_user_data(resource);
 
     struct wl_resource *keyboard_resource =
         wl_resource_create(client, &wl_keyboard_interface, wl_resource_get_version(resource), id);
@@ -699,31 +699,31 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
         wl_resource_post_no_memory(resource);
         return;
     }
-    wl_resource_set_implementation(keyboard_resource, &keyboard_impl, seat_g,
+    wl_resource_set_implementation(keyboard_resource, &keyboard_impl, seat,
                                    keyboard_resource_destroy);
 
-    wl_list_insert(&seat_g->keyboards, wl_resource_get_link(keyboard_resource));
+    wl_list_insert(&seat->keyboards, wl_resource_get_link(keyboard_resource));
 
-    if (seat_g->cfg->input.custom_keymap) {
+    if (seat->cfg->input.custom_keymap) {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat_g->kb_state.local_keymap.fd,
-                                seat_g->kb_state.local_keymap.size);
+                                seat->kb_state.local_keymap.fd,
+                                seat->kb_state.local_keymap.size);
     } else {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat_g->kb_state.remote_keymap.fd,
-                                seat_g->kb_state.remote_keymap.size);
+                                seat->kb_state.remote_keymap.fd,
+                                seat->kb_state.remote_keymap.size);
     }
 
-    int32_t rate = seat_g->cfg->input.repeat_rate >= 0 ? seat_g->cfg->input.repeat_rate
-                                                       : seat_g->kb_state.repeat_rate;
-    int32_t delay = seat_g->cfg->input.repeat_delay >= 0 ? seat_g->cfg->input.repeat_delay
-                                                         : seat_g->kb_state.repeat_delay;
+    int32_t rate = seat->cfg->input.repeat_rate >= 0 ? seat->cfg->input.repeat_rate
+                                                       : seat->kb_state.repeat_rate;
+    int32_t delay = seat->cfg->input.repeat_delay >= 0 ? seat->cfg->input.repeat_delay
+                                                         : seat->kb_state.repeat_delay;
     wl_keyboard_send_repeat_info(keyboard_resource, rate, delay);
 }
 
 static void
 seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_seat_g *seat_g = wl_resource_get_user_data(resource);
+    struct server_seat *seat = wl_resource_get_user_data(resource);
 
     struct wl_resource *pointer_resource =
         wl_resource_create(client, &wl_pointer_interface, wl_resource_get_version(resource), id);
@@ -731,10 +731,10 @@ seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_
         wl_resource_post_no_memory(resource);
         return;
     }
-    wl_resource_set_implementation(pointer_resource, &pointer_impl, seat_g,
+    wl_resource_set_implementation(pointer_resource, &pointer_impl, seat,
                                    pointer_resource_destroy);
 
-    wl_list_insert(&seat_g->pointers, wl_resource_get_link(pointer_resource));
+    wl_list_insert(&seat->pointers, wl_resource_get_link(pointer_resource));
 }
 
 static void
@@ -758,14 +758,14 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_SEAT_VERSION);
 
-    struct server_seat_g *seat_g = data;
+    struct server_seat *seat = data;
 
     struct wl_resource *resource = wl_resource_create(client, &wl_seat_interface, version, id);
     if (!resource) {
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &seat_impl, seat_g, seat_resource_destroy);
+    wl_resource_set_implementation(resource, &seat_impl, seat, seat_resource_destroy);
 
     if (version >= WL_SEAT_NAME_SINCE_VERSION) {
         wl_seat_send_name(resource, "Waywall Seat");
@@ -775,115 +775,115 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_seat_g *seat_g = wl_container_of(listener, seat_g, on_display_destroy);
+    struct server_seat *seat = wl_container_of(listener, seat, on_display_destroy);
 
-    wl_global_destroy(seat_g->global);
+    wl_global_destroy(seat->global);
 
-    if (seat_g->kb_state.local_keymap.fd >= 0) {
-        close(seat_g->kb_state.local_keymap.fd);
+    if (seat->kb_state.local_keymap.fd >= 0) {
+        close(seat->kb_state.local_keymap.fd);
     }
-    if (seat_g->kb_state.remote_keymap.fd >= 0) {
-        close(seat_g->kb_state.remote_keymap.fd);
+    if (seat->kb_state.remote_keymap.fd >= 0) {
+        close(seat->kb_state.remote_keymap.fd);
     }
-    if (seat_g->kb_state.remote_keymap.xkb_state) {
-        xkb_state_unref(seat_g->kb_state.remote_keymap.xkb_state);
+    if (seat->kb_state.remote_keymap.xkb_state) {
+        xkb_state_unref(seat->kb_state.remote_keymap.xkb_state);
     }
-    if (seat_g->kb_state.remote_keymap.xkb) {
-        xkb_keymap_unref(seat_g->kb_state.remote_keymap.xkb);
+    if (seat->kb_state.remote_keymap.xkb) {
+        xkb_keymap_unref(seat->kb_state.remote_keymap.xkb);
     }
-    if (seat_g->kb_state.pressed.data) {
-        free(seat_g->kb_state.pressed.data);
+    if (seat->kb_state.pressed.data) {
+        free(seat->kb_state.pressed.data);
     }
 
-    wl_list_remove(&seat_g->on_input_focus.link);
-    wl_list_remove(&seat_g->on_keyboard.link);
-    wl_list_remove(&seat_g->on_pointer.link);
+    wl_list_remove(&seat->on_input_focus.link);
+    wl_list_remove(&seat->on_keyboard.link);
+    wl_list_remove(&seat->on_pointer.link);
 
-    wl_list_remove(&seat_g->on_display_destroy.link);
+    wl_list_remove(&seat->on_display_destroy.link);
 
-    free(seat_g);
+    free(seat);
 }
 
-struct server_seat_g *
-server_seat_g_create(struct server *server, struct config *cfg) {
-    struct server_seat_g *seat_g = calloc(1, sizeof(*seat_g));
-    if (!seat_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_seat_g");
+struct server_seat *
+server_seat_create(struct server *server, struct config *cfg) {
+    struct server_seat *seat = calloc(1, sizeof(*seat));
+    if (!seat) {
+        ww_log(LOG_ERROR, "failed to allocate server_seat");
         return NULL;
     }
 
-    seat_g->cfg = cfg;
-    seat_g->server = server;
+    seat->cfg = cfg;
+    seat->server = server;
 
-    seat_g->kb_state.local_keymap.fd = -1;
-    if (prepare_keymap(seat_g) != 0) {
+    seat->kb_state.local_keymap.fd = -1;
+    if (prepare_keymap(seat) != 0) {
         goto fail_keymap;
     }
 
-    seat_g->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat_g,
+    seat->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat,
                                       on_global_bind);
-    if (!seat_g->global) {
+    if (!seat->global) {
         ww_log(LOG_ERROR, "failed to allocate seat global");
         goto fail_global;
     }
 
-    seat_g->kb_state.remote_keymap.fd = -1;
-    seat_g->kb_state.pressed.cap = 8;
-    seat_g->kb_state.pressed.data = calloc(seat_g->kb_state.pressed.cap, sizeof(uint32_t));
-    if (!seat_g->kb_state.pressed.data) {
+    seat->kb_state.remote_keymap.fd = -1;
+    seat->kb_state.pressed.cap = 8;
+    seat->kb_state.pressed.data = calloc(seat->kb_state.pressed.cap, sizeof(uint32_t));
+    if (!seat->kb_state.pressed.data) {
         ww_log(LOG_ERROR, "failed to allocate pressed keys array");
         goto fail_pressed_keys;
     }
 
-    wl_list_init(&seat_g->keyboards);
-    wl_list_init(&seat_g->pointers);
+    wl_list_init(&seat->keyboards);
+    wl_list_init(&seat->pointers);
 
-    wl_signal_init(&seat_g->events.pointer_enter);
+    wl_signal_init(&seat->events.pointer_enter);
 
-    seat_g->on_input_focus.notify = on_input_focus;
-    wl_signal_add(&server->events.input_focus, &seat_g->on_input_focus);
+    seat->on_input_focus.notify = on_input_focus;
+    wl_signal_add(&server->events.input_focus, &seat->on_input_focus);
 
-    seat_g->on_keyboard.notify = on_keyboard;
-    wl_signal_add(&server->backend.events.seat_keyboard, &seat_g->on_keyboard);
+    seat->on_keyboard.notify = on_keyboard;
+    wl_signal_add(&server->backend.events.seat_keyboard, &seat->on_keyboard);
 
-    seat_g->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->backend.events.seat_pointer, &seat_g->on_pointer);
+    seat->on_pointer.notify = on_pointer;
+    wl_signal_add(&server->backend.events.seat_pointer, &seat->on_pointer);
 
-    seat_g->keyboard = server_get_wl_keyboard(server);
-    if (seat_g->keyboard) {
-        wl_keyboard_add_listener(seat_g->keyboard, &keyboard_listener, seat_g);
+    seat->keyboard = server_get_wl_keyboard(server);
+    if (seat->keyboard) {
+        wl_keyboard_add_listener(seat->keyboard, &keyboard_listener, seat);
     }
 
-    seat_g->pointer = server_get_wl_pointer(server);
-    if (seat_g->pointer) {
-        wl_pointer_add_listener(seat_g->pointer, &pointer_listener, seat_g);
+    seat->pointer = server_get_wl_pointer(server);
+    if (seat->pointer) {
+        wl_pointer_add_listener(seat->pointer, &pointer_listener, seat);
     }
 
-    seat_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &seat_g->on_display_destroy);
+    seat->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &seat->on_display_destroy);
 
-    return seat_g;
+    return seat;
 
 fail_pressed_keys:
-    wl_global_destroy(seat_g->global);
+    wl_global_destroy(seat->global);
 
 fail_global:
-    close(seat_g->kb_state.local_keymap.fd);
+    close(seat->kb_state.local_keymap.fd);
 
 fail_keymap:
-    free(seat_g);
+    free(seat);
     return NULL;
 }
 
 void
-server_seat_g_send_click(struct server_seat_g *seat_g, struct server_view *view) {
-    ww_assert(seat_g->input_focus != view);
+server_seat_send_click(struct server_seat *seat, struct server_view *view) {
+    ww_assert(seat->input_focus != view);
 
     uint32_t time = current_time();
 
     struct wl_client *client = wl_resource_get_client(view->surface->resource);
     struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat_g->pointers) {
+    wl_resource_for_each(resource, &seat->pointers) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
@@ -898,7 +898,7 @@ server_seat_g_send_click(struct server_seat_g *seat_g, struct server_view *view)
 }
 
 void
-server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
+server_seat_send_keys(struct server_seat *seat, struct server_view *view,
                         const struct syn_key *keys, size_t num_keys) {
     struct wl_client *client = wl_resource_get_client(view->surface->resource);
     struct wl_resource *resource;
@@ -908,12 +908,12 @@ server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
 
     uint32_t time = current_time();
 
-    wl_resource_for_each(resource, &seat_g->keyboards) {
+    wl_resource_for_each(resource, &seat->keyboards) {
         if (wl_resource_get_client(resource) != client) {
             continue;
         }
 
-        if (seat_g->input_focus != view) {
+        if (seat->input_focus != view) {
             wl_keyboard_send_enter(resource, next_serial(resource), view->surface->resource,
                                    &wl_keys);
         }
@@ -924,7 +924,7 @@ server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
                                                : WL_KEYBOARD_KEY_STATE_RELEASED);
         }
 
-        if (seat_g->input_focus != view) {
+        if (seat->input_focus != view) {
             wl_keyboard_send_leave(resource, next_serial(resource), view->surface->resource);
         }
     }
@@ -933,10 +933,10 @@ server_seat_g_send_keys(struct server_seat_g *seat_g, struct server_view *view,
 }
 
 void
-server_seat_g_set_listener(struct server_seat_g *seat_g,
+server_seat_set_listener(struct server_seat *seat,
                            const struct server_seat_listener *listener, void *data) {
-    ww_assert(!seat_g->listener);
+    ww_assert(!seat->listener);
 
-    seat_g->listener = listener;
-    seat_g->listener_data = data;
+    seat->listener = listener;
+    seat->listener_data = data;
 }

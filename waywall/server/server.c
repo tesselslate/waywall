@@ -409,7 +409,7 @@ server_create(struct config *cfg) {
     if (!server->compositor) {
         goto fail_globals;
     }
-    server->seat = server_seat_g_create(server, server->cfg);
+    server->seat = server_seat_create(server, server->cfg);
     if (!server->seat) {
         goto fail_globals;
     }
@@ -543,7 +543,7 @@ server_set_pointer_pos(struct server *server, double x, double y) {
 void
 server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
                          void *data) {
-    server_seat_g_set_listener(server->seat, listener, data);
+    server_seat_set_listener(server->seat, listener, data);
 }
 
 void
@@ -577,12 +577,12 @@ server_view_has_focus(struct server_view *view) {
 
 void
 server_view_send_click(struct server_view *view) {
-    struct server_seat_g *seat_g = view->ui->server->seat;
-    server_seat_g_send_click(seat_g, view);
+    struct server_seat *seat = view->ui->server->seat;
+    server_seat_send_click(seat, view);
 }
 
 void
 server_view_send_keys(struct server_view *view, const struct syn_key *keys, size_t num_keys) {
-    struct server_seat_g *seat_g = view->ui->server->seat;
-    server_seat_g_send_keys(seat_g, view, keys, num_keys);
+    struct server_seat *seat = view->ui->server->seat;
+    server_seat_send_keys(seat, view, keys, num_keys);
 }
