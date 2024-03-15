@@ -16,7 +16,6 @@ struct wall {
 
     int active_instance; // -1 on wall
 
-    struct xkb_keymap *keymap;
     uint32_t modifiers, group;
     bool buttons[16];
     bool pointer_locked;

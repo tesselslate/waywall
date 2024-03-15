@@ -39,7 +39,10 @@ struct server_seat_g {
         struct {
             int32_t fd;
             uint32_t size;
+
             struct xkb_keymap *xkb;
+            struct xkb_state *xkb_state;
+            struct kb_modifiers mods;
         } remote_keymap;
 
         int32_t repeat_rate, repeat_delay;

@@ -17,6 +17,13 @@
 
 #define SRV_SEAT_VERSION 6
 
+static const char *mod_names[] = {
+    XKB_MOD_NAME_SHIFT, XKB_MOD_NAME_CAPS,
+    XKB_MOD_NAME_CTRL,  XKB_MOD_NAME_ALT,
+    XKB_MOD_NAME_NUM,   "Mod3",
+    XKB_MOD_NAME_LOGO,  "Mod5",
+};
+
 static void
 cursor_role_commit(struct wl_resource *resource) {
     // Unused.
@@ -295,8 +302,14 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
         return;
     }
 
+    // TODO: handle errors somehow (not sure how to be honest)
+
     if (seat_g->kb_state.remote_keymap.fd >= 0) {
         close(seat_g->kb_state.remote_keymap.fd);
+    }
+    if (seat_g->kb_state.remote_keymap.xkb_state) {
+        xkb_state_unref(seat_g->kb_state.remote_keymap.xkb_state);
+        seat_g->kb_state.remote_keymap.xkb_state = NULL;
     }
     if (seat_g->kb_state.remote_keymap.xkb) {
         xkb_keymap_unref(seat_g->kb_state.remote_keymap.xkb);
@@ -309,6 +322,16 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     if (!seat_g->kb_state.remote_keymap.xkb) {
         ww_log(LOG_ERROR, "failed to create remote keymap");
         return;
+    }
+
+    seat_g->kb_state.remote_keymap.xkb_state = xkb_state_new(seat_g->kb_state.remote_keymap.xkb);
+    ww_assert(seat_g->kb_state.remote_keymap.xkb_state);
+
+    for (size_t i = 0; i < STATIC_ARRLEN(seat_g->kb_state.remote_keymap.mods.indices); i++) {
+        size_t mod = xkb_keymap_mod_get_index(seat_g->kb_state.remote_keymap.xkb, mod_names[i]);
+        ww_assert(mod != XKB_MOD_INVALID);
+
+        seat_g->kb_state.remote_keymap.mods.indices[i] = mod;
     }
 }
 
@@ -333,6 +356,9 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
                       uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
     struct server_seat_g *seat_g = data;
 
+    // TODO: I don't think it's valid to just send the same modifiers here if there are two
+    // different keymaps at play.
+
     seat_g->kb_state.mods.depressed = mods_depressed;
     seat_g->kb_state.mods.latched = mods_latched;
     seat_g->kb_state.mods.locked = mods_locked;
@@ -340,8 +366,25 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
     send_keyboard_modifiers(seat_g);
 
     if (seat_g->listener) {
-        seat_g->listener->modifiers(seat_g->listener_data, mods_depressed, mods_latched,
-                                    mods_locked, group);
+        if (!seat_g->kb_state.remote_keymap.xkb_state) {
+            return;
+        }
+
+        xkb_mod_mask_t xkb_mods = xkb_state_serialize_mods(
+            seat_g->kb_state.remote_keymap.xkb_state,
+            XKB_STATE_MODS_DEPRESSED | XKB_STATE_MODS_LATCHED | XKB_STATE_MODS_LOCKED);
+        xkb_layout_index_t group = xkb_state_serialize_layout(
+            seat_g->kb_state.remote_keymap.xkb_state, XKB_STATE_LAYOUT_EFFECTIVE);
+
+        uint32_t mods = 0;
+        for (size_t i = 0; i < STATIC_ARRLEN(seat_g->kb_state.remote_keymap.mods.indices); i++) {
+            uint8_t index = seat_g->kb_state.remote_keymap.mods.indices[i];
+            if (xkb_mods & (1 << index)) {
+                mods |= (1 << i);
+            }
+        }
+
+        seat_g->listener->modifiers(seat_g->listener_data, mods, group);
     }
 }
 
@@ -739,6 +782,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     }
     if (seat_g->kb_state.remote_keymap.fd >= 0) {
         close(seat_g->kb_state.remote_keymap.fd);
+    }
+    if (seat_g->kb_state.remote_keymap.xkb_state) {
+        xkb_state_unref(seat_g->kb_state.remote_keymap.xkb_state);
     }
     if (seat_g->kb_state.remote_keymap.xkb) {
         xkb_keymap_unref(seat_g->kb_state.remote_keymap.xkb);

@@ -4,6 +4,7 @@
 #include "instance.h"
 #include "server/cursor.h"
 #include "server/server.h"
+#include "server/wl_seat.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
 #include <sys/inotify.h>
@@ -270,7 +271,10 @@ on_key(void *data, uint32_t key, bool pressed) {
 
     if (pressed) {
         const xkb_keysym_t *syms;
-        int nsyms = xkb_keymap_key_get_syms_by_level(wall->keymap, key, wall->group, 0, &syms);
+
+        // TODO: this is stupid
+        int nsyms = xkb_keymap_key_get_syms_by_level(wall->server->seat->kb_state.remote_keymap.xkb,
+                                                     key, wall->group, 0, &syms);
 
         if (nsyms >= 1) {
             struct config_action action = {0};
@@ -289,11 +293,11 @@ on_key(void *data, uint32_t key, bool pressed) {
 }
 
 static void
-on_modifiers(void *data, uint32_t depressed, uint32_t latched, uint32_t locked, uint32_t group) {
+on_modifiers(void *data, uint32_t mods, uint32_t group) {
     // TODO: use an xkb_state and properly handle all of the modifiers
     struct wall *wall = data;
 
-    wall->modifiers = depressed;
+    wall->modifiers = mods;
     wall->group = group;
 }
 
