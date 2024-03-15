@@ -54,7 +54,7 @@ struct server {
     struct remote_buffer_manager *remote_buf;
 
     struct server_compositor *compositor;
-    struct server_linux_dmabuf_g *linux_dmabuf;
+    struct server_linux_dmabuf *linux_dmabuf;
     struct server_pointer_constraints_g *pointer_constraints;
     struct server_relative_pointer_g *relative_pointer;
     struct server_seat *seat;

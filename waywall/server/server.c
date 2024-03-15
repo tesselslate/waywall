@@ -414,7 +414,7 @@ server_create(struct config *cfg) {
         goto fail_globals;
     }
 
-    server->linux_dmabuf = server_linux_dmabuf_g_create(server);
+    server->linux_dmabuf = server_linux_dmabuf_create(server);
     if (!server->linux_dmabuf) {
         goto fail_globals;
     }

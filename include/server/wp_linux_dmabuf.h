@@ -5,7 +5,7 @@
 
 struct server;
 
-struct server_linux_dmabuf_g {
+struct server_linux_dmabuf {
     struct wl_global *global;
 
     struct zwp_linux_dmabuf_v1 *remote;
@@ -33,6 +33,6 @@ struct server_linux_dmabuf_feedback {
     struct zwp_linux_dmabuf_feedback_v1 *remote;
 };
 
-struct server_linux_dmabuf_g *server_linux_dmabuf_g_create(struct server *server);
+struct server_linux_dmabuf *server_linux_dmabuf_create(struct server *server);
 
 #endif

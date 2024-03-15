@@ -286,7 +286,7 @@ linux_dmabuf_resource_destroy(struct wl_resource *resource) {
 
 static void
 linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
-    struct server_linux_dmabuf_g *linux_dmabuf_g = wl_resource_get_user_data(resource);
+    struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
 
     struct dmabuf_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
     if (!buffer_data) {
@@ -310,7 +310,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
     wl_resource_set_implementation(buffer_params->resource, &linux_buffer_params_impl,
                                    buffer_params, linux_buffer_params_resource_destroy);
 
-    buffer_params->remote = zwp_linux_dmabuf_v1_create_params(linux_dmabuf_g->remote);
+    buffer_params->remote = zwp_linux_dmabuf_v1_create_params(linux_dmabuf->remote);
     if (!buffer_params->remote) {
         wl_resource_post_no_memory(buffer_params->resource);
         goto fail_remote;
@@ -318,9 +318,9 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 
     zwp_linux_buffer_params_v1_add_listener(buffer_params->remote, &linux_buffer_params_listener,
                                             buffer_params);
-    wl_display_roundtrip(linux_dmabuf_g->remote_display);
+    wl_display_roundtrip(linux_dmabuf->remote_display);
 
-    buffer_params->remote_display = linux_dmabuf_g->remote_display;
+    buffer_params->remote_display = linux_dmabuf->remote_display;
 
     return;
 
@@ -340,7 +340,7 @@ linux_dmabuf_destroy(struct wl_client *client, struct wl_resource *resource) {
 static void
 linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *resource,
                                   uint32_t id) {
-    struct server_linux_dmabuf_g *linux_dmabuf_g = wl_resource_get_user_data(resource);
+    struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
 
     struct server_linux_dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
     if (!feedback) {
@@ -358,7 +358,7 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
 
-    feedback->remote = zwp_linux_dmabuf_v1_get_default_feedback(linux_dmabuf_g->remote);
+    feedback->remote = zwp_linux_dmabuf_v1_get_default_feedback(linux_dmabuf->remote);
     if (!feedback->remote) {
         wl_resource_post_no_memory(feedback->resource);
         free(feedback);
@@ -367,13 +367,13 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
-    wl_display_roundtrip(linux_dmabuf_g->remote_display);
+    wl_display_roundtrip(linux_dmabuf->remote_display);
 }
 
 static void
 linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *resource,
                                   uint32_t id, struct wl_resource *surface_resource) {
-    struct server_linux_dmabuf_g *linux_dmabuf_g = wl_resource_get_user_data(resource);
+    struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
     struct server_linux_dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
@@ -393,7 +393,7 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
                                    linux_dmabuf_feedback_resource_destroy);
 
     feedback->remote =
-        zwp_linux_dmabuf_v1_get_surface_feedback(linux_dmabuf_g->remote, surface->remote);
+        zwp_linux_dmabuf_v1_get_surface_feedback(linux_dmabuf->remote, surface->remote);
     if (!feedback->remote) {
         wl_resource_post_no_memory(feedback->resource);
         free(feedback);
@@ -402,7 +402,7 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
-    wl_display_roundtrip(linux_dmabuf_g->remote_display);
+    wl_display_roundtrip(linux_dmabuf->remote_display);
 }
 
 static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_impl = {
@@ -424,7 +424,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         return;
     }
 
-    struct server_linux_dmabuf_g *linux_dmabuf_g = data;
+    struct server_linux_dmabuf *linux_dmabuf = data;
 
     struct wl_resource *resource =
         wl_resource_create(client, &zwp_linux_dmabuf_v1_interface, version, id);
@@ -432,45 +432,45 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &linux_dmabuf_impl, linux_dmabuf_g,
+    wl_resource_set_implementation(resource, &linux_dmabuf_impl, linux_dmabuf,
                                    linux_dmabuf_resource_destroy);
 }
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_linux_dmabuf_g *linux_dmabuf_g =
-        wl_container_of(listener, linux_dmabuf_g, on_display_destroy);
+    struct server_linux_dmabuf *linux_dmabuf =
+        wl_container_of(listener, linux_dmabuf, on_display_destroy);
 
-    wl_global_destroy(linux_dmabuf_g->global);
+    wl_global_destroy(linux_dmabuf->global);
 
-    wl_list_remove(&linux_dmabuf_g->on_display_destroy.link);
+    wl_list_remove(&linux_dmabuf->on_display_destroy.link);
 
-    free(linux_dmabuf_g);
+    free(linux_dmabuf);
 }
 
-struct server_linux_dmabuf_g *
-server_linux_dmabuf_g_create(struct server *server) {
-    struct server_linux_dmabuf_g *linux_dmabuf_g = calloc(1, sizeof(*linux_dmabuf_g));
-    if (!linux_dmabuf_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_linux_dmabuf_g");
+struct server_linux_dmabuf *
+server_linux_dmabuf_create(struct server *server) {
+    struct server_linux_dmabuf *linux_dmabuf = calloc(1, sizeof(*linux_dmabuf));
+    if (!linux_dmabuf) {
+        ww_log(LOG_ERROR, "failed to allocate server_linux_dmabuf");
         return NULL;
     }
 
-    linux_dmabuf_g->global =
+    linux_dmabuf->global =
         wl_global_create(server->display, &zwp_linux_dmabuf_v1_interface, SRV_LINUX_DMABUF_VERSION,
-                         linux_dmabuf_g, on_global_bind);
-    if (!linux_dmabuf_g->global) {
+                         linux_dmabuf, on_global_bind);
+    if (!linux_dmabuf->global) {
         ww_log(LOG_ERROR, "failed to allocate linux_dmabuf global");
         zwp_linux_dmabuf_v1_destroy(server->backend.linux_dmabuf);
-        free(linux_dmabuf_g);
+        free(linux_dmabuf);
         return NULL;
     }
 
-    linux_dmabuf_g->remote = server->backend.linux_dmabuf;
-    linux_dmabuf_g->remote_display = server->backend.display;
+    linux_dmabuf->remote = server->backend.linux_dmabuf;
+    linux_dmabuf->remote_display = server->backend.display;
 
-    linux_dmabuf_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &linux_dmabuf_g->on_display_destroy);
+    linux_dmabuf->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &linux_dmabuf->on_display_destroy);
 
-    return linux_dmabuf_g;
+    return linux_dmabuf;
 }
