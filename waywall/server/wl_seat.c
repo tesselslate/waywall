@@ -370,9 +370,11 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
             return;
         }
 
-        xkb_mod_mask_t xkb_mods = xkb_state_serialize_mods(
-            seat_g->kb_state.remote_keymap.xkb_state,
-            XKB_STATE_MODS_DEPRESSED | XKB_STATE_MODS_LATCHED | XKB_STATE_MODS_LOCKED);
+        xkb_state_update_mask(seat_g->kb_state.remote_keymap.xkb_state, mods_depressed,
+                              mods_latched, mods_locked, 0, 0, group);
+
+        xkb_mod_mask_t xkb_mods = xkb_state_serialize_mods(seat_g->kb_state.remote_keymap.xkb_state,
+                                                           XKB_STATE_MODS_EFFECTIVE);
         xkb_layout_index_t group = xkb_state_serialize_layout(
             seat_g->kb_state.remote_keymap.xkb_state, XKB_STATE_LAYOUT_EFFECTIVE);
 
