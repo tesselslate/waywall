@@ -139,16 +139,13 @@ static const struct wl_shm_pool_interface shm_pool_impl = {
 
 static void
 shm_resource_destroy(struct wl_resource *resource) {
-    struct server_shm *shm = wl_resource_get_user_data(resource);
-
-    wl_list_remove(&shm->link);
-    free(shm);
+    // Unused.
 }
 
 static void
 shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t id, int32_t fd,
                 int32_t size) {
-    struct server_shm *shm = wl_resource_get_user_data(resource);
+    struct server_shm_g *shm_g = wl_resource_get_user_data(resource);
 
     struct server_shm_pool *shm_pool = calloc(1, sizeof(*shm_pool));
     if (!shm_pool) {
@@ -167,11 +164,11 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     wl_resource_set_implementation(shm_pool->resource, &shm_pool_impl, shm_pool,
                                    shm_pool_resource_destroy);
 
-    shm_pool->formats = shm->formats;
+    shm_pool->formats = shm_g->formats;
     shm_pool->fd = fd;
     shm_pool->sz = size;
 
-    shm_pool->remote = wl_shm_create_pool(shm->remote, fd, size);
+    shm_pool->remote = wl_shm_create_pool(shm_g->remote, fd, size);
     if (!shm_pool->remote) {
         wl_resource_post_no_memory(shm_pool->resource);
         close(fd);
@@ -190,24 +187,14 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct server_shm_g *shm_g = data;
 
-    struct server_shm *shm = calloc(1, sizeof(*shm));
-    if (!shm) {
+    struct wl_resource *resource = wl_resource_create(client, &wl_shm_interface, version, id);
+    if (!resource) {
         wl_client_post_no_memory(client);
         return;
     }
+    wl_resource_set_implementation(resource, &shm_impl, shm_g, shm_resource_destroy);
 
-    shm->resource = wl_resource_create(client, &wl_shm_interface, version, id);
-    if (!shm->resource) {
-        wl_client_post_no_memory(client);
-        free(shm);
-        return;
-    }
-    wl_resource_set_implementation(shm->resource, &shm_impl, shm, shm_resource_destroy);
-
-    shm->formats = shm_g->formats;
-    shm->remote = shm_g->remote;
-
-    wl_list_insert(&shm_g->objects, &shm->link);
+    wl_list_insert(&shm_g->objects, wl_resource_get_link(resource));
 }
 
 static void
@@ -215,9 +202,9 @@ on_shm_format(struct wl_listener *listener, void *data) {
     struct server_shm_g *shm_g = wl_container_of(listener, shm_g, on_shm_format);
     uint32_t *format = data;
 
-    struct server_shm *shm;
-    wl_list_for_each (shm, &shm_g->objects, link) {
-        wl_shm_send_format(shm->resource, *format);
+    struct wl_resource *resource;
+    wl_resource_for_each(resource, &shm_g->objects) {
+        wl_shm_send_format(resource, *format);
     }
 }
 
