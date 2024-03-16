@@ -4,8 +4,6 @@
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
-struct xkb_keymap;
-
 struct server {
     struct config *cfg;
     struct wl_display *display;

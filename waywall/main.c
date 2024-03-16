@@ -73,5 +73,6 @@ fail_inotify:
 fail_server:
 fail_config_populate:
     config_destroy(cfg);
+
     return 1;
 }

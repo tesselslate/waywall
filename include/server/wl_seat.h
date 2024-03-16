@@ -14,15 +14,12 @@ enum kb_modifier {
     KB_MOD_MOD5 = (1 << 7),
 };
 
-struct kb_modifiers {
-    uint8_t indices[8];
-};
-
 struct server_seat {
     struct wl_global *global;
 
     struct config *cfg;
     struct server *server;
+    struct xkb_context *ctx;
 
     struct wl_keyboard *keyboard;
     struct wl_pointer *pointer;
@@ -30,22 +27,16 @@ struct server_seat {
         struct {
             int32_t fd;
             uint32_t size;
-        } local_keymap;
-
-        struct {
-            int32_t fd;
-            uint32_t size;
-
             struct xkb_keymap *xkb;
-            struct xkb_state *xkb_state;
-            struct kb_modifiers mods;
-        } remote_keymap;
+            struct xkb_state *state;
+        } local_km, remote_km;
 
         int32_t repeat_rate, repeat_delay;
 
         struct {
             uint32_t depressed, latched, locked;
             uint32_t group;
+            uint8_t indices[8];
         } mods;
         struct {
             uint32_t *data;

@@ -22,6 +22,14 @@
 static const struct config defaults = {
     .input =
         {
+            .keymap =
+                {
+                    .layout = "",
+                    .model = "",
+                    .rules = "",
+                    .variant = "",
+                    .options = "",
+                },
             .repeat_rate = -1,
             .repeat_delay = -1,
             .sens = 1.0,
@@ -365,82 +373,6 @@ fail:
     return 1;
 }
 
-static int
-get_keymap(struct config *cfg) {
-    char *layout = NULL;
-    char *model = NULL;
-    char *rules = NULL;
-    char *variant = NULL;
-    char *options = NULL;
-
-    if (get_string(cfg, "layout", &layout, "input.layout", false) != 0) {
-        return 1;
-    }
-    if (get_string(cfg, "model", &model, "input.model", false) != 0) {
-        goto fail_model;
-    }
-    if (get_string(cfg, "rules", &rules, "input.rules", false) != 0) {
-        goto fail_rules;
-    }
-    if (get_string(cfg, "variant", &variant, "input.variant", false) != 0) {
-        goto fail_variant;
-    }
-    if (get_string(cfg, "options", &variant, "input.options", false) != 0) {
-        goto fail_options;
-    }
-
-    if (layout || model || rules || variant || options) {
-        cfg->input.custom_keymap = true;
-    }
-
-    struct xkb_rule_names rule_names = {
-        .layout = layout,
-        .model = model,
-        .rules = rules,
-        .variant = variant,
-        .options = options,
-    };
-
-    cfg->input.xkb_ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
-    if (!cfg->input.xkb_ctx) {
-        goto fail_xkb_ctx;
-    }
-
-    // TODO: This leaks memory somehow, even though we later call xkb_keymap_unref
-    cfg->input.xkb_keymap =
-        xkb_keymap_new_from_names(cfg->input.xkb_ctx, &rule_names, XKB_KEYMAP_COMPILE_NO_FLAGS);
-    if (!cfg->input.xkb_keymap) {
-        goto fail_xkb_keymap;
-    }
-
-    free(options);
-    free(variant);
-    free(rules);
-    free(model);
-    free(layout);
-    return 0;
-
-fail_xkb_keymap:
-    xkb_context_unref(cfg->input.xkb_ctx);
-    cfg->input.xkb_ctx = NULL;
-
-fail_xkb_ctx:
-    free(options);
-
-fail_options:
-    free(variant);
-
-fail_variant:
-    free(rules);
-
-fail_rules:
-    free(model);
-
-fail_model:
-    free(layout);
-    return 1;
-}
-
 static void
 encode_bind(char buf[static BIND_BUFLEN], struct config_action action) {
     uint64_t data = (((uint64_t)action.data) << 32) | (uint64_t)action.modifiers;
@@ -595,7 +527,23 @@ process_config_actions(struct config *cfg) {
 
 static int
 process_config_input(struct config *cfg) {
-    if (get_keymap(cfg) != 0) {
+    if (get_string(cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
+        return 1;
+    }
+
+    if (get_string(cfg, "model", &cfg->input.keymap.model, "input.model", false) != 0) {
+        return 1;
+    }
+
+    if (get_string(cfg, "rules", &cfg->input.keymap.rules, "input.rules", false) != 0) {
+        return 1;
+    }
+
+    if (get_string(cfg, "variant", &cfg->input.keymap.variant, "input.variant", false) != 0) {
+        return 1;
+    }
+
+    if (get_string(cfg, "options", &cfg->input.keymap.options, "input.options", false) != 0) {
         return 1;
     }
 
@@ -764,37 +712,45 @@ config_create() {
     // Copy the default configuration, and then heap allocate any strings as needed.
     *cfg = defaults;
 
-    cfg->theme.cursor_theme = strdup(cfg->theme.cursor_theme);
-    if (!cfg->theme.cursor_theme) {
-        ww_log(LOG_ERROR, "failed to allocate config->theme.cursor_theme");
-        goto fail_cursor_theme;
-    }
+    const struct {
+        char **storage;
+        const char *name;
+    } strings[] = {
+        {&cfg->input.keymap.layout, "input.layout"},
+        {&cfg->input.keymap.model, "input.model"},
+        {&cfg->input.keymap.rules, "input.rules"},
+        {&cfg->input.keymap.variant, "input.variant"},
+        {&cfg->input.keymap.options, "input.options"},
+        {&cfg->theme.cursor_theme, "theme.cursor_theme"},
+        {&cfg->theme.cursor_icon, "theme.cursor_icon"},
+    };
 
-    cfg->theme.cursor_icon = strdup(cfg->theme.cursor_icon);
-    if (!cfg->theme.cursor_icon) {
-        ww_log(LOG_ERROR, "failed to allocate config->theme.cursor_icon");
-        goto fail_cursor_icon;
+    for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
+        char **storage = strings[i].storage;
+        const char *name = strings[i].name;
+
+        *storage = strdup(*storage);
+        if (!*storage) {
+            ww_log(LOG_ERROR, "failed to allocate %s", name);
+
+            for (size_t j = 0; j < i; j++) {
+                free(*strings[j].storage);
+            }
+            free(cfg);
+            return NULL;
+        }
     }
 
     return cfg;
-
-fail_cursor_icon:
-    free(cfg->theme.cursor_icon);
-
-fail_cursor_theme:
-    free(cfg);
-    return NULL;
 }
 
 void
 config_destroy(struct config *cfg) {
-    if (cfg->input.xkb_keymap) {
-        xkb_keymap_unref(cfg->input.xkb_keymap);
-    }
-    if (cfg->input.xkb_ctx) {
-        xkb_context_unref(cfg->input.xkb_ctx);
-    }
-
+    free(cfg->input.keymap.layout);
+    free(cfg->input.keymap.model);
+    free(cfg->input.keymap.rules);
+    free(cfg->input.keymap.variant);
+    free(cfg->input.keymap.options);
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
 
@@ -869,4 +825,10 @@ config_populate(struct config *cfg) {
     }
 
     return 0;
+}
+
+bool
+config_has_keymap(struct config *cfg) {
+    return !!cfg->input.keymap.layout || !!cfg->input.keymap.model || !!cfg->input.keymap.rules ||
+           !!cfg->input.keymap.variant || !!cfg->input.keymap.options;
 }
