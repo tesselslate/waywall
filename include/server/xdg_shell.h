@@ -14,7 +14,7 @@ struct server_xdg_wm_base_g {
     struct wl_listener on_display_destroy;
 };
 
-struct server_xdg_wm_base {
+struct server_xdg_client {
     struct wl_resource *resource;
 
     struct server *server;
@@ -22,10 +22,10 @@ struct server_xdg_wm_base {
 };
 
 struct server_xdg_surface {
-    struct wl_list link; // server_xdg_wm_base.surfaces
+    struct wl_list link; // server_xdg_client.surfaces
     struct wl_resource *resource;
 
-    struct server_xdg_wm_base *xdg_wm_base;
+    struct server_xdg_client *xdg_wm_base;
     struct server_surface *parent;
     struct server_xdg_toplevel *child;
     struct serial_ring serials;

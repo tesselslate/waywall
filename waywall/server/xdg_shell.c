@@ -365,15 +365,15 @@ static const struct xdg_surface_interface xdg_surface_impl = {
 
 static void
 xdg_wm_base_resource_destroy(struct wl_resource *resource) {
-    struct server_xdg_wm_base *xdg_wm_base = wl_resource_get_user_data(resource);
+    struct server_xdg_client *xdg_client = wl_resource_get_user_data(resource);
 
-    if (!wl_list_empty(&xdg_wm_base->surfaces)) {
+    if (!wl_list_empty(&xdg_client->surfaces)) {
         wl_resource_post_error(resource, XDG_WM_BASE_ERROR_DEFUNCT_SURFACES,
                                "xdg_wm_base destroyed with %d remaining surfaces",
-                               wl_list_length(&xdg_wm_base->surfaces));
+                               wl_list_length(&xdg_client->surfaces));
     }
 
-    free(xdg_wm_base);
+    free(xdg_client);
 }
 
 static void
@@ -390,7 +390,7 @@ xdg_wm_base_destroy(struct wl_client *client, struct wl_resource *resource) {
 static void
 xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resource, uint32_t id,
                             struct wl_resource *surface_resource) {
-    struct server_xdg_wm_base *xdg_wm_base = wl_resource_get_user_data(resource);
+    struct server_xdg_client *xdg_client = wl_resource_get_user_data(resource);
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
     if (surface->current.buffer || surface->pending.buffer) {
@@ -415,13 +415,13 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
     wl_resource_set_implementation(xdg_surface->resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_resource_destroy);
 
-    wl_list_insert(&xdg_wm_base->surfaces, &xdg_surface->link);
-    xdg_surface->xdg_wm_base = xdg_wm_base;
+    wl_list_insert(&xdg_client->surfaces, &xdg_surface->link);
+    xdg_surface->xdg_wm_base = xdg_client;
     xdg_surface->parent = surface;
 
     if (server_surface_set_role(xdg_surface->parent, &xdg_surface_role, xdg_surface->resource) !=
         0) {
-        wl_resource_post_error(xdg_wm_base->resource, XDG_WM_BASE_ERROR_ROLE,
+        wl_resource_post_error(xdg_client->resource, XDG_WM_BASE_ERROR_ROLE,
                                "cannot create xdg_surface for surface with another role");
         wl_resource_destroy(xdg_surface->resource);
         return;
@@ -446,24 +446,24 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct server_xdg_wm_base_g *xdg_wm_base_g = data;
 
-    struct server_xdg_wm_base *xdg_wm_base = calloc(1, sizeof(*xdg_wm_base));
-    if (!xdg_wm_base) {
+    struct server_xdg_client *xdg_client = calloc(1, sizeof(*xdg_client));
+    if (!xdg_client) {
         wl_client_post_no_memory(client);
         return;
     }
 
-    xdg_wm_base->resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
-    if (!xdg_wm_base->resource) {
+    xdg_client->resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
+    if (!xdg_client->resource) {
         wl_client_post_no_memory(client);
-        free(xdg_wm_base);
+        free(xdg_client);
         return;
     }
-    wl_resource_set_implementation(xdg_wm_base->resource, &xdg_wm_base_impl, xdg_wm_base,
+    wl_resource_set_implementation(xdg_client->resource, &xdg_wm_base_impl, xdg_client,
                                    xdg_wm_base_resource_destroy);
 
-    xdg_wm_base->server = xdg_wm_base_g->server;
+    xdg_client->server = xdg_wm_base_g->server;
 
-    wl_list_init(&xdg_wm_base->surfaces);
+    wl_list_init(&xdg_client->surfaces);
 }
 
 static void
