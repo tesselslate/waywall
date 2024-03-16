@@ -48,8 +48,9 @@ enum ww_log_level {
     LOG_ERROR,
 };
 
-void util_log_va(enum ww_log_level, const char *fmt, va_list args);
 void util_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+void util_log_init();
+void util_log_va(enum ww_log_level, const char *fmt, va_list args);
 noreturn void util_panic(const char *file, int line, const char *msg);
 
 struct str {

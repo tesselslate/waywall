@@ -9,7 +9,17 @@ static const char *color_info = "";
 static const char *color_warn = "";
 static const char *color_err = "";
 static const char *color_reset = "";
-static void __attribute__((constructor)) init_log() {
+
+void
+util_log(enum ww_log_level level, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    util_log_va(level, fmt, args);
+    va_end(args);
+}
+
+void
+util_log_init() {
     static const char *info = "\x1b[1;34m";
     static const char *warn = "\x1b[1;33m";
     static const char *err = "\x1b[1;31m";
@@ -47,14 +57,6 @@ util_log_va(enum ww_log_level level, const char *fmt, va_list args) {
     vfprintf(stderr, fmt, vargs);
     va_end(vargs);
     fprintf(stderr, "%s\n", color_reset);
-}
-
-void
-util_log(enum ww_log_level level, const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    util_log_va(level, fmt, args);
-    va_end(args);
 }
 
 noreturn void

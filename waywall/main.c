@@ -15,6 +15,8 @@ handle_signal(int signal, void *data) {
 
 int
 main() {
+    util_log_init();
+
     struct config *cfg = config_create();
     if (!cfg) {
         return 1;
