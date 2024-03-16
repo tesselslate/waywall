@@ -444,7 +444,7 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_XDG_WM_BASE_VERSION);
 
-    struct server_xdg_wm_base_g *xdg_wm_base_g = data;
+    struct server_xdg_wm_base *xdg_wm_base = data;
 
     struct server_xdg_client *xdg_client = calloc(1, sizeof(*xdg_client));
     if (!xdg_client) {
@@ -461,46 +461,46 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     wl_resource_set_implementation(xdg_client->resource, &xdg_wm_base_impl, xdg_client,
                                    xdg_wm_base_resource_destroy);
 
-    xdg_client->server = xdg_wm_base_g->server;
+    xdg_client->server = xdg_wm_base->server;
 
     wl_list_init(&xdg_client->surfaces);
 }
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_xdg_wm_base_g *xdg_wm_base_g =
-        wl_container_of(listener, xdg_wm_base_g, on_display_destroy);
+    struct server_xdg_wm_base *xdg_wm_base =
+        wl_container_of(listener, xdg_wm_base, on_display_destroy);
 
-    wl_global_destroy(xdg_wm_base_g->global);
+    wl_global_destroy(xdg_wm_base->global);
 
-    wl_list_remove(&xdg_wm_base_g->on_display_destroy.link);
+    wl_list_remove(&xdg_wm_base->on_display_destroy.link);
 
-    free(xdg_wm_base_g);
+    free(xdg_wm_base);
 }
 
-struct server_xdg_wm_base_g *
-server_xdg_wm_base_g_create(struct server *server) {
-    struct server_xdg_wm_base_g *xdg_wm_base_g = calloc(1, sizeof(*xdg_wm_base_g));
-    if (!xdg_wm_base_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_xdg_wm_base_g");
+struct server_xdg_wm_base *
+server_xdg_wm_base_create(struct server *server) {
+    struct server_xdg_wm_base *xdg_wm_base = calloc(1, sizeof(*xdg_wm_base));
+    if (!xdg_wm_base) {
+        ww_log(LOG_ERROR, "failed to allocate server_xdg_wm_base");
         return NULL;
     }
 
-    xdg_wm_base_g->global =
+    xdg_wm_base->global =
         wl_global_create(server->display, &xdg_wm_base_interface, SRV_XDG_WM_BASE_VERSION,
-                         xdg_wm_base_g, on_global_bind);
-    if (!xdg_wm_base_g->global) {
+                         xdg_wm_base, on_global_bind);
+    if (!xdg_wm_base->global) {
         ww_log(LOG_ERROR, "failed to create xdg_wm_base global");
-        free(xdg_wm_base_g);
+        free(xdg_wm_base);
         return NULL;
     }
 
-    xdg_wm_base_g->server = server;
+    xdg_wm_base->server = server;
 
-    xdg_wm_base_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &xdg_wm_base_g->on_display_destroy);
+    xdg_wm_base->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &xdg_wm_base->on_display_destroy);
 
-    return xdg_wm_base_g;
+    return xdg_wm_base;
 }
 
 void

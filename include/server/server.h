@@ -60,7 +60,7 @@ struct server {
     struct server_seat *seat;
     struct server_shm *shm;
     struct server_xdg_decoration_manager *xdg_decoration;
-    struct server_xdg_wm_base_g *xdg_shell;
+    struct server_xdg_wm_base *xdg_shell;
 
     struct {
         struct wl_signal input_focus;    // data: struct server_view *

@@ -6,7 +6,7 @@
 
 struct server;
 
-struct server_xdg_wm_base_g {
+struct server_xdg_wm_base {
     struct wl_global *global;
 
     struct server *server;
@@ -47,7 +47,7 @@ struct server_xdg_toplevel {
     } events;
 };
 
-struct server_xdg_wm_base_g *server_xdg_wm_base_g_create(struct server *server);
+struct server_xdg_wm_base *server_xdg_wm_base_create(struct server *server);
 void server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface);
 struct server_xdg_surface *server_xdg_surface_from_resource(struct wl_resource *resource);
 struct server_xdg_toplevel *server_xdg_toplevel_from_resource(struct wl_resource *resource);

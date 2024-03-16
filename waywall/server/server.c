@@ -434,7 +434,7 @@ server_create(struct config *cfg) {
     if (!server->xdg_decoration) {
         goto fail_globals;
     }
-    server->xdg_shell = server_xdg_wm_base_g_create(server);
+    server->xdg_shell = server_xdg_wm_base_create(server);
     if (!server->xdg_shell) {
         goto fail_globals;
     }
