@@ -30,7 +30,7 @@
 
 #define ww_assert(x)                                                                               \
     do {                                                                                           \
-        if (!(x)) {                                                                                \
+        if (__builtin_expect(!(bool)(x), 0)) {                                                     \
             _ww_panic(__FILE__, __LINE__, "assert failed: '" #x "'");                              \
         }                                                                                          \
     } while (0)
