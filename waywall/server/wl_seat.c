@@ -281,11 +281,22 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     }
 
     if (seat->listener) {
-        // Add 8 to convert from libinput to XKB keycodes.
-        bool consumed = seat->listener->key(seat->listener_data, key + 8,
-                                            state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        if (consumed) {
-            return;
+        // Only send a key event to the wall code if this keycode has an associated keysym.
+        // TODO: Probably not worth it to send all keysyms?
+
+        const xkb_keysym_t *syms;
+
+        // We need to add 8 to the keycode to convert from libinput to XKB keycodes. See
+        // WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1.
+        int nsyms = xkb_keymap_key_get_syms_by_level(seat->kb_state.remote_keymap.xkb, key + 8,
+                                                     seat->kb_state.mods.group, 0, &syms);
+
+        if (nsyms >= 1) {
+            bool consumed = seat->listener->key(seat->listener_data, syms[0],
+                                                state == WL_KEYBOARD_KEY_STATE_PRESSED);
+            if (consumed) {
+                return;
+            }
         }
     }
     send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);

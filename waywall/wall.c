@@ -266,27 +266,17 @@ on_button(void *data, uint32_t button, bool pressed) {
 }
 
 static bool
-on_key(void *data, uint32_t key, bool pressed) {
+on_key(void *data, xkb_keysym_t sym, bool pressed) {
     struct wall *wall = data;
 
     if (pressed) {
-        const xkb_keysym_t *syms;
+        struct config_action action = {0};
+        action.type = CONFIG_ACTION_KEY;
+        action.data = sym;
+        action.modifiers = wall->modifiers;
 
-        // TODO: this is stupid
-        int nsyms = xkb_keymap_key_get_syms_by_level(wall->server->seat->kb_state.remote_keymap.xkb,
-                                                     key, wall->group, 0, &syms);
-
-        if (nsyms >= 1) {
-            struct config_action action = {0};
-            action.type = CONFIG_ACTION_KEY;
-            action.data = syms[0];
-            action.modifiers = wall->modifiers;
-
-            int ret = config_do_action(wall->cfg, wall, action);
-            return ret > 0;
-        } else {
-            return false;
-        }
+        int ret = config_do_action(wall->cfg, wall, action);
+        return ret > 0;
     } else {
         return false;
     }
@@ -294,7 +284,6 @@ on_key(void *data, uint32_t key, bool pressed) {
 
 static void
 on_modifiers(void *data, uint32_t mods, uint32_t group) {
-    // TODO: use an xkb_state and properly handle all of the modifiers
     struct wall *wall = data;
 
     wall->modifiers = mods;
