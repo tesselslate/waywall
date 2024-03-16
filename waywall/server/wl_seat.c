@@ -75,6 +75,12 @@ prepare_keymap(struct server_seat *seat) {
         return 1;
     }
 
+    seat->keyboard.local_km.state = xkb_state_new(seat->keyboard.local_km.xkb);
+    if (!seat->keyboard.local_km.xkb) {
+        ww_log(LOG_ERROR, "failed to create local XKB state");
+        return 1;
+    }
+
     char *keymap = xkb_keymap_get_as_string(seat->keyboard.local_km.xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
     if (!keymap) {
         ww_log(LOG_ERROR, "failed to get XKB keymap as string");
@@ -241,6 +247,15 @@ send_keyboard_modifiers(struct server_seat *seat) {
         return;
     }
 
+    xkb_mod_mask_t depressed =
+        xkb_state_serialize_mods(seat->keyboard.local_km.state, XKB_STATE_MODS_DEPRESSED);
+    xkb_mod_mask_t latched =
+        xkb_state_serialize_mods(seat->keyboard.local_km.state, XKB_STATE_MODS_LATCHED);
+    xkb_mod_mask_t locked =
+        xkb_state_serialize_mods(seat->keyboard.local_km.state, XKB_STATE_MODS_LOCKED);
+    xkb_layout_index_t group =
+        xkb_state_serialize_layout(seat->keyboard.local_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
+
     struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
     wl_resource_for_each(resource, &seat->keyboards) {
@@ -248,9 +263,8 @@ send_keyboard_modifiers(struct server_seat *seat) {
             continue;
         }
 
-        wl_keyboard_send_modifiers(resource, next_serial(resource), seat->keyboard.mods.depressed,
-                                   seat->keyboard.mods.latched, seat->keyboard.mods.locked,
-                                   seat->keyboard.mods.group);
+        wl_keyboard_send_modifiers(resource, next_serial(resource), depressed, latched, locked,
+                                   group);
     }
 }
 
@@ -302,6 +316,8 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
                 uint32_t state) {
     struct server_seat *seat = data;
 
+    bool local_state_updated = false;
+
     // Update the pressed keys array.
     switch ((enum wl_keyboard_key_state)state) {
     case WL_KEYBOARD_KEY_STATE_PRESSED:
@@ -327,8 +343,13 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         }
 
         seat->keyboard.pressed.data[seat->keyboard.pressed.len++] = key;
+        if (xkb_state_update_key(seat->keyboard.local_km.state, key + 8, XKB_KEY_DOWN) != 0) {
+            local_state_updated = true;
+        }
         break;
-    case WL_KEYBOARD_KEY_STATE_RELEASED:
+    case WL_KEYBOARD_KEY_STATE_RELEASED: {
+        bool found = false;
+
         for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
             if (seat->keyboard.pressed.data[i] != key) {
                 continue;
@@ -337,9 +358,17 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
             memmove(seat->keyboard.pressed.data + i, seat->keyboard.pressed.data + i + 1,
                     sizeof(uint32_t) * (seat->keyboard.pressed.len - i - 1));
             seat->keyboard.pressed.len--;
+            found = true;
             break;
         }
+
+        if (found) {
+            if (xkb_state_update_key(seat->keyboard.local_km.state, key + 8, XKB_KEY_UP) != 0) {
+                local_state_updated = true;
+            }
+        }
         break;
+    }
     }
 
     if (seat->listener) {
@@ -348,10 +377,13 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
 
         const xkb_keysym_t *syms;
 
+        xkb_layout_index_t group =
+            xkb_state_serialize_layout(seat->keyboard.remote_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
+
         // We need to add 8 to the keycode to convert from libinput to XKB keycodes. See
         // WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1.
-        int nsyms = xkb_keymap_key_get_syms_by_level(seat->keyboard.remote_km.xkb, key + 8,
-                                                     seat->keyboard.mods.group, 0, &syms);
+        int nsyms = xkb_keymap_key_get_syms_by_level(seat->keyboard.remote_km.xkb, key + 8, group,
+                                                     0, &syms);
 
         if (nsyms >= 1) {
             bool consumed = seat->listener->key(seat->listener_data, syms[0],
@@ -360,6 +392,10 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
                 return;
             }
         }
+    }
+
+    if (local_state_updated) {
+        send_keyboard_modifiers(seat);
     }
     send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 }
@@ -397,11 +433,11 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     seat->keyboard.remote_km.state = xkb_state_new(seat->keyboard.remote_km.xkb);
     ww_assert(seat->keyboard.remote_km.state);
 
-    for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mods.indices); i++) {
+    for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mod_indices); i++) {
         size_t mod = xkb_keymap_mod_get_index(seat->keyboard.remote_km.xkb, mod_names[i]);
         ww_assert(mod != XKB_MOD_INVALID);
 
-        seat->keyboard.mods.indices[i] = mod;
+        seat->keyboard.mod_indices[i] = mod;
     }
 }
 
@@ -410,30 +446,17 @@ on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     struct server_seat *seat = data;
 
     for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        xkb_state_update_key(seat->keyboard.remote_km.state, seat->keyboard.pressed.data[i] + 8,
+                             XKB_KEY_UP);
         send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
     }
     seat->keyboard.pressed.len = 0;
-
-    seat->keyboard.mods.depressed = 0;
-    seat->keyboard.mods.latched = 0;
-    seat->keyboard.mods.locked = 0;
-    seat->keyboard.mods.group = 0;
-    send_keyboard_modifiers(seat);
 }
 
 static void
 on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t mods_depressed,
                       uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
     struct server_seat *seat = data;
-
-    // TODO: I don't think it's valid to just send the same modifiers here if there are two
-    // different keymaps at play.
-
-    seat->keyboard.mods.depressed = mods_depressed;
-    seat->keyboard.mods.latched = mods_latched;
-    seat->keyboard.mods.locked = mods_locked;
-    seat->keyboard.mods.group = group;
-    send_keyboard_modifiers(seat);
 
     if (seat->listener) {
         if (!seat->keyboard.remote_km.state) {
@@ -449,8 +472,8 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
             xkb_state_serialize_layout(seat->keyboard.remote_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
 
         uint32_t mods = 0;
-        for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mods.indices); i++) {
-            uint8_t index = seat->keyboard.mods.indices[i];
+        for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mod_indices); i++) {
+            uint8_t index = seat->keyboard.mod_indices[i];
             if (xkb_mods & (1 << index)) {
                 mods |= (1 << i);
             }

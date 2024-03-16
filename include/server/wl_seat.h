@@ -32,11 +32,7 @@ struct server_seat {
         } local_km, remote_km;
         int32_t repeat_rate, repeat_delay;
 
-        struct {
-            uint32_t depressed, latched, locked;
-            uint32_t group;
-            uint8_t indices[8];
-        } mods;
+        uint8_t mod_indices[8];
         struct {
             uint32_t *data;
             size_t cap, len;
