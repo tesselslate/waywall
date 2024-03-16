@@ -174,6 +174,8 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
     }
 
     if (state->apply & SURFACE_STATE_ATTACH) {
+        ww_assert(state->buffer);
+
         wl_surface_attach(surface->remote, state->buffer->remote, 0, 0);
         surface->current.buffer = state->buffer;
     }
