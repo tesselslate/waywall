@@ -25,17 +25,17 @@
 #define STATIC_STRLEN(x) (sizeof((x)) - 1)
 #define static_assert(x) _Static_assert(x, #x)
 
-#define ww_log(lvl, fmt, ...) _ww_log(lvl, "[%s:%d] " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
+#define ww_log(lvl, fmt, ...) util_log(lvl, "[%s:%d] " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
 #define ww_log_errno(lvl, fmt, ...)                                                                \
-    _ww_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, strerror(errno))
+    util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, strerror(errno))
 
 #define ww_assert(x)                                                                               \
     do {                                                                                           \
         if (__builtin_expect(!(bool)(x), 0)) {                                                     \
-            _ww_panic(__FILE__, __LINE__, "assert failed: '" #x "'");                              \
+            util_panic(__FILE__, __LINE__, "assert failed: '" #x "'");                             \
         }                                                                                          \
     } while (0)
-#define ww_panic(msg) _ww_panic(__FILE__, __LINE__, "panic: " msg)
+#define ww_panic(msg) util_panic(__FILE__, __LINE__, "panic: " msg)
 #define ww_unreachable()                                                                           \
     do {                                                                                           \
         ww_panic("unreachable");                                                                   \
@@ -48,9 +48,9 @@ enum ww_log_level {
     LOG_ERROR,
 };
 
-void _ww_log_va(enum ww_log_level, const char *fmt, va_list args);
-void _ww_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
-noreturn void _ww_panic(const char *file, int line, const char *msg);
+void util_log_va(enum ww_log_level, const char *fmt, va_list args);
+void util_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+noreturn void util_panic(const char *file, int line, const char *msg);
 
 struct str {
     char data[PATH_MAX];

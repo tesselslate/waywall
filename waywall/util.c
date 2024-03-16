@@ -24,7 +24,7 @@ static void __attribute__((constructor)) init_log() {
 }
 
 void
-_ww_log_va(enum ww_log_level level, const char *fmt, va_list args) {
+util_log_va(enum ww_log_level level, const char *fmt, va_list args) {
     struct timespec now = {0};
     clock_gettime(CLOCK_MONOTONIC, &now);
     unsigned long sec = now.tv_sec;
@@ -50,15 +50,15 @@ _ww_log_va(enum ww_log_level level, const char *fmt, va_list args) {
 }
 
 void
-_ww_log(enum ww_log_level level, const char *fmt, ...) {
+util_log(enum ww_log_level level, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    _ww_log_va(level, fmt, args);
+    util_log_va(level, fmt, args);
     va_end(args);
 }
 
 noreturn void
-_ww_panic(const char *file, int line, const char *msg) {
+util_panic(const char *file, int line, const char *msg) {
     fprintf(stderr, "[%s:%d] %s\n", file, line, msg);
     exit(1);
 }
