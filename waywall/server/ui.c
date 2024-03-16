@@ -93,7 +93,7 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->background = remote_buffer_manager_color(server->remote_buf, ui->cfg->theme.background);
     if (!ui->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
-        return NULL;
+        goto fail_background;
     }
 
     ui->surface = wl_compositor_create_surface(server->backend->compositor);
@@ -141,6 +141,9 @@ fail_viewport:
 
 fail_surface:
     remote_buffer_deref(ui->background);
+
+fail_background:
+    free(ui);
     return NULL;
 }
 
