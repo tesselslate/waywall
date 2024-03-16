@@ -59,7 +59,7 @@ struct server {
     struct server_relative_pointer *relative_pointer;
     struct server_seat *seat;
     struct server_shm *shm;
-    struct server_xdg_decoration_manager_g *xdg_decoration;
+    struct server_xdg_decoration_manager *xdg_decoration;
     struct server_xdg_wm_base_g *xdg_shell;
 
     struct {

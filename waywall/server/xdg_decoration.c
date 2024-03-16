@@ -73,7 +73,7 @@ static void
 xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
                                                struct wl_resource *resource, uint32_t id,
                                                struct wl_resource *toplevel_resource) {
-    struct server_xdg_decoration_manager_g *xdg_decoration_manager_g =
+    struct server_xdg_decoration_manager *xdg_decoration_manager =
         wl_resource_get_user_data(resource);
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(toplevel_resource);
 
@@ -97,7 +97,7 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
                                    toplevel_decoration, xdg_toplevel_decoration_resource_destroy);
 
     struct server_xdg_toplevel_decoration *elem;
-    wl_list_for_each (elem, &xdg_decoration_manager_g->decorations, link) {
+    wl_list_for_each (elem, &xdg_decoration_manager->decorations, link) {
         if (elem->xdg_toplevel == xdg_toplevel) {
             wl_resource_post_error(
                 toplevel_decoration->resource,
@@ -116,9 +116,9 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
         return;
     }
 
-    toplevel_decoration->parent = xdg_decoration_manager_g;
+    toplevel_decoration->parent = xdg_decoration_manager;
     toplevel_decoration->on_toplevel_destroy.notify = on_toplevel_destroy;
-    wl_list_insert(&xdg_decoration_manager_g->decorations, &toplevel_decoration->link);
+    wl_list_insert(&xdg_decoration_manager->decorations, &toplevel_decoration->link);
     wl_signal_add(&xdg_toplevel->events.destroy, &toplevel_decoration->on_toplevel_destroy);
 
     zxdg_toplevel_decoration_v1_send_configure(toplevel_decoration->resource,
@@ -135,7 +135,7 @@ static void
 on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t id) {
     ww_assert(version <= SRV_XDG_DECORATION_MANAGER_VERSION);
 
-    struct server_xdg_decoration_manager_g *xdg_decoration_manager_g = data;
+    struct server_xdg_decoration_manager *xdg_decoration_manager = data;
 
     struct wl_resource *resource =
         wl_resource_create(client, &zxdg_decoration_manager_v1_interface, version, id);
@@ -143,44 +143,44 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         wl_client_post_no_memory(client);
         return;
     }
-    wl_resource_set_implementation(resource, &xdg_decoration_manager_impl, xdg_decoration_manager_g,
+    wl_resource_set_implementation(resource, &xdg_decoration_manager_impl, xdg_decoration_manager,
                                    xdg_decoration_manager_resource_destroy);
 }
 
 static void
 on_display_destroy(struct wl_listener *listener, void *data) {
-    struct server_xdg_decoration_manager_g *xdg_decoration_manager_g =
-        wl_container_of(listener, xdg_decoration_manager_g, on_display_destroy);
+    struct server_xdg_decoration_manager *xdg_decoration_manager =
+        wl_container_of(listener, xdg_decoration_manager, on_display_destroy);
 
-    wl_global_destroy(xdg_decoration_manager_g->global);
+    wl_global_destroy(xdg_decoration_manager->global);
 
-    wl_list_remove(&xdg_decoration_manager_g->on_display_destroy.link);
+    wl_list_remove(&xdg_decoration_manager->on_display_destroy.link);
 
-    free(xdg_decoration_manager_g);
+    free(xdg_decoration_manager);
 }
 
-struct server_xdg_decoration_manager_g *
-server_xdg_decoration_manager_g_create(struct server *server) {
-    struct server_xdg_decoration_manager_g *xdg_decoration_manager_g =
-        calloc(1, sizeof(*xdg_decoration_manager_g));
-    if (!xdg_decoration_manager_g) {
-        ww_log(LOG_ERROR, "failed to allocate server_xdg_decoration_manager_g");
+struct server_xdg_decoration_manager *
+server_xdg_decoration_manager_create(struct server *server) {
+    struct server_xdg_decoration_manager *xdg_decoration_manager =
+        calloc(1, sizeof(*xdg_decoration_manager));
+    if (!xdg_decoration_manager) {
+        ww_log(LOG_ERROR, "failed to allocate server_xdg_decoration_manager");
         return NULL;
     }
 
-    xdg_decoration_manager_g->global = wl_global_create(
+    xdg_decoration_manager->global = wl_global_create(
         server->display, &zxdg_decoration_manager_v1_interface, SRV_XDG_DECORATION_MANAGER_VERSION,
-        xdg_decoration_manager_g, on_global_bind);
-    if (!xdg_decoration_manager_g->global) {
+        xdg_decoration_manager, on_global_bind);
+    if (!xdg_decoration_manager->global) {
         ww_log(LOG_ERROR, "failed to allocate xdg_decoration_manager global");
-        free(xdg_decoration_manager_g);
+        free(xdg_decoration_manager);
         return NULL;
     }
 
-    xdg_decoration_manager_g->on_display_destroy.notify = on_display_destroy;
-    wl_display_add_destroy_listener(server->display, &xdg_decoration_manager_g->on_display_destroy);
+    xdg_decoration_manager->on_display_destroy.notify = on_display_destroy;
+    wl_display_add_destroy_listener(server->display, &xdg_decoration_manager->on_display_destroy);
 
-    wl_list_init(&xdg_decoration_manager_g->decorations);
+    wl_list_init(&xdg_decoration_manager->decorations);
 
-    return xdg_decoration_manager_g;
+    return xdg_decoration_manager;
 }

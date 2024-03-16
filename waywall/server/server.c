@@ -430,7 +430,7 @@ server_create(struct config *cfg) {
     if (!server->shm) {
         goto fail_globals;
     }
-    server->xdg_decoration = server_xdg_decoration_manager_g_create(server);
+    server->xdg_decoration = server_xdg_decoration_manager_create(server);
     if (!server->xdg_decoration) {
         goto fail_globals;
     }
