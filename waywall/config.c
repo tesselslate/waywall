@@ -340,7 +340,7 @@ parse_theme_background(struct config *cfg, const char *raw) {
         goto fail;
     }
 
-    int r = 0, g = 0, b = 0, a = 255;
+    unsigned int r = 0, g = 0, b = 0, a = 255;
     if (maybe_valid_rgb) {
         ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x", &r, &g, &b);
         if (n != 3) {
