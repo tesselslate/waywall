@@ -112,7 +112,7 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
         ww_assert(!xdg_toplevel->view);
 
         xdg_toplevel->view =
-            server_view_create(&xdg_surface->xdg_wm_base->server->ui, xdg_surface->parent,
+            server_view_create(xdg_surface->xdg_wm_base->server->ui, xdg_surface->parent,
                                &xdg_toplevel_view_impl, xdg_toplevel->resource);
         if (!xdg_toplevel->view) {
             wl_resource_post_no_memory(role_resource);

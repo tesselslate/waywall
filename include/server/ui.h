@@ -55,8 +55,8 @@ struct server_view_impl {
     void (*set_size)(struct wl_resource *impl_resource, uint32_t width, uint32_t height);
 };
 
+struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
-int server_ui_init(struct server *server, struct server_ui *ui, struct config *cfg);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_show(struct server_ui *ui);
 

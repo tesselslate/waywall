@@ -2,6 +2,7 @@
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-server-protocol.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
 #include "util.h"
@@ -96,7 +97,7 @@ pointer_constraints_lock_pointer(struct wl_client *client, struct wl_resource *r
     if (client == focus_client) {
         if (!pointer_constraints->remote_pointer) {
             pointer_constraints->remote_pointer = zwp_pointer_constraints_v1_lock_pointer(
-                pointer_constraints->remote, pointer_constraints->server->ui.surface,
+                pointer_constraints->remote, pointer_constraints->server->ui->surface,
                 server_get_wl_pointer(pointer_constraints->server), NULL,
                 ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
             ww_assert(pointer_constraints->remote_pointer);
@@ -164,7 +165,7 @@ on_input_focus(struct wl_listener *listener, void *data) {
         ww_assert(!pointer_constraints->remote_pointer);
 
         pointer_constraints->remote_pointer = zwp_pointer_constraints_v1_lock_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui.surface,
+            pointer_constraints->remote, pointer_constraints->server->ui->surface,
             server_get_wl_pointer(pointer_constraints->server), NULL,
             ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         ww_assert(pointer_constraints->remote_pointer);
@@ -184,7 +185,7 @@ on_pointer(struct wl_listener *listener, void *data) {
     if (pointer_constraints->remote_pointer) {
         zwp_locked_pointer_v1_destroy(pointer_constraints->remote_pointer);
         pointer_constraints->remote_pointer = zwp_pointer_constraints_v1_lock_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui.surface, pointer, NULL,
+            pointer_constraints->remote, pointer_constraints->server->ui->surface, pointer, NULL,
             ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         ww_assert(pointer_constraints->remote_pointer);
     }

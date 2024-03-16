@@ -3,6 +3,7 @@
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-server-protocol.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "util.h"
 

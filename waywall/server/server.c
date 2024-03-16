@@ -452,11 +452,12 @@ server_create(struct config *cfg) {
     }
     server_cursor_show(server->cursor);
 
-    if (server_ui_init(server, &server->ui, server->cfg) != 0) {
+    server->ui = server_ui_create(server, cfg);
+    if (!server->ui) {
         ww_log(LOG_ERROR, "failed to initialize server_ui");
         goto fail_ui;
     }
-    server_ui_show(&server->ui);
+    server_ui_show(server->ui);
 
     return server;
 
@@ -487,7 +488,7 @@ server_destroy(struct server *server) {
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
 
-    server_ui_destroy(&server->ui);
+    server_ui_destroy(server->ui);
     remote_buffer_manager_destroy(server->remote_buf);
 
     server_cursor_destroy(server->cursor);
@@ -537,7 +538,7 @@ server_get_wl_pointer(struct server *server) {
 void
 server_set_pointer_pos(struct server *server, double x, double y) {
     server_pointer_constraints_set_hint(server->pointer_constraints, x, y);
-    wl_surface_commit(server->ui.surface);
+    wl_surface_commit(server->ui->surface);
 }
 
 void

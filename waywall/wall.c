@@ -4,6 +4,7 @@
 #include "instance.h"
 #include "server/cursor.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "server/wl_seat.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
@@ -21,8 +22,8 @@ struct box {
 
 static struct box
 get_hitbox(struct wall *wall, int id) {
-    int inst_width = wall->server->ui.width / wall->cfg->wall.width;
-    int inst_height = wall->server->ui.height / wall->cfg->wall.height;
+    int inst_width = wall->server->ui->width / wall->cfg->wall.width;
+    int inst_height = wall->server->ui->height / wall->cfg->wall.height;
 
     struct box box;
     box.x = (id % wall->cfg->wall.width) * inst_width;
@@ -34,15 +35,15 @@ get_hitbox(struct wall *wall, int id) {
 
 static int
 get_hovered(struct wall *wall) {
-    if (wall->mx < 0 || wall->mx >= wall->server->ui.width) {
+    if (wall->mx < 0 || wall->mx >= wall->server->ui->width) {
         return -1;
     }
-    if (wall->my < 0 || wall->my >= wall->server->ui.height) {
+    if (wall->my < 0 || wall->my >= wall->server->ui->height) {
         return -1;
     }
 
-    int inst_width = wall->server->ui.width / wall->cfg->wall.width;
-    int inst_height = wall->server->ui.height / wall->cfg->wall.height;
+    int inst_width = wall->server->ui->width / wall->cfg->wall.width;
+    int inst_height = wall->server->ui->height / wall->cfg->wall.height;
 
     int x = wall->mx / inst_width;
     int y = wall->my / inst_height;
@@ -158,10 +159,10 @@ play_instance(struct wall *wall, int id) {
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
     server_view_set_position(wall->instances[id]->view, 0, 0);
-    server_view_set_dest_size(wall->instances[id]->view, wall->server->ui.width,
-                              wall->server->ui.height);
-    server_view_set_size(wall->instances[id]->view, wall->server->ui.width,
-                         wall->server->ui.height);
+    server_view_set_dest_size(wall->instances[id]->view, wall->server->ui->width,
+                              wall->server->ui->height);
+    server_view_set_size(wall->instances[id]->view, wall->server->ui->width,
+                         wall->server->ui->height);
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (i == id) {
@@ -178,8 +179,8 @@ on_pointer_lock(struct wl_listener *listener, void *data) {
     server_cursor_hide(wall->server->cursor);
     wall->pointer_locked = true;
 
-    server_set_pointer_pos(wall->server, wall->server->ui.width / 2.0,
-                           wall->server->ui.height / 2.0);
+    server_set_pointer_pos(wall->server, wall->server->ui->width / 2.0,
+                           wall->server->ui->height / 2.0);
 }
 
 static void
@@ -197,13 +198,13 @@ on_resize(struct wl_listener *listener, void *data) {
         layout_wall(wall);
     } else {
         struct server_view *view = wall->instances[wall->active_instance]->view;
-        server_view_set_dest_size(view, wall->server->ui.width, wall->server->ui.height);
-        server_view_set_size(view, wall->server->ui.width, wall->server->ui.height);
+        server_view_set_dest_size(view, wall->server->ui->width, wall->server->ui->height);
+        server_view_set_size(view, wall->server->ui->width, wall->server->ui->height);
     }
 
     if (wall->pointer_locked) {
-        server_set_pointer_pos(wall->server, wall->server->ui.width / 2.0,
-                               wall->server->ui.height / 2.0);
+        server_set_pointer_pos(wall->server, wall->server->ui->width / 2.0,
+                               wall->server->ui->height / 2.0);
     }
 }
 
@@ -341,13 +342,13 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wl_signal_add(&server->events.pointer_unlock, &wall->on_pointer_unlock);
 
     wall->on_resize.notify = on_resize;
-    wl_signal_add(&server->ui.events.resize, &wall->on_resize);
+    wl_signal_add(&server->ui->events.resize, &wall->on_resize);
 
     wall->on_view_create.notify = on_view_create;
-    wl_signal_add(&server->ui.events.view_create, &wall->on_view_create);
+    wl_signal_add(&server->ui->events.view_create, &wall->on_view_create);
 
     wall->on_view_destroy.notify = on_view_destroy;
-    wl_signal_add(&server->ui.events.view_destroy, &wall->on_view_destroy);
+    wl_signal_add(&server->ui->events.view_destroy, &wall->on_view_destroy);
 
     server_seat_set_listener(server->seat, &seat_listener, wall);
 

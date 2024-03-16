@@ -5,6 +5,7 @@
 #include "config.h"
 #include "server/serial.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
 #include "util.h"
@@ -530,7 +531,7 @@ on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_s
                  wl_fixed_t surface_x, wl_fixed_t surface_y) {
     struct server_seat *seat = data;
 
-    if (surface != seat->server->ui.surface) {
+    if (surface != seat->server->ui->surface) {
         ww_log(LOG_WARN, "received wl_pointer.enter for unknown surface");
         return;
     }

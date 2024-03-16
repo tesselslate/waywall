@@ -1,7 +1,6 @@
 #ifndef WAYWALL_SERVER_SERVER_H
 #define WAYWALL_SERVER_SERVER_H
 
-#include "server/ui.h"
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
@@ -42,7 +41,7 @@ struct server {
     struct config *cfg;
     struct wl_display *display;
     struct server_backend backend;
-    struct server_ui ui;
+    struct server_ui *ui;
 
     struct server_view *input_focus;
     struct wl_listener on_view_destroy;

@@ -78,24 +78,21 @@ static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = on_xdg_surface_configure,
 };
 
-void
-server_ui_destroy(struct server_ui *ui) {
-    xdg_toplevel_destroy(ui->xdg_toplevel);
-    xdg_surface_destroy(ui->xdg_surface);
-    wp_viewport_destroy(ui->viewport);
-    wl_surface_destroy(ui->surface);
-    remote_buffer_deref(ui->background);
-}
+struct server_ui *
+server_ui_create(struct server *server, struct config *cfg) {
+    struct server_ui *ui = calloc(1, sizeof(*ui));
+    if (!ui) {
+        ww_log(LOG_ERROR, "failed to allocate server_ui");
+        return NULL;
+    }
 
-int
-server_ui_init(struct server *server, struct server_ui *ui, struct config *cfg) {
     ui->cfg = cfg;
     ui->server = server;
 
     ui->background = remote_buffer_manager_color(server->remote_buf, ui->cfg->theme.background);
     if (!ui->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
-        return 1;
+        return NULL;
     }
 
     ui->surface = wl_compositor_create_surface(server->backend.compositor);
@@ -130,7 +127,7 @@ server_ui_init(struct server *server, struct server_ui *ui, struct config *cfg) 
     wl_signal_init(&ui->events.view_create);
     wl_signal_init(&ui->events.view_destroy);
 
-    return 0;
+    return ui;
 
 fail_xdg_toplevel:
     xdg_surface_destroy(ui->xdg_surface);
@@ -143,7 +140,18 @@ fail_viewport:
 
 fail_surface:
     remote_buffer_deref(ui->background);
-    return 1;
+    return NULL;
+}
+
+void
+server_ui_destroy(struct server_ui *ui) {
+    xdg_toplevel_destroy(ui->xdg_toplevel);
+    xdg_surface_destroy(ui->xdg_surface);
+    wp_viewport_destroy(ui->viewport);
+    wl_surface_destroy(ui->surface);
+    remote_buffer_deref(ui->background);
+
+    free(ui);
 }
 
 void
