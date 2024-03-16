@@ -1,4 +1,5 @@
 #include "server/wl_compositor.h"
+#include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
 #include "util.h"
@@ -469,7 +470,7 @@ server_compositor_create(struct server *server) {
         return NULL;
     }
 
-    compositor->remote = server->backend.compositor;
+    compositor->remote = server->backend->compositor;
 
     compositor->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &compositor->on_display_destroy);

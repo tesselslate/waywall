@@ -3,6 +3,7 @@
 #undef _GNU_SOURCE
 
 #include "config.h"
+#include "server/backend.h"
 #include "server/serial.h"
 #include "server/server.h"
 #include "server/ui.h"
@@ -850,10 +851,10 @@ server_seat_create(struct server *server, struct config *cfg) {
     wl_signal_add(&server->events.input_focus, &seat->on_input_focus);
 
     seat->on_keyboard.notify = on_keyboard;
-    wl_signal_add(&server->backend.events.seat_keyboard, &seat->on_keyboard);
+    wl_signal_add(&server->backend->events.seat_keyboard, &seat->on_keyboard);
 
     seat->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->backend.events.seat_pointer, &seat->on_pointer);
+    wl_signal_add(&server->backend->events.seat_pointer, &seat->on_pointer);
 
     seat->keyboard = server_get_wl_keyboard(server);
     if (seat->keyboard) {

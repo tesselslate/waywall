@@ -1,5 +1,6 @@
 #include "server/ui.h"
 #include "config.h"
+#include "server/backend.h"
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
@@ -95,19 +96,19 @@ server_ui_create(struct server *server, struct config *cfg) {
         return NULL;
     }
 
-    ui->surface = wl_compositor_create_surface(server->backend.compositor);
+    ui->surface = wl_compositor_create_surface(server->backend->compositor);
     if (!ui->surface) {
         ww_log(LOG_ERROR, "failed to create root surface");
         goto fail_surface;
     }
 
-    ui->viewport = wp_viewporter_get_viewport(server->backend.viewporter, ui->surface);
+    ui->viewport = wp_viewporter_get_viewport(server->backend->viewporter, ui->surface);
     if (!ui->viewport) {
         ww_log(LOG_ERROR, "failed to create root viewport");
         goto fail_viewport;
     }
 
-    ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend.xdg_wm_base, ui->surface);
+    ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->surface);
     if (!ui->xdg_surface) {
         ww_log(LOG_ERROR, "failed to create root xdg surface");
         goto fail_xdg_surface;
@@ -168,7 +169,7 @@ void
 server_ui_show(struct server_ui *ui) {
     ww_assert(!ui->mapped);
 
-    struct wl_display *display = ui->server->backend.display;
+    struct wl_display *display = ui->server->backend->display;
 
     wl_surface_attach(ui->surface, NULL, 0, 0);
     wl_surface_commit(ui->surface);
@@ -241,7 +242,7 @@ server_view_show(struct server_view *view) {
         return;
     }
 
-    view->subsurface = wl_subcompositor_get_subsurface(view->ui->server->backend.subcompositor,
+    view->subsurface = wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor,
                                                        view->surface->remote, view->ui->surface);
     if (!view->subsurface) {
         ww_log(LOG_ERROR, "failed to allocate view subsurface");
@@ -273,7 +274,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
     view->surface = surface;
 
-    view->viewport = wp_viewporter_get_viewport(ui->server->backend.viewporter, surface->remote);
+    view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
     if (!view->viewport) {
         wl_subsurface_destroy(view->subsurface);
         free(view);

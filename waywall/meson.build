@@ -6,6 +6,7 @@ init_lua = custom_target(
 )
 
 executable('waywall',
+  'server/backend.c',
   'server/buffer.c',
   'server/cursor.c',
   'server/remote_buffer.c',

@@ -1,5 +1,6 @@
 #include "server/cursor.h"
 #include "config.h"
+#include "server/backend.h"
 #include "server/server.h"
 #include "server/wl_seat.h"
 #include "util.h"
@@ -29,7 +30,7 @@ server_cursor_create(struct server *server) {
     cursor->cfg = server->cfg;
     cursor->server = server;
 
-    cursor->surface = wl_compositor_create_surface(server->backend.compositor);
+    cursor->surface = wl_compositor_create_surface(server->backend->compositor);
     if (!cursor->surface) {
         ww_log(LOG_ERROR, "failed to create cursor surface");
         free(cursor);
@@ -86,7 +87,7 @@ server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size
         cursor->buffer = NULL;
     }
 
-    cursor->theme = wl_cursor_theme_load(name, size, cursor->server->backend.shm);
+    cursor->theme = wl_cursor_theme_load(name, size, cursor->server->backend->shm);
     if (!cursor->theme) {
         ww_log(LOG_ERROR, "failed to load cursor theme '%s'", name);
         return 1;

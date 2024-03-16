@@ -2,6 +2,7 @@
 #include "config.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-server-protocol.h"
+#include "server/backend.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -189,14 +190,14 @@ server_relative_pointer_create(struct server *server, struct config *cfg) {
 
     wl_list_init(&relative_pointer->objects);
 
-    relative_pointer->remote = server->backend.relative_pointer_manager;
+    relative_pointer->remote = server->backend->relative_pointer_manager;
     process_pointer(relative_pointer, server_get_wl_pointer(server));
 
     relative_pointer->on_input_focus.notify = on_input_focus;
     wl_signal_add(&server->events.input_focus, &relative_pointer->on_input_focus);
 
     relative_pointer->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->backend.events.seat_pointer, &relative_pointer->on_pointer);
+    wl_signal_add(&server->backend->events.seat_pointer, &relative_pointer->on_pointer);
 
     relative_pointer->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &relative_pointer->on_display_destroy);

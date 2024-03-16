@@ -1,6 +1,7 @@
 #include "server/wp_pointer_constraints.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-server-protocol.h"
+#include "server/backend.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -231,13 +232,13 @@ server_pointer_constraints_create(struct server *server) {
 
     wl_list_init(&pointer_constraints->objects);
 
-    pointer_constraints->remote = server->backend.pointer_constraints;
+    pointer_constraints->remote = server->backend->pointer_constraints;
 
     pointer_constraints->on_input_focus.notify = on_input_focus;
     wl_signal_add(&server->events.input_focus, &pointer_constraints->on_input_focus);
 
     pointer_constraints->on_pointer.notify = on_pointer;
-    wl_signal_add(&server->backend.events.seat_pointer, &pointer_constraints->on_pointer);
+    wl_signal_add(&server->backend->events.seat_pointer, &pointer_constraints->on_pointer);
 
     pointer_constraints->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &pointer_constraints->on_display_destroy);

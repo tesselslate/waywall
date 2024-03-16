@@ -2,6 +2,7 @@
 #include <sys/mman.h>
 #undef _GNU_SOURCE
 
+#include "server/backend.h"
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "util.h"
@@ -88,7 +89,7 @@ remote_buffer_manager_create(struct server *server) {
     // Check that RGBA8 is a supported SHM buffer format, because it's what will be used.
     uint32_t *format;
     bool ok = false;
-    wl_array_for_each(format, &server->backend.shm_formats) {
+    wl_array_for_each(format, &server->backend->shm_formats) {
         if (*format == WL_SHM_FORMAT_ARGB8888) {
             ok = true;
             break;
@@ -123,7 +124,7 @@ remote_buffer_manager_create(struct server *server) {
         goto fail_mmap;
     }
 
-    manager->pool = wl_shm_create_pool(server->backend.shm, manager->fd, manager->size);
+    manager->pool = wl_shm_create_pool(server->backend->shm, manager->fd, manager->size);
     if (!manager->pool) {
         ww_log(LOG_ERROR, "failed to create wl_shm_pool");
         goto fail_shm_pool;

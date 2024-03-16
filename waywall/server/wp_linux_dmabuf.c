@@ -1,6 +1,7 @@
 #include "server/wp_linux_dmabuf.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "linux-dmabuf-v1-server-protocol.h"
+#include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
@@ -460,13 +461,13 @@ server_linux_dmabuf_create(struct server *server) {
                                             SRV_LINUX_DMABUF_VERSION, linux_dmabuf, on_global_bind);
     if (!linux_dmabuf->global) {
         ww_log(LOG_ERROR, "failed to allocate linux_dmabuf global");
-        zwp_linux_dmabuf_v1_destroy(server->backend.linux_dmabuf);
+        zwp_linux_dmabuf_v1_destroy(server->backend->linux_dmabuf);
         free(linux_dmabuf);
         return NULL;
     }
 
-    linux_dmabuf->remote = server->backend.linux_dmabuf;
-    linux_dmabuf->remote_display = server->backend.display;
+    linux_dmabuf->remote = server->backend->linux_dmabuf;
+    linux_dmabuf->remote_display = server->backend->display;
 
     linux_dmabuf->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &linux_dmabuf->on_display_destroy);

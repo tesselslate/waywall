@@ -1,4 +1,5 @@
 #include "server/wl_shm.h"
+#include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
 #include "util.h"
@@ -237,11 +238,11 @@ server_shm_create(struct server *server) {
     }
 
     wl_list_init(&shm->objects);
-    shm->remote = server->backend.shm;
-    shm->formats = &server->backend.shm_formats;
+    shm->remote = server->backend->shm;
+    shm->formats = &server->backend->shm_formats;
 
     shm->on_shm_format.notify = on_shm_format;
-    wl_signal_add(&server->backend.events.shm_format, &shm->on_shm_format);
+    wl_signal_add(&server->backend->events.shm_format, &shm->on_shm_format);
 
     shm->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &shm->on_display_destroy);
