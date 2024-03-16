@@ -12,6 +12,7 @@
 
 #include <errno.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -47,6 +48,7 @@ enum ww_log_level {
     LOG_ERROR,
 };
 
+void _ww_log_va(enum ww_log_level, const char *fmt, va_list args);
 void _ww_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 noreturn void _ww_panic(const char *file, int line, const char *msg);
 

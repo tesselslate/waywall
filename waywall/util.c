@@ -24,7 +24,7 @@ static void __attribute__((constructor)) init_log() {
 }
 
 void
-_ww_log(enum ww_log_level level, const char *fmt, ...) {
+_ww_log_va(enum ww_log_level level, const char *fmt, va_list args) {
     struct timespec now = {0};
     clock_gettime(CLOCK_MONOTONIC, &now);
     unsigned long sec = now.tv_sec;
@@ -42,11 +42,19 @@ _ww_log(enum ww_log_level level, const char *fmt, ...) {
         break;
     }
 
+    va_list vargs;
+    va_copy(vargs, args);
+    vfprintf(stderr, fmt, vargs);
+    va_end(vargs);
+    fprintf(stderr, "%s\n", color_reset);
+}
+
+void
+_ww_log(enum ww_log_level level, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
+    _ww_log_va(level, fmt, args);
     va_end(args);
-    fprintf(stderr, "%s\n", color_reset);
 }
 
 noreturn void
