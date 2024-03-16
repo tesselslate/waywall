@@ -21,16 +21,15 @@ struct server_seat {
     struct server *server;
     struct xkb_context *ctx;
 
-    struct wl_keyboard *keyboard;
-    struct wl_pointer *pointer;
     struct {
-        struct {
+        struct wl_keyboard *remote;
+
+        struct server_seat_keymap {
             int32_t fd;
             uint32_t size;
             struct xkb_keymap *xkb;
             struct xkb_state *state;
         } local_km, remote_km;
-
         int32_t repeat_rate, repeat_delay;
 
         struct {
@@ -42,10 +41,11 @@ struct server_seat {
             uint32_t *data;
             size_t cap, len;
         } pressed;
-    } kb_state;
+    } keyboard;
     struct {
+        struct wl_pointer *remote;
         double x, y;
-    } ptr_state;
+    } pointer;
 
     struct server_view *input_focus;
     struct wl_listener on_input_focus;

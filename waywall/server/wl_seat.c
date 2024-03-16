@@ -54,8 +54,8 @@ static void
 get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     ww_assert(seat->input_focus);
 
-    *x = seat->ptr_state.x - (double)seat->input_focus->x;
-    *y = seat->ptr_state.y - (double)seat->input_focus->y;
+    *x = seat->pointer.x - (double)seat->input_focus->x;
+    *y = seat->pointer.y - (double)seat->input_focus->y;
 }
 
 static int
@@ -68,48 +68,48 @@ prepare_keymap(struct server_seat *seat) {
         .options = seat->cfg->input.keymap.options,
     };
 
-    seat->kb_state.local_km.xkb =
+    seat->keyboard.local_km.xkb =
         xkb_keymap_new_from_names(seat->ctx, &rule_names, XKB_MAP_COMPILE_NO_FLAGS);
-    if (!seat->kb_state.local_km.xkb) {
+    if (!seat->keyboard.local_km.xkb) {
         ww_log(LOG_ERROR, "failed to create local XKB keymap");
         return 1;
     }
 
-    char *keymap = xkb_keymap_get_as_string(seat->kb_state.local_km.xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
+    char *keymap = xkb_keymap_get_as_string(seat->keyboard.local_km.xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
     if (!keymap) {
         ww_log(LOG_ERROR, "failed to get XKB keymap as string");
         return 1;
     }
 
-    seat->kb_state.local_km.size = strlen(keymap) + 1;
-    seat->kb_state.local_km.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
-    if (seat->kb_state.local_km.fd == -1) {
+    seat->keyboard.local_km.size = strlen(keymap) + 1;
+    seat->keyboard.local_km.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
+    if (seat->keyboard.local_km.fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to create keymap memfd");
         goto fail_memfd;
     }
 
-    if (ftruncate(seat->kb_state.local_km.fd, seat->kb_state.local_km.size) == -1) {
+    if (ftruncate(seat->keyboard.local_km.fd, seat->keyboard.local_km.size) == -1) {
         ww_log_errno(LOG_ERROR, "failed to expand keymap memfd");
         goto fail_truncate;
     }
 
-    char *data = mmap(NULL, seat->kb_state.local_km.size + 1, PROT_READ | PROT_WRITE, MAP_SHARED,
-                      seat->kb_state.local_km.fd, 0);
+    char *data = mmap(NULL, seat->keyboard.local_km.size + 1, PROT_READ | PROT_WRITE, MAP_SHARED,
+                      seat->keyboard.local_km.fd, 0);
     if (data == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap keymap memfd");
         goto fail_mmap;
     }
 
-    memcpy(data, keymap, seat->kb_state.local_km.size + 1);
-    ww_assert(munmap(data, seat->kb_state.local_km.size + 1) == 0);
+    memcpy(data, keymap, seat->keyboard.local_km.size + 1);
+    ww_assert(munmap(data, seat->keyboard.local_km.size + 1) == 0);
 
     free(keymap);
     return 0;
 
 fail_mmap:
 fail_truncate:
-    close(seat->kb_state.local_km.fd);
-    seat->kb_state.local_km.fd = -1;
+    close(seat->keyboard.local_km.fd);
+    seat->keyboard.local_km.fd = -1;
 
 fail_memfd:
     free(keymap);
@@ -129,6 +129,19 @@ prepare_remote_km(struct xkb_context *ctx, int32_t fd, int32_t size) {
 
     ww_assert(munmap(data, size) == 0);
     return keymap;
+}
+
+static void
+server_seat_keymap_destroy(const struct server_seat_keymap *keymap) {
+    if (keymap->fd >= 0) {
+        close(keymap->fd);
+    }
+    if (keymap->state) {
+        xkb_state_unref(keymap->state);
+    }
+    if (keymap->xkb) {
+        xkb_keymap_unref(keymap->xkb);
+    }
 }
 
 static void
@@ -167,10 +180,10 @@ send_keyboard_enter(struct server_seat *seat) {
 
     struct wl_array keys;
     wl_array_init(&keys);
-    uint32_t *data = wl_array_add(&keys, sizeof(uint32_t) * seat->kb_state.pressed.len);
+    uint32_t *data = wl_array_add(&keys, sizeof(uint32_t) * seat->keyboard.pressed.len);
     ww_assert(data);
-    for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
-        data[i] = seat->kb_state.pressed.data[i];
+    for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        data[i] = seat->keyboard.pressed.data[i];
     }
 
     struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
@@ -235,9 +248,9 @@ send_keyboard_modifiers(struct server_seat *seat) {
             continue;
         }
 
-        wl_keyboard_send_modifiers(resource, next_serial(resource), seat->kb_state.mods.depressed,
-                                   seat->kb_state.mods.latched, seat->kb_state.mods.locked,
-                                   seat->kb_state.mods.group);
+        wl_keyboard_send_modifiers(resource, next_serial(resource), seat->keyboard.mods.depressed,
+                                   seat->keyboard.mods.latched, seat->keyboard.mods.locked,
+                                   seat->keyboard.mods.group);
     }
 }
 
@@ -292,38 +305,38 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     // Update the pressed keys array.
     switch ((enum wl_keyboard_key_state)state) {
     case WL_KEYBOARD_KEY_STATE_PRESSED:
-        for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
-            if (seat->kb_state.pressed.data[i] == key) {
+        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+            if (seat->keyboard.pressed.data[i] == key) {
                 ww_log(LOG_WARN, "duplicate key press event received");
                 return;
             }
         }
 
-        if (seat->kb_state.pressed.len == seat->kb_state.pressed.cap) {
-            ww_assert(seat->kb_state.pressed.cap > 0);
+        if (seat->keyboard.pressed.len == seat->keyboard.pressed.cap) {
+            ww_assert(seat->keyboard.pressed.cap > 0);
 
-            uint32_t *new_data = realloc(seat->kb_state.pressed.data,
-                                         sizeof(uint32_t) * seat->kb_state.pressed.cap * 2);
+            uint32_t *new_data = realloc(seat->keyboard.pressed.data,
+                                         sizeof(uint32_t) * seat->keyboard.pressed.cap * 2);
             if (!new_data) {
                 ww_log(LOG_WARN, "failed to reallocate pressed keys buffer - input dropped");
                 return;
             }
 
-            seat->kb_state.pressed.data = new_data;
-            seat->kb_state.pressed.cap *= 2;
+            seat->keyboard.pressed.data = new_data;
+            seat->keyboard.pressed.cap *= 2;
         }
 
-        seat->kb_state.pressed.data[seat->kb_state.pressed.len++] = key;
+        seat->keyboard.pressed.data[seat->keyboard.pressed.len++] = key;
         break;
     case WL_KEYBOARD_KEY_STATE_RELEASED:
-        for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
-            if (seat->kb_state.pressed.data[i] != key) {
+        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+            if (seat->keyboard.pressed.data[i] != key) {
                 continue;
             }
 
-            memmove(seat->kb_state.pressed.data + i, seat->kb_state.pressed.data + i + 1,
-                    sizeof(uint32_t) * (seat->kb_state.pressed.len - i - 1));
-            seat->kb_state.pressed.len--;
+            memmove(seat->keyboard.pressed.data + i, seat->keyboard.pressed.data + i + 1,
+                    sizeof(uint32_t) * (seat->keyboard.pressed.len - i - 1));
+            seat->keyboard.pressed.len--;
             break;
         }
         break;
@@ -337,8 +350,8 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
 
         // We need to add 8 to the keycode to convert from libinput to XKB keycodes. See
         // WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1.
-        int nsyms = xkb_keymap_key_get_syms_by_level(seat->kb_state.remote_km.xkb, key + 8,
-                                                     seat->kb_state.mods.group, 0, &syms);
+        int nsyms = xkb_keymap_key_get_syms_by_level(seat->keyboard.remote_km.xkb, key + 8,
+                                                     seat->keyboard.mods.group, 0, &syms);
 
         if (nsyms >= 1) {
             bool consumed = seat->listener->key(seat->listener_data, syms[0],
@@ -362,33 +375,33 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
 
     // TODO: handle errors somehow (not sure how to be honest)
 
-    if (seat->kb_state.remote_km.fd >= 0) {
-        close(seat->kb_state.remote_km.fd);
+    if (seat->keyboard.remote_km.fd >= 0) {
+        close(seat->keyboard.remote_km.fd);
     }
-    if (seat->kb_state.remote_km.state) {
-        xkb_state_unref(seat->kb_state.remote_km.state);
-        seat->kb_state.remote_km.state = NULL;
+    if (seat->keyboard.remote_km.state) {
+        xkb_state_unref(seat->keyboard.remote_km.state);
+        seat->keyboard.remote_km.state = NULL;
     }
-    if (seat->kb_state.remote_km.xkb) {
-        xkb_keymap_unref(seat->kb_state.remote_km.xkb);
+    if (seat->keyboard.remote_km.xkb) {
+        xkb_keymap_unref(seat->keyboard.remote_km.xkb);
     }
-    seat->kb_state.remote_km.fd = fd;
-    seat->kb_state.remote_km.size = size;
+    seat->keyboard.remote_km.fd = fd;
+    seat->keyboard.remote_km.size = size;
 
-    seat->kb_state.remote_km.xkb = prepare_remote_km(seat->ctx, fd, size);
-    if (!seat->kb_state.remote_km.xkb) {
+    seat->keyboard.remote_km.xkb = prepare_remote_km(seat->ctx, fd, size);
+    if (!seat->keyboard.remote_km.xkb) {
         ww_log(LOG_ERROR, "failed to create remote keymap");
         return;
     }
 
-    seat->kb_state.remote_km.state = xkb_state_new(seat->kb_state.remote_km.xkb);
-    ww_assert(seat->kb_state.remote_km.state);
+    seat->keyboard.remote_km.state = xkb_state_new(seat->keyboard.remote_km.xkb);
+    ww_assert(seat->keyboard.remote_km.state);
 
-    for (size_t i = 0; i < STATIC_ARRLEN(seat->kb_state.mods.indices); i++) {
-        size_t mod = xkb_keymap_mod_get_index(seat->kb_state.remote_km.xkb, mod_names[i]);
+    for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mods.indices); i++) {
+        size_t mod = xkb_keymap_mod_get_index(seat->keyboard.remote_km.xkb, mod_names[i]);
         ww_assert(mod != XKB_MOD_INVALID);
 
-        seat->kb_state.mods.indices[i] = mod;
+        seat->keyboard.mods.indices[i] = mod;
     }
 }
 
@@ -396,15 +409,15 @@ static void
 on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface) {
     struct server_seat *seat = data;
 
-    for (size_t i = 0; i < seat->kb_state.pressed.len; i++) {
-        send_keyboard_key(seat, seat->kb_state.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
+    for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
     }
-    seat->kb_state.pressed.len = 0;
+    seat->keyboard.pressed.len = 0;
 
-    seat->kb_state.mods.depressed = 0;
-    seat->kb_state.mods.latched = 0;
-    seat->kb_state.mods.locked = 0;
-    seat->kb_state.mods.group = 0;
+    seat->keyboard.mods.depressed = 0;
+    seat->keyboard.mods.latched = 0;
+    seat->keyboard.mods.locked = 0;
+    seat->keyboard.mods.group = 0;
     send_keyboard_modifiers(seat);
 }
 
@@ -416,28 +429,28 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
     // TODO: I don't think it's valid to just send the same modifiers here if there are two
     // different keymaps at play.
 
-    seat->kb_state.mods.depressed = mods_depressed;
-    seat->kb_state.mods.latched = mods_latched;
-    seat->kb_state.mods.locked = mods_locked;
-    seat->kb_state.mods.group = group;
+    seat->keyboard.mods.depressed = mods_depressed;
+    seat->keyboard.mods.latched = mods_latched;
+    seat->keyboard.mods.locked = mods_locked;
+    seat->keyboard.mods.group = group;
     send_keyboard_modifiers(seat);
 
     if (seat->listener) {
-        if (!seat->kb_state.remote_km.state) {
+        if (!seat->keyboard.remote_km.state) {
             return;
         }
 
-        xkb_state_update_mask(seat->kb_state.remote_km.state, mods_depressed, mods_latched,
+        xkb_state_update_mask(seat->keyboard.remote_km.state, mods_depressed, mods_latched,
                               mods_locked, 0, 0, group);
 
         xkb_mod_mask_t xkb_mods =
-            xkb_state_serialize_mods(seat->kb_state.remote_km.state, XKB_STATE_MODS_EFFECTIVE);
+            xkb_state_serialize_mods(seat->keyboard.remote_km.state, XKB_STATE_MODS_EFFECTIVE);
         xkb_layout_index_t group =
-            xkb_state_serialize_layout(seat->kb_state.remote_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
+            xkb_state_serialize_layout(seat->keyboard.remote_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
 
         uint32_t mods = 0;
-        for (size_t i = 0; i < STATIC_ARRLEN(seat->kb_state.mods.indices); i++) {
-            uint8_t index = seat->kb_state.mods.indices[i];
+        for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mods.indices); i++) {
+            uint8_t index = seat->keyboard.mods.indices[i];
             if (xkb_mods & (1 << index)) {
                 mods |= (1 << i);
             }
@@ -451,8 +464,8 @@ static void
 on_keyboard_repeat_info(void *data, struct wl_keyboard *wl, int32_t rate, int32_t delay) {
     struct server_seat *seat = data;
 
-    seat->kb_state.repeat_rate = rate;
-    seat->kb_state.repeat_delay = delay;
+    seat->keyboard.repeat_rate = rate;
+    seat->keyboard.repeat_delay = delay;
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
@@ -618,11 +631,11 @@ on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t s
                   wl_fixed_t surface_y) {
     struct server_seat *seat = data;
 
-    seat->ptr_state.x = wl_fixed_to_double(surface_x);
-    seat->ptr_state.y = wl_fixed_to_double(surface_y);
+    seat->pointer.x = wl_fixed_to_double(surface_x);
+    seat->pointer.y = wl_fixed_to_double(surface_y);
 
     if (seat->listener) {
-        seat->listener->motion(seat->listener_data, seat->ptr_state.x, seat->ptr_state.y);
+        seat->listener->motion(seat->listener_data, seat->pointer.x, seat->pointer.y);
     }
 
     if (!seat->input_focus) {
@@ -677,9 +690,9 @@ static void
 on_keyboard(struct wl_listener *listener, void *data) {
     struct server_seat *seat = wl_container_of(listener, seat, on_keyboard);
 
-    seat->keyboard = server_get_wl_keyboard(seat->server);
-    if (seat->keyboard) {
-        wl_keyboard_add_listener(seat->keyboard, &keyboard_listener, seat);
+    seat->keyboard.remote = server_get_wl_keyboard(seat->server);
+    if (seat->keyboard.remote) {
+        wl_keyboard_add_listener(seat->keyboard.remote, &keyboard_listener, seat);
     }
 }
 
@@ -687,9 +700,9 @@ static void
 on_pointer(struct wl_listener *listener, void *data) {
     struct server_seat *seat = wl_container_of(listener, seat, on_pointer);
 
-    seat->pointer = server_get_wl_pointer(seat->server);
-    if (seat->pointer) {
-        wl_pointer_add_listener(seat->pointer, &pointer_listener, seat);
+    seat->pointer.remote = server_get_wl_pointer(seat->server);
+    if (seat->pointer.remote) {
+        wl_pointer_add_listener(seat->pointer.remote, &pointer_listener, seat);
     }
 }
 
@@ -763,16 +776,16 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
 
     if (config_has_keymap(seat->cfg)) {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat->kb_state.local_km.fd, seat->kb_state.local_km.size);
+                                seat->keyboard.local_km.fd, seat->keyboard.local_km.size);
     } else {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat->kb_state.remote_km.fd, seat->kb_state.remote_km.size);
+                                seat->keyboard.remote_km.fd, seat->keyboard.remote_km.size);
     }
 
     int32_t rate = seat->cfg->input.repeat_rate >= 0 ? seat->cfg->input.repeat_rate
-                                                     : seat->kb_state.repeat_rate;
+                                                     : seat->keyboard.repeat_rate;
     int32_t delay = seat->cfg->input.repeat_delay >= 0 ? seat->cfg->input.repeat_delay
-                                                       : seat->kb_state.repeat_delay;
+                                                       : seat->keyboard.repeat_delay;
     wl_keyboard_send_repeat_info(keyboard_resource, rate, delay);
 }
 
@@ -833,25 +846,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_global_destroy(seat->global);
 
-    if (seat->kb_state.local_km.fd >= 0) {
-        close(seat->kb_state.local_km.fd);
-    }
-    if (seat->kb_state.local_km.state) {
-        xkb_state_unref(seat->kb_state.local_km.state);
-    }
-    if (seat->kb_state.local_km.xkb) {
-        xkb_keymap_unref(seat->kb_state.local_km.xkb);
-    }
-    if (seat->kb_state.remote_km.fd >= 0) {
-        close(seat->kb_state.remote_km.fd);
-    }
-    if (seat->kb_state.remote_km.state) {
-        xkb_state_unref(seat->kb_state.remote_km.state);
-    }
-    if (seat->kb_state.remote_km.xkb) {
-        xkb_keymap_unref(seat->kb_state.remote_km.xkb);
-    }
-    free(seat->kb_state.pressed.data);
+    server_seat_keymap_destroy(&seat->keyboard.local_km);
+    server_seat_keymap_destroy(&seat->keyboard.remote_km);
+    free(seat->keyboard.pressed.data);
 
     xkb_context_unref(seat->ctx);
 
@@ -881,7 +878,7 @@ server_seat_create(struct server *server, struct config *cfg) {
     }
     xkb_context_set_log_fn(seat->ctx, xkb_log);
 
-    seat->kb_state.local_km.fd = -1;
+    seat->keyboard.local_km.fd = -1;
     if (prepare_keymap(seat) != 0) {
         goto fail_keymap;
     }
@@ -893,10 +890,10 @@ server_seat_create(struct server *server, struct config *cfg) {
         goto fail_global;
     }
 
-    seat->kb_state.remote_km.fd = -1;
-    seat->kb_state.pressed.cap = 8;
-    seat->kb_state.pressed.data = calloc(seat->kb_state.pressed.cap, sizeof(uint32_t));
-    if (!seat->kb_state.pressed.data) {
+    seat->keyboard.remote_km.fd = -1;
+    seat->keyboard.pressed.cap = 8;
+    seat->keyboard.pressed.data = calloc(seat->keyboard.pressed.cap, sizeof(uint32_t));
+    if (!seat->keyboard.pressed.data) {
         ww_log(LOG_ERROR, "failed to allocate pressed keys array");
         goto fail_pressed_keys;
     }
@@ -915,14 +912,14 @@ server_seat_create(struct server *server, struct config *cfg) {
     seat->on_pointer.notify = on_pointer;
     wl_signal_add(&server->backend->events.seat_pointer, &seat->on_pointer);
 
-    seat->keyboard = server_get_wl_keyboard(server);
-    if (seat->keyboard) {
-        wl_keyboard_add_listener(seat->keyboard, &keyboard_listener, seat);
+    seat->keyboard.remote = server_get_wl_keyboard(server);
+    if (seat->keyboard.remote) {
+        wl_keyboard_add_listener(seat->keyboard.remote, &keyboard_listener, seat);
     }
 
-    seat->pointer = server_get_wl_pointer(server);
-    if (seat->pointer) {
-        wl_pointer_add_listener(seat->pointer, &pointer_listener, seat);
+    seat->pointer.remote = server_get_wl_pointer(server);
+    if (seat->pointer.remote) {
+        wl_pointer_add_listener(seat->pointer.remote, &pointer_listener, seat);
     }
 
     seat->on_display_destroy.notify = on_display_destroy;
@@ -934,7 +931,7 @@ fail_pressed_keys:
     wl_global_destroy(seat->global);
 
 fail_global:
-    close(seat->kb_state.local_km.fd);
+    close(seat->keyboard.local_km.fd);
 
 fail_keymap:
     xkb_context_unref(seat->ctx);
