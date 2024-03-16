@@ -110,6 +110,13 @@ read_options(FILE *file, struct instance_options *opts) {
                 ww_log(LOG_ERROR, "invalid boolean in options file: '%s'", val);
                 return 1;
             }
+        } else if (strcmp(key, "firstWorldF3PauseDelay") == 0) {
+            char *endptr;
+            opts->f3_pause_delay = strtol(val, &endptr, 10);
+            if (*endptr) {
+                ww_log(LOG_ERROR, "failed to parse firstWorldF3PauseDelay: '%s'", val);
+                return 1;
+            }
         } else if (strcmp(key, "f1") == 0) {
             if (strcmp(val, "false") == 0) {
                 opts->f1 = false;
