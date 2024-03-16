@@ -3,10 +3,6 @@
 
 #include <wayland-server-core.h>
 
-struct server;
-struct server_surface;
-struct syn_key;
-
 enum kb_modifier {
     KB_MOD_SHIFT = (1 << 0),
     KB_MOD_CAPS = (1 << 1),
@@ -79,10 +75,22 @@ struct server_seat {
     } events;
 };
 
+struct server_seat_listener {
+    bool (*button)(void *data, uint32_t button, bool state);
+    bool (*key)(void *data, uint32_t sym, bool state);
+    void (*modifiers)(void *data, uint32_t mods, uint32_t group);
+    void (*motion)(void *data, double x, double y);
+};
+
+struct syn_key {
+    uint32_t keycode;
+    bool press;
+};
+
 struct server_seat *server_seat_create(struct server *server, struct config *cfg);
 void server_seat_send_click(struct server_seat *seat, struct server_view *view);
-void server_seat_send_keys(struct server_seat *seat, struct server_view *view,
-                           const struct syn_key *keys, size_t num_keys);
+void server_seat_send_keys(struct server_seat *seat, struct server_view *view, size_t num_keys,
+                           const struct syn_key[static num_keys]);
 void server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
                               void *data);
 

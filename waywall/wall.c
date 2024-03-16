@@ -349,7 +349,7 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wall->on_view_destroy.notify = on_view_destroy;
     wl_signal_add(&server->ui.events.view_destroy, &wall->on_view_destroy);
 
-    server_set_seat_listener(server, &seat_listener, wall);
+    server_seat_set_listener(server->seat, &seat_listener, wall);
 
     return wall;
 }

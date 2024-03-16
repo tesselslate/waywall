@@ -1,5 +1,6 @@
 #include "instance.h"
 #include "inotify.h"
+#include "server/fake_input.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "util.h"
@@ -486,7 +487,7 @@ pause_instance(struct instance *instance) {
         {KEY_F3, false},
     };
 
-    server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
+    server_view_send_keys(instance->view, STATIC_ARRLEN(keys), keys);
 }
 
 struct instance *
@@ -605,7 +606,7 @@ instance_reset(struct instance *instance) {
         {reset_key, true},
         {reset_key, false},
     };
-    server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
+    server_view_send_keys(instance->view, STATIC_ARRLEN(keys), keys);
 
     instance->state.screen = SCREEN_WAITING;
     instance->state.data.percent = 0;
@@ -639,7 +640,7 @@ instance_state_update(struct instance *instance) {
                     {KEY_F1, true},
                     {KEY_F1, false},
                 };
-                server_view_send_keys(instance->view, keys, STATIC_ARRLEN(keys));
+                server_view_send_keys(instance->view, STATIC_ARRLEN(keys), keys);
             }
         }
     }
@@ -654,5 +655,5 @@ instance_unpause(struct instance *instance) {
         {KEY_F1, false},
     };
 
-    server_view_send_keys(instance->view, keys, instance->opts.f1 ? 4 : 2);
+    server_view_send_keys(instance->view, instance->opts.f1 ? 4 : 2, keys);
 }

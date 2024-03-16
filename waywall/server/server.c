@@ -574,15 +574,3 @@ bool
 server_view_has_focus(struct server_view *view) {
     return view->ui->server->input_focus == view;
 }
-
-void
-server_view_send_click(struct server_view *view) {
-    struct server_seat *seat = view->ui->server->seat;
-    server_seat_send_click(seat, view);
-}
-
-void
-server_view_send_keys(struct server_view *view, const struct syn_key *keys, size_t num_keys) {
-    struct server_seat *seat = view->ui->server->seat;
-    server_seat_send_keys(seat, view, keys, num_keys);
-}

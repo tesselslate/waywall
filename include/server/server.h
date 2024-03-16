@@ -69,31 +69,15 @@ struct server {
     } events;
 };
 
-struct server_seat_listener {
-    bool (*button)(void *data, uint32_t button, bool state);
-    bool (*key)(void *data, uint32_t sym, bool state);
-    void (*modifiers)(void *data, uint32_t mods, uint32_t group);
-    void (*motion)(void *data, double x, double y);
-};
-
-struct syn_key {
-    uint32_t keycode;
-    bool press;
-};
-
 struct server *server_create(struct config *cfg);
 void server_destroy(struct server *server);
 
 struct wl_keyboard *server_get_wl_keyboard(struct server *server);
 struct wl_pointer *server_get_wl_pointer(struct server *server);
 void server_set_pointer_pos(struct server *server, double x, double y);
-void server_set_seat_listener(struct server *server, const struct server_seat_listener *listener,
-                              void *data);
 void server_set_input_focus(struct server *server, struct server_view *view);
 void server_shutdown(struct server *server);
 
 bool server_view_has_focus(struct server_view *view);
-void server_view_send_click(struct server_view *view);
-void server_view_send_keys(struct server_view *view, const struct syn_key *keys, size_t num_keys);
 
 #endif
