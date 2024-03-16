@@ -58,8 +58,7 @@ get_pointer_offset(struct server_seat *seat, double *x, double *y) {
 
 static int
 prepare_keymap(struct server_seat *seat) {
-    char *keymap =
-        xkb_keymap_get_as_string(seat->cfg->input.xkb_keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
+    char *keymap = xkb_keymap_get_as_string(seat->cfg->input.xkb_keymap, XKB_KEYMAP_FORMAT_TEXT_V1);
     if (!keymap) {
         ww_log(LOG_ERROR, "failed to get XKB keymap as string");
         return 1;
@@ -209,9 +208,8 @@ send_pointer_enter(struct server_seat *seat) {
             continue;
         }
 
-        wl_pointer_send_enter(resource, next_serial(resource),
-                              seat->input_focus->surface->resource, wl_fixed_from_double(x),
-                              wl_fixed_from_double(y));
+        wl_pointer_send_enter(resource, next_serial(resource), seat->input_focus->surface->resource,
+                              wl_fixed_from_double(x), wl_fixed_from_double(y));
     }
 }
 
@@ -285,7 +283,7 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     if (seat->listener) {
         // Add 8 to convert from libinput to XKB keycodes.
         bool consumed = seat->listener->key(seat->listener_data, key + 8,
-                                              state == WL_KEYBOARD_KEY_STATE_PRESSED);
+                                            state == WL_KEYBOARD_KEY_STATE_PRESSED);
         if (consumed) {
             return;
         }
@@ -317,8 +315,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     seat->kb_state.remote_keymap.fd = fd;
     seat->kb_state.remote_keymap.size = size;
 
-    seat->kb_state.remote_keymap.xkb =
-        prepare_remote_keymap(seat->cfg->input.xkb_ctx, fd, size);
+    seat->kb_state.remote_keymap.xkb = prepare_remote_keymap(seat->cfg->input.xkb_ctx, fd, size);
     if (!seat->kb_state.remote_keymap.xkb) {
         ww_log(LOG_ERROR, "failed to create remote keymap");
         return;
@@ -370,8 +367,8 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
             return;
         }
 
-        xkb_state_update_mask(seat->kb_state.remote_keymap.xkb_state, mods_depressed,
-                              mods_latched, mods_locked, 0, 0, group);
+        xkb_state_update_mask(seat->kb_state.remote_keymap.xkb_state, mods_depressed, mods_latched,
+                              mods_locked, 0, 0, group);
 
         xkb_mod_mask_t xkb_mods = xkb_state_serialize_mods(seat->kb_state.remote_keymap.xkb_state,
                                                            XKB_STATE_MODS_EFFECTIVE);
@@ -496,7 +493,7 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
 
     if (seat->listener) {
         bool consumed = seat->listener->button(seat->listener_data, button,
-                                                 state == WL_POINTER_BUTTON_STATE_PRESSED);
+                                               state == WL_POINTER_BUTTON_STATE_PRESSED);
         if (consumed) {
             return;
         }
@@ -706,18 +703,16 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
 
     if (seat->cfg->input.custom_keymap) {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat->kb_state.local_keymap.fd,
-                                seat->kb_state.local_keymap.size);
+                                seat->kb_state.local_keymap.fd, seat->kb_state.local_keymap.size);
     } else {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat->kb_state.remote_keymap.fd,
-                                seat->kb_state.remote_keymap.size);
+                                seat->kb_state.remote_keymap.fd, seat->kb_state.remote_keymap.size);
     }
 
     int32_t rate = seat->cfg->input.repeat_rate >= 0 ? seat->cfg->input.repeat_rate
-                                                       : seat->kb_state.repeat_rate;
+                                                     : seat->kb_state.repeat_rate;
     int32_t delay = seat->cfg->input.repeat_delay >= 0 ? seat->cfg->input.repeat_delay
-                                                         : seat->kb_state.repeat_delay;
+                                                       : seat->kb_state.repeat_delay;
     wl_keyboard_send_repeat_info(keyboard_resource, rate, delay);
 }
 
@@ -731,8 +726,7 @@ seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_
         wl_resource_post_no_memory(resource);
         return;
     }
-    wl_resource_set_implementation(pointer_resource, &pointer_impl, seat,
-                                   pointer_resource_destroy);
+    wl_resource_set_implementation(pointer_resource, &pointer_impl, seat, pointer_resource_destroy);
 
     wl_list_insert(&seat->pointers, wl_resource_get_link(pointer_resource));
 }
@@ -821,7 +815,7 @@ server_seat_create(struct server *server, struct config *cfg) {
     }
 
     seat->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat,
-                                      on_global_bind);
+                                    on_global_bind);
     if (!seat->global) {
         ww_log(LOG_ERROR, "failed to allocate seat global");
         goto fail_global;
@@ -899,7 +893,7 @@ server_seat_send_click(struct server_seat *seat, struct server_view *view) {
 
 void
 server_seat_send_keys(struct server_seat *seat, struct server_view *view,
-                        const struct syn_key *keys, size_t num_keys) {
+                      const struct syn_key *keys, size_t num_keys) {
     struct wl_client *client = wl_resource_get_client(view->surface->resource);
     struct wl_resource *resource;
 
@@ -933,8 +927,8 @@ server_seat_send_keys(struct server_seat *seat, struct server_view *view,
 }
 
 void
-server_seat_set_listener(struct server_seat *seat,
-                           const struct server_seat_listener *listener, void *data) {
+server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
+                         void *data) {
     ww_assert(!seat->listener);
 
     seat->listener = listener;

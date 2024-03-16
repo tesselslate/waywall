@@ -14,7 +14,7 @@ struct shared {
 static int
 make_file(char *namebuf) {
     sprintf(namebuf, "/tmp/inotify-test-%d", getpid());
-    return open(namebuf, O_CREAT|O_WRONLY, 0644);
+    return open(namebuf, O_CREAT | O_WRONLY, 0644);
 }
 
 static void

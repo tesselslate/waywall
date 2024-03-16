@@ -24,6 +24,7 @@ struct server_relative_pointer {
     struct wl_listener on_display_destroy;
 };
 
-struct server_relative_pointer *server_relative_pointer_create(struct server *server, struct config *cfg);
+struct server_relative_pointer *server_relative_pointer_create(struct server *server,
+                                                               struct config *cfg);
 
 #endif

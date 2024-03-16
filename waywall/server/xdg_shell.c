@@ -486,9 +486,8 @@ server_xdg_wm_base_create(struct server *server) {
         return NULL;
     }
 
-    xdg_wm_base->global =
-        wl_global_create(server->display, &xdg_wm_base_interface, SRV_XDG_WM_BASE_VERSION,
-                         xdg_wm_base, on_global_bind);
+    xdg_wm_base->global = wl_global_create(server->display, &xdg_wm_base_interface,
+                                           SRV_XDG_WM_BASE_VERSION, xdg_wm_base, on_global_bind);
     if (!xdg_wm_base->global) {
         ww_log(LOG_ERROR, "failed to create xdg_wm_base global");
         free(xdg_wm_base);

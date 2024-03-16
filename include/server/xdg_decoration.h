@@ -22,7 +22,6 @@ struct server_xdg_toplevel_decoration {
     struct wl_listener on_toplevel_destroy;
 };
 
-struct server_xdg_decoration_manager *
-server_xdg_decoration_manager_create(struct server *server);
+struct server_xdg_decoration_manager *server_xdg_decoration_manager_create(struct server *server);
 
 #endif
