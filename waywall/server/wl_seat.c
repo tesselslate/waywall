@@ -255,6 +255,8 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         }
 
         if (seat->kb_state.pressed.len == seat->kb_state.pressed.cap) {
+            ww_assert(seat->kb_state.pressed.cap > 0);
+
             uint32_t *new_data = realloc(seat->kb_state.pressed.data,
                                          sizeof(uint32_t) * seat->kb_state.pressed.cap * 2);
             if (!new_data) {
