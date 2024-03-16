@@ -29,17 +29,17 @@
     _ww_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, strerror(errno))
 
 #define ww_assert(x)                                                                               \
-    ({                                                                                             \
+    do {                                                                                           \
         if (!(x)) {                                                                                \
             _ww_panic(__FILE__, __LINE__, "assert failed: '" #x "'");                              \
         }                                                                                          \
-    })
+    } while (0)
 #define ww_panic(msg) _ww_panic(__FILE__, __LINE__, "panic: " msg)
 #define ww_unreachable()                                                                           \
-    ({                                                                                             \
+    do {                                                                                           \
         ww_panic("unreachable");                                                                   \
         __builtin_unreachable();                                                                   \
-    })
+    } while (0)
 
 enum ww_log_level {
     LOG_INFO,
