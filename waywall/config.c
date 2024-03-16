@@ -826,9 +826,3 @@ config_populate(struct config *cfg) {
 
     return 0;
 }
-
-bool
-config_has_keymap(struct config *cfg) {
-    return !!cfg->input.keymap.layout || !!cfg->input.keymap.model || !!cfg->input.keymap.rules ||
-           !!cfg->input.keymap.variant || !!cfg->input.keymap.options;
-}

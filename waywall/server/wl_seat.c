@@ -797,13 +797,8 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
 
     wl_list_insert(&seat->keyboards, wl_resource_get_link(keyboard_resource));
 
-    if (config_has_keymap(seat->cfg)) {
-        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat->keyboard.local_km.fd, seat->keyboard.local_km.size);
-    } else {
-        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                seat->keyboard.remote_km.fd, seat->keyboard.remote_km.size);
-    }
+    wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
+                            seat->keyboard.local_km.fd, seat->keyboard.local_km.size);
 
     int32_t rate = seat->cfg->input.repeat_rate >= 0 ? seat->cfg->input.repeat_rate
                                                      : seat->keyboard.repeat_rate;

@@ -50,6 +50,5 @@ struct config *config_create();
 void config_destroy(struct config *cfg);
 int config_do_action(struct config *cfg, struct wall *wall, struct config_action action);
 int config_populate(struct config *cfg);
-bool config_has_keymap(struct config *cfg);
 
 #endif
