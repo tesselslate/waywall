@@ -44,4 +44,13 @@ M.reset = priv.reset
 -- @param sensitivity The multiplier to use. Must be greater than zero.
 M.set_sensitivity = priv.set_sensitivity
 
+--- Sets the resolution of the active instance.
+-- This function will throw an error if there is no active instance or if the
+-- provided resolution is invalid.
+-- Providing a resolution of 0 width and 0 height will cause the instance to be
+-- set back to the size of the waywall window.
+-- @param width The width to set the instance window to.
+-- @param height The height to set the instance window to.
+M.set_resolution = priv.set_resolution
+
 package.loaded["waywall"] = M

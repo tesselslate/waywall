@@ -16,6 +16,9 @@ struct wall {
     struct instance *instances[MAX_INSTANCES];
     ssize_t num_instances;
 
+    struct {
+        int32_t w, h;
+    } active_res;
     int active_instance; // -1 on wall
 
     uint32_t modifiers, group;
@@ -38,5 +41,6 @@ int wall_lua_play(struct wall *wall, int id);
 int wall_lua_reset_one(struct wall *wall, int id);
 int wall_lua_reset_many(struct wall *wall, size_t num_ids, int ids[static num_ids]);
 int wall_lua_return(struct wall *wall);
+int wall_lua_set_active_res(struct wall *wall, int32_t width, int32_t height);
 
 #endif

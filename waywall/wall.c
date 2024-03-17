@@ -54,12 +54,65 @@ get_hovered(struct wall *wall) {
 }
 
 static void
+layout_active(struct wall *wall) {
+    ww_assert(!ON_WALL(wall));
+
+    struct server_view *view = wall->instances[wall->active_instance]->view;
+
+    if (wall->active_res.w == 0) {
+        ww_assert(wall->active_res.h == 0);
+
+        server_view_set_position(view, 0, 0);
+        server_view_set_dest_size(view, wall->server->ui->width, wall->server->ui->height);
+        server_view_set_size(view, wall->server->ui->width, wall->server->ui->height);
+        server_view_unset_crop(view);
+    } else {
+        int32_t x = (wall->server->ui->width / 2) - (wall->active_res.w / 2);
+        int32_t y = (wall->server->ui->height / 2) - (wall->active_res.h / 2);
+
+        if (x >= 0 && y >= 0) {
+            server_view_set_position(view, x, y);
+            server_view_set_dest_size(view, wall->active_res.w, wall->active_res.h);
+            server_view_set_size(view, wall->active_res.w, wall->active_res.h);
+            server_view_unset_crop(view);
+        } else {
+            // Negative X or Y coordinates mean that the provided resolution is greater than the
+            // size of the waywall window. In this case, we need to crop the view.
+            int32_t w = (x >= 0) ? wall->active_res.w : wall->server->ui->width;
+            int32_t h = (y >= 0) ? wall->active_res.h : wall->server->ui->height;
+
+            int32_t crop_x = (wall->active_res.w / 2) - (w / 2);
+            int32_t crop_y = (wall->active_res.h / 2) - (h / 2);
+
+            x = x >= 0 ? x : 0;
+            y = y >= 0 ? y : 0;
+
+            // TODO: I think the compositor can throw a protocol error here when we do the crop? See
+            // the documentation for wp_viewport:
+            // > If src_x or src_y are negative, the bad_value protocol error is raised. Otherwise,
+            // > if the source rectangle is partially or completely outside of the non-NULL
+            // > wl_buffer, then the out_of_buffer protocol error is raised when the surface state
+            // > is applied. A NULL wl_buffer does not raise the out_of_buffer error.
+            //
+            // All of the subsurface logic will need an overhaul eventually anyway for the fabled
+            // Wayland ~frame perfection~
+
+            server_view_set_position(view, x, y);
+            server_view_set_dest_size(view, w, h);
+            server_view_set_size(view, wall->active_res.w, wall->active_res.h);
+            server_view_set_crop(view, crop_x, crop_y, w, h);
+        }
+    }
+}
+
+static void
 layout_instance(struct wall *wall, int id) {
     ww_assert(ON_WALL(wall));
 
     struct box hb = get_hitbox(wall, id);
     server_view_set_dest_size(wall->instances[id]->view, hb.w, hb.h);
     server_view_set_position(wall->instances[id]->view, hb.x, hb.y);
+    server_view_unset_crop(wall->instances[id]->view);
 }
 
 static void
@@ -199,9 +252,7 @@ on_resize(struct wl_listener *listener, void *data) {
     if (ON_WALL(wall)) {
         layout_wall(wall);
     } else {
-        struct server_view *view = wall->instances[wall->active_instance]->view;
-        server_view_set_dest_size(view, wall->server->ui->width, wall->server->ui->height);
-        server_view_set_size(view, wall->server->ui->width, wall->server->ui->height);
+        layout_active(wall);
     }
 
     if (wall->pointer_locked) {
@@ -216,8 +267,9 @@ on_view_create(struct wl_listener *listener, void *data) {
     struct server_view *view = data;
 
     // TODO: No instance cap
-    // Also, I'd like to stop heap allocating all of the instances for cache locality, even though
-    // I imagine the bulk of the bad performance will come from libwayland and the server code
+    // Also, I'd like to stop heap allocating all of the instances for cache locality, even
+    // though I imagine the bulk of the bad performance will come from libwayland and the server
+    // code
     ww_assert(wall->num_instances < MAX_INSTANCES);
 
     struct instance *instance = instance_create(view, wall->inotify);
@@ -448,5 +500,23 @@ wall_lua_return(struct wall *wall) {
     }
 
     focus_wall(wall);
+    return 0;
+}
+
+int
+wall_lua_set_active_res(struct wall *wall, int32_t width, int32_t height) {
+    if (ON_WALL(wall)) {
+        return 1;
+    }
+
+    if ((width == 0) != (height == 0)) {
+        return 1;
+    }
+
+    // TODO: check against buffer transform
+    wall->active_res.w = width;
+    wall->active_res.h = height;
+
+    layout_active(wall);
     return 0;
 }

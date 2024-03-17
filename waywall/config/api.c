@@ -136,6 +136,22 @@ l_reset(lua_State *L) {
 }
 
 static int
+l_set_resolution(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int32_t width = luaL_checkint(L, 1);
+    int32_t height = luaL_checkint(L, 2);
+    luaL_argcheck(L, width >= 0, 1, "width must be non-negative");
+    luaL_argcheck(L, height >= 0, 1, "height must be non-negative");
+
+    bool ok = wall_lua_set_active_res(wall, width, height) == 0;
+    if (!ok) {
+        return luaL_error(L, "cannot set resolution");
+    }
+
+    return 0;
+}
+
+static int
 l_set_sensitivity(lua_State *L) {
     struct wall *wall = get_wall(L);
 
@@ -173,6 +189,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"num_instances", l_num_instances},
     {"play", l_play},
     {"reset", l_reset},
+    {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
 
     // private (see init.lua)
