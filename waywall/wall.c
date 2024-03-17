@@ -388,12 +388,12 @@ wall_destroy(struct wall *wall) {
 }
 
 int
-wall_get_hovered(struct wall *wall) {
+wall_lua_get_hovered(struct wall *wall) {
     return ON_WALL(wall) ? get_hovered(wall) : -1;
 }
 
 int
-wall_play(struct wall *wall, int id) {
+wall_lua_play(struct wall *wall, int id) {
     ww_assert(id >= 0 && id < wall->num_instances);
 
     if (wall->active_instance == id) {
@@ -405,7 +405,7 @@ wall_play(struct wall *wall, int id) {
 }
 
 int
-wall_reset(struct wall *wall, int id) {
+wall_lua_reset(struct wall *wall, int id) {
     ww_assert(id >= 0 && id < wall->num_instances);
 
     bool ok = instance_reset(wall->instances[id]);
@@ -421,7 +421,7 @@ wall_reset(struct wall *wall, int id) {
 }
 
 int
-wall_return(struct wall *wall) {
+wall_lua_return(struct wall *wall) {
     if (ON_WALL(wall)) {
         return 1;
     }

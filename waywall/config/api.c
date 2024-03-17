@@ -33,7 +33,7 @@ static int
 l_goto_wall(lua_State *L) {
     struct wall *wall = get_wall(L);
 
-    bool ok = wall_return(wall) == 0;
+    bool ok = wall_lua_return(wall) == 0;
     if (!ok) {
         return luaL_error(L, "wall already active");
     }
@@ -44,7 +44,7 @@ l_goto_wall(lua_State *L) {
 static int
 l_hovered(lua_State *L) {
     struct wall *wall = get_wall(L);
-    int id = wall_get_hovered(wall);
+    int id = wall_lua_get_hovered(wall);
 
     if (id >= 0) {
         lua_pushinteger(L, id + 1);
@@ -61,7 +61,7 @@ l_play(lua_State *L) {
     int id = luaL_checkint(L, 1);
     luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
 
-    bool ok = wall_play(wall, id - 1) == 0;
+    bool ok = wall_lua_play(wall, id - 1) == 0;
     if (!ok) {
         return luaL_error(L, "instance %d already active", id);
     }
@@ -75,7 +75,7 @@ l_reset(lua_State *L) {
     int id = luaL_checkint(L, 1);
     luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
 
-    lua_pushboolean(L, wall_reset(wall, id - 1) == 0);
+    lua_pushboolean(L, wall_lua_reset(wall, id - 1) == 0);
     return 1;
 }
 
