@@ -118,7 +118,7 @@ server_create(struct config *cfg) {
     if (!server->linux_dmabuf) {
         goto fail_globals;
     }
-    server->pointer_constraints = server_pointer_constraints_create(server);
+    server->pointer_constraints = server_pointer_constraints_create(server, server->cfg);
     if (!server->pointer_constraints) {
         goto fail_globals;
     }

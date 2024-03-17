@@ -65,6 +65,34 @@ static const struct {
 };
 
 static int
+get_bool(struct lua_State *L, struct config *cfg, const char *key, bool *dst, const char *full_name,
+         bool required) {
+    lua_pushstring(L, key);
+    lua_rawget(L, -2);
+
+    switch (lua_type(L, -1)) {
+    case LUA_TBOOLEAN: {
+        bool x = lua_toboolean(L, -1);
+        *dst = x;
+        break;
+    }
+    case LUA_TNIL:
+        if (required) {
+            ww_log(LOG_ERROR, "config property '%s' is required", full_name);
+            return 1;
+        }
+        break;
+    default:
+        ww_log(LOG_ERROR, "expected '%s' to be of type 'boolean', was '%s'", full_name,
+               luaL_typename(L, -1));
+        return 1;
+    }
+
+    lua_pop(L, 1);
+    return 0;
+}
+
+static int
 get_double(struct lua_State *L, struct config *cfg, const char *key, double *dst,
            const char *full_name, bool required) {
     lua_pushstring(L, key);
@@ -409,6 +437,11 @@ process_config_input(struct config *cfg) {
     }
     if (cfg->input.sens <= 0) {
         ww_log(LOG_ERROR, "'input.sensitivity' must be a positive, non-zero number");
+        return 1;
+    }
+
+    if (get_bool(cfg->L, cfg, "confine_pointer", &cfg->input.confine, "input.confine_pointer",
+                 false) != 0) {
         return 1;
     }
 

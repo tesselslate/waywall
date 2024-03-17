@@ -1,4 +1,5 @@
 #include "server/wp_pointer_constraints.h"
+#include "config/config.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-server-protocol.h"
 #include "server/backend.h"
@@ -12,24 +13,55 @@
 #define SRV_POINTER_CONSTRAINTS_VERSION 1
 
 static void
+lock_pointer(struct server_pointer_constraints *pointer_constraints) {
+    if (pointer_constraints->cfg->input.confine) {
+        if (pointer_constraints->confined_pointer) {
+            zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
+            pointer_constraints->confined_pointer = NULL;
+        }
+    }
+
+    pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
+        pointer_constraints->remote, pointer_constraints->server->ui->surface,
+        server_get_wl_pointer(pointer_constraints->server), NULL,
+        ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+    ww_assert(pointer_constraints->locked_pointer);
+
+    wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, NULL);
+}
+
+static void
+unlock_pointer(struct server_pointer_constraints *pointer_constraints) {
+    zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
+    pointer_constraints->locked_pointer = NULL;
+
+    wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
+
+    if (pointer_constraints->cfg->input.confine) {
+        pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+            pointer_constraints->remote, pointer_constraints->server->ui->surface,
+            server_get_wl_pointer(pointer_constraints->server), NULL,
+            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        ww_assert(pointer_constraints->confined_pointer);
+    }
+}
+
+static void
 locked_pointer_resource_destroy(struct wl_resource *resource) {
     struct server_pointer_constraints *pointer_constraints = wl_resource_get_user_data(resource);
 
     wl_list_remove(wl_resource_get_link(resource));
 
     if (!pointer_constraints->input_focus) {
-        ww_assert(!pointer_constraints->remote_pointer);
+        ww_assert(!pointer_constraints->locked_pointer);
         return;
     }
 
-    if (pointer_constraints->remote_pointer) {
+    if (pointer_constraints->locked_pointer) {
         struct wl_client *focus_client =
             wl_resource_get_client(pointer_constraints->input_focus->surface->resource);
         if (wl_resource_get_client(resource) == focus_client) {
-            zwp_locked_pointer_v1_destroy(pointer_constraints->remote_pointer);
-            pointer_constraints->remote_pointer = NULL;
-
-            wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
+            unlock_pointer(pointer_constraints);
         }
     }
 }
@@ -96,14 +128,8 @@ pointer_constraints_lock_pointer(struct wl_client *client, struct wl_resource *r
     struct wl_client *focus_client =
         wl_resource_get_client(pointer_constraints->input_focus->surface->resource);
     if (client == focus_client) {
-        if (!pointer_constraints->remote_pointer) {
-            pointer_constraints->remote_pointer = zwp_pointer_constraints_v1_lock_pointer(
-                pointer_constraints->remote, pointer_constraints->server->ui->surface,
-                server_get_wl_pointer(pointer_constraints->server), NULL,
-                ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            ww_assert(pointer_constraints->remote_pointer);
-
-            wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, NULL);
+        if (!pointer_constraints->locked_pointer) {
+            lock_pointer(pointer_constraints);
         }
     }
 
@@ -138,7 +164,7 @@ on_input_focus(struct wl_listener *listener, void *data) {
         wl_container_of(listener, pointer_constraints, on_input_focus);
     struct server_view *view = data;
 
-    bool was_locked = !!pointer_constraints->remote_pointer;
+    bool was_locked = !!pointer_constraints->locked_pointer;
     bool is_locked = false;
 
     if (view) {
@@ -156,22 +182,13 @@ on_input_focus(struct wl_listener *listener, void *data) {
     }
 
     if (was_locked && !is_locked) {
-        ww_assert(pointer_constraints->remote_pointer);
+        ww_assert(pointer_constraints->locked_pointer);
 
-        zwp_locked_pointer_v1_destroy(pointer_constraints->remote_pointer);
-        pointer_constraints->remote_pointer = NULL;
-
-        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
+        unlock_pointer(pointer_constraints);
     } else if (!was_locked && is_locked) {
-        ww_assert(!pointer_constraints->remote_pointer);
+        ww_assert(!pointer_constraints->locked_pointer);
 
-        pointer_constraints->remote_pointer = zwp_pointer_constraints_v1_lock_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui->surface,
-            server_get_wl_pointer(pointer_constraints->server), NULL,
-            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-        ww_assert(pointer_constraints->remote_pointer);
-
-        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, NULL);
+        lock_pointer(pointer_constraints);
     }
 
     pointer_constraints->input_focus = view;
@@ -183,12 +200,18 @@ on_pointer(struct wl_listener *listener, void *data) {
         wl_container_of(listener, pointer_constraints, on_pointer);
     struct wl_pointer *pointer = server_get_wl_pointer(pointer_constraints->server);
 
-    if (pointer_constraints->remote_pointer) {
-        zwp_locked_pointer_v1_destroy(pointer_constraints->remote_pointer);
-        pointer_constraints->remote_pointer = zwp_pointer_constraints_v1_lock_pointer(
+    if (pointer_constraints->locked_pointer) {
+        zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
+        pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
             pointer_constraints->remote, pointer_constraints->server->ui->surface, pointer, NULL,
             ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-        ww_assert(pointer_constraints->remote_pointer);
+        ww_assert(pointer_constraints->locked_pointer);
+    } else if (pointer_constraints->confined_pointer) {
+        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
+        pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+            pointer_constraints->remote, pointer_constraints->server->ui->surface, pointer, NULL,
+            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        ww_assert(pointer_constraints->confined_pointer);
     }
 }
 
@@ -199,8 +222,11 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_global_destroy(pointer_constraints->global);
 
-    if (pointer_constraints->remote_pointer) {
-        zwp_locked_pointer_v1_destroy(pointer_constraints->remote_pointer);
+    if (pointer_constraints->locked_pointer) {
+        zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
+    }
+    if (pointer_constraints->confined_pointer) {
+        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
     }
 
     wl_list_remove(&pointer_constraints->on_input_focus.link);
@@ -211,7 +237,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct server_pointer_constraints *
-server_pointer_constraints_create(struct server *server) {
+server_pointer_constraints_create(struct server *server, struct config *cfg) {
     struct server_pointer_constraints *pointer_constraints =
         calloc(1, sizeof(*pointer_constraints));
     if (!pointer_constraints) {
@@ -219,6 +245,7 @@ server_pointer_constraints_create(struct server *server) {
         return NULL;
     }
 
+    pointer_constraints->cfg = cfg;
     pointer_constraints->server = server;
 
     pointer_constraints->global =
@@ -249,8 +276,8 @@ server_pointer_constraints_create(struct server *server) {
 void
 server_pointer_constraints_set_hint(struct server_pointer_constraints *pointer_constraints,
                                     double x, double y) {
-    ww_assert(pointer_constraints->remote_pointer);
+    ww_assert(pointer_constraints->locked_pointer);
 
     zwp_locked_pointer_v1_set_cursor_position_hint(
-        pointer_constraints->remote_pointer, wl_fixed_from_double(x), wl_fixed_from_double(y));
+        pointer_constraints->locked_pointer, wl_fixed_from_double(x), wl_fixed_from_double(y));
 }

@@ -21,6 +21,7 @@ struct config {
 
         int repeat_rate, repeat_delay;
         double sens;
+        bool confine;
     } input;
     struct {
         uint8_t background[4];
