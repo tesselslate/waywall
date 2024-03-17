@@ -136,6 +136,17 @@ l_reset(lua_State *L) {
 }
 
 static int
+l_set_sensitivity(lua_State *L) {
+    struct wall *wall = get_wall(L);
+
+    double sens = luaL_checknumber(L, 1);
+    luaL_argcheck(L, sens > 0, 1, "sensitivity must be a positive, non-zero number");
+
+    wall->cfg->input.sens = sens;
+    return 0;
+}
+
+static int
 l_getenv(lua_State *L) {
     const char *var = luaL_checkstring(L, 1);
     const char *result = getenv(var);
@@ -162,6 +173,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"num_instances", l_num_instances},
     {"play", l_play},
     {"reset", l_reset},
+    {"set_sensitivity", l_set_sensitivity},
 
     // private (see init.lua)
     {"getenv", l_getenv},
