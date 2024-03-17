@@ -34,7 +34,6 @@ counter_destroy(struct counter *counter) {
 
 void
 counter_commit(struct counter *counter) {
-    counter->queue = false;
     if (counter->written == counter->count) {
         return;
     }
@@ -59,9 +58,7 @@ counter_commit(struct counter *counter) {
 uint64_t
 counter_increment(struct counter *counter) {
     counter->count++;
-    if (!counter->queue) {
-        counter_commit(counter);
-    }
+    counter_commit(counter);
     return counter->count;
 }
 
@@ -126,9 +123,4 @@ fail_read:
 fail_open:
     free(path_dup);
     return 1;
-}
-
-void
-counter_queue(struct counter *counter) {
-    counter->queue = true;
 }
