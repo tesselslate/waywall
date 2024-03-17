@@ -542,8 +542,6 @@ load_config(struct config *cfg) {
         goto fail_load;
     }
 
-    config_dump_stack(cfg->L);
-
     lua_pop(cfg->L, 1);
     ww_assert(lua_gettop(cfg->L) == 0);
 

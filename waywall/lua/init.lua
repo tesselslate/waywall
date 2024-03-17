@@ -1,12 +1,8 @@
 --[[
-    This script contains the first code to be run when the internal Lua VM is
-    created. It sets up the environment for the user's configuration to run in,
-    and then requires the user's `init.lua` file.
-
-    The user's `init.lua` file should return a table containing their
-    configuration. Any user-defined functions which then attempt to modify the
-    configuration must do so through the (more limited) set of functions for
-    that purpose, which are provided by C code.
+    This script is the 2nd piece of code to run in the internal Lua VM. The
+    API module is run first and inserts itself into `package.loaded`. This
+    script is then called, and it in turn requires the user's `init.lua` to
+    load their configuration.
 ]]--
 
 -- Setup the environment for the user's configuration.
@@ -28,18 +24,6 @@ _G.print = function(...)
     end
     priv.log(str)
 end
-
-_G.waywall = {}
-setmetatable(_G.waywall, {
-    __metatable = "waywall",
-
-    __index = function(_, k)
-        return priv[k]
-    end,
-    __newindex = function(_, k, v)
-        error("modification of the waywall table is not permitted")
-    end
-})
 
 -- Setup the package path to include the waywall configuration directory.
 local getenv = priv.getenv

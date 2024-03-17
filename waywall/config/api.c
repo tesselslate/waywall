@@ -1,6 +1,7 @@
 #include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
+#include "lua/api.h"
 #include "util.h"
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
@@ -116,7 +117,20 @@ config_api_init(struct config *cfg) {
     luaL_register(cfg->L, "priv_waywall", lua_lib);
     lua_pop(cfg->L, 2);
 
+    if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_api, luaJIT_BC_api_SIZE, "__api") != 0) {
+        ww_log(LOG_ERROR, "failed to load internal api chunk");
+        goto fail_loadbuffer;
+    }
+    if (lua_pcall(cfg->L, 0, 0, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to load API: '%s'", lua_tostring(cfg->L, -1));
+        goto fail_pcall;
+    }
+
     return 0;
+
+fail_pcall:
+fail_loadbuffer:
+    return 1;
 }
 
 void
