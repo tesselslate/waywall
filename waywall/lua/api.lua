@@ -28,9 +28,12 @@ M.hovered = priv.hovered
 -- the given instance is already active.
 M.play = priv.play
 
---- Reset the given instance.
--- @param instance The ID of the instance to reset.
--- @return Whether or not the instance was in a valid state to be reset.
+--- Reset the given instance(s).
+-- The caller can provide either a number (single instance ID), or an array
+-- containing one or more instance IDs.
+-- This function will throw an error in the event of an allocation failure.
+-- @param instances The ID of the instance(s) to reset.
+-- @return The number of instances which were actually reset.
 M.reset = priv.reset
 
 package.loaded["waywall"] = M

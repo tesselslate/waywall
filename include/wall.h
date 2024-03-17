@@ -35,7 +35,8 @@ void wall_destroy(struct wall *wall);
 
 int wall_lua_get_hovered(struct wall *wall);
 int wall_lua_play(struct wall *wall, int id);
-int wall_lua_reset(struct wall *wall, int id);
+int wall_lua_reset_one(struct wall *wall, int id);
+int wall_lua_reset_many(struct wall *wall, size_t num_ids, int ids[static num_ids]);
 int wall_lua_return(struct wall *wall);
 
 #endif

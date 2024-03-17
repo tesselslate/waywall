@@ -5,6 +5,7 @@
 #include "util.h"
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
+#include <luajit-2.1/lualib.h>
 
 static struct wall *
 get_wall(lua_State *L) {
@@ -73,11 +74,57 @@ l_play(lua_State *L) {
 static int
 l_reset(lua_State *L) {
     struct wall *wall = get_wall(L);
-    int id = luaL_checkint(L, 1);
-    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
 
-    lua_pushboolean(L, wall_lua_reset(wall, id - 1) == 0);
-    return 1;
+    switch (lua_type(L, 1)) {
+    case LUA_TNUMBER: {
+        int id = luaL_checkinteger(L, 1);
+        luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+
+        if (wall_lua_reset_one(wall, id - 1) == 0) {
+            lua_pushinteger(L, 1);
+        } else {
+            lua_pushinteger(L, 0);
+        }
+
+        return 1;
+    }
+    case LUA_TTABLE: {
+        size_t n = lua_objlen(L, 1);
+        if (n == 0) {
+            lua_pushinteger(L, 0);
+            return 1;
+        }
+
+        int *ids = calloc(n, sizeof(int));
+        if (!ids) {
+            return luaL_error(L, "failed to allocate IDs");
+        }
+
+        lua_pushnil(L);
+        for (size_t i = 0; i < n; i++) {
+            ww_assert(lua_next(L, 1) != 0);
+
+            if (!lua_isnumber(L, -1)) {
+                free(ids);
+                return luaL_error(L, "expected instance ID (number), got %s", luaL_typename(L, -1));
+            }
+            int id = lua_tointeger(L, -1);
+            if (id < 1 || id > wall->num_instances) {
+                return luaL_error(L, "invalid instance: %d", id);
+            }
+
+            ids[i] = id - 1;
+
+            lua_pop(L, 1);
+        }
+
+        lua_pushinteger(L, wall_lua_reset_many(wall, n, ids));
+        free(ids);
+        return 1;
+    }
+    default:
+        return luaL_argerror(L, 1, "expected number or table");
+    }
 }
 
 static int
@@ -100,12 +147,14 @@ l_log(lua_State *L) {
 }
 
 static const struct luaL_Reg lua_lib[] = {
+    // public (see api.lua)
     {"active_instance", l_active_instance},
     {"goto_wall", l_goto_wall},
     {"hovered", l_hovered},
     {"play", l_play},
     {"reset", l_reset},
 
+    // private (see init.lua)
     {"getenv", l_getenv},
     {"log", l_log},
     {NULL, NULL},

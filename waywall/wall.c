@@ -405,7 +405,7 @@ wall_lua_play(struct wall *wall, int id) {
 }
 
 int
-wall_lua_reset(struct wall *wall, int id) {
+wall_lua_reset_one(struct wall *wall, int id) {
     ww_assert(id >= 0 && id < wall->num_instances);
 
     bool ok = instance_reset(wall->instances[id]);
@@ -418,6 +418,27 @@ wall_lua_reset(struct wall *wall, int id) {
     }
 
     return 0;
+}
+
+int
+wall_lua_reset_many(struct wall *wall, size_t num_ids, int ids[static num_ids]) {
+    int successful = 0;
+
+    for (size_t i = 0; i < num_ids; i++) {
+        int id = ids[i];
+        ww_assert(id >= 0 && id < wall->num_instances);
+
+        if (instance_reset(wall->instances[id])) {
+            successful++;
+        }
+    }
+
+    if (wall->counter) {
+        wall->counter->count += successful;
+        counter_commit(wall->counter);
+    }
+
+    return successful;
 }
 
 int
