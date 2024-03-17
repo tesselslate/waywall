@@ -58,6 +58,14 @@ l_hovered(lua_State *L) {
 }
 
 static int
+l_num_instances(lua_State *L) {
+    struct wall *wall = get_wall(L);
+
+    lua_pushinteger(L, wall->num_instances);
+    return 1;
+}
+
+static int
 l_play(lua_State *L) {
     struct wall *wall = get_wall(L);
     int id = luaL_checkint(L, 1);
@@ -151,6 +159,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"active_instance", l_active_instance},
     {"goto_wall", l_goto_wall},
     {"hovered", l_hovered},
+    {"num_instances", l_num_instances},
     {"play", l_play},
     {"reset", l_reset},
 

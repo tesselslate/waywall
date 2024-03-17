@@ -22,6 +22,10 @@ M.goto_wall = priv.goto_wall
 -- @return The ID of the hovered instance, or nil if no instance is hovered.
 M.hovered = priv.hovered
 
+--- Get the number of currently running instances.
+-- @return The number of instances.
+M.num_instances = priv.num_instances
+
 --- Play the given instance.
 -- @param instance The ID of the instance to play.
 -- This function will throw an error if the given instance does not exist, or if
