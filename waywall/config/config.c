@@ -65,14 +65,13 @@ static const struct {
 };
 
 static int
-get_bool(struct lua_State *L, struct config *cfg, const char *key, bool *dst, const char *full_name,
-         bool required) {
-    lua_pushstring(L, key);
-    lua_rawget(L, -2);
+get_bool(struct config *cfg, const char *key, bool *dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->L, key);
+    lua_rawget(cfg->L, -2);
 
-    switch (lua_type(L, -1)) {
+    switch (lua_type(cfg->L, -1)) {
     case LUA_TBOOLEAN: {
-        bool x = lua_toboolean(L, -1);
+        bool x = lua_toboolean(cfg->L, -1);
         *dst = x;
         break;
     }
@@ -84,23 +83,22 @@ get_bool(struct lua_State *L, struct config *cfg, const char *key, bool *dst, co
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'boolean', was '%s'", full_name,
-               luaL_typename(L, -1));
+               luaL_typename(cfg->L, -1));
         return 1;
     }
 
-    lua_pop(L, 1);
+    lua_pop(cfg->L, 1);
     return 0;
 }
 
 static int
-get_double(struct lua_State *L, struct config *cfg, const char *key, double *dst,
-           const char *full_name, bool required) {
-    lua_pushstring(L, key);
-    lua_rawget(L, -2);
+get_double(struct config *cfg, const char *key, double *dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->L, key);
+    lua_rawget(cfg->L, -2);
 
-    switch (lua_type(L, -1)) {
+    switch (lua_type(cfg->L, -1)) {
     case LUA_TNUMBER: {
-        double x = lua_tonumber(L, -1);
+        double x = lua_tonumber(cfg->L, -1);
         *dst = x;
         break;
     }
@@ -112,23 +110,22 @@ get_double(struct lua_State *L, struct config *cfg, const char *key, double *dst
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
-               luaL_typename(L, -1));
+               luaL_typename(cfg->L, -1));
         return 1;
     }
 
-    lua_pop(L, 1);
+    lua_pop(cfg->L, 1);
     return 0;
 }
 
 static int
-get_int(struct lua_State *L, struct config *cfg, const char *key, int *dst, const char *full_name,
-        bool required) {
-    lua_pushstring(L, key);
-    lua_rawget(L, -2);
+get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->L, key);
+    lua_rawget(cfg->L, -2);
 
-    switch (lua_type(L, -1)) {
+    switch (lua_type(cfg->L, -1)) {
     case LUA_TNUMBER: {
-        double x = lua_tonumber(L, -1);
+        double x = lua_tonumber(cfg->L, -1);
         int ix = (int)x;
         if (ix != x) {
             ww_log(LOG_ERROR, "expected '%s' to be an integer, got '%lf'", full_name, x);
@@ -145,24 +142,23 @@ get_int(struct lua_State *L, struct config *cfg, const char *key, int *dst, cons
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
-               luaL_typename(L, -1));
+               luaL_typename(cfg->L, -1));
         return 1;
     }
 
-    lua_pop(L, 1);
+    lua_pop(cfg->L, 1);
     return 0;
 }
 
 static int
-get_string(struct lua_State *L, struct config *cfg, const char *key, char **dst,
-           const char *full_name, bool required) {
-    lua_pushstring(L, key);
-    lua_rawget(L, -2);
+get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
+    lua_pushstring(cfg->L, key);
+    lua_rawget(cfg->L, -2);
 
-    switch (lua_type(L, -1)) {
+    switch (lua_type(cfg->L, -1)) {
     case LUA_TSTRING:
         free(*dst);
-        *dst = strdup(lua_tostring(L, -1));
+        *dst = strdup(lua_tostring(cfg->L, -1));
         if (!*dst) {
             ww_log(LOG_ERROR, "failed to allocate string for '%s'", full_name);
             return 1;
@@ -176,11 +172,11 @@ get_string(struct lua_State *L, struct config *cfg, const char *key, char **dst,
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'string', was '%s'", full_name,
-               luaL_typename(L, -1));
+               luaL_typename(cfg->L, -1));
         return 1;
     }
 
-    lua_pop(L, 1);
+    lua_pop(cfg->L, 1);
     return 0;
 }
 
@@ -390,7 +386,7 @@ process_config_actions(struct config *cfg) {
 
 static int
 process_config_general(struct config *cfg) {
-    if (get_string(cfg->L, cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
+    if (get_string(cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
                    false) != 0) {
         return 1;
     }
@@ -400,39 +396,35 @@ process_config_general(struct config *cfg) {
 
 static int
 process_config_input(struct config *cfg) {
-    if (get_string(cfg->L, cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
+    if (get_string(cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg->L, cfg, "model", &cfg->input.keymap.model, "input.model", false) != 0) {
+    if (get_string(cfg, "model", &cfg->input.keymap.model, "input.model", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg->L, cfg, "rules", &cfg->input.keymap.rules, "input.rules", false) != 0) {
+    if (get_string(cfg, "rules", &cfg->input.keymap.rules, "input.rules", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg->L, cfg, "variant", &cfg->input.keymap.variant, "input.variant", false) !=
-        0) {
+    if (get_string(cfg, "variant", &cfg->input.keymap.variant, "input.variant", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg->L, cfg, "options", &cfg->input.keymap.options, "input.options", false) !=
-        0) {
+    if (get_string(cfg, "options", &cfg->input.keymap.options, "input.options", false) != 0) {
         return 1;
     }
 
-    if (get_int(cfg->L, cfg, "repeat_rate", &cfg->input.repeat_rate, "input.repeat_rate", false) !=
-        0) {
+    if (get_int(cfg, "repeat_rate", &cfg->input.repeat_rate, "input.repeat_rate", false) != 0) {
         return 1;
     }
 
-    if (get_int(cfg->L, cfg, "repeat_delay", &cfg->input.repeat_delay, "input.repeat_delay",
-                false) != 0) {
+    if (get_int(cfg, "repeat_delay", &cfg->input.repeat_delay, "input.repeat_delay", false) != 0) {
         return 1;
     }
 
-    if (get_double(cfg->L, cfg, "sensitivity", &cfg->input.sens, "input.sensitivity", false) != 0) {
+    if (get_double(cfg, "sensitivity", &cfg->input.sens, "input.sensitivity", false) != 0) {
         return 1;
     }
     if (cfg->input.sens <= 0) {
@@ -440,8 +432,8 @@ process_config_input(struct config *cfg) {
         return 1;
     }
 
-    if (get_bool(cfg->L, cfg, "confine_pointer", &cfg->input.confine, "input.confine_pointer",
-                 false) != 0) {
+    if (get_bool(cfg, "confine_pointer", &cfg->input.confine, "input.confine_pointer", false) !=
+        0) {
         return 1;
     }
 
@@ -451,7 +443,7 @@ process_config_input(struct config *cfg) {
 static int
 process_config_theme(struct config *cfg) {
     char *raw_background = NULL;
-    if (get_string(cfg->L, cfg, "background", &raw_background, "theme.background", false) != 0) {
+    if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
         return 1;
     }
     if (raw_background) {
@@ -462,18 +454,16 @@ process_config_theme(struct config *cfg) {
         free(raw_background);
     }
 
-    if (get_string(cfg->L, cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme",
-                   false) != 0) {
-        return 1;
-    }
-
-    if (get_string(cfg->L, cfg, "cursor_icon", &cfg->theme.cursor_icon, "theme.cursor_icon",
-                   false) != 0) {
-        return 1;
-    }
-
-    if (get_int(cfg->L, cfg, "cursor_size", &cfg->theme.cursor_size, "theme.cursor_size", false) !=
+    if (get_string(cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme", false) !=
         0) {
+        return 1;
+    }
+
+    if (get_string(cfg, "cursor_icon", &cfg->theme.cursor_icon, "theme.cursor_icon", false) != 0) {
+        return 1;
+    }
+
+    if (get_int(cfg, "cursor_size", &cfg->theme.cursor_size, "theme.cursor_size", false) != 0) {
         return 1;
     }
     if (cfg->theme.cursor_size <= 0) {
@@ -486,7 +476,7 @@ process_config_theme(struct config *cfg) {
 
 static int
 process_config_wall(struct config *cfg) {
-    if (get_int(cfg->L, cfg, "width", &cfg->wall.width, "wall.width", true) != 0) {
+    if (get_int(cfg, "width", &cfg->wall.width, "wall.width", true) != 0) {
         return 1;
     }
     if (cfg->wall.width <= 0) {
@@ -494,7 +484,7 @@ process_config_wall(struct config *cfg) {
         return 1;
     }
 
-    if (get_int(cfg->L, cfg, "height", &cfg->wall.height, "wall.height", true) != 0) {
+    if (get_int(cfg, "height", &cfg->wall.height, "wall.height", true) != 0) {
         return 1;
     }
     if (cfg->wall.height <= 0) {
@@ -502,8 +492,7 @@ process_config_wall(struct config *cfg) {
         return 1;
     }
 
-    if (get_int(cfg->L, cfg, "stretch_width", &cfg->wall.stretch_width, "wall.stretch_width",
-                true) != 0) {
+    if (get_int(cfg, "stretch_width", &cfg->wall.stretch_width, "wall.stretch_width", true) != 0) {
         return 1;
     }
     if (cfg->wall.stretch_width <= 0) {
@@ -511,8 +500,8 @@ process_config_wall(struct config *cfg) {
         return 1;
     }
 
-    if (get_int(cfg->L, cfg, "stretch_height", &cfg->wall.stretch_height, "wall.stretch_height",
-                true) != 0) {
+    if (get_int(cfg, "stretch_height", &cfg->wall.stretch_height, "wall.stretch_height", true) !=
+        0) {
         return 1;
     }
     if (cfg->wall.stretch_height <= 0) {
