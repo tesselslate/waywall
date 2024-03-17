@@ -228,6 +228,7 @@ server_view_set_position(struct server_view *view, int32_t x, int32_t y) {
     if (view->subsurface) {
         wl_subsurface_set_position(view->subsurface, x, y);
         wl_surface_commit(view->surface->remote);
+        wl_surface_commit(view->ui->surface);
     }
 
     view->x = x;
