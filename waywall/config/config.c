@@ -2,7 +2,7 @@
 #include "config/action.h"
 #include "config/api.h"
 #include "config/internal.h"
-#include "init.lua.h"
+#include "lua/init.h"
 #include "server/wl_seat.h"
 #include "util.h"
 #include <linux/input-event-codes.h>

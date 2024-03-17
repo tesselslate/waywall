@@ -1,9 +1,4 @@
-init_lua = custom_target(
-  'init.lua',
-  input: 'init.lua',
-  output: '@PLAINNAME@.h',
-  command: [find_program('luajit'), '-b', '@INPUT@', '@OUTPUT@'],
-)
+subdir('lua')
 
 executable('waywall',
   'config/action.c',
@@ -33,7 +28,7 @@ executable('waywall',
 
   protocol_headers,
   protocol_sources,
-  init_lua,
+  lua_headers,
 
   dependencies: [
     libm,
