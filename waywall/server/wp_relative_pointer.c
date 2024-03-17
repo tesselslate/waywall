@@ -22,9 +22,6 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
 
     // Boat eye relies on precise cursor positioning. Sending relative pointer motion events with
     // non-whole number values will cause boat eye to not work correctly.
-    //
-    // TODO: Do we need to accumulate unaccel movement as well? I don't know if any compositors send
-    // non-whole number values
     relative_pointer->acc_x += wl_fixed_to_double(dx) * relative_pointer->cfg->input.sens;
     relative_pointer->acc_y += wl_fixed_to_double(dy) * relative_pointer->cfg->input.sens;
 
@@ -33,6 +30,17 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
 
     double y = trunc(relative_pointer->acc_y);
     relative_pointer->acc_y -= y;
+
+    // I'm not sure if any other compositors would have a reason to send non-whole number motion,
+    // but better safe than sorry.
+    relative_pointer->acc_x_unaccel += wl_fixed_to_double(dx_unaccel);
+    relative_pointer->acc_y_unaccel += wl_fixed_to_double(dy_unaccel);
+
+    double x_unaccel = trunc(relative_pointer->acc_x_unaccel);
+    relative_pointer->acc_x_unaccel -= x_unaccel;
+
+    double y_unaccel = trunc(relative_pointer->acc_y_unaccel);
+    relative_pointer->acc_y_unaccel -= y;
 
     struct wl_client *client =
         wl_resource_get_client(relative_pointer->input_focus->surface->resource);
@@ -44,7 +52,7 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
 
         zwp_relative_pointer_v1_send_relative_motion(
             resource, utime_hi, utime_lo, wl_fixed_from_double(x), wl_fixed_from_double(y),
-            dx_unaccel, dy_unaccel);
+            wl_fixed_from_double(x_unaccel), wl_fixed_from_double(y_unaccel));
     }
 }
 

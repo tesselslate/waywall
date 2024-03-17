@@ -14,6 +14,7 @@ struct server_relative_pointer {
     struct server_view *input_focus;
 
     double acc_x, acc_y;
+    double acc_x_unaccel, acc_y_unaccel;
 
     struct zwp_relative_pointer_manager_v1 *remote;
     struct zwp_relative_pointer_v1 *remote_pointer;
