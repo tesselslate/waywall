@@ -117,6 +117,13 @@ read_options(FILE *file, struct instance_options *opts) {
                 ww_log(LOG_ERROR, "failed to parse firstWorldF3PauseDelay: '%s'", val);
                 return 1;
             }
+
+            // StandardSettings clamps this value between 1 and 60.
+            if (opts->f3_pause_delay < 1) {
+                opts->f3_pause_delay = 1;
+            } else if (opts->f3_pause_delay > 60) {
+                opts->f3_pause_delay = 60;
+            }
         } else if (strcmp(key, "f1") == 0) {
             if (strcmp(val, "false") == 0) {
                 opts->f1 = false;
