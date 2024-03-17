@@ -211,6 +211,9 @@ parse_state_output(struct instance *instance) {
             next.data.inworld = INWORLD_MENU;
             break;
         }
+        if (instance->state.screen != SCREEN_INWORLD) {
+            clock_gettime(CLOCK_MONOTONIC, &next.last_load);
+        }
         break;
     default:
         ww_log(LOG_ERROR, "cannot parse wpstateout.txt: '%s'", buf);
@@ -492,6 +495,51 @@ open_state_file(const char *dir, struct instance_mods mods) {
     return fd;
 }
 
+static uint32_t
+ms_since(struct timespec ts) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+
+    uint64_t ts_ms = ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+    uint64_t now_ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+
+    return now_ms - ts_ms;
+}
+
+static bool
+debounce_f3_pause(struct instance *instance) {
+    // Newer versions of StandardSettings feature an option to automatically press F3+Esc on world
+    // load.
+    // - The pause will not happen if the instance window is focused.
+    // - The pause timer is set to n+1 client ticks (where n is firstWorldF3PauseDelay) on the first
+    //   world load if the window is not focused.
+    // - The pause timer is set to 1 client tick on subsequent world loads.
+    // - When the pause timer is at 0 ticks, the automatic F3+Esc input occurs.
+    //
+    // It would be ideal to count down the timer ourselves and allow for resets during the first
+    // pause delay, but realistically it is not worth the effort. It's easier to prevent people from
+    // resetting for the whole duration of the F3 pause delay.
+    //
+    // See:
+    // https://github.com/Slackow/StandardSettings/blob/58c64da051ddb72b9405d9161723f715a97b1b35/src/main/java/com/kingcontaria/standardsettings/mixins/MinecraftClientMixin.java#L176
+
+    if (instance->state.screen == SCREEN_INWORLD) {
+        uint32_t elapsed = ms_since(instance->state.last_load);
+        uint32_t delay = 1 + (instance->state.f3_delayed ? 0 : instance->opts.f3_pause_delay);
+        delay *= 50;
+
+        if (!server_view_has_focus(instance->view) && elapsed <= delay) {
+            return true;
+        }
+
+        if (elapsed > delay) {
+            instance->state.f3_delayed = true;
+        }
+    }
+
+    return false;
+}
+
 static void
 pause_instance(struct instance *instance) {
     static const struct syn_key keys[] = {
@@ -611,6 +659,10 @@ instance_reset(struct instance *instance) {
         }
     }
 
+    if (debounce_f3_pause(instance)) {
+        return false;
+    }
+
     // TODO: atum click fix is only necessary on older atum versions?
 
     uint8_t reset_key = instance->state.screen == SCREEN_PREVIEWING
@@ -668,6 +720,18 @@ instance_unpause(struct instance *instance) {
         {KEY_F1, true},
         {KEY_F1, false},
     };
+
+    if (debounce_f3_pause(instance)) {
+        // Tabbing into the game does not cause it to set a pointer constraint automatically. The
+        // old-school pause+unpause trick is necessary. Pressing F1 may also be needed.
+        static const struct syn_key pause_keys[] = {
+            {KEY_ESC, true},  {KEY_ESC, false}, {KEY_ESC, true},
+            {KEY_ESC, false}, {KEY_F1, true},   {KEY_F1, false},
+        };
+
+        server_view_send_keys(instance->view, instance->opts.f1 ? 6 : 4, pause_keys);
+        return;
+    }
 
     server_view_send_keys(instance->view, instance->opts.f1 ? 4 : 2, keys);
 }

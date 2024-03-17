@@ -52,7 +52,8 @@ struct instance {
             } inworld;
         } data;
 
-        struct timespec last_preview;
+        struct timespec last_load, last_preview;
+        bool f3_delayed; // see debounce_f3_pause
     } state;
 
     struct server_view *view;
