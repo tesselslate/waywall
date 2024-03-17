@@ -118,6 +118,7 @@ l_reset(lua_State *L) {
             }
             int id = lua_tointeger(L, -1);
             if (id < 1 || id > wall->num_instances) {
+                free(ids);
                 return luaL_error(L, "invalid instance: %d", id);
             }
 
