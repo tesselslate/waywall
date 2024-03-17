@@ -1,5 +1,6 @@
 #include "wall.h"
 #include "config.h"
+#include "counter.h"
 #include "inotify.h"
 #include "instance.h"
 #include "server/cursor.h"
@@ -333,6 +334,15 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wall->server = server;
     wall->inotify = inotify;
 
+    if (strcmp(cfg->general.counter_path, "") != 0) {
+        wall->counter = counter_create(cfg->general.counter_path);
+        if (!wall->counter) {
+            ww_log(LOG_ERROR, "failed to create reset counter");
+            free(wall);
+            return NULL;
+        }
+    }
+
     wall->active_instance = -1;
 
     wall->on_pointer_lock.notify = on_pointer_lock;
@@ -362,6 +372,10 @@ wall_destroy(struct wall *wall) {
         instance_destroy(wall->instances[i]);
     }
     wall->num_instances = 0;
+
+    if (wall->counter) {
+        counter_destroy(wall->counter);
+    }
 
     wl_list_remove(&wall->on_pointer_lock.link);
     wl_list_remove(&wall->on_pointer_unlock.link);
@@ -393,7 +407,16 @@ int
 wall_reset(struct wall *wall, int id) {
     ww_assert(id >= 0 && id < wall->num_instances);
 
-    return instance_reset(wall->instances[id]) != true;
+    bool ok = instance_reset(wall->instances[id]);
+    if (!ok) {
+        return 1;
+    }
+
+    if (wall->counter) {
+        counter_increment(wall->counter);
+    }
+
+    return 0;
 }
 
 int

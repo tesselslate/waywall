@@ -60,11 +60,11 @@ main() {
     ww_log(LOG_INFO, "Done");
     return 0;
 
-fail_wall:
-    inotify_destroy(inotify);
-
 fail_socket:
     wall_destroy(wall);
+
+fail_wall:
+    inotify_destroy(inotify);
 
 fail_inotify:
     wl_event_source_remove(src_sigint);

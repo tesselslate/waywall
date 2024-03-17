@@ -20,6 +20,10 @@
 #define METATABLE_WALL "waywall.wall"
 
 static const struct config defaults = {
+    .general =
+        {
+            .counter_path = "",
+        },
     .input =
         {
             .keymap =
@@ -526,6 +530,16 @@ process_config_actions(struct config *cfg) {
 }
 
 static int
+process_config_general(struct config *cfg) {
+    if (get_string(cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
+                   false) != 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 process_config_input(struct config *cfg) {
     if (get_string(cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
         return 1;
@@ -644,6 +658,10 @@ process_config(struct config *cfg) {
         return 1;
     }
 
+    if (get_table(cfg, "general", process_config_general, "general", false) != 0) {
+        return 1;
+    }
+
     if (get_table(cfg, "input", process_config_input, "input", false) != 0) {
         return 1;
     }
@@ -716,6 +734,7 @@ config_create() {
         char **storage;
         const char *name;
     } strings[] = {
+        {&cfg->general.counter_path, "general.counter_path"},
         {&cfg->input.keymap.layout, "input.layout"},
         {&cfg->input.keymap.model, "input.model"},
         {&cfg->input.keymap.rules, "input.rules"},
@@ -746,6 +765,7 @@ config_create() {
 
 void
 config_destroy(struct config *cfg) {
+    free(cfg->general.counter_path);
     free(cfg->input.keymap.layout);
     free(cfg->input.keymap.model);
     free(cfg->input.keymap.rules);

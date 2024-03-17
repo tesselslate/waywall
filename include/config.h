@@ -8,6 +8,9 @@ struct wall;
 
 struct config {
     struct {
+        char *counter_path;
+    } general;
+    struct {
         struct {
             char *layout;
             char *model;

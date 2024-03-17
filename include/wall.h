@@ -11,6 +11,8 @@ struct wall {
     struct server *server;
     struct inotify *inotify;
 
+    struct counter *counter;
+
     struct instance *instances[MAX_INSTANCES];
     ssize_t num_instances;
 
