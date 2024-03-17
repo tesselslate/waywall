@@ -1,4 +1,4 @@
-#include "config.h"
+#include "config/config.h"
 #include "inotify.h"
 #include "server/server.h"
 #include "util.h"
@@ -21,7 +21,7 @@ main() {
     if (!cfg) {
         return 1;
     }
-    if (config_populate(cfg) != 0) {
+    if (config_load(cfg) != 0) {
         goto fail_config_populate;
     }
 

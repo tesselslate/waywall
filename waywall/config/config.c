@@ -1,23 +1,17 @@
-#include "config.h"
+#include "config/config.h"
+#include "config/action.h"
+#include "config/api.h"
+#include "config/internal.h"
 #include "init.lua.h"
 #include "server/wl_seat.h"
 #include "util.h"
-#include "wall.h"
 #include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/luajit.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
-#include <string.h>
 #include <strings.h>
 #include <xkbcommon/xkbcommon.h>
-
-// TODO: slightly better sandboxing (at least enough that bad lua code cannot crash or otherwise
-// make very bad things happen)
-// - prevent lua code from messing with the registry
-
-#define BIND_BUFLEN 17
-#define METATABLE_WALL "waywall.wall"
 
 static const struct config defaults = {
     .general =
@@ -70,170 +64,15 @@ static const struct {
     {"mod4", KB_MOD_LOGO},     {"mod5", KB_MOD_MOD5},
 };
 
-static const struct {
-    char actions;
-    char wall;
-} registry_keys;
-
-typedef int (*table_func)(struct config *cfg);
-
-static struct wall *
-get_wall(lua_State *L) {
-    lua_pushlightuserdata(L, (void *)&registry_keys.wall);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-    luaL_checkudata(L, -1, METATABLE_WALL);
-
-    struct wall **wall = lua_touserdata(L, -1);
-    return *wall;
-}
-
-static void
-set_wall(struct config *cfg, struct wall *wall) {
-    ssize_t stack_start = lua_gettop(cfg->vm.L);
-
-    struct wall **udata = lua_newuserdata(cfg->vm.L, sizeof(*udata));
-    luaL_getmetatable(cfg->vm.L, METATABLE_WALL);
-    lua_setmetatable(cfg->vm.L, -2);
-    *udata = wall;
-
-    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.wall);
-    lua_pushvalue(cfg->vm.L, -2);
-    lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
-
-    lua_pop(cfg->vm.L, 1);
-    ww_assert(lua_gettop(cfg->vm.L) == stack_start);
-}
-
 static int
-lua_lib_active_instance(lua_State *L) {
-    struct wall *wall = get_wall(L);
-    int id = wall->active_instance;
+get_double(struct lua_State *L, struct config *cfg, const char *key, double *dst,
+           const char *full_name, bool required) {
+    lua_pushstring(L, key);
+    lua_rawget(L, -2);
 
-    if (id >= 0) {
-        lua_pushinteger(L, id + 1);
-    } else {
-        lua_pushnil(L);
-    }
-
-    return 1;
-}
-
-static int
-lua_lib_goto_wall(lua_State *L) {
-    struct wall *wall = get_wall(L);
-
-    bool ok = wall_return(wall) == 0;
-    if (!ok) {
-        return luaL_error(L, "wall already active");
-    }
-
-    return 0;
-}
-
-static int
-lua_lib_hovered(lua_State *L) {
-    struct wall *wall = get_wall(L);
-    int id = wall_get_hovered(wall);
-
-    if (id >= 0) {
-        lua_pushinteger(L, id + 1);
-    } else {
-        lua_pushnil(L);
-    }
-
-    return 1;
-}
-
-static int
-lua_lib_play(lua_State *L) {
-    struct wall *wall = get_wall(L);
-    int id = luaL_checkint(L, 1);
-    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
-
-    bool ok = wall_play(wall, id - 1) == 0;
-    if (!ok) {
-        return luaL_error(L, "instance %d already active", id);
-    }
-
-    return 0;
-}
-
-static int
-lua_lib_reset(lua_State *L) {
-    struct wall *wall = get_wall(L);
-    int id = luaL_checkint(L, 1);
-    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
-
-    lua_pushboolean(L, wall_reset(wall, id - 1) == 0);
-    return 1;
-}
-
-static int
-lua_lib_getenv(lua_State *L) {
-    const char *var = luaL_checkstring(L, 1);
-    const char *result = getenv(var);
-    if (result) {
-        lua_pushstring(L, result);
-    } else {
-        lua_pushnil(L);
-    }
-
-    return 1;
-}
-
-static int
-lua_lib_log(lua_State *L) {
-    ww_log(LOG_INFO, "lua: %s", lua_tostring(L, 1));
-    return 0;
-}
-
-static const struct luaL_Reg lua_lib[] = {
-    {"active_instance", lua_lib_active_instance},
-    {"goto_wall", lua_lib_goto_wall},
-    {"hovered", lua_lib_hovered},
-    {"play", lua_lib_play},
-    {"reset", lua_lib_reset},
-
-    {"getenv", lua_lib_getenv},
-    {"log", lua_lib_log},
-    {NULL, NULL},
-};
-
-// This function is intended for debugging purposes.
-// Adapted from: https://stackoverflow.com/a/59097940
-__attribute__((unused)) static inline void
-dump_stack(struct config *cfg) {
-    int n = lua_gettop(cfg->vm.L);
-    fprintf(stderr, "--- stack (%d)\n", n);
-
-    for (int i = 1; i <= n; i++) {
-        fprintf(stderr, "%d\t%s\t", i, luaL_typename(cfg->vm.L, i));
-
-        switch (lua_type(cfg->vm.L, i)) {
-        case LUA_TBOOLEAN:
-            fprintf(stderr, lua_toboolean(cfg->vm.L, i) ? "true\n" : "false\n");
-            break;
-        case LUA_TNUMBER:
-            fprintf(stderr, "%lf\n", lua_tonumber(cfg->vm.L, i));
-            break;
-        case LUA_TSTRING:
-            fprintf(stderr, "%s\n", lua_tostring(cfg->vm.L, i));
-            break;
-        default:
-            fprintf(stderr, "%p\n", lua_topointer(cfg->vm.L, i));
-            break;
-        }
-    }
-}
-
-static int
-get_double(struct config *cfg, const char *key, double *dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->vm.L, key);
-    lua_rawget(cfg->vm.L, -2);
-
-    switch (lua_type(cfg->vm.L, -1)) {
+    switch (lua_type(L, -1)) {
     case LUA_TNUMBER: {
-        double x = lua_tonumber(cfg->vm.L, -1);
+        double x = lua_tonumber(L, -1);
         *dst = x;
         break;
     }
@@ -245,22 +84,23 @@ get_double(struct config *cfg, const char *key, double *dst, const char *full_na
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
-               luaL_typename(cfg->vm.L, -1));
+               luaL_typename(L, -1));
         return 1;
     }
 
-    lua_pop(cfg->vm.L, 1);
+    lua_pop(L, 1);
     return 0;
 }
 
 static int
-get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->vm.L, key);
-    lua_rawget(cfg->vm.L, -2);
+get_int(struct lua_State *L, struct config *cfg, const char *key, int *dst, const char *full_name,
+        bool required) {
+    lua_pushstring(L, key);
+    lua_rawget(L, -2);
 
-    switch (lua_type(cfg->vm.L, -1)) {
+    switch (lua_type(L, -1)) {
     case LUA_TNUMBER: {
-        double x = lua_tonumber(cfg->vm.L, -1);
+        double x = lua_tonumber(L, -1);
         int ix = (int)x;
         if (ix != x) {
             ww_log(LOG_ERROR, "expected '%s' to be an integer, got '%lf'", full_name, x);
@@ -277,23 +117,24 @@ get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bo
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
-               luaL_typename(cfg->vm.L, -1));
+               luaL_typename(L, -1));
         return 1;
     }
 
-    lua_pop(cfg->vm.L, 1);
+    lua_pop(L, 1);
     return 0;
 }
 
 static int
-get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->vm.L, key);
-    lua_rawget(cfg->vm.L, -2);
+get_string(struct lua_State *L, struct config *cfg, const char *key, char **dst,
+           const char *full_name, bool required) {
+    lua_pushstring(L, key);
+    lua_rawget(L, -2);
 
-    switch (lua_type(cfg->vm.L, -1)) {
+    switch (lua_type(L, -1)) {
     case LUA_TSTRING:
         free(*dst);
-        *dst = strdup(lua_tostring(cfg->vm.L, -1));
+        *dst = strdup(lua_tostring(L, -1));
         if (!*dst) {
             ww_log(LOG_ERROR, "failed to allocate string for '%s'", full_name);
             return 1;
@@ -307,21 +148,21 @@ get_string(struct config *cfg, const char *key, char **dst, const char *full_nam
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'string', was '%s'", full_name,
-               luaL_typename(cfg->vm.L, -1));
+               luaL_typename(L, -1));
         return 1;
     }
 
-    lua_pop(cfg->vm.L, 1);
+    lua_pop(L, 1);
     return 0;
 }
 
 static int
-get_table(struct config *cfg, const char *key, table_func func, const char *full_name,
+get_table(struct config *cfg, const char *key, int (*func)(struct config *), const char *full_name,
           bool required) {
-    lua_pushstring(cfg->vm.L, key);
-    lua_rawget(cfg->vm.L, -2);
+    lua_pushstring(cfg->L, key);
+    lua_rawget(cfg->L, -2);
 
-    switch (lua_type(cfg->vm.L, -1)) {
+    switch (lua_type(cfg->L, -1)) {
     case LUA_TTABLE:
         if (func(cfg) != 0) {
             return 1;
@@ -335,11 +176,11 @@ get_table(struct config *cfg, const char *key, table_func func, const char *full
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'table', was '%s'", full_name,
-               luaL_typename(cfg->vm.L, -1));
+               luaL_typename(cfg->L, -1));
         return 1;
     }
 
-    lua_pop(cfg->vm.L, 1);
+    lua_pop(cfg->L, 1);
     return 0;
 }
 
@@ -375,16 +216,6 @@ parse_theme_background(struct config *cfg, const char *raw) {
 fail:
     ww_log(LOG_ERROR, "expected 'theme.background' to have a valid hex color, got '%s'", raw);
     return 1;
-}
-
-static void
-encode_bind(char buf[static BIND_BUFLEN], struct config_action action) {
-    uint64_t data = (((uint64_t)action.data) << 32) | (uint64_t)action.modifiers;
-
-    buf[0] = (action.type == CONFIG_ACTION_BUTTON) ? 'm' : 'k';
-    for (size_t i = 0; i < 16; i++) {
-        buf[i + 1] = "0123456789abcdef"[(data >> (i * 4)) & 0xF];
-    }
 }
 
 static int
@@ -473,12 +304,12 @@ fail:
 
 static int
 process_config_actions(struct config *cfg) {
-    ssize_t stack_start = lua_gettop(cfg->vm.L);
+    ssize_t stack_start = lua_gettop(cfg->L);
 
-    lua_newtable(cfg->vm.L);
+    lua_newtable(cfg->L);
 
-    lua_pushnil(cfg->vm.L);
-    while (lua_next(cfg->vm.L, -3)) {
+    lua_pushnil(cfg->L);
+    while (lua_next(cfg->L, -3)) {
         // stack:
         // - value (should be function)
         // - key (should be string)
@@ -486,52 +317,52 @@ process_config_actions(struct config *cfg) {
         // - config.actions
         // - config
 
-        if (!lua_isstring(cfg->vm.L, -2)) {
+        if (!lua_isstring(cfg->L, -2)) {
             ww_log(LOG_ERROR, "non-string key '%s' found in actions table",
-                   lua_tostring(cfg->vm.L, -2));
+                   lua_tostring(cfg->L, -2));
             return 1;
         }
-        if (!lua_isfunction(cfg->vm.L, -1)) {
+        if (!lua_isfunction(cfg->L, -1)) {
             ww_log(LOG_ERROR, "non-function value for key '%s' found in actions table",
-                   lua_tostring(cfg->vm.L, -2));
+                   lua_tostring(cfg->L, -2));
             return 1;
         }
 
-        const char *bind = lua_tostring(cfg->vm.L, -2);
+        const char *bind = lua_tostring(cfg->L, -2);
         struct config_action action = {0};
         if (parse_bind(bind, &action) != 0) {
             return 1;
         }
 
         char buf[BIND_BUFLEN];
-        encode_bind(buf, action);
+        config_encode_bind(buf, action);
 
-        lua_pushlstring(cfg->vm.L, buf, STATIC_ARRLEN(buf));
-        lua_pushvalue(cfg->vm.L, -2);
-        lua_rawset(cfg->vm.L, -5);
+        lua_pushlstring(cfg->L, buf, STATIC_ARRLEN(buf));
+        lua_pushvalue(cfg->L, -2);
+        lua_rawset(cfg->L, -5);
 
         // Pop the value from the top of the stack.
-        lua_pop(cfg->vm.L, 1);
+        lua_pop(cfg->L, 1);
     }
 
     // stack:
     // - registry actions table
     // - config.actions
     // - config
-    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.actions);
-    lua_pushvalue(cfg->vm.L, -2);
-    lua_rawset(cfg->vm.L, LUA_REGISTRYINDEX);
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.actions);
+    lua_pushvalue(cfg->L, -2);
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
     // Pop the registry actions table which was created at the start of this function.
-    lua_pop(cfg->vm.L, 1);
-    ww_assert(lua_gettop(cfg->vm.L) == stack_start);
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == stack_start);
 
     return 0;
 }
 
 static int
 process_config_general(struct config *cfg) {
-    if (get_string(cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
+    if (get_string(cfg->L, cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
                    false) != 0) {
         return 1;
     }
@@ -541,35 +372,39 @@ process_config_general(struct config *cfg) {
 
 static int
 process_config_input(struct config *cfg) {
-    if (get_string(cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
+    if (get_string(cfg->L, cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg, "model", &cfg->input.keymap.model, "input.model", false) != 0) {
+    if (get_string(cfg->L, cfg, "model", &cfg->input.keymap.model, "input.model", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg, "rules", &cfg->input.keymap.rules, "input.rules", false) != 0) {
+    if (get_string(cfg->L, cfg, "rules", &cfg->input.keymap.rules, "input.rules", false) != 0) {
         return 1;
     }
 
-    if (get_string(cfg, "variant", &cfg->input.keymap.variant, "input.variant", false) != 0) {
+    if (get_string(cfg->L, cfg, "variant", &cfg->input.keymap.variant, "input.variant", false) !=
+        0) {
         return 1;
     }
 
-    if (get_string(cfg, "options", &cfg->input.keymap.options, "input.options", false) != 0) {
+    if (get_string(cfg->L, cfg, "options", &cfg->input.keymap.options, "input.options", false) !=
+        0) {
         return 1;
     }
 
-    if (get_int(cfg, "repeat_rate", &cfg->input.repeat_rate, "input.repeat_rate", false) != 0) {
+    if (get_int(cfg->L, cfg, "repeat_rate", &cfg->input.repeat_rate, "input.repeat_rate", false) !=
+        0) {
         return 1;
     }
 
-    if (get_int(cfg, "repeat_delay", &cfg->input.repeat_delay, "input.repeat_delay", false) != 0) {
+    if (get_int(cfg->L, cfg, "repeat_delay", &cfg->input.repeat_delay, "input.repeat_delay",
+                false) != 0) {
         return 1;
     }
 
-    if (get_double(cfg, "sensitivity", &cfg->input.sens, "input.sensitivity", false) != 0) {
+    if (get_double(cfg->L, cfg, "sensitivity", &cfg->input.sens, "input.sensitivity", false) != 0) {
         return 1;
     }
     if (cfg->input.sens <= 0) {
@@ -583,7 +418,7 @@ process_config_input(struct config *cfg) {
 static int
 process_config_theme(struct config *cfg) {
     char *raw_background = NULL;
-    if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
+    if (get_string(cfg->L, cfg, "background", &raw_background, "theme.background", false) != 0) {
         return 1;
     }
     if (raw_background) {
@@ -594,16 +429,18 @@ process_config_theme(struct config *cfg) {
         free(raw_background);
     }
 
-    if (get_string(cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme", false) !=
+    if (get_string(cfg->L, cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme",
+                   false) != 0) {
+        return 1;
+    }
+
+    if (get_string(cfg->L, cfg, "cursor_icon", &cfg->theme.cursor_icon, "theme.cursor_icon",
+                   false) != 0) {
+        return 1;
+    }
+
+    if (get_int(cfg->L, cfg, "cursor_size", &cfg->theme.cursor_size, "theme.cursor_size", false) !=
         0) {
-        return 1;
-    }
-
-    if (get_string(cfg, "cursor_icon", &cfg->theme.cursor_icon, "theme.cursor_icon", false) != 0) {
-        return 1;
-    }
-
-    if (get_int(cfg, "cursor_size", &cfg->theme.cursor_size, "theme.cursor_size", false) != 0) {
         return 1;
     }
     if (cfg->theme.cursor_size <= 0) {
@@ -616,7 +453,7 @@ process_config_theme(struct config *cfg) {
 
 static int
 process_config_wall(struct config *cfg) {
-    if (get_int(cfg, "width", &cfg->wall.width, "wall.width", true) != 0) {
+    if (get_int(cfg->L, cfg, "width", &cfg->wall.width, "wall.width", true) != 0) {
         return 1;
     }
     if (cfg->wall.width <= 0) {
@@ -624,7 +461,7 @@ process_config_wall(struct config *cfg) {
         return 1;
     }
 
-    if (get_int(cfg, "height", &cfg->wall.height, "wall.height", true) != 0) {
+    if (get_int(cfg->L, cfg, "height", &cfg->wall.height, "wall.height", true) != 0) {
         return 1;
     }
     if (cfg->wall.height <= 0) {
@@ -632,7 +469,8 @@ process_config_wall(struct config *cfg) {
         return 1;
     }
 
-    if (get_int(cfg, "stretch_width", &cfg->wall.stretch_width, "wall.stretch_width", true) != 0) {
+    if (get_int(cfg->L, cfg, "stretch_width", &cfg->wall.stretch_width, "wall.stretch_width",
+                true) != 0) {
         return 1;
     }
     if (cfg->wall.stretch_width <= 0) {
@@ -640,8 +478,8 @@ process_config_wall(struct config *cfg) {
         return 1;
     }
 
-    if (get_int(cfg, "stretch_height", &cfg->wall.stretch_height, "wall.stretch_height", true) !=
-        0) {
+    if (get_int(cfg->L, cfg, "stretch_height", &cfg->wall.stretch_height, "wall.stretch_height",
+                true) != 0) {
         return 1;
     }
     if (cfg->wall.stretch_height <= 0) {
@@ -678,25 +516,24 @@ process_config(struct config *cfg) {
 }
 
 static int
-run_config(struct config *cfg) {
-    if (luaL_loadbuffer(cfg->vm.L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE, "__init") !=
-        0) {
+load_config(struct config *cfg) {
+    if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE, "__init") != 0) {
         ww_log(LOG_ERROR, "failed to load internal init chunk");
         goto fail_loadbuffer;
     }
-    if (lua_pcall(cfg->vm.L, 0, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->vm.L, -1));
+    if (lua_pcall(cfg->L, 0, 1, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->L, -1));
         goto fail_pcall;
     }
 
-    int type = lua_type(cfg->vm.L, -1);
+    int type = lua_type(cfg->L, -1);
     if (type != LUA_TTABLE) {
         ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
-               lua_typename(cfg->vm.L, -1));
+               lua_typename(cfg->L, -1));
         goto fail_table;
     }
 
-    if (!lua_checkstack(cfg->vm.L, 16)) {
+    if (!lua_checkstack(cfg->L, 16)) {
         ww_log(LOG_ERROR, "not enough lua stack space");
         goto fail_load;
     }
@@ -705,14 +542,16 @@ run_config(struct config *cfg) {
         goto fail_load;
     }
 
-    lua_pop(cfg->vm.L, 1);
-    ww_assert(lua_gettop(cfg->vm.L) == 0);
+    config_dump_stack(cfg->L);
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
 
     return 0;
 
 fail_load:
 fail_table:
-    lua_settop(cfg->vm.L, 0);
+    lua_settop(cfg->L, 0);
 
 fail_pcall:
 fail_loadbuffer:
@@ -774,56 +613,24 @@ config_destroy(struct config *cfg) {
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
 
-    if (cfg->vm.L) {
-        lua_close(cfg->vm.L);
+    if (cfg->L) {
+        lua_close(cfg->L);
     }
-
     free(cfg);
 }
 
 int
-config_do_action(struct config *cfg, struct wall *wall, struct config_action action) {
-    char buf[BIND_BUFLEN];
-    encode_bind(buf, action);
+config_load(struct config *cfg) {
+    ww_assert(!cfg->L);
 
-    lua_pushlightuserdata(cfg->vm.L, (void *)&registry_keys.actions);
-    lua_gettable(cfg->vm.L, LUA_REGISTRYINDEX);
-
-    lua_pushlstring(cfg->vm.L, buf, STATIC_ARRLEN(buf));
-    lua_gettable(cfg->vm.L, -2);
-
-    switch (lua_type(cfg->vm.L, -1)) {
-    case LUA_TFUNCTION:
-        set_wall(cfg, wall);
-
-        if (lua_pcall(cfg->vm.L, 0, 0, 0) != 0) {
-            ww_log(LOG_ERROR, "failed to perform action: '%s'", lua_tostring(cfg->vm.L, -1));
-            return -1;
-        }
-
-        lua_pop(cfg->vm.L, 1);
-        return 1;
-    case LUA_TNIL:
-        lua_pop(cfg->vm.L, 2);
-        return 0;
-    default:
-        // Non-function values should have been filtered out by config_build_actions.
-        ww_unreachable();
-    }
-}
-
-int
-config_populate(struct config *cfg) {
-    ww_assert(!cfg->vm.L);
-
-    cfg->vm.L = luaL_newstate();
-    if (!cfg->vm.L) {
+    cfg->L = luaL_newstate();
+    if (!cfg->L) {
         ww_log(LOG_ERROR, "failed to create lua VM");
         return 1;
     }
 
-    luaL_newmetatable(cfg->vm.L, METATABLE_WALL);
-    lua_pop(cfg->vm.L, 1);
+    luaL_newmetatable(cfg->L, METATABLE_WALL);
+    lua_pop(cfg->L, 1);
 
     static const struct luaL_Reg base_lib[] = {
         {"", luaopen_base},         {"package", luaopen_package}, {"table", luaopen_table},
@@ -831,18 +638,23 @@ config_populate(struct config *cfg) {
     };
 
     for (size_t i = 0; i < STATIC_ARRLEN(base_lib); i++) {
-        lua_pushcfunction(cfg->vm.L, base_lib[i].func);
-        lua_pushstring(cfg->vm.L, base_lib[i].name);
-        lua_call(cfg->vm.L, 1, 0);
+        lua_pushcfunction(cfg->L, base_lib[i].func);
+        lua_pushstring(cfg->L, base_lib[i].name);
+        lua_call(cfg->L, 1, 0);
     }
 
-    lua_getglobal(cfg->vm.L, "_G");
-    luaL_register(cfg->vm.L, "priv_waywall", lua_lib);
-    lua_pop(cfg->vm.L, 2);
+    if (config_api_init(cfg) != 0) {
+        goto fail;
+    }
 
-    if (run_config(cfg) != 0) {
-        return 1;
+    if (load_config(cfg) != 0) {
+        goto fail;
     }
 
     return 0;
+
+fail:
+    lua_close(cfg->L);
+    cfg->L = NULL;
+    return 1;
 }

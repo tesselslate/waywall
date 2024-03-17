@@ -1,5 +1,6 @@
 #include "wall.h"
-#include "config.h"
+#include "config/action.h"
+#include "config/config.h"
 #include "counter.h"
 #include "inotify.h"
 #include "instance.h"
@@ -260,7 +261,7 @@ on_button(void *data, uint32_t button, bool pressed) {
         action.data = button;
         action.modifiers = wall->modifiers;
 
-        int ret = config_do_action(wall->cfg, wall, action);
+        int ret = config_action_try(wall->cfg, wall, action);
         return ret > 0;
     } else {
         return false;
@@ -277,7 +278,7 @@ on_key(void *data, xkb_keysym_t sym, bool pressed) {
         action.data = sym;
         action.modifiers = wall->modifiers;
 
-        int ret = config_do_action(wall->cfg, wall, action);
+        int ret = config_action_try(wall->cfg, wall, action);
         return ret > 0;
     } else {
         return false;
@@ -310,7 +311,7 @@ on_motion(void *data, double x, double y) {
             action.data = i + BTN_MOUSE;
             action.modifiers = wall->modifiers;
 
-            config_do_action(wall->cfg, wall, action);
+            config_action_try(wall->cfg, wall, action);
         }
     }
 }

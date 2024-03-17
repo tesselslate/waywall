@@ -1,5 +1,5 @@
 #include "server/server.h"
-#include "config.h"
+#include "config/config.h"
 #include "server/backend.h"
 #include "server/cursor.h"
 #include "server/remote_buffer.h"

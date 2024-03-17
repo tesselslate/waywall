@@ -1,5 +1,5 @@
 #include "server/wp_relative_pointer.h"
-#include "config.h"
+#include "config/config.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-server-protocol.h"
 #include "server/backend.h"

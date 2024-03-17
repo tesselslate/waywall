@@ -2,7 +2,7 @@
 #include <sys/mman.h>
 #undef _GNU_SOURCE
 
-#include "config.h"
+#include "config/config.h"
 #include "server/backend.h"
 #include "server/serial.h"
 #include "server/server.h"

@@ -6,6 +6,10 @@ init_lua = custom_target(
 )
 
 executable('waywall',
+  'config/action.c',
+  'config/api.c',
+  'config/config.c',
+  'config/internal.c',
   'server/backend.c',
   'server/buffer.c',
   'server/cursor.c',
@@ -20,7 +24,6 @@ executable('waywall',
   'server/wp_relative_pointer.c',
   'server/xdg_decoration.c',
   'server/xdg_shell.c',
-  'config.c',
   'counter.c',
   'inotify.c',
   'instance.c',

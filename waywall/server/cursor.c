@@ -1,5 +1,5 @@
 #include "server/cursor.h"
-#include "config.h"
+#include "config/config.h"
 #include "server/backend.h"
 #include "server/server.h"
 #include "server/wl_seat.h"
