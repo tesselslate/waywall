@@ -37,10 +37,6 @@ struct config {
         char *cursor_icon;
         int cursor_size;
     } theme;
-    struct {
-        int width, height;
-        int stretch_width, stretch_height;
-    } wall;
 
     struct lua_State *L;
 };

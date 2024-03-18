@@ -1,6 +1,7 @@
 #include "wall.h"
 #include "config/action.h"
 #include "config/config.h"
+#include "config/layout.h"
 #include "counter.h"
 #include "inotify.h"
 #include "instance.h"
@@ -17,40 +18,24 @@ static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.buttons
 
 #define ON_WALL(w) ((w)->active_instance == -1)
 
-struct box {
-    int32_t x, y;
-    uint32_t w, h;
-};
-
-static struct box
-get_hitbox(struct wall *wall, int id) {
-    int inst_width = wall->server->ui->width / wall->cfg->wall.width;
-    int inst_height = wall->server->ui->height / wall->cfg->wall.height;
-
-    struct box box;
-    box.x = (id % wall->cfg->wall.width) * inst_width;
-    box.y = (id / wall->cfg->wall.width) * inst_height;
-    box.w = inst_width;
-    box.h = inst_height;
-    return box;
-}
-
 static int
 get_hovered(struct wall *wall) {
-    if (wall->mx < 0 || wall->mx >= wall->server->ui->width) {
-        return -1;
-    }
-    if (wall->my < 0 || wall->my >= wall->server->ui->height) {
+    if (!wall->layout) {
         return -1;
     }
 
-    int inst_width = wall->server->ui->width / wall->cfg->wall.width;
-    int inst_height = wall->server->ui->height / wall->cfg->wall.height;
+    for (size_t i = 0; i < wall->layout->num_elements; i++) {
+        struct config_layout_element *element = &wall->layout->elements[i];
+        if (element->type == LAYOUT_ELEMENT_INSTANCE) {
+            bool x = element->x <= wall->mx && element->x + element->w >= wall->mx;
+            bool y = element->y <= wall->my && element->y + element->h >= wall->my;
+            if (x && y) {
+                return element->data.instance;
+            }
+        }
+    }
 
-    int x = wall->mx / inst_width;
-    int y = wall->my / inst_height;
-    int id = y * wall->cfg->wall.width + x;
-    return (id < wall->num_instances) ? id : -1;
+    return -1;
 }
 
 static void
@@ -106,22 +91,81 @@ layout_active(struct wall *wall) {
 }
 
 static void
-layout_instance(struct wall *wall, int id) {
-    ww_assert(ON_WALL(wall));
-
-    struct box hb = get_hitbox(wall, id);
-    server_view_set_dest_size(wall->instances[id]->view, hb.w, hb.h);
-    server_view_set_position(wall->instances[id]->view, hb.x, hb.y);
-    server_view_unset_crop(wall->instances[id]->view);
-}
-
-static void
 layout_wall(struct wall *wall) {
     ww_assert(ON_WALL(wall));
 
-    for (int i = 0; i < wall->num_instances; i++) {
-        layout_instance(wall, i);
+    if (!wall->layout) {
+        return;
     }
+
+    bool shown[MAX_INSTANCES] = {0};
+    for (size_t i = 0; i < wall->layout->num_elements; i++) {
+        struct config_layout_element *element = &wall->layout->elements[i];
+        switch (element->type) {
+        case LAYOUT_ELEMENT_INSTANCE:
+            ww_assert(element->data.instance >= 0 && element->data.instance < wall->num_instances);
+
+            struct server_view *view = wall->instances[element->data.instance]->view;
+            server_view_set_dest_size(view, element->w, element->y);
+            server_view_set_position(view, element->x, element->h);
+            server_view_show(view);
+            shown[element->data.instance] = true;
+        }
+    }
+
+    for (int i = 0; i < wall->num_instances; i++) {
+        if (!shown[i]) {
+            server_view_hide(wall->instances[i]->view);
+        }
+    }
+}
+
+static void
+change_layout(struct wall *wall, struct config_layout *layout) {
+    if (!layout) {
+        return;
+    }
+
+    if (wall->layout) {
+        config_layout_destroy(wall->layout);
+    }
+
+    wall->layout = layout;
+
+    if (ON_WALL(wall)) {
+        layout_wall(wall);
+    }
+}
+
+static void
+fixup_layout(struct wall *wall, int id) {
+    // This function is called when an instance dies and there is no new layout from the user's
+    // layout generator. In this case, we may need to shift some instance IDs in the layout to
+    // ensure that it can continue being used.
+    if (!wall->layout) {
+        return;
+    }
+
+    for (size_t i = 0; i < wall->layout->num_elements; i++) {
+        struct config_layout_element *elem = &wall->layout->elements[i];
+        if (elem->type == LAYOUT_ELEMENT_INSTANCE) {
+            if (elem->data.instance > id) {
+                elem->data.instance--;
+            }
+        }
+    }
+}
+
+static bool
+process_action(struct wall *wall, struct config_action action) {
+    bool consumed = (config_action_try(wall->cfg, wall, action) != 0);
+
+    if (consumed) {
+        struct config_layout *layout = config_layout_request_manual(wall->cfg, wall);
+        change_layout(wall, layout);
+    }
+
+    return consumed;
 }
 
 static void
@@ -139,7 +183,20 @@ process_state_update(int wd, uint32_t mask, void *data) {
         return;
     }
 
+    int screen = wall->instances[id]->state.screen;
+    int percent = (screen == SCREEN_PREVIEWING) ? wall->instances[id]->state.data.percent : -1;
+
     instance_state_update(wall->instances[id]);
+
+    if (screen != SCREEN_PREVIEWING && wall->instances[id]->state.screen == SCREEN_PREVIEWING) {
+        struct config_layout *layout = config_layout_request_preview_start(wall->cfg, wall, id);
+        change_layout(wall, layout);
+    } else if (wall->instances[id]->state.screen == SCREEN_PREVIEWING &&
+               percent != wall->instances[id]->state.data.percent) {
+        struct config_layout *layout = config_layout_request_preview_percent(
+            wall->cfg, wall, id, wall->instances[id]->state.data.percent);
+        change_layout(wall, layout);
+    }
 }
 
 static void
@@ -160,13 +217,10 @@ add_instance(struct wall *wall, struct instance *instance) {
     int id = wall->num_instances;
     wall->instances[wall->num_instances++] = instance;
 
-    server_view_set_size(instance->view, wall->cfg->wall.stretch_width,
-                         wall->cfg->wall.stretch_height);
+#warning TODO stretch
 
-    if (ON_WALL(wall)) {
-        layout_instance(wall, id);
-        server_view_show(instance->view);
-    }
+    struct config_layout *layout = config_layout_request_spawn(wall->cfg, wall, id);
+    change_layout(wall, layout);
 
     free(state_path);
     return;
@@ -184,25 +238,26 @@ focus_wall(struct wall *wall) {
 
     wall->active_instance = -1;
     server_set_input_focus(wall->server, NULL);
-    layout_wall(wall);
 
-    for (int i = 0; i < wall->num_instances; i++) {
-        server_view_show(wall->instances[i]->view);
-    }
+    layout_wall(wall);
 }
 
 static void
-remove_instance(struct wall *wall, int index) {
-    instance_destroy(wall->instances[index]);
+remove_instance(struct wall *wall, int id) {
+    instance_destroy(wall->instances[id]);
 
-    memmove(wall + index, wall + index + 1,
-            sizeof(struct instance *) * (wall->num_instances - index - 1));
+    memmove(wall + id, wall + id + 1, sizeof(struct instance *) * (wall->num_instances - id - 1));
     wall->num_instances--;
 
-    if (ON_WALL(wall)) {
-        layout_wall(wall);
-    } else if (wall->active_instance == index) {
+    if (wall->active_instance == id) {
         focus_wall(wall);
+    }
+
+    struct config_layout *layout = config_layout_request_death(wall->cfg, wall, id);
+    if (layout) {
+        change_layout(wall, layout);
+    } else {
+        fixup_layout(wall, id);
     }
 }
 
@@ -250,7 +305,9 @@ on_resize(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_resize);
 
     if (ON_WALL(wall)) {
-        layout_wall(wall);
+        struct config_layout *layout = config_layout_request_resize(
+            wall->cfg, wall, wall->server->ui->width, wall->server->ui->height);
+        change_layout(wall, layout);
     } else {
         layout_active(wall);
     }
@@ -313,8 +370,7 @@ on_button(void *data, uint32_t button, bool pressed) {
         action.data = button;
         action.modifiers = wall->modifiers;
 
-        int ret = config_action_try(wall->cfg, wall, action);
-        return ret > 0;
+        return process_action(wall, action);
     } else {
         return false;
     }
@@ -330,8 +386,7 @@ on_key(void *data, xkb_keysym_t sym, bool pressed) {
         action.data = sym;
         action.modifiers = wall->modifiers;
 
-        int ret = config_action_try(wall->cfg, wall, action);
-        return ret > 0;
+        return process_action(wall, action);
     } else {
         return false;
     }
@@ -363,7 +418,7 @@ on_motion(void *data, double x, double y) {
             action.data = i + BTN_MOUSE;
             action.modifiers = wall->modifiers;
 
-            config_action_try(wall->cfg, wall, action);
+            process_action(wall, action);
         }
     }
 }
@@ -425,6 +480,10 @@ wall_destroy(struct wall *wall) {
         instance_destroy(wall->instances[i]);
     }
     wall->num_instances = 0;
+
+    if (wall->layout) {
+        config_layout_destroy(wall->layout);
+    }
 
     if (wall->counter) {
         counter_destroy(wall->counter);

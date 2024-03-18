@@ -527,44 +527,6 @@ process_config_theme(struct config *cfg) {
 }
 
 static int
-process_config_wall(struct config *cfg) {
-    if (get_int(cfg, "width", &cfg->wall.width, "wall.width", true) != 0) {
-        return 1;
-    }
-    if (cfg->wall.width <= 0) {
-        ww_log(LOG_ERROR, "'wall.width' must be a positive, non-zero integer");
-        return 1;
-    }
-
-    if (get_int(cfg, "height", &cfg->wall.height, "wall.height", true) != 0) {
-        return 1;
-    }
-    if (cfg->wall.height <= 0) {
-        ww_log(LOG_ERROR, "'wall.height' must be a positive, non-zero integer");
-        return 1;
-    }
-
-    if (get_int(cfg, "stretch_width", &cfg->wall.stretch_width, "wall.stretch_width", true) != 0) {
-        return 1;
-    }
-    if (cfg->wall.stretch_width <= 0) {
-        ww_log(LOG_ERROR, "'wall.stretch_width' must be a positive, non-zero integer");
-        return 1;
-    }
-
-    if (get_int(cfg, "stretch_height", &cfg->wall.stretch_height, "wall.stretch_height", true) !=
-        0) {
-        return 1;
-    }
-    if (cfg->wall.stretch_height <= 0) {
-        ww_log(LOG_ERROR, "'wall.stretch_height' must be a positive, non-zero integer");
-        return 1;
-    }
-
-    return 0;
-}
-
-static int
 process_config(struct config *cfg) {
     if (get_table(cfg, "actions", process_config_actions, "actions", false) != 0) {
         return 1;
@@ -583,10 +545,6 @@ process_config(struct config *cfg) {
     }
 
     if (get_table(cfg, "theme", process_config_theme, "theme", false) != 0) {
-        return 1;
-    }
-
-    if (get_table(cfg, "wall", process_config_wall, "wall", true) != 0) {
         return 1;
     }
 

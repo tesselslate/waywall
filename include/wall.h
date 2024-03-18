@@ -16,6 +16,8 @@ struct wall {
     struct instance *instances[MAX_INSTANCES];
     ssize_t num_instances;
 
+    struct config_layout *layout;
+
     struct {
         int32_t w, h;
     } active_res;
