@@ -441,6 +441,58 @@ process_config_input(struct config *cfg) {
 }
 
 static int
+process_config_layout(struct config *cfg) {
+    ssize_t stack_start = lua_gettop(cfg->L);
+
+    const struct {
+        const char *name;
+        const char *full_name;
+        bool *dst;
+    } functions[] = {
+        {"death", "layout.death", &cfg->layout.handle_death},
+        {"manual", "layout.manual", &cfg->layout.handle_manual},
+        {"preview_percent", "layout.preview_percent", &cfg->layout.handle_preview_percent},
+        {"preview_start", "layout.preview_start", &cfg->layout.handle_preview_start},
+        {"resize", "layout.resize", &cfg->layout.handle_resize},
+        {"spawn", "layout.spawn", &cfg->layout.handle_spawn},
+    };
+
+    lua_newtable(cfg->L);
+
+    for (size_t i = 0; i < STATIC_ARRLEN(functions); i++) {
+        lua_pushstring(cfg->L, functions[i].name);
+        lua_rawget(cfg->L, -3);
+
+        switch (lua_type(cfg->L, -1)) {
+        case LUA_TFUNCTION:
+            lua_pushstring(cfg->L, functions[i].name);
+            lua_pushvalue(cfg->L, -2);
+            lua_rawset(cfg->L, -4);
+            *functions[i].dst = true;
+            break;
+        case LUA_TNIL:
+            break;
+        default:
+            ww_log(LOG_ERROR, "expected '%s' to be of type 'function', was '%s'",
+                   functions[i].full_name, luaL_typename(cfg->L, -1));
+            return 1;
+        }
+
+        lua_pop(cfg->L, 1);
+    }
+
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
+    lua_pushvalue(cfg->L, -2);
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+
+    // Pop the registry layout table which was created at the start of this function.
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == stack_start);
+
+    return 0;
+}
+
+static int
 process_config_theme(struct config *cfg) {
     char *raw_background = NULL;
     if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
@@ -523,6 +575,10 @@ process_config(struct config *cfg) {
     }
 
     if (get_table(cfg, "input", process_config_input, "input", false) != 0) {
+        return 1;
+    }
+
+    if (get_table(cfg, "layout", process_config_layout, "layout", false) != 0) {
         return 1;
     }
 

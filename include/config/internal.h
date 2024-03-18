@@ -10,6 +10,7 @@ struct lua_State;
 
 extern const struct config_registry_keys {
     char actions;
+    char layout;
     char wall;
 } config_registry_keys;
 
