@@ -2,6 +2,8 @@
 #include "config/config.h"
 #include "config/internal.h"
 #include "lua/api.h"
+#include "server/server.h"
+#include "server/ui.h"
 #include "util.h"
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
@@ -164,6 +166,19 @@ l_set_sensitivity(lua_State *L) {
 }
 
 static int
+l_window_size(lua_State *L) {
+    struct wall *wall = get_wall(L);
+
+    if (!wall->server->ui->mapped) {
+        return luaL_error(L, "window is not open");
+    }
+
+    lua_pushinteger(L, wall->server->ui->width);
+    lua_pushinteger(L, wall->server->ui->height);
+    return 2;
+}
+
+static int
 l_getenv(lua_State *L) {
     const char *var = luaL_checkstring(L, 1);
     const char *result = getenv(var);
@@ -192,6 +207,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"reset", l_reset},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
+    {"window_size", l_window_size},
 
     // private (see init.lua)
     {"getenv", l_getenv},

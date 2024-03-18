@@ -53,4 +53,10 @@ M.set_sensitivity = priv.set_sensitivity
 -- @param height The height to set the instance window to.
 M.set_resolution = priv.set_resolution
 
+--- Gets the size of the waywall window.
+-- This function will throw an error if the window is not open.
+-- @return width The width of the window, in pixels
+-- @return height The height of the window, in pixels
+M.window_size = priv.window_size
+
 package.loaded["waywall"] = M
