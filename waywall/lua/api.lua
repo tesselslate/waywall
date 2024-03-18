@@ -38,6 +38,14 @@ M.num_instances = priv.num_instances
 -- the given instance is already active.
 M.play = priv.play
 
+--- Requests that the layout generator's `manual` function is called.
+-- Not providing a data argument, or passing nil, will result in the `manual`
+-- function not being called.
+-- If more than one call is made to this function before control returns to C
+-- code, only the last call matters.
+-- @param data The data to pass to the `manual` function.
+M.request_layout = priv.request_layout
+
 --- Reset the given instance(s).
 -- The caller can provide either a number (single instance ID), or an array
 -- containing one or more instance IDs.

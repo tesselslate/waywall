@@ -136,6 +136,22 @@ l_play(lua_State *L) {
 }
 
 static int
+l_request_layout(lua_State *L) {
+    ssize_t nargs = lua_gettop(L);
+    if (nargs > 1) {
+        return luaL_error(L, "expected at most 1 argument, received %d", lua_gettop(L));
+    } else if (nargs == 0) {
+        lua_pushnil(L);
+    }
+
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.layout_reason);
+    lua_pushvalue(L, 1);
+    lua_rawset(L, LUA_REGISTRYINDEX);
+
+    return 0;
+}
+
+static int
 l_reset(lua_State *L) {
     struct wall *wall = get_wall(L);
 
@@ -259,6 +275,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"instance", l_instance},
     {"num_instances", l_num_instances},
     {"play", l_play},
+    {"request_layout", l_request_layout},
     {"reset", l_reset},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
