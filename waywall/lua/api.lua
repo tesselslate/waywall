@@ -22,6 +22,12 @@ M.goto_wall = priv.goto_wall
 -- @return The ID of the hovered instance, or nil if no instance is hovered.
 M.hovered = priv.hovered
 
+--- Gets information about the state of the provided instance.
+-- This function will throw an error if the given instance does not exist.
+-- @param instance The ID of the instance to get information for.
+-- @return state A table containing the state of the instance.
+M.instance = priv.instance
+
 --- Get the number of currently running instances.
 -- @return The number of instances.
 M.num_instances = priv.num_instances

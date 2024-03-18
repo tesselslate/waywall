@@ -1,6 +1,7 @@
 #include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
+#include "instance.h"
 #include "lua/api.h"
 #include "server/server.h"
 #include "server/ui.h"
@@ -8,6 +9,12 @@
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
+#include <time.h>
+
+static inline uint32_t
+timespec_ms(struct timespec *ts) {
+    return (uint32_t)(ts->tv_sec * 1000) + (uint32_t)(ts->tv_nsec / 1000000);
+}
 
 static struct wall *
 get_wall(lua_State *L) {
@@ -55,6 +62,53 @@ l_hovered(lua_State *L) {
     } else {
         lua_pushnil(L);
     }
+
+    return 1;
+}
+
+static int
+l_instance(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int id = luaL_checkint(L, 1);
+    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+
+    static const char *screen_names[] = {
+        [SCREEN_TITLE] = "title",           [SCREEN_WAITING] = "waiting",
+        [SCREEN_GENERATING] = "generating", [SCREEN_PREVIEWING] = "previewing",
+        [SCREEN_INWORLD] = "inworld",
+    };
+
+    static const char *inworld_names[] = {
+        [INWORLD_UNPAUSED] = "unpaused",
+        [INWORLD_PAUSED] = "paused",
+        [INWORLD_MENU] = "menu",
+    };
+
+    struct instance_state state = wall->instances[id - 1]->state;
+
+    lua_newtable(L);
+
+    lua_pushstring(L, "screen");
+    lua_pushstring(L, screen_names[state.screen]);
+    lua_rawset(L, -3);
+
+    if (state.screen == SCREEN_GENERATING || state.screen == SCREEN_PREVIEWING) {
+        lua_pushstring(L, "percent");
+        lua_pushinteger(L, state.data.percent);
+        lua_rawset(L, -3);
+    } else if (state.screen == SCREEN_INWORLD) {
+        lua_pushstring(L, "inworld");
+        lua_pushstring(L, inworld_names[state.data.inworld]);
+        lua_rawset(L, -3);
+    }
+
+    lua_pushstring(L, "last_load");
+    lua_pushinteger(L, timespec_ms(&state.last_load));
+    lua_rawset(L, -3);
+
+    lua_pushstring(L, "last_preview");
+    lua_pushinteger(L, timespec_ms(&state.last_preview));
+    lua_rawset(L, -3);
 
     return 1;
 }
@@ -202,6 +256,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"active_instance", l_active_instance},
     {"goto_wall", l_goto_wall},
     {"hovered", l_hovered},
+    {"instance", l_instance},
     {"num_instances", l_num_instances},
     {"play", l_play},
     {"reset", l_reset},
