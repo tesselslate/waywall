@@ -276,9 +276,9 @@ play_instance(struct wall *wall, int id) {
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (i == id) {
-            server_view_show(wall->instances[id]->view);
+            server_view_show(wall->instances[i]->view);
         } else {
-            server_view_hide(wall->instances[id]->view);
+            server_view_hide(wall->instances[i]->view);
         }
     }
 }
