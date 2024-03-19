@@ -106,8 +106,8 @@ layout_wall(struct wall *wall) {
             ww_assert(element->data.instance >= 0 && element->data.instance < wall->num_instances);
 
             struct server_view *view = wall->instances[element->data.instance]->view;
-            server_view_set_dest_size(view, element->w, element->y);
-            server_view_set_position(view, element->x, element->h);
+            server_view_set_dest_size(view, element->w, element->h);
+            server_view_set_position(view, element->x, element->y);
             server_view_show(view);
             shown[element->data.instance] = true;
         }
