@@ -68,7 +68,7 @@ M.set_sensitivity = priv.set_sensitivity
 M.set_resolution = priv.set_resolution
 
 --- Gets the size of the waywall window.
--- This function will throw an error if the window is not open.
+-- This function will return (0, 0) if the window is not open.
 -- @return width The width of the window, in pixels
 -- @return height The height of the window, in pixels
 M.window_size = priv.window_size

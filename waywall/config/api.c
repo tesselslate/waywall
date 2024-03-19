@@ -240,11 +240,13 @@ l_window_size(lua_State *L) {
     struct wall *wall = get_wall(L);
 
     if (!wall->server->ui->mapped) {
-        return luaL_error(L, "window is not open");
+        lua_pushinteger(L, 0);
+        lua_pushinteger(L, 0);
+    } else {
+        lua_pushinteger(L, wall->server->ui->width);
+        lua_pushinteger(L, wall->server->ui->height);
     }
 
-    lua_pushinteger(L, wall->server->ui->width);
-    lua_pushinteger(L, wall->server->ui->height);
     return 2;
 }
 
