@@ -169,17 +169,13 @@ config_layout_request_death(struct config *cfg, struct wall *wall, int id) {
     if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call layout.death: '%s'", lua_tostring(cfg->L, -1));
 
-        lua_pop(cfg->L, 1);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
+        lua_settop(cfg->L, 0);
         return NULL;
     }
 
     struct config_layout *layout = unmarshal_layout(cfg, wall);
 
-    lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == 0);
-
+    lua_settop(cfg->L, 0);
     return layout;
 }
 
@@ -207,16 +203,13 @@ config_layout_request_manual(struct config *cfg, struct wall *wall) {
     if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call layout.manual: '%s'", lua_tostring(cfg->L, -1));
 
-        lua_pop(cfg->L, 3);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
+        lua_settop(cfg->L, 0);
         return NULL;
     }
 
     struct config_layout *layout = unmarshal_layout(cfg, wall);
 
     lua_settop(cfg->L, 0);
-
     return layout;
 }
 
@@ -237,17 +230,13 @@ config_layout_request_preview_percent(struct config *cfg, struct wall *wall, int
     if (lua_pcall(cfg->L, 2, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call layout.preview_percent: '%s'", lua_tostring(cfg->L, -1));
 
-        lua_pop(cfg->L, 1);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
+        lua_settop(cfg->L, 0);
         return NULL;
     }
 
     struct config_layout *layout = unmarshal_layout(cfg, wall);
 
-    lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == 0);
-
+    lua_settop(cfg->L, 0);
     return layout;
 }
 
@@ -267,17 +256,13 @@ config_layout_request_preview_start(struct config *cfg, struct wall *wall, int i
     if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call layout.preview_start: '%s'", lua_tostring(cfg->L, -1));
 
-        lua_pop(cfg->L, 1);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
+        lua_settop(cfg->L, 0);
         return NULL;
     }
 
     struct config_layout *layout = unmarshal_layout(cfg, wall);
 
-    lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == 0);
-
+    lua_settop(cfg->L, 0);
     return layout;
 }
 
@@ -298,17 +283,13 @@ config_layout_request_resize(struct config *cfg, struct wall *wall, int width, i
     if (lua_pcall(cfg->L, 2, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call layout.resize: '%s'", lua_tostring(cfg->L, -1));
 
-        lua_pop(cfg->L, 1);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
+        lua_settop(cfg->L, 0);
         return NULL;
     }
 
     struct config_layout *layout = unmarshal_layout(cfg, wall);
 
-    lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == 0);
-
+    lua_settop(cfg->L, 0);
     return layout;
 }
 
@@ -328,16 +309,12 @@ config_layout_request_spawn(struct config *cfg, struct wall *wall, int id) {
     if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call layout.spawn: '%s'", lua_tostring(cfg->L, -1));
 
-        lua_pop(cfg->L, 1);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
+        lua_settop(cfg->L, 0);
         return NULL;
     }
 
     struct config_layout *layout = unmarshal_layout(cfg, wall);
 
-    lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == 0);
-
+    lua_settop(cfg->L, 0);
     return layout;
 }
