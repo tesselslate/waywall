@@ -3,6 +3,7 @@
 #include "config/internal.h"
 #include "instance.h"
 #include "lua/api.h"
+#include "lua/helpers.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "util.h"
@@ -304,8 +305,20 @@ config_api_init(struct config *cfg) {
         goto fail_pcall;
     }
 
+    if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE,
+                        "__helpers") != 0) {
+        ww_log(LOG_ERROR, "failed to load internal api helpers chunk");
+        goto fail_loadbuffer_helpers;
+    }
+    if (lua_pcall(cfg->L, 0, 0, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to load API helpers: '%s'", lua_tostring(cfg->L, -1));
+        goto fail_pcall_helpers;
+    }
+
     return 0;
 
+fail_pcall_helpers:
+fail_loadbuffer_helpers:
 fail_pcall:
 fail_loadbuffer:
     return 1;
