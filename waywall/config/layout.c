@@ -1,4 +1,5 @@
 #include "config/layout.h"
+#include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
 #include "util.h"
@@ -159,6 +160,8 @@ config_layout_request_death(struct config *cfg, struct wall *wall, int id) {
         return NULL;
     }
 
+    config_api_set_wall(cfg, wall);
+
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
     lua_pushstring(cfg->L, "death");
@@ -184,6 +187,8 @@ config_layout_request_manual(struct config *cfg, struct wall *wall) {
     if (!cfg->layout.handle_manual) {
         return NULL;
     }
+
+    config_api_set_wall(cfg, wall);
 
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout_reason);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
@@ -219,6 +224,8 @@ config_layout_request_preview_percent(struct config *cfg, struct wall *wall, int
         return NULL;
     }
 
+    config_api_set_wall(cfg, wall);
+
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
     lua_pushstring(cfg->L, "preview_percent");
@@ -246,6 +253,8 @@ config_layout_request_preview_start(struct config *cfg, struct wall *wall, int i
         return NULL;
     }
 
+    config_api_set_wall(cfg, wall);
+
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
     lua_pushstring(cfg->L, "preview_start");
@@ -271,6 +280,8 @@ config_layout_request_resize(struct config *cfg, struct wall *wall, int width, i
     if (!cfg->layout.handle_resize) {
         return NULL;
     }
+
+    config_api_set_wall(cfg, wall);
 
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
@@ -298,6 +309,8 @@ config_layout_request_spawn(struct config *cfg, struct wall *wall, int id) {
     if (!cfg->layout.handle_spawn) {
         return NULL;
     }
+
+    config_api_set_wall(cfg, wall);
 
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
