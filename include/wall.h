@@ -23,10 +23,12 @@ struct wall {
     } active_res;
     int active_instance; // -1 on wall
 
-    uint32_t modifiers, group;
-    bool buttons[16];
-    bool pointer_locked;
-    double mx, my;
+    struct {
+        uint32_t modifiers;
+        bool buttons[16];
+        bool pointer_locked;
+        double mx, my;
+    } input;
 
     struct wl_listener on_pointer_lock;
     struct wl_listener on_pointer_unlock;

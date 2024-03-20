@@ -14,7 +14,7 @@
 #include <sys/inotify.h>
 #include <xkbcommon/xkbcommon.h>
 
-static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.buttons));
+static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.input.buttons));
 
 #define ON_WALL(w) ((w)->active_instance == -1)
 
@@ -27,8 +27,8 @@ get_hovered(struct wall *wall) {
     for (size_t i = 0; i < wall->layout->num_elements; i++) {
         struct config_layout_element *element = &wall->layout->elements[i];
         if (element->type == LAYOUT_ELEMENT_INSTANCE) {
-            bool x = element->x <= wall->mx && element->x + element->w >= wall->mx;
-            bool y = element->y <= wall->my && element->y + element->h >= wall->my;
+            bool x = element->x <= wall->input.mx && element->x + element->w >= wall->input.mx;
+            bool y = element->y <= wall->input.my && element->y + element->h >= wall->input.my;
             if (x && y) {
                 return element->data.instance;
             }
@@ -288,7 +288,7 @@ static void
 on_pointer_lock(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_pointer_lock);
     server_cursor_hide(wall->server->cursor);
-    wall->pointer_locked = true;
+    wall->input.pointer_locked = true;
 
     server_set_pointer_pos(wall->server, wall->server->ui->width / 2.0,
                            wall->server->ui->height / 2.0);
@@ -298,7 +298,7 @@ static void
 on_pointer_unlock(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_pointer_unlock);
     server_cursor_show(wall->server->cursor);
-    wall->pointer_locked = false;
+    wall->input.pointer_locked = false;
 }
 
 static void
@@ -313,7 +313,7 @@ on_resize(struct wl_listener *listener, void *data) {
         layout_active(wall);
     }
 
-    if (wall->pointer_locked) {
+    if (wall->input.pointer_locked) {
         server_set_pointer_pos(wall->server, wall->server->ui->width / 2.0,
                                wall->server->ui->height / 2.0);
     }
@@ -355,11 +355,11 @@ static bool
 on_button(void *data, uint32_t button, bool pressed) {
     struct wall *wall = data;
 
-    if (button - BTN_MOUSE >= STATIC_ARRLEN(wall->buttons)) {
+    if (button - BTN_MOUSE >= STATIC_ARRLEN(wall->input.buttons)) {
         return false;
     }
 
-    wall->buttons[button - BTN_MOUSE] = pressed;
+    wall->input.buttons[button - BTN_MOUSE] = pressed;
 
     if (!ON_WALL(wall)) {
         return false;
@@ -369,7 +369,7 @@ on_button(void *data, uint32_t button, bool pressed) {
         struct config_action action = {0};
         action.type = CONFIG_ACTION_BUTTON;
         action.data = button;
-        action.modifiers = wall->modifiers;
+        action.modifiers = wall->input.modifiers;
 
         return process_action(wall, action);
     } else {
@@ -385,7 +385,7 @@ on_key(void *data, xkb_keysym_t sym, bool pressed) {
         struct config_action action = {0};
         action.type = CONFIG_ACTION_KEY;
         action.data = sym;
-        action.modifiers = wall->modifiers;
+        action.modifiers = wall->input.modifiers;
 
         return process_action(wall, action);
     } else {
@@ -397,27 +397,26 @@ static void
 on_modifiers(void *data, uint32_t mods, uint32_t group) {
     struct wall *wall = data;
 
-    wall->modifiers = mods;
-    wall->group = group;
+    wall->input.modifiers = mods;
 }
 
 static void
 on_motion(void *data, double x, double y) {
     struct wall *wall = data;
 
-    wall->mx = x;
-    wall->my = y;
+    wall->input.mx = x;
+    wall->input.my = y;
 
     if (!ON_WALL(wall)) {
         return;
     }
 
-    for (size_t i = 0; i < STATIC_ARRLEN(wall->buttons); i++) {
-        if (wall->buttons[i]) {
+    for (size_t i = 0; i < STATIC_ARRLEN(wall->input.buttons); i++) {
+        if (wall->input.buttons[i]) {
             struct config_action action = {0};
             action.type = CONFIG_ACTION_BUTTON;
             action.data = i + BTN_MOUSE;
-            action.modifiers = wall->modifiers;
+            action.modifiers = wall->input.modifiers;
 
             process_action(wall, action);
         }
