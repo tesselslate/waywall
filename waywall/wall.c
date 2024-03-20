@@ -244,6 +244,8 @@ focus_wall(struct wall *wall) {
 
 static void
 remove_instance(struct wall *wall, int id) {
+    // TODO: This results in a warning log message.
+    inotify_unsubscribe(wall->inotify, wall->instances[id]->state_wd);
     instance_destroy(wall->instances[id]);
 
     memmove(&wall->instances[id], &wall->instances[id + 1],
