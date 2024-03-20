@@ -394,7 +394,7 @@ on_key(void *data, xkb_keysym_t sym, bool pressed) {
 }
 
 static void
-on_modifiers(void *data, uint32_t mods, uint32_t group) {
+on_modifiers(void *data, uint32_t mods) {
     struct wall *wall = data;
 
     wall->input.modifiers = mods;

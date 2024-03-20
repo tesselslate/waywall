@@ -65,7 +65,7 @@ struct server_seat {
 struct server_seat_listener {
     bool (*button)(void *data, uint32_t button, bool state);
     bool (*key)(void *data, uint32_t sym, bool state);
-    void (*modifiers)(void *data, uint32_t mods, uint32_t group);
+    void (*modifiers)(void *data, uint32_t mods);
     void (*motion)(void *data, double x, double y);
 };
 

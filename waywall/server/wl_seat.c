@@ -468,8 +468,6 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
 
         xkb_mod_mask_t xkb_mods =
             xkb_state_serialize_mods(seat->keyboard.remote_km.state, XKB_STATE_MODS_EFFECTIVE);
-        xkb_layout_index_t group =
-            xkb_state_serialize_layout(seat->keyboard.remote_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
 
         uint32_t mods = 0;
         for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mod_indices); i++) {
@@ -479,7 +477,7 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
             }
         }
 
-        seat->listener->modifiers(seat->listener_data, mods, group);
+        seat->listener->modifiers(seat->listener_data, mods);
     }
 }
 
