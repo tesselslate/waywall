@@ -246,7 +246,8 @@ static void
 remove_instance(struct wall *wall, int id) {
     instance_destroy(wall->instances[id]);
 
-    memmove(wall + id, wall + id + 1, sizeof(struct instance *) * (wall->num_instances - id - 1));
+    memmove(&wall->instances[id], &wall->instances[id + 1],
+            sizeof(struct instance *) * (wall->num_instances - id - 1));
     wall->num_instances--;
 
     if (wall->active_instance == id) {
