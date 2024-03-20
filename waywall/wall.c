@@ -217,8 +217,6 @@ add_instance(struct wall *wall, struct instance *instance) {
     int id = wall->num_instances;
     wall->instances[wall->num_instances++] = instance;
 
-#warning TODO stretch
-
     struct config_layout *layout = config_layout_request_spawn(wall->cfg, wall, id);
     change_layout(wall, layout);
 
@@ -566,19 +564,19 @@ wall_lua_return(struct wall *wall) {
 }
 
 int
-wall_lua_set_active_res(struct wall *wall, int32_t width, int32_t height) {
-    if (ON_WALL(wall)) {
-        return 1;
-    }
-
+wall_lua_set_res(struct wall *wall, int id, int32_t width, int32_t height) {
     if ((width == 0) != (height == 0)) {
         return 1;
     }
 
     // TODO: check against buffer transform
-    wall->active_res.w = width;
-    wall->active_res.h = height;
+    if (id == wall->active_instance) {
+        wall->active_res.w = width;
+        wall->active_res.h = height;
+        layout_active(wall);
+    } else {
+        server_view_set_size(wall->instances[id]->view, width, height);
+    }
 
-    layout_active(wall);
     return 0;
 }

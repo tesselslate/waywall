@@ -212,12 +212,14 @@ l_reset(lua_State *L) {
 static int
 l_set_resolution(lua_State *L) {
     struct wall *wall = get_wall(L);
-    int32_t width = luaL_checkint(L, 1);
-    int32_t height = luaL_checkint(L, 2);
+    int id = luaL_checkint(L, 1);
+    int32_t width = luaL_checkint(L, 2);
+    int32_t height = luaL_checkint(L, 3);
+    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
     luaL_argcheck(L, width >= 0, 1, "width must be non-negative");
     luaL_argcheck(L, height >= 0, 1, "height must be non-negative");
 
-    bool ok = wall_lua_set_active_res(wall, width, height) == 0;
+    bool ok = wall_lua_set_res(wall, id - 1, width, height) == 0;
     if (!ok) {
         return luaL_error(L, "cannot set resolution");
     }
