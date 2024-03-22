@@ -48,12 +48,12 @@ layout_active(struct wall *wall) {
         ww_assert(wall->active_res.h == 0);
 
         server_view_set_position(view, 0, 0);
-        server_view_set_dest_size(view, wall->server->ui->width, wall->server->ui->height);
-        server_view_set_size(view, wall->server->ui->width, wall->server->ui->height);
+        server_view_set_dest_size(view, wall->width, wall->height);
+        server_view_set_size(view, wall->width, wall->height);
         server_view_unset_crop(view);
     } else {
-        int32_t x = (wall->server->ui->width / 2) - (wall->active_res.w / 2);
-        int32_t y = (wall->server->ui->height / 2) - (wall->active_res.h / 2);
+        int32_t x = (wall->width / 2) - (wall->active_res.w / 2);
+        int32_t y = (wall->height / 2) - (wall->active_res.h / 2);
 
         if (x >= 0 && y >= 0) {
             server_view_set_position(view, x, y);
@@ -63,8 +63,8 @@ layout_active(struct wall *wall) {
         } else {
             // Negative X or Y coordinates mean that the provided resolution is greater than the
             // size of the waywall window. In this case, we need to crop the view.
-            int32_t w = (x >= 0) ? wall->active_res.w : wall->server->ui->width;
-            int32_t h = (y >= 0) ? wall->active_res.h : wall->server->ui->height;
+            int32_t w = (x >= 0) ? wall->active_res.w : wall->width;
+            int32_t h = (y >= 0) ? wall->active_res.h : wall->height;
 
             int32_t crop_x = (wall->active_res.w / 2) - (w / 2);
             int32_t crop_y = (wall->active_res.h / 2) - (h / 2);
@@ -270,10 +270,8 @@ play_instance(struct wall *wall, int id) {
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
     server_view_set_position(wall->instances[id]->view, 0, 0);
-    server_view_set_dest_size(wall->instances[id]->view, wall->server->ui->width,
-                              wall->server->ui->height);
-    server_view_set_size(wall->instances[id]->view, wall->server->ui->width,
-                         wall->server->ui->height);
+    server_view_set_dest_size(wall->instances[id]->view, wall->width, wall->height);
+    server_view_set_size(wall->instances[id]->view, wall->width, wall->height);
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (i == id) {
@@ -290,8 +288,7 @@ on_pointer_lock(struct wl_listener *listener, void *data) {
     server_cursor_hide(wall->server->cursor);
     wall->input.pointer_locked = true;
 
-    server_set_pointer_pos(wall->server, wall->server->ui->width / 2.0,
-                           wall->server->ui->height / 2.0);
+    server_set_pointer_pos(wall->server, wall->width / 2.0, wall->height / 2.0);
 }
 
 static void
@@ -305,17 +302,26 @@ static void
 on_resize(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_resize);
 
+    int32_t new_width = wall->server->ui->width;
+    int32_t new_height = wall->server->ui->height;
+
+    if (new_width == wall->width && new_height == wall->height) {
+        return;
+    }
+
+    wall->width = new_width;
+    wall->height = new_height;
+
     if (ON_WALL(wall)) {
-        struct config_layout *layout = config_layout_request_resize(
-            wall->cfg, wall, wall->server->ui->width, wall->server->ui->height);
+        struct config_layout *layout =
+            config_layout_request_resize(wall->cfg, wall, wall->width, wall->height);
         change_layout(wall, layout);
     } else {
         layout_active(wall);
     }
 
     if (wall->input.pointer_locked) {
-        server_set_pointer_pos(wall->server, wall->server->ui->width / 2.0,
-                               wall->server->ui->height / 2.0);
+        server_set_pointer_pos(wall->server, wall->width / 2.0, wall->height / 2.0);
     }
 }
 

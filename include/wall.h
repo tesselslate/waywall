@@ -18,6 +18,7 @@ struct wall {
 
     struct config_layout *layout;
     int last_hovered;
+    int32_t width, height;
 
     struct {
         int32_t w, h;

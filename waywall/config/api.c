@@ -246,8 +246,8 @@ l_window_size(lua_State *L) {
         lua_pushinteger(L, 0);
         lua_pushinteger(L, 0);
     } else {
-        lua_pushinteger(L, wall->server->ui->width);
-        lua_pushinteger(L, wall->server->ui->height);
+        lua_pushinteger(L, wall->width);
+        lua_pushinteger(L, wall->height);
     }
 
     return 2;
