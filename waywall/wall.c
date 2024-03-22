@@ -371,6 +371,7 @@ on_button(void *data, uint32_t button, bool pressed) {
         action.data = button;
         action.modifiers = wall->input.modifiers;
 
+        wall->last_hovered = get_hovered(wall);
         return process_action(wall, action);
     } else {
         return false;
@@ -410,6 +411,12 @@ on_motion(void *data, double x, double y) {
     if (!ON_WALL(wall)) {
         return;
     }
+
+    int hovered = get_hovered(wall);
+    if (hovered == wall->last_hovered) {
+        return;
+    }
+    wall->last_hovered = hovered;
 
     for (size_t i = 0; i < STATIC_ARRLEN(wall->input.buttons); i++) {
         if (wall->input.buttons[i]) {

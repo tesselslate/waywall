@@ -17,6 +17,7 @@ struct wall {
     ssize_t num_instances;
 
     struct config_layout *layout;
+    int last_hovered;
 
     struct {
         int32_t w, h;
