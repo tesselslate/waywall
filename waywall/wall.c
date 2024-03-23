@@ -105,6 +105,13 @@ layout_wall(struct wall *wall) {
         case LAYOUT_ELEMENT_INSTANCE:
             ww_assert(element->data.instance >= 0 && element->data.instance < wall->num_instances);
 
+            if ((element->x + element->w > wall->width) ||
+                (element->y + element->h > wall->height)) {
+                ww_log(LOG_WARN, "layout element (instance %d) extends out of window bounds",
+                       element->data.instance);
+                continue;
+            }
+
             struct server_view *view = wall->instances[element->data.instance]->view;
             server_view_set_dest_size(view, element->w, element->h);
             server_view_set_position(view, element->x, element->y);

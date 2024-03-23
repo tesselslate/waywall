@@ -86,9 +86,15 @@ unmarshal_layout_element(struct config *cfg, struct wall *wall,
     if (get_int32(cfg->L, "x", &elem->x) != 0) {
         return 1;
     }
+    if (elem->x < 0) {
+        return luaL_error(cfg->L, "x of element must be greater than or equal to zero");
+    }
 
     if (get_int32(cfg->L, "y", &elem->y) != 0) {
         return 1;
+    }
+    if (elem->y < 0) {
+        return luaL_error(cfg->L, "y of element must be greater than or equal to zero");
     }
 
     if (get_int32(cfg->L, "w", &elem->w) != 0) {
