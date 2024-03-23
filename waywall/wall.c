@@ -98,6 +98,11 @@ layout_wall(struct wall *wall) {
         return;
     }
 
+    struct transaction *txn = transaction_create();
+    if (!txn) {
+        return;
+    }
+
     bool shown[MAX_INSTANCES] = {0};
     for (size_t i = 0; i < wall->layout->num_elements; i++) {
         struct config_layout_element *element = &wall->layout->elements[i];
@@ -113,18 +118,24 @@ layout_wall(struct wall *wall) {
             }
 
             struct server_view *view = wall->instances[element->data.instance]->view;
-            server_view_set_dest_size(view, element->w, element->h);
-            server_view_set_position(view, element->x, element->y);
-            server_view_show(view);
+            transaction_set_dest_size(txn, view, element->w, element->h);
+            transaction_set_position(txn, view, element->x, element->y);
+            transaction_set_visible(txn, view, true);
             shown[element->data.instance] = true;
         }
     }
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (!shown[i]) {
-            server_view_hide(wall->instances[i]->view);
+            // TODO: O(n^2) due to the implementation of get_txn_view
+            transaction_set_visible(txn, wall->instances[i]->view, false);
         }
     }
+
+    if (transaction_apply(wall->server->ui, txn) != 0) {
+        ww_log(LOG_ERROR, "failed to commit layout transaction");
+    }
+    transaction_destroy(txn);
 }
 
 static void
