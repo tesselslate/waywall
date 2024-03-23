@@ -19,7 +19,7 @@ struct server_ui {
     int32_t width, height;
     bool mapped;
 
-    struct wl_list views;
+    struct wl_list views; // server_view.link
 
     struct {
         struct wl_signal resize;       // data: NULL
@@ -55,6 +55,29 @@ struct server_view_impl {
     void (*set_size)(struct wl_resource *impl_resource, uint32_t width, uint32_t height);
 };
 
+struct transaction {
+    struct wl_list views; // transaction_view.link
+
+    // Optimization detail: store the last accessed view for use in get_txn_view
+    struct transaction_view *last_accessed;
+    bool failed;
+};
+
+struct transaction_view {
+    struct wl_list link; // transaction.views
+    struct server_view *view;
+
+    uint32_t x, y, width, height, dest_width, dest_height;
+    bool visible;
+
+    enum transaction_view_state {
+        TXN_VIEW_DEST_SIZE = (1 << 0),
+        TXN_VIEW_POS = (1 << 1),
+        TXN_VIEW_SIZE = (1 << 2),
+        TXN_VIEW_VISIBLE = (1 << 3),
+    } apply;
+};
+
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
@@ -75,5 +98,16 @@ struct server_view *server_view_create(struct server_ui *ui, struct server_surfa
                                        const struct server_view_impl *impl,
                                        struct wl_resource *impl_resource);
 void server_view_destroy(struct server_view *view);
+
+int transaction_apply(struct server_ui *ui, struct transaction *txn);
+struct transaction *transaction_create();
+void transaction_destroy(struct transaction *txn);
+void transaction_set_dest_size(struct transaction *txn, struct server_view *view, uint32_t width,
+                               uint32_t height);
+void transaction_set_position(struct transaction *txn, struct server_view *view, uint32_t x,
+                              uint32_t y);
+void transaction_set_size(struct transaction *txn, struct server_view *view, uint32_t width,
+                          uint32_t height);
+void transaction_set_visible(struct transaction *txn, struct server_view *view, bool visible);
 
 #endif
