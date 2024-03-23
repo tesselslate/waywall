@@ -382,6 +382,12 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
     wl_list_for_each (txn_view, &txn->views, link) {
         struct server_view *view = txn_view->view;
 
+        if (txn_view->apply & TXN_VIEW_CROP) {
+            wp_viewport_set_source(view->viewport, wl_fixed_from_int(txn_view->crop.x),
+                                   wl_fixed_from_int(txn_view->crop.y),
+                                   wl_fixed_from_int(txn_view->crop.width),
+                                   wl_fixed_from_int(txn_view->crop.height));
+        }
         if (txn_view->apply & TXN_VIEW_DEST_SIZE) {
             wp_viewport_set_destination(view->viewport, txn_view->dest_width,
                                         txn_view->dest_height);
@@ -395,7 +401,7 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
             view->y = txn_view->y;
         }
         if (txn_view->apply & TXN_VIEW_SIZE) {
-            server_view_set_size(view, txn_view->width, txn_view->height);
+            view->impl->set_size(view->impl_resource, txn_view->width, txn_view->height);
         }
         if (txn_view->apply & TXN_VIEW_VISIBLE) {
             txn_apply_visible(txn_view, view, ui);
@@ -430,6 +436,22 @@ transaction_destroy(struct transaction *txn) {
     }
 
     free(txn);
+}
+
+void
+transaction_set_crop(struct transaction *txn, struct server_view *view, uint32_t x, uint32_t y,
+                     uint32_t width, uint32_t height) {
+    struct transaction_view *txn_view = get_txn_view(txn, view);
+    if (!txn_view) {
+        txn->failed = true;
+        return;
+    }
+
+    txn_view->crop.x = x;
+    txn_view->crop.y = y;
+    txn_view->crop.width = width;
+    txn_view->crop.height = height;
+    txn_view->apply |= TXN_VIEW_CROP;
 }
 
 void

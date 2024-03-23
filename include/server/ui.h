@@ -68,13 +68,17 @@ struct transaction_view {
     struct server_view *view;
 
     uint32_t x, y, width, height, dest_width, dest_height;
+    struct {
+        uint32_t x, y, width, height;
+    } crop;
     bool visible;
 
     enum transaction_view_state {
-        TXN_VIEW_DEST_SIZE = (1 << 0),
-        TXN_VIEW_POS = (1 << 1),
-        TXN_VIEW_SIZE = (1 << 2),
-        TXN_VIEW_VISIBLE = (1 << 3),
+        TXN_VIEW_CROP = (1 << 0),
+        TXN_VIEW_DEST_SIZE = (1 << 1),
+        TXN_VIEW_POS = (1 << 2),
+        TXN_VIEW_SIZE = (1 << 3),
+        TXN_VIEW_VISIBLE = (1 << 4),
     } apply;
 };
 
@@ -102,6 +106,7 @@ void server_view_destroy(struct server_view *view);
 int transaction_apply(struct server_ui *ui, struct transaction *txn);
 struct transaction *transaction_create();
 void transaction_destroy(struct transaction *txn);
+void transaction_set_crop(struct transaction *txn, struct server_view *view, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 void transaction_set_dest_size(struct transaction *txn, struct server_view *view, uint32_t width,
                                uint32_t height);
 void transaction_set_position(struct transaction *txn, struct server_view *view, uint32_t x,
