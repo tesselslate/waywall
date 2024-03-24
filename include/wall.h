@@ -12,6 +12,7 @@ struct wall {
     struct inotify *inotify;
 
     struct counter *counter;
+    struct cpu_manager *cpu;
 
     struct instance *instances[MAX_INSTANCES];
     ssize_t num_instances;

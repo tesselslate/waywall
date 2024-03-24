@@ -3,6 +3,8 @@
 #include "config/config.h"
 #include "config/layout.h"
 #include "counter.h"
+#include "cpu/cgroup.h"
+#include "cpu/cpu.h"
 #include "inotify.h"
 #include "instance.h"
 #include "server/cursor.h"
@@ -231,6 +233,9 @@ process_state_update(int wd, uint32_t mask, void *data) {
     int percent = (screen == SCREEN_PREVIEWING) ? wall->instances[id]->state.data.percent : -1;
 
     instance_state_update(wall->instances[id]);
+    if (wall->cpu) {
+        cpu_update(wall->cpu, id, wall->instances[id]);
+    }
 
     if (screen != SCREEN_PREVIEWING && wall->instances[id]->state.screen == SCREEN_PREVIEWING) {
         struct config_layout *layout = config_layout_request_preview_start(wall->cfg, wall, id);
@@ -281,6 +286,10 @@ focus_wall(struct wall *wall) {
     wall->active_instance = -1;
     server_set_input_focus(wall->server, NULL);
 
+    if (wall->cpu) {
+        cpu_set_active(wall->cpu, -1);
+    }
+
     layout_wall(wall);
 }
 
@@ -289,6 +298,13 @@ remove_instance(struct wall *wall, int id) {
     // TODO: This results in a warning log message.
     inotify_unsubscribe(wall->inotify, wall->instances[id]->state_wd);
     instance_destroy(wall->instances[id]);
+
+    if (wall->cpu) {
+        if (wall->active_instance == id) {
+            cpu_set_active(wall->cpu, -1);
+        }
+        cpu_notify_death(wall->cpu, id);
+    }
 
     memmove(&wall->instances[id], &wall->instances[id + 1],
             sizeof(struct instance *) * (wall->num_instances - id - 1));
@@ -309,6 +325,10 @@ remove_instance(struct wall *wall, int id) {
 static void
 play_instance(struct wall *wall, int id) {
     wall->active_instance = id;
+
+    if (wall->cpu) {
+        cpu_set_active(wall->cpu, id);
+    }
 
     instance_unpause(wall->instances[id]);
     server_set_input_focus(wall->server, wall->instances[id]->view);
@@ -524,9 +544,16 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
         wall->counter = counter_create(cfg->general.counter_path);
         if (!wall->counter) {
             ww_log(LOG_ERROR, "failed to create reset counter");
-            free(wall);
-            return NULL;
+            goto fail_counter;
         }
+    }
+
+    // TODO: configurable weights
+    wall->cpu = cpu_manager_create_cgroup(
+        (struct cpu_cgroup_weights){.idle = 1, .low = 2, .high = 20, .active = 100});
+    if (!wall->cpu) {
+        ww_log(LOG_ERROR, "failed to create cpu manager");
+        goto fail_cpu;
     }
 
     wall->active_instance = -1;
@@ -549,6 +576,15 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     server_seat_set_listener(server->seat, &seat_listener, wall);
 
     return wall;
+
+fail_cpu:
+    if (wall->counter) {
+        counter_destroy(wall->counter);
+    }
+
+fail_counter:
+    free(wall);
+    return NULL;
 }
 
 void
@@ -565,6 +601,10 @@ wall_destroy(struct wall *wall) {
 
     if (wall->counter) {
         counter_destroy(wall->counter);
+    }
+
+    if (wall->cpu) {
+        cpu_destroy(wall->cpu);
     }
 
     wl_list_remove(&wall->on_pointer_lock.link);
