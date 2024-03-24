@@ -19,9 +19,12 @@ enum group {
 struct cpu_cgroup {
     struct cpu_manager manager;
 
+    struct {
+        int preview_threshold;
+    } config;
+
     int fds[4];
     int last_active;
-
     struct {
         enum group group;
         pid_t pid;
@@ -90,7 +93,7 @@ cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance
 
     cpu->instances[id].pid = instance->pid;
 
-    // TODO: instance priority (lock), world preview threshold
+    // TODO: instance priority (lock)
 
     enum group group = G_NONE;
     switch (instance->state.screen) {
@@ -100,7 +103,7 @@ cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance
         group = G_HIGH;
         break;
     case SCREEN_PREVIEWING:
-        group = G_HIGH;
+        group = (instance->state.data.percent < cpu->config.preview_threshold) ? G_HIGH : G_LOW;
         break;
     case SCREEN_INWORLD:
         group = (cpu->last_active == id) ? G_ACTIVE : G_IDLE;
@@ -156,7 +159,7 @@ set_group_weight(const char *base, const char *group, int weight) {
 }
 
 struct cpu_manager *
-cpu_manager_create_cgroup(struct cpu_cgroup_weights weights) {
+cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_threshold) {
     // TODO: Non-systemd support
     char *cgroup_base = cgroup_get_base_systemd();
     if (!cgroup_base) {
@@ -185,6 +188,8 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights) {
         ww_log(LOG_ERROR, "failed to allocate cpu_cgroup");
         goto fail_cpu;
     }
+
+    cpu->config.preview_threshold = preview_threshold;
 
     static const char *names[] = {"idle", "low", "high", "active"};
     static_assert(STATIC_ARRLEN(names) == STATIC_ARRLEN(cpu->fds));

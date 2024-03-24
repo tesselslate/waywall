@@ -10,6 +10,7 @@ struct cpu_cgroup_weights {
     int active;
 };
 
-struct cpu_manager *cpu_manager_create_cgroup(struct cpu_cgroup_weights weights);
+struct cpu_manager *cpu_manager_create_cgroup(struct cpu_cgroup_weights weights,
+                                              int preview_threshold);
 
 #endif
