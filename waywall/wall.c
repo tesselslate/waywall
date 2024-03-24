@@ -109,6 +109,37 @@ layout_active(struct wall *wall) {
 }
 
 static void
+destroy_rectangles(struct wall *wall) {
+    for (ssize_t i = 0; i < wall->layout_rectangles.len; i++) {
+        ui_rectangle_destroy(wall->layout_rectangles.data[i]);
+        wall->layout_rectangles.data[i] = NULL;
+    }
+
+    wall->layout_rectangles.len = 0;
+}
+
+static int
+add_rectangle(struct wall *wall, struct ui_rectangle *rect) {
+    if (wall->layout_rectangles.cap == wall->layout_rectangles.len) {
+        ww_assert(wall->layout_rectangles.cap < SSIZE_MAX / 2);
+
+        ssize_t cap = wall->layout_rectangles.cap * 2;
+        void *data =
+            realloc(wall->layout_rectangles.data, cap * sizeof(*wall->layout_rectangles.data));
+        if (!data) {
+            ww_log(LOG_ERROR, "failed to reallocate layout rectangles");
+            return 1;
+        }
+
+        wall->layout_rectangles.data = data;
+        wall->layout_rectangles.cap = cap;
+    }
+
+    wall->layout_rectangles.data[wall->layout_rectangles.len++] = rect;
+    return 0;
+}
+
+static void
 layout_wall(struct wall *wall) {
     ww_assert(ON_WALL(wall));
 
@@ -122,18 +153,23 @@ layout_wall(struct wall *wall) {
         return;
     }
 
+    destroy_rectangles(wall);
+
     // Used for Z ordering.
     struct wl_surface *previous = wall->server->ui->surface;
 
     bool shown[MAX_INSTANCES] = {0};
     for (size_t i = 0; i < wall->layout->num_elements; i++) {
         struct config_layout_element *element = &wall->layout->elements[i];
+
+        bool valid_bounds =
+            (element->x + element->w <= wall->width) && (element->y + element->h <= wall->height);
+
         switch (element->type) {
         case LAYOUT_ELEMENT_INSTANCE:
             ww_assert(element->data.instance >= 0 && element->data.instance < wall->num_instances);
 
-            if ((element->x + element->w > wall->width) ||
-                (element->y + element->h > wall->height)) {
+            if (!valid_bounds) {
                 ww_log(LOG_WARN, "layout element (instance %d) extends out of window bounds",
                        element->data.instance);
                 continue;
@@ -154,6 +190,27 @@ layout_wall(struct wall *wall) {
             shown[element->data.instance] = true;
 
             previous = view->view->surface->remote;
+            break;
+        case LAYOUT_ELEMENT_RECTANGLE:
+            if (!valid_bounds) {
+                ww_log(LOG_WARN, "layout element (rectangle) extends out of window bounds");
+                continue;
+            }
+
+            struct ui_rectangle *rect =
+                ui_rectangle_create(wall->server->ui, element->x, element->y, element->w,
+                                    element->h, element->data.rectangle);
+            if (!rect) {
+                transaction_destroy(txn);
+                return;
+            }
+
+            ui_rectangle_set_visible(rect, true);
+            if (add_rectangle(wall, rect) != 0) {
+                transaction_destroy(txn);
+                return;
+            }
+            break;
         }
     }
 
@@ -566,6 +623,14 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
         goto fail_cpu;
     }
 
+    wall->layout_rectangles.data = calloc(8, sizeof(*wall->layout_rectangles.data));
+    if (!wall->layout_rectangles.data) {
+        ww_log(LOG_ERROR, "failed to allocate layout rectangles");
+        goto fail_rectangles;
+    }
+    wall->layout_rectangles.len = 0;
+    wall->layout_rectangles.cap = 8;
+
     wall->active_instance = -1;
 
     wall->on_pointer_lock.notify = on_pointer_lock;
@@ -587,6 +652,9 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
 
     return wall;
 
+fail_rectangles:
+    cpu_destroy(wall->cpu);
+
 fail_cpu:
     if (wall->counter) {
         counter_destroy(wall->counter);
@@ -607,6 +675,10 @@ wall_destroy(struct wall *wall) {
 
     if (wall->layout) {
         config_layout_destroy(wall->layout);
+    }
+    if (wall->layout_rectangles.data) {
+        destroy_rectangles(wall);
+        free(wall->layout_rectangles.data);
     }
 
     if (wall->counter) {

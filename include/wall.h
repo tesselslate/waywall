@@ -18,6 +18,10 @@ struct wall {
     ssize_t num_instances;
 
     struct config_layout *layout;
+    struct {
+        struct ui_rectangle **data;
+        ssize_t len, cap;
+    } layout_rectangles;
     int last_hovered;
     int32_t width, height;
 

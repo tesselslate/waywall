@@ -50,6 +50,8 @@ unmarshal_layout_element(struct config *cfg, struct wall *wall,
         const char *type = lua_tostring(cfg->L, -1);
         if (strcmp(type, "instance") == 0) {
             elem->type = LAYOUT_ELEMENT_INSTANCE;
+        } else if (strcmp(type, "rectangle") == 0) {
+            elem->type = LAYOUT_ELEMENT_RECTANGLE;
         } else {
             ww_log(LOG_ERROR, "received layout element of unknown type '%s'", type);
             return 1;
@@ -79,6 +81,21 @@ unmarshal_layout_element(struct config *cfg, struct wall *wall,
                    luaL_typename(cfg->L, -1));
             return 1;
         }
+        break;
+    case LAYOUT_ELEMENT_RECTANGLE:
+        if (lua_type(cfg->L, -1) == LUA_TSTRING) {
+            const char *raw_rgba = lua_tostring(cfg->L, -1);
+            if (config_parse_hex(elem->data.rectangle, raw_rgba) != 0) {
+                ww_log(LOG_ERROR, "layout element contains invalid hex color '%s'", raw_rgba);
+                return 1;
+            }
+        } else {
+            ww_log(LOG_ERROR,
+                   "expected key '2' of rectangle layout element to be of type 'string', got '%s'",
+                   luaL_typename(cfg->L, -1));
+            return 1;
+        }
+        break;
     }
     lua_pop(cfg->L, 1);
 

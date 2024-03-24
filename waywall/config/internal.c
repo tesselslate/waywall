@@ -1,7 +1,9 @@
 #include "config/internal.h"
 #include <luajit-2.1/lauxlib.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 
 const struct config_registry_keys config_registry_keys = {0};
 
@@ -40,4 +42,34 @@ config_encode_bind(char buf[static BIND_BUFLEN], struct config_action action) {
     for (size_t i = 0; i < 16; i++) {
         buf[i + 1] = "0123456789abcdef"[(data >> (i * 4)) & 0xF];
     }
+}
+
+int
+config_parse_hex(uint8_t rgba[static 4], const char *raw) {
+    ssize_t len = strlen(raw);
+    bool maybe_valid_rgb = (len == 6) || (len == 7 && raw[0] == '#');
+    bool maybe_valid_rgba = (len == 8) || (len == 9 && raw[0] == '#');
+    if (!maybe_valid_rgb && !maybe_valid_rgba) {
+        return 1;
+    }
+
+    unsigned int r = 0, g = 0, b = 0, a = 255;
+    if (maybe_valid_rgb) {
+        ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x", &r, &g, &b);
+        if (n != 3) {
+            return 1;
+        }
+    } else {
+        ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x%02x", &r, &g, &b, &a);
+        if (n != 4) {
+            return 1;
+        }
+    }
+
+    rgba[0] = r;
+    rgba[1] = g;
+    rgba[2] = b;
+    rgba[3] = a;
+
+    return 0;
 }

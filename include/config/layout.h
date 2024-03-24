@@ -15,9 +15,11 @@ struct config_layout {
 struct config_layout_element {
     enum {
         LAYOUT_ELEMENT_INSTANCE,
+        LAYOUT_ELEMENT_RECTANGLE,
     } type;
     union {
         int instance;
+        uint8_t rectangle[4];
     } data;
 
     int32_t x, y, w, h;

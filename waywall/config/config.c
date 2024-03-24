@@ -217,40 +217,6 @@ get_table(struct config *cfg, const char *key, int (*func)(struct config *), con
 }
 
 static int
-parse_theme_background(struct config *cfg, const char *raw) {
-    ssize_t len = strlen(raw);
-    bool maybe_valid_rgb = (len == 6) || (len == 7 && raw[0] == '#');
-    bool maybe_valid_rgba = (len == 8) || (len == 9 && raw[0] == '#');
-    if (!maybe_valid_rgb && !maybe_valid_rgba) {
-        goto fail;
-    }
-
-    unsigned int r = 0, g = 0, b = 0, a = 255;
-    if (maybe_valid_rgb) {
-        ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x", &r, &g, &b);
-        if (n != 3) {
-            goto fail;
-        }
-    } else {
-        ssize_t n = sscanf(raw[0] == '#' ? raw + 1 : raw, "%02x%02x%02x%02x", &r, &g, &b, &a);
-        if (n != 4) {
-            goto fail;
-        }
-    }
-
-    cfg->theme.background[0] = r;
-    cfg->theme.background[1] = g;
-    cfg->theme.background[2] = b;
-    cfg->theme.background[3] = a;
-
-    return 0;
-
-fail:
-    ww_log(LOG_ERROR, "expected 'theme.background' to have a valid hex color, got '%s'", raw);
-    return 1;
-}
-
-static int
 parse_bind(const char *orig, struct config_action *action) {
     char *bind = strdup(orig);
     if (!bind) {
@@ -556,7 +522,9 @@ process_config_theme(struct config *cfg) {
         return 1;
     }
     if (raw_background) {
-        if (parse_theme_background(cfg, raw_background) != 0) {
+        if (config_parse_hex(cfg->theme.background, raw_background) != 0) {
+            ww_log(LOG_ERROR, "expected 'theme.background' to have a valid hex color, got '%s'",
+                   raw_background);
             free(raw_background);
             return 1;
         }
