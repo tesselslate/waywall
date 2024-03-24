@@ -28,6 +28,7 @@ struct cpu_cgroup {
     struct {
         enum group group;
         pid_t pid;
+        bool priority; // TODO: this wastes a ton of space with padding
     } instances[MAX_INSTANCES];
 };
 
@@ -88,12 +89,20 @@ cpu_cgroup_set_active(struct cpu_manager *manager, int id) {
 }
 
 static void
+cpu_cgroup_set_priority(struct cpu_manager *manager, int id, bool priority) {
+    struct cpu_cgroup *cpu = (struct cpu_cgroup *)manager;
+
+    cpu->instances[id].priority = priority;
+    if (priority && cpu->instances[id].group < G_HIGH) {
+        set_group(cpu, id, G_HIGH);
+    }
+}
+
+static void
 cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance) {
     struct cpu_cgroup *cpu = (struct cpu_cgroup *)manager;
 
     cpu->instances[id].pid = instance->pid;
-
-    // TODO: instance priority (lock)
 
     enum group group = G_NONE;
     switch (instance->state.screen) {
@@ -103,7 +112,11 @@ cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance
         group = G_HIGH;
         break;
     case SCREEN_PREVIEWING:
-        group = (instance->state.data.percent < cpu->config.preview_threshold) ? G_HIGH : G_LOW;
+        if (cpu->instances[id].priority) {
+            group = G_HIGH;
+        } else {
+            group = (instance->state.data.percent < cpu->config.preview_threshold) ? G_HIGH : G_LOW;
+        }
         break;
     case SCREEN_INWORLD:
         group = (cpu->last_active == id) ? G_ACTIVE : G_IDLE;
@@ -210,6 +223,7 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_thresho
     cpu->manager.destroy = cpu_cgroup_destroy;
     cpu->manager.death = cpu_cgroup_death;
     cpu->manager.set_active = cpu_cgroup_set_active;
+    cpu->manager.set_priority = cpu_cgroup_set_priority;
     cpu->manager.update = cpu_cgroup_update;
 
     free(cgroup_base);

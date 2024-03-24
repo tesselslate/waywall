@@ -1,6 +1,8 @@
 #ifndef WAYWALL_CPU_CPU_H
 #define WAYWALL_CPU_CPU_H
 
+#include <stdbool.h>
+
 struct instance;
 
 struct cpu_manager {
@@ -8,6 +10,7 @@ struct cpu_manager {
 
     void (*death)(struct cpu_manager *cpu, int id);
     void (*set_active)(struct cpu_manager *cpu, int id);
+    void (*set_priority)(struct cpu_manager *cpu, int id, bool priority);
     void (*update)(struct cpu_manager *cpu, int id, struct instance *instance);
 };
 
@@ -24,6 +27,11 @@ cpu_notify_death(struct cpu_manager *cpu, int id) {
 static inline void
 cpu_set_active(struct cpu_manager *cpu, int id) {
     cpu->set_active(cpu, id);
+}
+
+static inline void
+cpu_set_priority(struct cpu_manager *cpu, int id, bool priority) {
+    cpu->set_priority(cpu, id, priority);
 }
 
 static inline void
