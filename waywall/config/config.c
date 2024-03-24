@@ -18,6 +18,14 @@ static const struct config defaults = {
         {
             .counter_path = "",
         },
+    .cpu =
+        {
+            .weight_idle = 1,
+            .weight_low = 2,
+            .weight_high = 20,
+            .weight_active = 100,
+            .preview_threshold = 30,
+        },
     .input =
         {
             .keymap =
@@ -385,6 +393,55 @@ process_config_actions(struct config *cfg) {
 }
 
 static int
+process_config_cpu(struct config *cfg) {
+    // This is completely arbitrary.
+    static const int WEIGHT_MAX = 100000;
+
+    if (get_int(cfg, "weight_idle", &cfg->cpu.weight_idle, "cpu.weight_idle", false) != 0) {
+        return 1;
+    }
+    if (cfg->cpu.weight_idle < 1 || cfg->cpu.weight_idle > WEIGHT_MAX) {
+        ww_log(LOG_ERROR, "'cpu.weight_idle' must be between 1 and %d", WEIGHT_MAX);
+        return 1;
+    }
+
+    if (get_int(cfg, "weight_low", &cfg->cpu.weight_low, "cpu.weight_low", false) != 0) {
+        return 1;
+    }
+    if (cfg->cpu.weight_low < 1 || cfg->cpu.weight_low > WEIGHT_MAX) {
+        ww_log(LOG_ERROR, "'cpu.weight_low' must be between 1 and %d", WEIGHT_MAX);
+        return 1;
+    }
+
+    if (get_int(cfg, "weight_high", &cfg->cpu.weight_high, "cpu.weight_high", false) != 0) {
+        return 1;
+    }
+    if (cfg->cpu.weight_high < 1 || cfg->cpu.weight_high > WEIGHT_MAX) {
+        ww_log(LOG_ERROR, "'cpu.weight_high' must be between 1 and %d", WEIGHT_MAX);
+        return 1;
+    }
+
+    if (get_int(cfg, "weight_active", &cfg->cpu.weight_active, "cpu.weight_active", false) != 0) {
+        return 1;
+    }
+    if (cfg->cpu.weight_active < 1 || cfg->cpu.weight_active > WEIGHT_MAX) {
+        ww_log(LOG_ERROR, "'cpu.weight_active' must be between 1 and %d", WEIGHT_MAX);
+        return 1;
+    }
+
+    if (get_int(cfg, "preview_threshold", &cfg->cpu.preview_threshold, "cpu.preview_threshold",
+                false) != 0) {
+        return 1;
+    }
+    if (cfg->cpu.preview_threshold < 0 || cfg->cpu.preview_threshold > 100) {
+        ww_log(LOG_ERROR, "'cpu.preview_threshold' must be between 0 and 100");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 process_config_general(struct config *cfg) {
     if (get_string(cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
                    false) != 0) {
@@ -529,6 +586,10 @@ process_config_theme(struct config *cfg) {
 static int
 process_config(struct config *cfg) {
     if (get_table(cfg, "actions", process_config_actions, "actions", false) != 0) {
+        return 1;
+    }
+
+    if (get_table(cfg, "cpu", process_config_cpu, "cpu", false) != 0) {
         return 1;
     }
 

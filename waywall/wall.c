@@ -548,9 +548,12 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
         }
     }
 
-    // TODO: configurable weights, preview threshold
-    wall->cpu = cpu_manager_create_cgroup(
-        (struct cpu_cgroup_weights){.idle = 1, .low = 2, .high = 20, .active = 100}, 30);
+    wall->cpu =
+        cpu_manager_create_cgroup((struct cpu_cgroup_weights){.idle = cfg->cpu.weight_idle,
+                                                              .low = cfg->cpu.weight_low,
+                                                              .high = cfg->cpu.weight_high,
+                                                              .active = cfg->cpu.weight_active},
+                                  cfg->cpu.preview_threshold);
     if (!wall->cpu) {
         ww_log(LOG_ERROR, "failed to create cpu manager");
         goto fail_cpu;

@@ -84,9 +84,10 @@ cgroup_get_base_systemd() {
     int64_t uid = (int64_t)getuid();
 
     char buf[PATH_MAX];
-    size_t n = snprintf(
-        buf, STATIC_ARRLEN(buf),
-        "/sys/fs/cgroup/user.slice/user-%" PRIi64 ".slice/user@%" PRIi64 ".service/waywall/", uid, uid);
+    size_t n = snprintf(buf, STATIC_ARRLEN(buf),
+                        "/sys/fs/cgroup/user.slice/user-%" PRIi64 ".slice/user@%" PRIi64
+                        ".service/waywall/",
+                        uid, uid);
     ww_assert(n <= STATIC_STRLEN(buf));
 
     return strdup(buf);

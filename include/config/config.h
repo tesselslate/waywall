@@ -10,6 +10,14 @@ struct config {
     struct {
         char *counter_path;
     } general;
+
+    struct {
+        int weight_idle;
+        int weight_low;
+        int weight_high;
+        int weight_active;
+        int preview_threshold;
+    } cpu;
     struct {
         struct {
             char *layout;
