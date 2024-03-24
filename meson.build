@@ -31,4 +31,5 @@ xkbcommon = dependency('xkbcommon')
 
 subdir('protocol')
 subdir('test')
+subdir('tools')
 subdir('waywall')
