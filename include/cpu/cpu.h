@@ -8,7 +8,8 @@ struct instance;
 struct cpu_manager {
     void (*destroy)(struct cpu_manager *cpu);
 
-    void (*death)(struct cpu_manager *cpu, int id);
+    void (*add)(struct cpu_manager *cpu, int id, struct instance *instance);
+    void (*remove)(struct cpu_manager *cpu, int id);
     void (*set_active)(struct cpu_manager *cpu, int id);
     void (*set_priority)(struct cpu_manager *cpu, int id, bool priority);
     void (*update)(struct cpu_manager *cpu, int id, struct instance *instance);
@@ -20,8 +21,13 @@ cpu_destroy(struct cpu_manager *cpu) {
 }
 
 static inline void
-cpu_notify_death(struct cpu_manager *cpu, int id) {
-    cpu->death(cpu, id);
+cpu_add(struct cpu_manager *cpu, int id, struct instance *instance) {
+    cpu->add(cpu, id, instance);
+}
+
+static inline void
+cpu_remove(struct cpu_manager *cpu, int id) {
+    cpu->remove(cpu, id);
 }
 
 static inline void

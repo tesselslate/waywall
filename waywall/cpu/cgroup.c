@@ -62,16 +62,21 @@ cpu_cgroup_destroy(struct cpu_manager *manager) {
 }
 
 static void
-cpu_cgroup_death(struct cpu_manager *manager, int id) {
+cpu_cgroup_add(struct cpu_manager *manager, int id, struct instance *instance) {
+    struct cpu_cgroup *cpu = (struct cpu_cgroup *)manager;
+
+    cpu->instances[id].group = G_NONE;
+    cpu->instances[id].pid = instance->pid;
+    cpu->instances[id].priority = false;
+}
+
+static void
+cpu_cgroup_remove(struct cpu_manager *manager, int id) {
     struct cpu_cgroup *cpu = (struct cpu_cgroup *)manager;
 
     ww_assert(id != cpu->last_active);
     memmove(cpu->instances + id, cpu->instances + id + 1,
             sizeof(cpu->instances[0]) * (STATIC_ARRLEN(cpu->instances) - id - 1));
-
-    // Reset the last instance in the array to its zero value.
-    cpu->instances[STATIC_ARRLEN(cpu->instances) - 1].group = G_NONE;
-    cpu->instances[STATIC_ARRLEN(cpu->instances) - 1].pid = 0;
 }
 
 static void
@@ -101,8 +106,6 @@ cpu_cgroup_set_priority(struct cpu_manager *manager, int id, bool priority) {
 static void
 cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance) {
     struct cpu_cgroup *cpu = (struct cpu_cgroup *)manager;
-
-    cpu->instances[id].pid = instance->pid;
 
     enum group group = G_NONE;
     switch (instance->state.screen) {
@@ -221,7 +224,8 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_thresho
     cpu->last_active = -1;
 
     cpu->manager.destroy = cpu_cgroup_destroy;
-    cpu->manager.death = cpu_cgroup_death;
+    cpu->manager.add = cpu_cgroup_add;
+    cpu->manager.remove = cpu_cgroup_remove;
     cpu->manager.set_active = cpu_cgroup_set_active;
     cpu->manager.set_priority = cpu_cgroup_set_priority;
     cpu->manager.update = cpu_cgroup_update;

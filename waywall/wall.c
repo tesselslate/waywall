@@ -333,6 +333,10 @@ add_instance(struct wall *wall, struct instance *instance) {
     struct config_layout *layout = config_layout_request_spawn(wall->cfg, wall, id);
     change_layout(wall, layout);
 
+    if (wall->cpu) {
+        cpu_add(wall->cpu, id, instance);
+    }
+
     free(state_path);
     return;
 
@@ -367,7 +371,7 @@ remove_instance(struct wall *wall, int id) {
         if (wall->active_instance == id) {
             cpu_set_active(wall->cpu, -1);
         }
-        cpu_notify_death(wall->cpu, id);
+        cpu_remove(wall->cpu, id);
     }
 
     memmove(&wall->instances[id], &wall->instances[id + 1],
