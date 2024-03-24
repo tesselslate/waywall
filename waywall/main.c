@@ -83,9 +83,32 @@ main(int argc, char **argv) {
 
     if (argc > 1) {
         if (strcmp(argv[1], "cpu") == 0) {
-            return cgroup_setup_root();
+            // TODO: Non-systemd support
+            ww_log(LOG_ERROR, "Non-systemd cgroups support is not implemented yet.");
+            return 1;
         }
     }
+
+    char *cgroup_base = cgroup_get_base_systemd();
+    if (!cgroup_base) {
+        ww_log(LOG_ERROR, "failed to get cgroup base directory");
+        return 1;
+    }
+    switch (cgroup_setup_check(cgroup_base)) {
+    case 0:
+        break;
+    case 1:
+        if (cgroup_setup_dir(cgroup_base) != 0) {
+            free(cgroup_base);
+            return 1;
+        }
+        break;
+    case -1:
+        ww_log(LOG_ERROR, "failed to check cgroups");
+        free(cgroup_base);
+        return 1;
+    }
+    free(cgroup_base);
 
     return cmd_waywall();
 }

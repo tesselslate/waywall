@@ -1,4 +1,5 @@
 #include "cpu/cgroup.h"
+#include "cpu/cgroup_setup.h"
 #include "cpu/cpu.h"
 #include "instance.h"
 #include "util.h"
@@ -6,8 +7,6 @@
 #include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#define CGROUP_BASE_DIR "/sys/fs/cgroup/waywall/"
 
 enum group {
     G_NONE,
@@ -114,9 +113,9 @@ cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance
 }
 
 static int
-open_group_procs(const char *group) {
+open_group_procs(const char *base, const char *group) {
     struct str buf = {0};
-    ww_assert(str_append(&buf, CGROUP_BASE_DIR));
+    ww_assert(str_append(&buf, base));
     ww_assert(str_append(&buf, group));
     ww_assert(str_append(&buf, "/cgroup.procs"));
 
@@ -130,9 +129,9 @@ open_group_procs(const char *group) {
 }
 
 static int
-set_group_weight(const char *group, int weight) {
+set_group_weight(const char *base, const char *group, int weight) {
     struct str buf = {0};
-    ww_assert(str_append(&buf, CGROUP_BASE_DIR));
+    ww_assert(str_append(&buf, base));
     ww_assert(str_append(&buf, group));
     ww_assert(str_append(&buf, "/cpu.weight"));
 
@@ -158,6 +157,13 @@ set_group_weight(const char *group, int weight) {
 
 struct cpu_manager *
 cpu_manager_create_cgroup(struct cpu_cgroup_weights weights) {
+    // TODO: Non-systemd support
+    char *cgroup_base = cgroup_get_base_systemd();
+    if (!cgroup_base) {
+        ww_log(LOG_ERROR, "failed to get cgroup base directory");
+        return NULL;
+    }
+
     const struct {
         const char *name;
         int weight;
@@ -169,29 +175,28 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights) {
     };
 
     for (size_t i = 0; i < STATIC_ARRLEN(groups); i++) {
-        if (set_group_weight(groups[i].name, groups[i].weight) != 0) {
-            return NULL;
+        if (set_group_weight(cgroup_base, groups[i].name, groups[i].weight) != 0) {
+            goto fail_weight;
         }
     }
 
     struct cpu_cgroup *cpu = calloc(1, sizeof(*cpu));
     if (!cpu) {
         ww_log(LOG_ERROR, "failed to allocate cpu_cgroup");
-        return NULL;
+        goto fail_cpu;
     }
 
     static const char *names[] = {"idle", "low", "high", "active"};
     static_assert(STATIC_ARRLEN(names) == STATIC_ARRLEN(cpu->fds));
 
     for (size_t i = 0; i < STATIC_ARRLEN(names); i++) {
-        cpu->fds[i] = open_group_procs(names[i]);
+        cpu->fds[i] = open_group_procs(cgroup_base, names[i]);
 
         if (cpu->fds[i] == -1) {
             for (size_t j = 0; j < i; j++) {
                 close(cpu->fds[j]);
             }
-            free(cpu);
-            return NULL;
+            goto fail_group;
         }
     }
 
@@ -202,5 +207,14 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights) {
     cpu->manager.set_active = cpu_cgroup_set_active;
     cpu->manager.update = cpu_cgroup_update;
 
+    free(cgroup_base);
     return (struct cpu_manager *)cpu;
+
+fail_group:
+    free(cpu);
+
+fail_cpu:
+fail_weight:
+    free(cgroup_base);
+    return NULL;
 }

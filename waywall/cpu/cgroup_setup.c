@@ -1,15 +1,17 @@
 #include "cpu/cgroup_setup.h"
 #include "util.h"
 #include <fcntl.h>
+#include <inttypes.h>
 #include <pwd.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 /*
  * cgroup_setup_check is designed to be run regardless of privilege level.
- * cgroup_setup_root requires privileges to write to the cgroup filesystem.
+ * cgroup_setup_dir requires root privileges in environments without systemd.
  *
- * It may be helpful to see the bash script upon which cgroup_setup_root was based:
+ * It may be helpful to see the bash script upon which this code is based:
  *
  *  CGROUP_DIR=/sys/fs/cgroup/waywall
  *  USERNAME=$(logname)
@@ -26,8 +28,10 @@
  *  done
  */
 
-#define CGROUP_BASE_DIR "/sys/fs/cgroup/waywall/"
-#define PERMS_MESSAGE "elevated permissions are required to setup cgroups"
+// TODO: Non-systemd setups don't really work. We need to allow the user to move processes out of
+// the root cgroup and into the waywall cgroup, which is not ideal.
+
+#define PERMS_MESSAGE "elevated permissions are required"
 
 static const char *subgroups[] = {
     "idle/",
@@ -68,11 +72,31 @@ get_user(uid_t *uid, gid_t *gid) {
     return 0;
 }
 
+char *
+cgroup_get_base() {
+    return strdup("/sys/fs/cgroup/waywall/");
+}
+
+char *
+cgroup_get_base_systemd() {
+    static_assert(sizeof(uid_t) < sizeof(int64_t));
+
+    int64_t uid = (int64_t)getuid();
+
+    char buf[PATH_MAX];
+    size_t n = snprintf(
+        buf, STATIC_ARRLEN(buf),
+        "/sys/fs/cgroup/user.slice/user-%" PRIi64 ".slice/user@%" PRIi64 ".service/waywall/", uid, uid);
+    ww_assert(n <= STATIC_STRLEN(buf));
+
+    return strdup(buf);
+}
+
 int
-cgroup_setup_check() {
+cgroup_setup_check(const char *base) {
     // 1. Check that the files "cgroup.procs" and "cpu.weight" are present and writable by the
     //    current user in each subgroup.
-    // 2. Check that /sys/fs/cgroup/waywall/cgroup.procs is writable by the current user.
+    // 2. Check that the file "cgroup.procs" in the waywall group is writable by the current user.
 
     uid_t euid = geteuid();
     gid_t egid = getegid();
@@ -80,7 +104,7 @@ cgroup_setup_check() {
     for (size_t i = 0; i < STATIC_ARRLEN(subgroups); i++) {
         for (size_t j = 0; j < STATIC_ARRLEN(files); j++) {
             struct str buf = {0};
-            ww_assert(str_append(&buf, CGROUP_BASE_DIR));
+            ww_assert(str_append(&buf, base));
             ww_assert(str_append(&buf, subgroups[i]));
             ww_assert(str_append(&buf, files[j]));
 
@@ -100,12 +124,16 @@ cgroup_setup_check() {
         }
     }
 
+    struct str buf = {0};
+    ww_assert(str_append(&buf, base));
+    ww_assert(str_append(&buf, "cgroup.procs"));
+
     struct stat fstat = {0};
-    if (stat(CGROUP_BASE_DIR "cgroup.procs", &fstat) != 0) {
+    if (stat(buf.data, &fstat) != 0) {
         if (errno == ENOENT) {
             return 1;
         } else {
-            ww_log_errno(LOG_ERROR, "stat 'cgroup.procs'");
+            ww_log_errno(LOG_ERROR, "stat '%s'", buf.data);
             return -1;
         }
     }
@@ -114,29 +142,32 @@ cgroup_setup_check() {
 }
 
 int
-cgroup_setup_root() {
+cgroup_setup_dir(const char *base) {
     uid_t uid;
     gid_t gid;
     if (get_user(&uid, &gid) != 0) {
         return 1;
     }
 
-    if (mkdir(CGROUP_BASE_DIR, 0755) != 0 && errno != EEXIST) {
+    if (mkdir(base, 0755) != 0 && errno != EEXIST) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to create base cgroup directory '%s'", CGROUP_BASE_DIR);
+        ww_log_errno(LOG_ERROR, "failed to create base cgroup directory '%s'", base);
         return 1;
     }
 
-    int fd = open(CGROUP_BASE_DIR "cgroup.subtree_control", O_WRONLY, 0644);
+    struct str buf = {0};
+    ww_assert(str_append(&buf, base));
+    ww_assert(str_append(&buf, "cgroup.subtree_control"));
+    int fd = open(buf.data, O_WRONLY, 0644);
     if (fd == -1) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to open 'cgroup.subtree_control'");
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
         return 1;
     }
 
@@ -146,23 +177,26 @@ cgroup_setup_root() {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to write 'cgroup.subtree_control'");
+        ww_log_errno(LOG_ERROR, "failed to write '%s'", buf.data);
         return 1;
     }
 
-    if (chown(CGROUP_BASE_DIR "cgroup.procs", uid, gid) != 0) {
+    buf = (struct str){0};
+    ww_assert(str_append(&buf, base));
+    ww_assert(str_append(&buf, "cgroup.procs"));
+    if (chown(buf.data, uid, gid) != 0) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to chown 'cgroup.procs'");
+        ww_log_errno(LOG_ERROR, "failed to chown '%s'", buf.data);
         return 1;
     }
 
     for (size_t i = 0; i < STATIC_ARRLEN(subgroups); i++) {
         const char *subgroup = subgroups[i];
         struct str buf = {0};
-        ww_assert(str_append(&buf, CGROUP_BASE_DIR));
+        ww_assert(str_append(&buf, base));
         ww_assert(str_append(&buf, subgroup));
 
         if (mkdir(buf.data, 0755) != 0 && errno != EEXIST) {
