@@ -78,6 +78,17 @@ struct transaction_view {
     } apply;
 };
 
+struct ui_rectangle {
+    struct server_ui *parent;
+
+    uint32_t x, y;
+
+    struct wl_buffer *buffer;
+    struct wl_surface *surface;
+    struct wl_subsurface *subsurface;
+    struct wp_viewport *viewport;
+};
+
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
@@ -101,5 +112,10 @@ void transaction_view_set_dest_size(struct transaction_view *view, uint32_t widt
 void transaction_view_set_position(struct transaction_view *view, uint32_t x, uint32_t y);
 void transaction_view_set_size(struct transaction_view *view, uint32_t width, uint32_t height);
 void transaction_view_set_visible(struct transaction_view *view, bool visible);
+
+struct ui_rectangle *ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y,
+                                         uint32_t width, uint32_t height, const uint8_t rgba[static 4]);
+void ui_rectangle_destroy(struct ui_rectangle *rect);
+void ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible);
 
 #endif

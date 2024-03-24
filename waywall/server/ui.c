@@ -237,7 +237,6 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
     view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
     if (!view->viewport) {
-        wl_subsurface_destroy(view->subsurface);
         free(view);
         return NULL;
     }
@@ -385,4 +384,85 @@ void
 transaction_view_set_visible(struct transaction_view *view, bool visible) {
     view->visible = visible;
     view->apply |= TXN_VIEW_VISIBLE;
+}
+
+struct ui_rectangle *
+ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
+                    const uint8_t rgba[static 4]) {
+    struct ui_rectangle *rect = calloc(1, sizeof(*rect));
+    if (!rect) {
+        ww_log(LOG_ERROR, "failed to allocate ui_rectangle");
+        return NULL;
+    }
+
+    rect->parent = ui;
+
+    rect->x = x;
+    rect->y = y;
+
+    rect->buffer = remote_buffer_manager_color(ui->server->remote_buf, rgba);
+    if (!rect->buffer) {
+        ww_log(LOG_ERROR, "failed to get color buffer for ui_rectangle");
+        goto fail_buffer;
+    }
+
+    rect->surface = wl_compositor_create_surface(ui->server->backend->compositor);
+    if (!rect->surface) {
+        ww_log(LOG_ERROR, "failed to create surface for ui_rectangle");
+        goto fail_surface;
+    }
+    wl_surface_attach(rect->surface, rect->buffer, 0, 0);
+
+    rect->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, rect->surface);
+    if (!rect->viewport) {
+        ww_log(LOG_ERROR, "failed to create viewport for ui_rectangle");
+        goto fail_viewport;
+    }
+    wp_viewport_set_destination(rect->viewport, width, height);
+
+    return rect;
+
+fail_viewport:
+    wl_surface_destroy(rect->surface);
+
+fail_surface:
+    remote_buffer_deref(rect->buffer);
+
+fail_buffer:
+    free(rect);
+    return NULL;
+}
+
+void
+ui_rectangle_destroy(struct ui_rectangle *rect) {
+    wl_subsurface_destroy(rect->subsurface);
+    wp_viewport_destroy(rect->viewport);
+    wl_surface_destroy(rect->surface);
+    remote_buffer_deref(rect->buffer);
+    free(rect);
+}
+
+void
+ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible) {
+    if (visible == !!rect->subsurface) {
+        return;
+    }
+
+    if (visible) {
+        rect->subsurface = wl_subcompositor_get_subsurface(
+            rect->parent->server->backend->subcompositor, rect->surface, rect->parent->surface);
+        if (!rect->subsurface) {
+            ww_log(LOG_ERROR, "failed to create subsurface for ui_rectangle");
+            return;
+        }
+
+        wl_subsurface_set_position(rect->subsurface, rect->x, rect->y);
+        wl_subsurface_set_desync(rect->subsurface);
+        wl_surface_commit(rect->surface);
+        wl_surface_commit(rect->parent->surface);
+    } else {
+        wl_subsurface_destroy(rect->subsurface);
+        wl_surface_commit(rect->surface);
+        rect->subsurface = NULL;
+    }
 }
