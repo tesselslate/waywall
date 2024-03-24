@@ -4,6 +4,7 @@
 #include "server/server.h"
 #include "util.h"
 #include "wall.h"
+#include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
 #include <string.h>
@@ -34,9 +35,28 @@ handle_signal(int signal, void *data) {
 
 static int
 cmd_waywall() {
+    int display_file_fd = open("/tmp/waywall-display", O_WRONLY | O_CREAT, 0644);
+    if (display_file_fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to open /tmp/waywall-display");
+        return 1;
+    }
+
+    struct flock lock = {
+        .l_type = F_WRLCK,
+        .l_whence = SEEK_SET,
+        .l_start = 0,
+        .l_len = 0,
+        .l_pid = getpid(),
+    };
+    if (fcntl(display_file_fd, F_SETLK, &lock) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to lock waywall-display");
+        goto fail_lock;
+        return 1;
+    }
+
     struct config *cfg = config_create();
     if (!cfg) {
-        return 1;
+        goto fail_config_create;
     }
     if (config_load(cfg) != 0) {
         goto fail_config_populate;
@@ -66,6 +86,11 @@ cmd_waywall() {
         ww_log(LOG_ERROR, "failed to create wayland display socket");
         goto fail_socket;
     }
+
+    if (write(display_file_fd, socket_name, strlen(socket_name)) != (ssize_t)strlen(socket_name)) {
+        ww_log_errno(LOG_ERROR, "failed to write waywall-display");
+        goto fail_socket_write;
+    }
     wl_display_run(server->display);
 
     wall_destroy(wall);
@@ -74,9 +99,14 @@ cmd_waywall() {
     server_destroy(server);
     config_destroy(cfg);
 
+    lock.l_type = F_UNLCK;
+    fcntl(display_file_fd, F_SETLK, &lock);
+    close(display_file_fd);
+
     ww_log(LOG_INFO, "Done");
     return 0;
 
+fail_socket_write:
 fail_socket:
     wall_destroy(wall);
 
@@ -90,6 +120,13 @@ fail_inotify:
 fail_server:
 fail_config_populate:
     config_destroy(cfg);
+
+fail_config_create:
+    lock.l_type = F_UNLCK;
+    fcntl(display_file_fd, F_SETLK, &lock);
+
+fail_lock:
+    close(display_file_fd);
 
     return 1;
 }
