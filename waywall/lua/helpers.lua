@@ -50,6 +50,7 @@ M.wall = function(config, settings)
 
             state.locked[instance] = true
             waywall.request_layout("lock")
+            waywall.set_priority(instance, true)
         end,
         unlock = function(wall, instance)
             if not state.locked[instance] then
@@ -58,6 +59,7 @@ M.wall = function(config, settings)
 
             state.locked[instance] = nil
             waywall.request_layout("unlock")
+            waywall.set_priority(instance, false)
         end,
 
         focus_reset = function(wall)
@@ -82,6 +84,10 @@ M.wall = function(config, settings)
             end
 
             waywall.play(hovered)
+            if state.locked[hovered] then
+                state.locked[hovered] = nil
+                waywall.set_priority(hovered, false)
+            end
         end,
         reset = function(wall)
             local hovered = waywall.hovered()
