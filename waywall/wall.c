@@ -44,22 +44,27 @@ layout_active(struct wall *wall) {
 
     struct server_view *view = wall->instances[wall->active_instance]->view;
 
+    struct transaction *txn = transaction_create();
+    if (!txn) {
+        return;
+    }
+
     if (wall->active_res.w == 0) {
         ww_assert(wall->active_res.h == 0);
 
-        server_view_set_position(view, 0, 0);
-        server_view_set_dest_size(view, wall->width, wall->height);
-        server_view_set_size(view, wall->width, wall->height);
-        server_view_unset_crop(view);
+        transaction_set_position(txn, view, 0, 0);
+        transaction_set_dest_size(txn, view, wall->width, wall->height);
+        transaction_set_size(txn, view, wall->width, wall->height);
+        transaction_set_crop(txn, view, -1, -1, -1, -1);
     } else {
         int32_t x = (wall->width / 2) - (wall->active_res.w / 2);
         int32_t y = (wall->height / 2) - (wall->active_res.h / 2);
 
         if (x >= 0 && y >= 0) {
-            server_view_set_position(view, x, y);
-            server_view_set_dest_size(view, wall->active_res.w, wall->active_res.h);
-            server_view_set_size(view, wall->active_res.w, wall->active_res.h);
-            server_view_unset_crop(view);
+            transaction_set_position(txn, view, x, y);
+            transaction_set_dest_size(txn, view, wall->active_res.w, wall->active_res.h);
+            transaction_set_size(txn, view, wall->active_res.w, wall->active_res.h);
+            transaction_set_crop(txn, view, -1, -1, -1, -1);
         } else {
             // Negative X or Y coordinates mean that the provided resolution is greater than the
             // size of the waywall window. In this case, we need to crop the view.
@@ -82,12 +87,17 @@ layout_active(struct wall *wall) {
             // All of the subsurface logic will need an overhaul eventually anyway for the fabled
             // Wayland ~frame perfection~
 
-            server_view_set_position(view, x, y);
-            server_view_set_dest_size(view, w, h);
-            server_view_set_size(view, wall->active_res.w, wall->active_res.h);
-            server_view_set_crop(view, crop_x, crop_y, w, h);
+            transaction_set_position(txn, view, x, y);
+            transaction_set_dest_size(txn, view, w, h);
+            transaction_set_size(txn, view, wall->active_res.w, wall->active_res.h);
+            transaction_set_crop(txn, view, crop_x, crop_y, w, h);
         }
     }
+
+    if (transaction_apply(wall->server->ui, txn) != 0) {
+        ww_log(LOG_ERROR, "failed to commit active instance transaction");
+    }
+    transaction_destroy(txn);
 }
 
 static void
@@ -287,15 +297,21 @@ play_instance(struct wall *wall, int id) {
     instance_unpause(wall->instances[id]);
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
-    server_view_set_position(wall->instances[id]->view, 0, 0);
-    server_view_set_dest_size(wall->instances[id]->view, wall->width, wall->height);
-    server_view_set_size(wall->instances[id]->view, wall->width, wall->height);
+    struct transaction *txn = transaction_create();
+    if (!txn) {
+        return;
+    }
+
+    struct server_view *view = wall->instances[id]->view;
+    transaction_set_position(txn, view, 0, 0);
+    transaction_set_dest_size(txn, view, wall->width, wall->height);
+    transaction_set_size(txn, view, wall->width, wall->height);
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (i == id) {
-            server_view_show(wall->instances[i]->view);
+            transaction_set_visible(txn, wall->instances[i]->view, true);
         } else {
-            server_view_hide(wall->instances[i]->view);
+            transaction_set_visible(txn, wall->instances[i]->view, false);
         }
     }
 }
@@ -605,7 +621,18 @@ wall_lua_set_res(struct wall *wall, int id, int32_t width, int32_t height) {
         wall->active_res.h = height;
         layout_active(wall);
     } else {
-        server_view_set_size(wall->instances[id]->view, width, height);
+        struct transaction *txn = transaction_create();
+        if (!txn) {
+            ww_log(LOG_ERROR, "failed to create transaction in wall_lua_set_res");
+            return 0;
+        }
+
+        transaction_set_size(txn, wall->instances[id]->view, width, height);
+
+        if (transaction_apply(wall->server->ui, txn) != 0) {
+            ww_log(LOG_ERROR, "failed to apply transaction in wall_lua_set_res");
+        }
+        transaction_destroy(txn);
     }
 
     return 0;
