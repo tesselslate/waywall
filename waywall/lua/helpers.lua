@@ -42,101 +42,99 @@ M.wall = function(config, settings)
         height = math.floor(settings.height),
         lock_color = settings.lock_color or "#00000099",
     }
+    local wall = {}
 
-    local wall = {
-        is_locked = function(wall, instance)
-            return state.locked[instance]
-        end,
-        lock = function(wall, instance)
-            if state.locked[instance] then
-                return
-            end
+    wall.is_locked = function(instance)
+        return state.locked[instance]
+    end
+    wall.lock = function(instance)
+        if state.locked[instance] then
+            return
+        end
 
-            state.locked[instance] = true
-            waywall.request_layout("lock")
-            waywall.set_priority(instance, true)
-        end,
-        unlock = function(wall, instance)
-            if not state.locked[instance] then
-                return
-            end
+        state.locked[instance] = true
+        waywall.request_layout("lock")
+        waywall.set_priority(instance, true)
+    end
+    wall.unlock = function(instance)
+        if not state.locked[instance] then
+            return
+        end
 
-            state.locked[instance] = nil
-            waywall.request_layout("unlock")
-            waywall.set_priority(instance, false)
-        end,
+        state.locked[instance] = nil
+        waywall.request_layout("unlock")
+        waywall.set_priority(instance, false)
+    end
+    wall.focus_reset = function()
+        local hovered = waywall.hovered()
+        if not hovered then
+            return
+        end
 
-        focus_reset = function(wall)
-            local hovered = waywall.hovered()
-            if not hovered then
-                return
+        local num_instances = waywall.num_instances()
+        for i = 1, num_instances do
+            if i ~= hovered and not state.locked[i] then
+                waywall.reset(i)
             end
+        end
 
-            local num_instances = waywall.num_instances()
-            for i = 1, num_instances do
-                if i ~= hovered and not state.locked[i] then
-                    waywall.reset(i)
-                end
-            end
+        waywall.play(i)
+    end
+    wall.play = function()
+        local hovered = waywall.hovered()
+        if not hovered then
+            return
+        end
 
-            waywall.play(i)
-        end,
-        play = function(wall)
-            local hovered = waywall.hovered()
-            if not hovered then
-                return
-            end
+        waywall.play(hovered)
+        if state.locked[hovered] then
+            state.locked[hovered] = nil
+            waywall.set_priority(hovered, false)
+        end
+    end
+    wall.reset = function()
+        local hovered = waywall.hovered()
+        if not hovered then
+            return
+        end
 
-            waywall.play(hovered)
-            if state.locked[hovered] then
-                state.locked[hovered] = nil
-                waywall.set_priority(hovered, false)
-            end
-        end,
-        reset = function(wall)
-            local hovered = waywall.hovered()
-            if not hovered then
-                return
-            end
+        if not state.locked[hovered] then
+            waywall.reset(hovered)
+        end
+    end
+    wall.reset_all = function()
+        if waywall.active_instance() then
+            return
+        end
 
-            if not state.locked[hovered] then
-                waywall.reset(hovered)
+        local num_instances = waywall.num_instances()
+        for i = 1, num_instances do
+            if not state.locked[i] then
+                waywall.reset(i)
             end
-        end,
-        reset_all = function(wall)
-            if waywall.active_instance() then
-                return
-            end
+        end
+    end
+    wall.reset_ingame = function()
+        local active = waywall.active_instance()
+        if not active then
+            return
+        end
 
-            local num_instances = waywall.num_instances()
-            for i = 1, num_instances do
-                if not state.locked[i] then
-                    waywall.reset(i)
-                end
-            end
-        end,
-        reset_ingame = function(wall)
-            local active = waywall.active_instance()
-            if not active then
-                return
-            end
+        waywall.goto_wall()
+        waywall.reset(active)
+    end
+    wall.toggle_lock = function()
+        local hovered = waywall.hovered()
+        if not hovered then
+            return
+        end
 
-            waywall.goto_wall()
-            waywall.reset(active)
-        end,
-        toggle_lock = function(wall)
-            local hovered = waywall.hovered()
-            if not hovered then
-                return
-            end
-
-            if state.locked[hovered] then
-                wall:unlock(hovered)
-            else
-                wall:lock(hovered)
-            end
-        end,
-    }
+        if state.locked[hovered] then
+            wall.unlock(hovered)
+        else
+            wall.lock(hovered)
+        end
+    end
 
     local function generate()
         local num_instances = waywall.num_instances()
