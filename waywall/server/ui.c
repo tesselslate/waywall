@@ -305,6 +305,12 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
             txn_apply_visible(txn_view, view, ui);
         }
 
+        // TODO: Properly store Z order
+        if (txn_view->apply & TXN_VIEW_ABOVE) {
+            ww_assert(txn_view->view->subsurface);
+            wl_subsurface_place_above(txn_view->view->subsurface, txn_view->above);
+        }
+
         wl_surface_commit(view->surface->remote);
     }
 
@@ -347,6 +353,12 @@ transaction_get_view(struct transaction *txn, struct server_view *view) {
     wl_list_insert(&txn->views, &txn_view->link);
 
     return txn_view;
+}
+
+void
+transaction_view_set_above(struct transaction_view *view, struct wl_surface *surface) {
+    view->above = surface;
+    view->apply |= TXN_VIEW_ABOVE;
 }
 
 void

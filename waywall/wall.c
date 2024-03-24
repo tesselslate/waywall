@@ -10,6 +10,7 @@
 #include "server/cursor.h"
 #include "server/server.h"
 #include "server/ui.h"
+#include "server/wl_compositor.h"
 #include "server/wl_seat.h"
 #include "util.h"
 #include <linux/input-event-codes.h>
@@ -121,6 +122,9 @@ layout_wall(struct wall *wall) {
         return;
     }
 
+    // Used for Z ordering.
+    struct wl_surface *previous = wall->server->ui->surface;
+
     bool shown[MAX_INSTANCES] = {0};
     for (size_t i = 0; i < wall->layout->num_elements; i++) {
         struct config_layout_element *element = &wall->layout->elements[i];
@@ -146,7 +150,10 @@ layout_wall(struct wall *wall) {
             transaction_view_set_dest_size(view, element->w, element->h);
             transaction_view_set_position(view, element->x, element->y);
             transaction_view_set_visible(view, true);
+            transaction_view_set_above(view, previous);
             shown[element->data.instance] = true;
+
+            previous = view->view->surface->remote;
         }
     }
 
