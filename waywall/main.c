@@ -1,9 +1,11 @@
 #include "config/config.h"
+#include "cpu/cgroup_setup.h"
 #include "inotify.h"
 #include "server/server.h"
 #include "util.h"
 #include "wall.h"
 #include <signal.h>
+#include <string.h>
 #include <wayland-server-core.h>
 
 static int
@@ -13,10 +15,8 @@ handle_signal(int signal, void *data) {
     return 0;
 }
 
-int
-main() {
-    util_log_init();
-
+static int
+cmd_waywall() {
     struct config *cfg = config_create();
     if (!cfg) {
         return 1;
@@ -75,4 +75,17 @@ fail_config_populate:
     config_destroy(cfg);
 
     return 1;
+}
+
+int
+main(int argc, char **argv) {
+    util_log_init();
+
+    if (argc > 1) {
+        if (strcmp(argv[1], "cpu") == 0) {
+            return cgroup_setup_root();
+        }
+    }
+
+    return cmd_waywall();
 }
