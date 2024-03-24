@@ -32,7 +32,7 @@ struct remote_buffer_manager {
 
 struct remote_buffer_manager *remote_buffer_manager_create(struct server *server);
 struct wl_buffer *remote_buffer_manager_color(struct remote_buffer_manager *manager,
-                                              uint8_t rgba[static 4]);
+                                              const uint8_t rgba[static 4]);
 void remote_buffer_manager_destroy(struct remote_buffer_manager *manager);
 void remote_buffer_deref(struct wl_buffer *buffer);
 

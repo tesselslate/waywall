@@ -18,7 +18,7 @@
 #define POOL_INITIAL_SIZE 16384
 
 static inline void
-assign_rgba(char *dst, uint8_t src[static 4]) {
+assign_rgba(char *dst, const uint8_t src[static 4]) {
     dst[0] = src[2];
     dst[1] = src[1];
     dst[2] = src[0];
@@ -58,7 +58,7 @@ fail_truncate:
 
 static void
 make_color(struct remote_buffer_manager *manager, struct remote_buffer *buf,
-           uint8_t rgba[static 4]) {
+           const uint8_t rgba[static 4]) {
     static_assert(sizeof(uint32_t) == 4);
 
     // Ensure there is space to create a fresh buffer.
@@ -143,7 +143,7 @@ fail_memfd:
 }
 
 struct wl_buffer *
-remote_buffer_manager_color(struct remote_buffer_manager *manager, uint8_t rgba[static 4]) {
+remote_buffer_manager_color(struct remote_buffer_manager *manager, const uint8_t rgba[static 4]) {
     uint32_t argb = (uint32_t)rgba[0] | ((uint32_t)rgba[1] << 8) | ((uint32_t)rgba[2] << 16) |
                     ((uint32_t)rgba[3] << 24);
 
