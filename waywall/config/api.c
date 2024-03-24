@@ -1,6 +1,7 @@
 #include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
+#include "cpu/cpu.h"
 #include "instance.h"
 #include "lua/api.h"
 #include "lua/helpers.h"
@@ -210,6 +211,22 @@ l_reset(lua_State *L) {
 }
 
 static int
+l_set_priority(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    int id = luaL_checkint(L, 1);
+    luaL_checktype(L, 2, LUA_TBOOLEAN);
+    bool priority = lua_toboolean(L, 2);
+    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+
+    if (!wall->cpu) {
+        return 0;
+    }
+
+    cpu_set_priority(wall->cpu, id - 1, priority);
+    return 0;
+}
+
+static int
 l_set_resolution(lua_State *L) {
     struct wall *wall = get_wall(L);
     int id = luaL_checkint(L, 1);
@@ -282,6 +299,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"play", l_play},
     {"request_layout", l_request_layout},
     {"reset", l_reset},
+    {"set_priority", l_set_priority},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
     {"window_size", l_window_size},

@@ -54,6 +54,11 @@ M.request_layout = priv.request_layout
 -- @return The number of instances which were actually reset.
 M.reset = priv.reset
 
+--- Updates the CPU priority of the given instance.
+-- @param instance The instance to update priority for.
+-- @param priority Whether or not the instance should be given more CPU time.
+M.set_priority = priv.set_priority
+
 --- Sets the sensitivity multiplier for relative pointer motion (3D ingame aim).
 -- @param sensitivity The multiplier to use. Must be greater than zero.
 M.set_sensitivity = priv.set_sensitivity
