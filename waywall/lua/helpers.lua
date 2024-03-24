@@ -31,12 +31,16 @@ M.wall = function(config, settings)
     if settings.height < 1 then
         error("expected settings.height to be at least 1")
     end
+    if settings.lock_color and type(settings.lock_color) ~= "string" then
+        error("expected settings.lock_color to be of type string")
+    end
 
     -- Setup wall objects.
     local state = {
         locked = {},
         width = math.floor(settings.width),
         height = math.floor(settings.height),
+        lock_color = settings.lock_color or "#00000099",
     }
 
     local wall = {
@@ -149,13 +153,26 @@ M.wall = function(config, settings)
         local layout = {}
 
         for i = 1, num_instances do
+            local x = ((i - 1) % state.width) * instance_width
+            local y = math.floor((i - 1) / state.width) * instance_height
+
             table.insert(layout, {
                 "instance", i,
-                x = ((i - 1) % state.width) * instance_width,
-                y = math.floor((i - 1) / state.width) * instance_height,
+                x = x,
+                y = y,
                 w = instance_width,
                 h = instance_height,
             })
+
+            if state.locked[i] then
+                table.insert(layout, {
+                    "rectangle", state.lock_color,
+                    x = x,
+                    y = y,
+                    w = instance_width,
+                    h = instance_height,
+                })
+            end
         end
 
         return layout
