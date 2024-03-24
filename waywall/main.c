@@ -4,9 +4,26 @@
 #include "server/server.h"
 #include "util.h"
 #include "wall.h"
+#include <sched.h>
 #include <signal.h>
 #include <string.h>
+#include <unistd.h>
 #include <wayland-server-core.h>
+
+static void
+set_realtime() {
+    int priority = sched_get_priority_min(SCHED_RR);
+    if (priority == -1) {
+        ww_log_errno(LOG_ERROR, "failed to get minimum priority for SCHED_RR");
+        return;
+    }
+
+    const struct sched_param param = {.sched_priority = priority};
+    if (sched_setscheduler(getpid(), SCHED_RR, &param) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to set scheduler priority");
+        return;
+    }
+}
 
 static int
 handle_signal(int signal, void *data) {
@@ -88,6 +105,8 @@ main(int argc, char **argv) {
             return 1;
         }
     }
+
+    set_realtime();
 
     char *cgroup_base = cgroup_get_base_systemd();
     if (!cgroup_base) {
