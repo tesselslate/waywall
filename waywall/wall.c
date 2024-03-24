@@ -42,29 +42,36 @@ static void
 layout_active(struct wall *wall) {
     ww_assert(!ON_WALL(wall));
 
-    struct server_view *view = wall->instances[wall->active_instance]->view;
-
     struct transaction *txn = transaction_create();
     if (!txn) {
+        ww_log(LOG_ERROR, "failed transaction_create in layout_active");
+        return;
+    }
+
+    struct transaction_view *view =
+        transaction_get_view(txn, wall->instances[wall->active_instance]->view);
+    if (!view) {
+        ww_log(LOG_ERROR, "failed transaction_get_view in layout_active");
+        transaction_destroy(txn);
         return;
     }
 
     if (wall->active_res.w == 0) {
         ww_assert(wall->active_res.h == 0);
 
-        transaction_set_position(txn, view, 0, 0);
-        transaction_set_dest_size(txn, view, wall->width, wall->height);
-        transaction_set_size(txn, view, wall->width, wall->height);
-        transaction_set_crop(txn, view, -1, -1, -1, -1);
+        transaction_view_set_position(view, 0, 0);
+        transaction_view_set_dest_size(view, wall->width, wall->height);
+        transaction_view_set_size(view, wall->width, wall->height);
+        transaction_view_set_crop(view, -1, -1, -1, -1);
     } else {
         int32_t x = (wall->width / 2) - (wall->active_res.w / 2);
         int32_t y = (wall->height / 2) - (wall->active_res.h / 2);
 
         if (x >= 0 && y >= 0) {
-            transaction_set_position(txn, view, x, y);
-            transaction_set_dest_size(txn, view, wall->active_res.w, wall->active_res.h);
-            transaction_set_size(txn, view, wall->active_res.w, wall->active_res.h);
-            transaction_set_crop(txn, view, -1, -1, -1, -1);
+            transaction_view_set_position(view, x, y);
+            transaction_view_set_dest_size(view, wall->active_res.w, wall->active_res.h);
+            transaction_view_set_size(view, wall->active_res.w, wall->active_res.h);
+            transaction_view_set_crop(view, -1, -1, -1, -1);
         } else {
             // Negative X or Y coordinates mean that the provided resolution is greater than the
             // size of the waywall window. In this case, we need to crop the view.
@@ -87,16 +94,14 @@ layout_active(struct wall *wall) {
             // All of the subsurface logic will need an overhaul eventually anyway for the fabled
             // Wayland ~frame perfection~
 
-            transaction_set_position(txn, view, x, y);
-            transaction_set_dest_size(txn, view, w, h);
-            transaction_set_size(txn, view, wall->active_res.w, wall->active_res.h);
-            transaction_set_crop(txn, view, crop_x, crop_y, w, h);
+            transaction_view_set_position(view, x, y);
+            transaction_view_set_dest_size(view, w, h);
+            transaction_view_set_size(view, wall->active_res.w, wall->active_res.h);
+            transaction_view_set_crop(view, crop_x, crop_y, w, h);
         }
     }
 
-    if (transaction_apply(wall->server->ui, txn) != 0) {
-        ww_log(LOG_ERROR, "failed to commit active instance transaction");
-    }
+    transaction_apply(wall->server->ui, txn);
     transaction_destroy(txn);
 }
 
@@ -110,6 +115,7 @@ layout_wall(struct wall *wall) {
 
     struct transaction *txn = transaction_create();
     if (!txn) {
+        ww_log(LOG_ERROR, "failed transaction_create in layout_wall");
         return;
     }
 
@@ -127,24 +133,34 @@ layout_wall(struct wall *wall) {
                 continue;
             }
 
-            struct server_view *view = wall->instances[element->data.instance]->view;
-            transaction_set_dest_size(txn, view, element->w, element->h);
-            transaction_set_position(txn, view, element->x, element->y);
-            transaction_set_visible(txn, view, true);
+            struct transaction_view *view =
+                transaction_get_view(txn, wall->instances[element->data.instance]->view);
+            if (!view) {
+                ww_log(LOG_ERROR, "failed transaction_get_view in layout_wall");
+                transaction_destroy(txn);
+                return;
+            }
+
+            transaction_view_set_dest_size(view, element->w, element->h);
+            transaction_view_set_position(view, element->x, element->y);
+            transaction_view_set_visible(view, true);
             shown[element->data.instance] = true;
         }
     }
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (!shown[i]) {
-            // TODO: O(n^2) due to the implementation of get_txn_view
-            transaction_set_visible(txn, wall->instances[i]->view, false);
+            struct transaction_view *view = transaction_get_view(txn, wall->instances[i]->view);
+            if (!view) {
+                ww_log(LOG_ERROR, "failed transaction_get_view in layout_wall");
+                transaction_destroy(txn);
+                return;
+            }
+            transaction_view_set_visible(view, false);
         }
     }
 
-    if (transaction_apply(wall->server->ui, txn) != 0) {
-        ww_log(LOG_ERROR, "failed to commit layout transaction");
-    }
+    transaction_apply(wall->server->ui, txn);
     transaction_destroy(txn);
 }
 
@@ -299,21 +315,36 @@ play_instance(struct wall *wall, int id) {
 
     struct transaction *txn = transaction_create();
     if (!txn) {
+        ww_log(LOG_ERROR, "failed transaction_create in play_instance");
         return;
     }
 
-    struct server_view *view = wall->instances[id]->view;
-    transaction_set_position(txn, view, 0, 0);
-    transaction_set_dest_size(txn, view, wall->width, wall->height);
-    transaction_set_size(txn, view, wall->width, wall->height);
+    struct transaction_view *view = transaction_get_view(txn, wall->instances[id]->view);
+    if (!view) {
+        ww_log(LOG_ERROR, "failed transaction_get_view in play_instance");
+        transaction_destroy(txn);
+        return;
+    }
+
+    transaction_view_set_position(view, 0, 0);
+    transaction_view_set_dest_size(view, wall->width, wall->height);
+    transaction_view_set_size(view, wall->width, wall->height);
+    transaction_view_set_visible(view, true);
 
     for (int i = 0; i < wall->num_instances; i++) {
-        if (i == id) {
-            transaction_set_visible(txn, wall->instances[i]->view, true);
-        } else {
-            transaction_set_visible(txn, wall->instances[i]->view, false);
+        if (i != id) {
+            view = transaction_get_view(txn, wall->instances[i]->view);
+            if (!view) {
+                ww_log(LOG_ERROR, "failed transaction_get_view in play_instance");
+                transaction_destroy(txn);
+                return;
+            }
+            transaction_view_set_visible(view, false);
         }
     }
+
+    transaction_apply(wall->server->ui, txn);
+    transaction_destroy(txn);
 }
 
 static void
@@ -623,15 +654,20 @@ wall_lua_set_res(struct wall *wall, int id, int32_t width, int32_t height) {
     } else {
         struct transaction *txn = transaction_create();
         if (!txn) {
-            ww_log(LOG_ERROR, "failed to create transaction in wall_lua_set_res");
+            ww_log(LOG_ERROR, "failed transaction_create in wall_lua_set_res");
             return 0;
         }
 
-        transaction_set_size(txn, wall->instances[id]->view, width, height);
-
-        if (transaction_apply(wall->server->ui, txn) != 0) {
-            ww_log(LOG_ERROR, "failed to apply transaction in wall_lua_set_res");
+        struct transaction_view *view = transaction_get_view(txn, wall->instances[id]->view);
+        if (!view) {
+            ww_log(LOG_ERROR, "failed transaction_get_view in wall_lua_set_res");
+            transaction_destroy(txn);
+            return 0;
         }
+
+        transaction_view_set_size(view, width, height);
+
+        transaction_apply(wall->server->ui, txn);
         transaction_destroy(txn);
     }
 

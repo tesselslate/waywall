@@ -79,35 +79,6 @@ static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = on_xdg_surface_configure,
 };
 
-static struct transaction_view *
-get_txn_view(struct transaction *txn, struct server_view *view) {
-    // Fast path: return the last accessed view (for when multiple subsequent ops happen)
-    if (txn->last_accessed && txn->last_accessed->view == view) {
-        return txn->last_accessed;
-    }
-
-    // Slow path: scan the list and add a new view
-    struct transaction_view *txn_view;
-    wl_list_for_each (txn_view, &txn->views, link) {
-        if (txn_view->view == view) {
-            txn->last_accessed = txn_view;
-            return txn_view;
-        }
-    }
-
-    txn_view = calloc(1, sizeof(*txn_view));
-    if (!txn_view) {
-        ww_log(LOG_ERROR, "failed to allocate transaction_view");
-        return NULL;
-    }
-
-    txn_view->view = view;
-    wl_list_insert(&txn->views, &txn_view->link);
-
-    txn->last_accessed = txn_view;
-    return txn_view;
-}
-
 static inline void
 txn_apply_visible(struct transaction_view *txn_view, struct server_view *view,
                   struct server_ui *ui) {
@@ -296,12 +267,8 @@ server_view_destroy(struct server_view *view) {
     free(view);
 }
 
-int
+void
 transaction_apply(struct server_ui *ui, struct transaction *txn) {
-    if (txn->failed) {
-        return 1;
-    }
-
     // TODO: transaction_apply is not actually atomic because the subsurfaces of each server_view
     // are always in desynchronized mode
 
@@ -343,7 +310,6 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
     }
 
     wl_surface_commit(ui->surface);
-    return 0;
 }
 
 struct transaction *
@@ -370,72 +336,53 @@ transaction_destroy(struct transaction *txn) {
     free(txn);
 }
 
-void
-transaction_set_crop(struct transaction *txn, struct server_view *view, uint32_t x, uint32_t y,
-                     uint32_t width, uint32_t height) {
-    struct transaction_view *txn_view = get_txn_view(txn, view);
+struct transaction_view *
+transaction_get_view(struct transaction *txn, struct server_view *view) {
+    struct transaction_view *txn_view = calloc(1, sizeof(*txn_view));
     if (!txn_view) {
-        txn->failed = true;
-        return;
+        ww_log(LOG_ERROR, "failed to allocate transaction_view");
+        return NULL;
     }
 
-    txn_view->crop.x = x;
-    txn_view->crop.y = y;
-    txn_view->crop.width = width;
-    txn_view->crop.height = height;
-    txn_view->apply |= TXN_VIEW_CROP;
+    txn_view->view = view;
+    wl_list_insert(&txn->views, &txn_view->link);
+
+    return txn_view;
 }
 
 void
-transaction_set_dest_size(struct transaction *txn, struct server_view *view, uint32_t width,
+transaction_view_set_crop(struct transaction_view *view, uint32_t x, uint32_t y, uint32_t width,
                           uint32_t height) {
-    struct transaction_view *txn_view = get_txn_view(txn, view);
-    if (!txn_view) {
-        txn->failed = true;
-        return;
-    }
-
-    txn_view->dest_width = width;
-    txn_view->dest_height = height;
-    txn_view->apply |= TXN_VIEW_DEST_SIZE;
+    view->crop.x = x;
+    view->crop.y = y;
+    view->crop.width = width;
+    view->crop.height = height;
+    view->apply |= TXN_VIEW_CROP;
 }
 
 void
-transaction_set_position(struct transaction *txn, struct server_view *view, uint32_t x,
-                         uint32_t y) {
-    struct transaction_view *txn_view = get_txn_view(txn, view);
-    if (!txn_view) {
-        txn->failed = true;
-        return;
-    }
-
-    txn_view->x = x;
-    txn_view->y = y;
-    txn_view->apply |= TXN_VIEW_POS;
+transaction_view_set_dest_size(struct transaction_view *view, uint32_t width, uint32_t height) {
+    view->dest_width = width;
+    view->dest_height = height;
+    view->apply |= TXN_VIEW_DEST_SIZE;
 }
 
 void
-transaction_set_size(struct transaction *txn, struct server_view *view, uint32_t width,
-                     uint32_t height) {
-    struct transaction_view *txn_view = get_txn_view(txn, view);
-    if (!txn_view) {
-        txn->failed = true;
-        return;
-    }
-
-    txn_view->width = width;
-    txn_view->height = height;
-    txn_view->apply |= TXN_VIEW_SIZE;
+transaction_view_set_position(struct transaction_view *view, uint32_t x, uint32_t y) {
+    view->x = x;
+    view->y = y;
+    view->apply |= TXN_VIEW_POS;
 }
 
 void
-transaction_set_visible(struct transaction *txn, struct server_view *view, bool visible) {
-    struct transaction_view *txn_view = get_txn_view(txn, view);
-    if (!txn_view) {
-        txn->failed = true;
-        return;
-    }
+transaction_view_set_size(struct transaction_view *view, uint32_t width, uint32_t height) {
+    view->width = width;
+    view->height = height;
+    view->apply |= TXN_VIEW_SIZE;
+}
 
-    txn_view->visible = visible;
-    txn_view->apply |= TXN_VIEW_VISIBLE;
+void
+transaction_view_set_visible(struct transaction_view *view, bool visible) {
+    view->visible = visible;
+    view->apply |= TXN_VIEW_VISIBLE;
 }

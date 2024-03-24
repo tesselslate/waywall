@@ -57,10 +57,6 @@ struct server_view_impl {
 
 struct transaction {
     struct wl_list views; // transaction_view.link
-
-    // Optimization detail: store the last accessed view for use in get_txn_view
-    struct transaction_view *last_accessed;
-    bool failed;
 };
 
 struct transaction_view {
@@ -95,16 +91,15 @@ struct server_view *server_view_create(struct server_ui *ui, struct server_surfa
                                        struct wl_resource *impl_resource);
 void server_view_destroy(struct server_view *view);
 
-int transaction_apply(struct server_ui *ui, struct transaction *txn);
+void transaction_apply(struct server_ui *ui, struct transaction *txn);
 struct transaction *transaction_create();
+struct transaction_view *transaction_get_view(struct transaction *txn, struct server_view *view);
 void transaction_destroy(struct transaction *txn);
-void transaction_set_crop(struct transaction *txn, struct server_view *view, uint32_t x, uint32_t y, uint32_t width, uint32_t height);
-void transaction_set_dest_size(struct transaction *txn, struct server_view *view, uint32_t width,
-                               uint32_t height);
-void transaction_set_position(struct transaction *txn, struct server_view *view, uint32_t x,
-                              uint32_t y);
-void transaction_set_size(struct transaction *txn, struct server_view *view, uint32_t width,
-                          uint32_t height);
-void transaction_set_visible(struct transaction *txn, struct server_view *view, bool visible);
+void transaction_view_set_crop(struct transaction_view *view, uint32_t x, uint32_t y,
+                               uint32_t width, uint32_t height);
+void transaction_view_set_dest_size(struct transaction_view *view, uint32_t width, uint32_t height);
+void transaction_view_set_position(struct transaction_view *view, uint32_t x, uint32_t y);
+void transaction_view_set_size(struct transaction_view *view, uint32_t width, uint32_t height);
+void transaction_view_set_visible(struct transaction_view *view, bool visible);
 
 #endif
