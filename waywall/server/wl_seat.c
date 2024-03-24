@@ -177,7 +177,7 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
         return;
     }
 
-    util_log_va(level, fmtbuf.data, args);
+    util_log_va(level, fmtbuf.data, args, false);
 }
 
 static void

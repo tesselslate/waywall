@@ -14,7 +14,7 @@ void
 util_log(enum ww_log_level level, const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    util_log_va(level, fmt, args);
+    util_log_va(level, fmt, args, true);
     va_end(args);
 }
 
@@ -34,7 +34,7 @@ util_log_init() {
 }
 
 void
-util_log_va(enum ww_log_level level, const char *fmt, va_list args) {
+util_log_va(enum ww_log_level level, const char *fmt, va_list args, bool newline) {
     struct timespec now = {0};
     clock_gettime(CLOCK_MONOTONIC, &now);
     unsigned long sec = now.tv_sec;
@@ -56,7 +56,9 @@ util_log_va(enum ww_log_level level, const char *fmt, va_list args) {
     va_copy(vargs, args);
     vfprintf(stderr, fmt, vargs);
     va_end(vargs);
-    fprintf(stderr, "%s\n", color_reset);
+    if (newline) {
+        fprintf(stderr, "%s\n", color_reset);
+    }
 }
 
 noreturn void
