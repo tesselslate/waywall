@@ -425,6 +425,14 @@ ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y, uint32_t width
     }
     wl_surface_attach(rect->surface, rect->buffer, 0, 0);
 
+    struct wl_region *region = wl_compositor_create_region(ui->server->backend->compositor);
+    if (!region) {
+        ww_log(LOG_ERROR, "failed to create input region for ui_rectangle");
+        goto fail_region;
+    }
+    wl_surface_set_input_region(rect->surface, region);
+    wl_region_destroy(region);
+
     rect->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, rect->surface);
     if (!rect->viewport) {
         ww_log(LOG_ERROR, "failed to create viewport for ui_rectangle");
@@ -437,6 +445,7 @@ ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y, uint32_t width
 fail_viewport:
     wl_surface_destroy(rect->surface);
 
+fail_region:
 fail_surface:
     remote_buffer_deref(rect->buffer);
 
