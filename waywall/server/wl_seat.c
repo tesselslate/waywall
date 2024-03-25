@@ -973,10 +973,7 @@ server_seat_create(struct server *server, struct config *cfg) {
 
     seat->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat,
                                     on_global_bind);
-    if (!seat->global) {
-        ww_log(LOG_ERROR, "failed to allocate seat global");
-        goto fail_global;
-    }
+    check_alloc(seat->global);
 
     seat->keyboard.remote_km.fd = -1;
     seat->keyboard.pressed.cap = 8;
@@ -1010,9 +1007,6 @@ server_seat_create(struct server *server, struct config *cfg) {
     wl_display_add_destroy_listener(server->display, &seat->on_display_destroy);
 
     return seat;
-
-fail_global:
-    close(seat->keyboard.local_km.fd);
 
 fail_keymap:
     free(seat->remaps.buttons);

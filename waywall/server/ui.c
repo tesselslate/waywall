@@ -89,10 +89,7 @@ txn_apply_visible(struct transaction_view *txn_view, struct server_view *view,
     if (txn_view->visible) {
         view->subsurface = wl_subcompositor_get_subsurface(
             ui->server->backend->subcompositor, view->surface->remote, view->ui->surface);
-        if (!view->subsurface) {
-            ww_log(LOG_ERROR, "failed to allocate view subsurface");
-            return;
-        }
+        check_alloc(view->subsurface);
 
         wl_subsurface_set_position(view->subsurface, view->x, view->y);
         wl_subsurface_set_desync(view->subsurface);
@@ -112,10 +109,7 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->server = server;
 
     ui->empty_region = wl_compositor_create_region(server->backend->compositor);
-    if (!ui->empty_region) {
-        ww_log(LOG_ERROR, "failed to create empty region");
-        goto fail_empty_region;
-    }
+    check_alloc(ui->empty_region);
 
     ui->background = remote_buffer_manager_color(server->remote_buf, ui->cfg->theme.background);
     if (!ui->background) {
@@ -124,29 +118,17 @@ server_ui_create(struct server *server, struct config *cfg) {
     }
 
     ui->surface = wl_compositor_create_surface(server->backend->compositor);
-    if (!ui->surface) {
-        ww_log(LOG_ERROR, "failed to create root surface");
-        goto fail_surface;
-    }
+    check_alloc(ui->surface);
 
     ui->viewport = wp_viewporter_get_viewport(server->backend->viewporter, ui->surface);
-    if (!ui->viewport) {
-        ww_log(LOG_ERROR, "failed to create root viewport");
-        goto fail_viewport;
-    }
+    check_alloc(ui->viewport);
 
     ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->surface);
-    if (!ui->xdg_surface) {
-        ww_log(LOG_ERROR, "failed to create root xdg surface");
-        goto fail_xdg_surface;
-    }
+    check_alloc(ui->xdg_surface);
     xdg_surface_add_listener(ui->xdg_surface, &xdg_surface_listener, ui);
 
     ui->xdg_toplevel = xdg_surface_get_toplevel(ui->xdg_surface);
-    if (!ui->xdg_toplevel) {
-        ww_log(LOG_ERROR, "failed to create root xdg toplevel");
-        goto fail_xdg_toplevel;
-    }
+    check_alloc(ui->xdg_toplevel);
     xdg_toplevel_add_listener(ui->xdg_toplevel, &xdg_toplevel_listener, ui);
 
     wl_list_init(&ui->views);
@@ -157,22 +139,8 @@ server_ui_create(struct server *server, struct config *cfg) {
 
     return ui;
 
-fail_xdg_toplevel:
-    xdg_surface_destroy(ui->xdg_surface);
-
-fail_xdg_surface:
-    wp_viewport_destroy(ui->viewport);
-
-fail_viewport:
-    wl_surface_destroy(ui->surface);
-
-fail_surface:
-    remote_buffer_deref(ui->background);
-
 fail_background:
     wl_region_destroy(ui->empty_region);
-
-fail_empty_region:
     free(ui);
     return NULL;
 }
@@ -407,35 +375,15 @@ ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y, uint32_t width
     }
 
     rect->surface = wl_compositor_create_surface(ui->server->backend->compositor);
-    if (!rect->surface) {
-        ww_log(LOG_ERROR, "failed to create surface for ui_rectangle");
-        goto fail_surface;
-    }
+    check_alloc(rect->surface);
     wl_surface_attach(rect->surface, rect->buffer, 0, 0);
-
-    struct wl_region *region = wl_compositor_create_region(ui->server->backend->compositor);
-    if (!region) {
-        ww_log(LOG_ERROR, "failed to create input region for ui_rectangle");
-        goto fail_region;
-    }
-    wl_surface_set_input_region(rect->surface, region);
-    wl_region_destroy(region);
+    wl_surface_set_input_region(rect->surface, ui->empty_region);
 
     rect->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, rect->surface);
-    if (!rect->viewport) {
-        ww_log(LOG_ERROR, "failed to create viewport for ui_rectangle");
-        goto fail_viewport;
-    }
+    check_alloc(rect->viewport);
     wp_viewport_set_destination(rect->viewport, width, height);
 
     return rect;
-
-fail_viewport:
-    wl_surface_destroy(rect->surface);
-
-fail_region:
-fail_surface:
-    remote_buffer_deref(rect->buffer);
 
 fail_buffer:
     free(rect);
@@ -460,10 +408,7 @@ ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible) {
     if (visible) {
         rect->subsurface = wl_subcompositor_get_subsurface(
             rect->parent->server->backend->subcompositor, rect->surface, rect->parent->surface);
-        if (!rect->subsurface) {
-            ww_log(LOG_ERROR, "failed to create subsurface for ui_rectangle");
-            return;
-        }
+        check_alloc(rect->subsurface);
 
         wl_subsurface_set_position(rect->subsurface, rect->x, rect->y);
         wl_subsurface_set_desync(rect->subsurface);

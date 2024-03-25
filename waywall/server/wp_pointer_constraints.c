@@ -241,11 +241,7 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
     pointer_constraints->global =
         wl_global_create(server->display, &zwp_pointer_constraints_v1_interface,
                          SRV_POINTER_CONSTRAINTS_VERSION, pointer_constraints, on_global_bind);
-    if (!pointer_constraints->global) {
-        ww_log(LOG_ERROR, "failed to allocate wl_pointer_constraints global");
-        free(pointer_constraints);
-        return NULL;
-    }
+    check_alloc(pointer_constraints->global);
 
     wl_list_init(&pointer_constraints->objects);
 

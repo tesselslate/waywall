@@ -213,10 +213,7 @@ get_string(struct config *cfg, const char *key, char **dst, const char *full_nam
     case LUA_TSTRING:
         free(*dst);
         *dst = strdup(lua_tostring(cfg->L, -1));
-        if (!*dst) {
-            ww_log(LOG_ERROR, "failed to allocate string for '%s'", full_name);
-            return 1;
-        }
+        check_alloc(*dst);
         break;
     case LUA_TNIL:
         if (required) {
@@ -265,10 +262,7 @@ get_table(struct config *cfg, const char *key, int (*func)(struct config *), con
 static int
 parse_bind(const char *orig, struct config_action *action) {
     char *bind = strdup(orig);
-    if (!bind) {
-        ww_log(LOG_ERROR, "failed to allocate keybind string");
-        return 1;
-    }
+    check_alloc(bind);
 
     char *needle = bind;
     char *elem;
@@ -781,18 +775,9 @@ config_create() {
 
     for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
         char **storage = strings[i].storage;
-        const char *name = strings[i].name;
 
         *storage = strdup(*storage);
-        if (!*storage) {
-            ww_log(LOG_ERROR, "failed to allocate %s", name);
-
-            for (size_t j = 0; j < i; j++) {
-                free(*strings[j].storage);
-            }
-            free(cfg);
-            return NULL;
-        }
+        check_alloc(*storage);
     }
 
     return cfg;

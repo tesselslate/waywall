@@ -67,10 +67,7 @@ counter_set_file(struct counter *counter, const char *path) {
     }
 
     char *path_dup = strdup(path);
-    if (!path_dup) {
-        ww_log(LOG_ERROR, "failed to allocate counter path");
-        return 1;
-    }
+    check_alloc(path_dup);
 
     int fd = open(path, O_CREAT | O_RDWR, 0644);
     if (fd == -1) {

@@ -156,11 +156,7 @@ server_xdg_decoration_manager_create(struct server *server) {
     xdg_decoration_manager->global = wl_global_create(
         server->display, &zxdg_decoration_manager_v1_interface, SRV_XDG_DECORATION_MANAGER_VERSION,
         xdg_decoration_manager, on_global_bind);
-    if (!xdg_decoration_manager->global) {
-        ww_log(LOG_ERROR, "failed to allocate xdg_decoration_manager global");
-        free(xdg_decoration_manager);
-        return NULL;
-    }
+    check_alloc(xdg_decoration_manager->global);
 
     xdg_decoration_manager->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &xdg_decoration_manager->on_display_destroy);

@@ -55,9 +55,8 @@ cmd_waywall() {
     }
 
     struct config *cfg = config_create();
-    if (!cfg) {
-        goto fail_config_create;
-    }
+    ww_assert(cfg);
+
     if (config_load(cfg) != 0) {
         goto fail_config_populate;
     }
@@ -120,8 +119,6 @@ fail_inotify:
 fail_server:
 fail_config_populate:
     config_destroy(cfg);
-
-fail_config_create:
     lock.l_type = F_UNLCK;
     fcntl(display_file_fd, F_SETLK, &lock);
 

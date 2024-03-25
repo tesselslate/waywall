@@ -46,18 +46,11 @@ layout_active(struct wall *wall) {
     ww_assert(!ON_WALL(wall));
 
     struct transaction *txn = transaction_create();
-    if (!txn) {
-        ww_log(LOG_ERROR, "failed transaction_create in layout_active");
-        return;
-    }
+    ww_assert(txn);
 
     struct transaction_view *view =
         transaction_get_view(txn, wall->instances[wall->active_instance]->view);
-    if (!view) {
-        ww_log(LOG_ERROR, "failed transaction_get_view in layout_active");
-        transaction_destroy(txn);
-        return;
-    }
+    ww_assert(view);
 
     if (wall->active_res.w == 0) {
         ww_assert(wall->active_res.h == 0);
@@ -144,10 +137,7 @@ layout_wall(struct wall *wall) {
     }
 
     struct transaction *txn = transaction_create();
-    if (!txn) {
-        ww_log(LOG_ERROR, "failed transaction_create in layout_wall");
-        return;
-    }
+    ww_assert(txn);
 
     destroy_rectangles(wall);
 
@@ -173,11 +163,7 @@ layout_wall(struct wall *wall) {
 
             struct transaction_view *view =
                 transaction_get_view(txn, wall->instances[element->data.instance]->view);
-            if (!view) {
-                ww_log(LOG_ERROR, "failed transaction_get_view in layout_wall");
-                transaction_destroy(txn);
-                return;
-            }
+            ww_assert(view);
 
             transaction_view_set_dest_size(view, element->w, element->h);
             transaction_view_set_position(view, element->x, element->y);
@@ -196,10 +182,7 @@ layout_wall(struct wall *wall) {
             struct ui_rectangle *rect =
                 ui_rectangle_create(wall->server->ui, element->x, element->y, element->w,
                                     element->h, element->data.rectangle);
-            if (!rect) {
-                transaction_destroy(txn);
-                return;
-            }
+            ww_assert(rect);
 
             ui_rectangle_set_visible(rect, true);
             add_rectangle(wall, rect);
@@ -210,11 +193,8 @@ layout_wall(struct wall *wall) {
     for (int i = 0; i < wall->num_instances; i++) {
         if (!shown[i]) {
             struct transaction_view *view = transaction_get_view(txn, wall->instances[i]->view);
-            if (!view) {
-                ww_log(LOG_ERROR, "failed transaction_get_view in layout_wall");
-                transaction_destroy(txn);
-                return;
-            }
+            ww_assert(view);
+
             transaction_view_set_visible(view, false);
         }
     }
@@ -395,17 +375,10 @@ play_instance(struct wall *wall, int id) {
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
     struct transaction *txn = transaction_create();
-    if (!txn) {
-        ww_log(LOG_ERROR, "failed transaction_create in play_instance");
-        return;
-    }
+    ww_assert(txn);
 
     struct transaction_view *view = transaction_get_view(txn, wall->instances[id]->view);
-    if (!view) {
-        ww_log(LOG_ERROR, "failed transaction_get_view in play_instance");
-        transaction_destroy(txn);
-        return;
-    }
+    ww_assert(view);
 
     transaction_view_set_position(view, 0, 0);
     transaction_view_set_dest_size(view, wall->width, wall->height);
@@ -415,11 +388,8 @@ play_instance(struct wall *wall, int id) {
     for (int i = 0; i < wall->num_instances; i++) {
         if (i != id) {
             view = transaction_get_view(txn, wall->instances[i]->view);
-            if (!view) {
-                ww_log(LOG_ERROR, "failed transaction_get_view in play_instance");
-                transaction_destroy(txn);
-                return;
-            }
+            ww_assert(view);
+
             transaction_view_set_visible(view, false);
         }
     }
@@ -761,17 +731,10 @@ wall_lua_set_res(struct wall *wall, int id, int32_t width, int32_t height) {
         layout_active(wall);
     } else {
         struct transaction *txn = transaction_create();
-        if (!txn) {
-            ww_log(LOG_ERROR, "failed transaction_create in wall_lua_set_res");
-            return 0;
-        }
+        ww_assert(txn);
 
         struct transaction_view *view = transaction_get_view(txn, wall->instances[id]->view);
-        if (!view) {
-            ww_log(LOG_ERROR, "failed transaction_get_view in wall_lua_set_res");
-            transaction_destroy(txn);
-            return 0;
-        }
+        ww_assert(view);
 
         transaction_view_set_size(view, width, height);
 

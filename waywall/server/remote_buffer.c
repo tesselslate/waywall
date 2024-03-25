@@ -121,15 +121,11 @@ remote_buffer_manager_create(struct server *server) {
     }
 
     manager->pool = wl_shm_create_pool(server->backend->shm, manager->fd, manager->size);
-    if (!manager->pool) {
-        ww_log(LOG_ERROR, "failed to create wl_shm_pool");
-        goto fail_shm_pool;
-    }
+    check_alloc(manager->pool);
 
     return manager;
 
 fail_mmap:
-fail_shm_pool:
 fail_truncate:
     close(manager->fd);
 

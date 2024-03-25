@@ -391,12 +391,7 @@ server_linux_dmabuf_create(struct server *server) {
 
     linux_dmabuf->global = wl_global_create(server->display, &zwp_linux_dmabuf_v1_interface,
                                             SRV_LINUX_DMABUF_VERSION, linux_dmabuf, on_global_bind);
-    if (!linux_dmabuf->global) {
-        ww_log(LOG_ERROR, "failed to allocate linux_dmabuf global");
-        zwp_linux_dmabuf_v1_destroy(server->backend->linux_dmabuf);
-        free(linux_dmabuf);
-        return NULL;
-    }
+    check_alloc(linux_dmabuf->global);
 
     linux_dmabuf->remote = server->backend->linux_dmabuf;
     linux_dmabuf->remote_display = server->backend->display;

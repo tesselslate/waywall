@@ -27,11 +27,7 @@ server_cursor_create(struct server *server) {
     cursor->server = server;
 
     cursor->surface = wl_compositor_create_surface(server->backend->compositor);
-    if (!cursor->surface) {
-        ww_log(LOG_ERROR, "failed to create cursor surface");
-        free(cursor);
-        return NULL;
-    }
+    check_alloc(cursor->surface);
 
     cursor->on_pointer_enter.notify = on_pointer_enter;
     wl_signal_add(&server->seat->events.pointer_enter, &cursor->on_pointer_enter);

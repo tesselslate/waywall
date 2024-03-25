@@ -68,10 +68,7 @@ process_pointer(struct server_relative_pointer *relative_pointer, struct wl_poin
     if (pointer) {
         relative_pointer->remote_pointer =
             zwp_relative_pointer_manager_v1_get_relative_pointer(relative_pointer->remote, pointer);
-        if (!relative_pointer->remote_pointer) {
-            ww_log(LOG_ERROR, "failed to get remote relative pointer");
-            return;
-        }
+        check_alloc(relative_pointer->remote_pointer);
 
         zwp_relative_pointer_v1_add_listener(relative_pointer->remote_pointer,
                                              &relative_pointer_listener, relative_pointer);
@@ -180,11 +177,7 @@ server_relative_pointer_create(struct server *server, struct config *cfg) {
     relative_pointer->global =
         wl_global_create(server->display, &zwp_relative_pointer_manager_v1_interface,
                          SRV_RELATIVE_POINTER_VERSION, relative_pointer, on_global_bind);
-    if (!relative_pointer->global) {
-        ww_log(LOG_ERROR, "failed to allocate wl_relative_pointer global");
-        free(relative_pointer);
-        return NULL;
-    }
+    check_alloc(relative_pointer->global);
 
     wl_list_init(&relative_pointer->objects);
 
