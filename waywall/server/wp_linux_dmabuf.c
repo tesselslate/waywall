@@ -180,17 +180,9 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
     }
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, 0);
-    if (!buffer_resource) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(buffer_resource);
 
     buffer_params->buffer = server_buffer_create_invalid(buffer_resource);
-    if (!buffer_params->buffer) {
-        wl_resource_post_no_memory(buffer_resource);
-        return;
-    }
-
     buffer_params->data->width = width;
     buffer_params->data->height = height;
 
@@ -221,17 +213,9 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
     }
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    if (!buffer_resource) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(buffer_resource);
 
     buffer_params->buffer = server_buffer_create_invalid(buffer_resource);
-    if (!buffer_params->buffer) {
-        wl_resource_post_no_memory(buffer_resource);
-        return;
-    }
-
     buffer_params->data->width = width;
     buffer_params->data->height = height;
 
@@ -296,18 +280,12 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 
     buffer_params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
                                                  wl_resource_get_version(resource), id);
-    if (!buffer_params->resource) {
-        wl_resource_post_no_memory(resource);
-        goto fail_resource;
-    }
+    check_alloc(buffer_params->resource);
     wl_resource_set_implementation(buffer_params->resource, &linux_buffer_params_impl,
                                    buffer_params, linux_buffer_params_resource_destroy);
 
     buffer_params->remote = zwp_linux_dmabuf_v1_create_params(linux_dmabuf->remote);
-    if (!buffer_params->remote) {
-        wl_resource_post_no_memory(buffer_params->resource);
-        goto fail_remote;
-    }
+    check_alloc(buffer_params->remote);
 
     zwp_linux_buffer_params_v1_add_listener(buffer_params->remote, &linux_buffer_params_listener,
                                             buffer_params);
@@ -316,11 +294,6 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
     buffer_params->remote_display = linux_dmabuf->remote_display;
 
     return;
-
-fail_remote:
-fail_resource:
-    free(buffer_params);
-    free(buffer_data);
 }
 
 static void
@@ -337,20 +310,12 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
 
     feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface,
                                             wl_resource_get_version(resource), id);
-    if (!feedback->resource) {
-        wl_resource_post_no_memory(resource);
-        free(feedback);
-        return;
-    }
+    check_alloc(feedback->resource);
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
 
     feedback->remote = zwp_linux_dmabuf_v1_get_default_feedback(linux_dmabuf->remote);
-    if (!feedback->remote) {
-        wl_resource_post_no_memory(feedback->resource);
-        free(feedback);
-        return;
-    }
+    check_alloc(feedback->remote);
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
@@ -367,21 +332,13 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
 
     feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface,
                                             wl_resource_get_version(resource), id);
-    if (!feedback->resource) {
-        wl_resource_post_no_memory(resource);
-        free(feedback);
-        return;
-    }
+    check_alloc(feedback->resource);
     wl_resource_set_implementation(feedback->resource, &linux_dmabuf_feedback_impl, feedback,
                                    linux_dmabuf_feedback_resource_destroy);
 
     feedback->remote =
         zwp_linux_dmabuf_v1_get_surface_feedback(linux_dmabuf->remote, surface->remote);
-    if (!feedback->remote) {
-        wl_resource_post_no_memory(feedback->resource);
-        free(feedback);
-        return;
-    }
+    check_alloc(feedback->remote);
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
@@ -411,10 +368,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct wl_resource *resource =
         wl_resource_create(client, &zwp_linux_dmabuf_v1_interface, version, id);
-    if (!resource) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    check_alloc(resource);
     wl_resource_set_implementation(resource, &linux_dmabuf_impl, linux_dmabuf,
                                    linux_dmabuf_resource_destroy);
 }

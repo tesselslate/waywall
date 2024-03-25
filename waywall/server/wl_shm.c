@@ -79,33 +79,15 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
     buffer_data->height = height;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
-    if (!buffer_resource) {
-        wl_resource_post_no_memory(resource);
-        goto fail_resource;
-    }
+    check_alloc(buffer_resource);
 
     struct wl_buffer *remote =
         wl_shm_pool_create_buffer(shm_pool->remote, offset, width, height, stride, format);
-    if (!remote) {
-        wl_resource_post_no_memory(buffer_resource);
-        goto fail_remote;
-    }
+    check_alloc(remote);
 
-    struct server_buffer *buffer =
-        server_buffer_create(buffer_resource, remote, &shm_buffer_impl, buffer_data);
-    if (!buffer) {
-        wl_resource_post_no_memory(buffer_resource);
-        goto fail_buffer;
-    }
+    server_buffer_create(buffer_resource, remote, &shm_buffer_impl, buffer_data);
 
     return;
-
-fail_buffer:
-    wl_buffer_destroy(remote);
-
-fail_remote:
-fail_resource:
-    free(buffer_data);
 }
 
 static void
@@ -148,12 +130,7 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
 
     shm_pool->resource =
         wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
-    if (!shm_pool->resource) {
-        wl_resource_post_no_memory(resource);
-        close(fd);
-        free(shm_pool);
-        return;
-    }
+    check_alloc(shm_pool->resource);
     wl_resource_set_implementation(shm_pool->resource, &shm_pool_impl, shm_pool,
                                    shm_pool_resource_destroy);
 
@@ -162,12 +139,7 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
     shm_pool->sz = size;
 
     shm_pool->remote = wl_shm_create_pool(shm->remote, fd, size);
-    if (!shm_pool->remote) {
-        wl_resource_post_no_memory(shm_pool->resource);
-        close(fd);
-        free(shm_pool);
-        return;
-    }
+    check_alloc(shm_pool->remote);
 }
 
 static const struct wl_shm_interface shm_impl = {
@@ -181,10 +153,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     struct server_shm *shm = data;
 
     struct wl_resource *resource = wl_resource_create(client, &wl_shm_interface, version, id);
-    if (!resource) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    check_alloc(resource);
     wl_resource_set_implementation(resource, &shm_impl, shm, shm_resource_destroy);
 
     wl_list_insert(&shm->objects, wl_resource_get_link(resource));

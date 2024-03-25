@@ -62,10 +62,8 @@ region_add(struct wl_client *client, struct wl_resource *resource, int32_t x, in
     wl_region_add(region->remote, x, y, width, height);
 
     struct server_region_op *op = wl_array_add(&region->ops, sizeof(*op));
-    if (!op) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(op);
+
     op->add = true;
     op->x = x;
     op->y = y;
@@ -86,10 +84,8 @@ region_subtract(struct wl_client *client, struct wl_resource *resource, int32_t 
     wl_region_subtract(region->remote, x, y, width, height);
 
     struct server_region_op *op = wl_array_add(&region->ops, sizeof(*op));
-    if (!op) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(op);
+
     op->add = false;
     op->x = x;
     op->y = y;
@@ -197,10 +193,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
     }
     if (state->apply & SURFACE_STATE_OPAQUE) {
         struct wl_region *region = wl_compositor_create_region(surface->parent->remote);
-        if (!region) {
-            wl_resource_post_no_memory(resource);
-            return;
-        }
+        check_alloc(region);
 
         struct server_region_op *op;
         wl_array_for_each(op, &state->opaque) {
@@ -232,10 +225,8 @@ surface_damage(struct wl_client *client, struct wl_resource *resource, int32_t x
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
     struct server_surface_damage *dmg = wl_array_add(&surface->pending.damage, sizeof(*dmg));
-    if (!dmg) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(dmg);
+
     dmg->x = x;
     dmg->y = y;
     dmg->width = width;
@@ -249,10 +240,8 @@ surface_damage_buffer(struct wl_client *client, struct wl_resource *resource, in
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
     struct server_surface_damage *dmg = wl_array_add(&surface->pending.buffer_damage, sizeof(*dmg));
-    if (!dmg) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(dmg);
+
     dmg->x = x;
     dmg->y = y;
     dmg->width = width;
@@ -272,19 +261,11 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
     struct server_surface_frame *frame = zalloc(1, sizeof(*frame));
 
     frame->resource = wl_resource_create(client, &wl_callback_interface, 1, id);
-    if (!frame->resource) {
-        wl_resource_post_no_memory(resource);
-        free(frame);
-        return;
-    }
+    check_alloc(frame->resource);
     wl_resource_set_implementation(frame->resource, NULL, frame, surface_frame_resource_destroy);
 
     frame->remote = wl_surface_frame(surface->remote);
-    if (!frame->remote) {
-        wl_resource_post_no_memory(frame->resource);
-        free(frame);
-        return;
-    }
+    check_alloc(frame->remote);
     wl_callback_add_listener(frame->remote, &surface_frame_listener, frame);
 }
 
@@ -361,19 +342,11 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
 
     region->resource =
         wl_resource_create(client, &wl_region_interface, wl_resource_get_version(resource), id);
-    if (!region->resource) {
-        wl_resource_post_no_memory(resource);
-        free(region);
-        return;
-    }
+    check_alloc(region->resource);
     wl_resource_set_implementation(region->resource, &region_impl, region, region_resource_destroy);
 
     region->remote = wl_compositor_create_region(compositor->remote);
-    if (!region->remote) {
-        wl_resource_post_no_memory(region->resource);
-        free(region);
-        return;
-    }
+    check_alloc(region->remote);
 
     wl_array_init(&region->ops);
 }
@@ -386,20 +359,12 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     surface->resource =
         wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
-    if (!surface->resource) {
-        wl_resource_post_no_memory(resource);
-        free(surface);
-        return;
-    }
+    check_alloc(surface->resource);
     wl_resource_set_implementation(surface->resource, &surface_impl, surface,
                                    surface_resource_destroy);
 
     surface->remote = wl_compositor_create_surface(compositor->remote);
-    if (!surface->remote) {
-        wl_resource_post_no_memory(surface->resource);
-        free(surface);
-        return;
-    }
+    check_alloc(surface->remote);
 
     // We need to ensure that input events are never given to a child surface. See
     // `surface_set_input_region` for more details.
@@ -422,10 +387,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct wl_resource *resource =
         wl_resource_create(client, &wl_compositor_interface, version, id);
-    if (!resource) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    check_alloc(resource);
     wl_resource_set_implementation(resource, &compositor_impl, compositor,
                                    compositor_resource_destroy);
 }

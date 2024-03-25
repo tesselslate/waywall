@@ -118,10 +118,7 @@ pointer_constraints_lock_pointer(struct wl_client *client, struct wl_resource *r
 
     struct wl_resource *locked_pointer_resource = wl_resource_create(
         client, &zwp_locked_pointer_v1_interface, wl_resource_get_version(resource), id);
-    if (!locked_pointer_resource) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(locked_pointer_resource);
     wl_resource_set_implementation(locked_pointer_resource, &locked_pointer_impl,
                                    pointer_constraints, locked_pointer_resource_destroy);
 
@@ -150,10 +147,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct wl_resource *resource =
         wl_resource_create(client, &zwp_pointer_constraints_v1_interface, version, id);
-    if (!resource) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    check_alloc(resource);
     wl_resource_set_implementation(resource, &pointer_constraints_impl, pointer_constraints,
                                    pointer_constraints_resource_destroy);
 }

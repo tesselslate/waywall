@@ -239,10 +239,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     view->surface = surface;
 
     view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
-    if (!view->viewport) {
-        free(view);
-        return NULL;
-    }
+    check_alloc(view->viewport);
 
     view->impl = impl;
     view->impl_resource = impl_resource;

@@ -110,10 +110,7 @@ relative_pointer_manager_get_relative_pointer(struct wl_client *client,
 
     struct wl_resource *relative_pointer_resource = wl_resource_create(
         client, &zwp_relative_pointer_v1_interface, wl_resource_get_version(resource), id);
-    if (!relative_pointer_resource) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(relative_pointer_resource);
     wl_resource_set_implementation(relative_pointer_resource, &relative_pointer_impl,
                                    relative_pointer, relative_pointer_resource_destroy);
 
@@ -133,10 +130,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct wl_resource *resource =
         wl_resource_create(client, &zwp_relative_pointer_manager_v1_interface, version, id);
-    if (!resource) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    check_alloc(resource);
     wl_resource_set_implementation(resource, &relative_pointer_manager_impl, relative_pointer,
                                    relative_pointer_manager_resource_destroy);
 }

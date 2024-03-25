@@ -845,10 +845,7 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
 
     struct wl_resource *keyboard_resource =
         wl_resource_create(client, &wl_keyboard_interface, wl_resource_get_version(resource), id);
-    if (!keyboard_resource) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(keyboard_resource);
     wl_resource_set_implementation(keyboard_resource, &keyboard_impl, seat,
                                    keyboard_resource_destroy);
 
@@ -870,10 +867,7 @@ seat_get_pointer(struct wl_client *client, struct wl_resource *resource, uint32_
 
     struct wl_resource *pointer_resource =
         wl_resource_create(client, &wl_pointer_interface, wl_resource_get_version(resource), id);
-    if (!pointer_resource) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    check_alloc(pointer_resource);
     wl_resource_set_implementation(pointer_resource, &pointer_impl, seat, pointer_resource_destroy);
 
     wl_list_insert(&seat->pointers, wl_resource_get_link(pointer_resource));
@@ -903,10 +897,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     struct server_seat *seat = data;
 
     struct wl_resource *resource = wl_resource_create(client, &wl_seat_interface, version, id);
-    if (!resource) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    check_alloc(resource);
     wl_resource_set_implementation(resource, &seat_impl, seat, seat_resource_destroy);
 
     if (version >= WL_SEAT_NAME_SINCE_VERSION) {

@@ -114,9 +114,6 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
         xdg_toplevel->view =
             server_view_create(xdg_surface->xdg_wm_base->server->ui, xdg_surface->parent,
                                &xdg_toplevel_view_impl, xdg_toplevel->resource);
-        if (!xdg_toplevel->view) {
-            wl_resource_post_no_memory(role_resource);
-        }
     }
 }
 
@@ -331,11 +328,7 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
 
     xdg_toplevel->resource =
         wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
-    if (!xdg_toplevel->resource) {
-        wl_resource_post_no_memory(resource);
-        free(xdg_toplevel);
-        return;
-    }
+    check_alloc(xdg_toplevel->resource);
     wl_resource_set_implementation(xdg_toplevel->resource, &xdg_toplevel_impl, xdg_toplevel,
                                    xdg_toplevel_resource_destroy);
 
@@ -399,11 +392,7 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
 
     xdg_surface->resource =
         wl_resource_create(client, &xdg_surface_interface, wl_resource_get_version(resource), id);
-    if (!xdg_surface->resource) {
-        wl_resource_post_no_memory(resource);
-        free(xdg_surface);
-        return;
-    }
+    check_alloc(xdg_surface->resource);
     wl_resource_set_implementation(xdg_surface->resource, &xdg_surface_impl, xdg_surface,
                                    xdg_surface_resource_destroy);
 
@@ -441,11 +430,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     struct server_xdg_client *xdg_client = zalloc(1, sizeof(*xdg_client));
 
     xdg_client->resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
-    if (!xdg_client->resource) {
-        wl_client_post_no_memory(client);
-        free(xdg_client);
-        return;
-    }
+    check_alloc(xdg_client->resource);
     wl_resource_set_implementation(xdg_client->resource, &xdg_wm_base_impl, xdg_client,
                                    xdg_wm_base_resource_destroy);
 
