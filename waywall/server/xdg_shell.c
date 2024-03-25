@@ -327,11 +327,7 @@ xdg_surface_get_toplevel(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
-    struct server_xdg_toplevel *xdg_toplevel = calloc(1, sizeof(*xdg_toplevel));
-    if (!xdg_toplevel) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_xdg_toplevel *xdg_toplevel = zalloc(1, sizeof(*xdg_toplevel));
 
     xdg_toplevel->resource =
         wl_resource_create(client, &xdg_toplevel_interface, wl_resource_get_version(resource), id);
@@ -399,11 +395,7 @@ xdg_wm_base_get_xdg_surface(struct wl_client *client, struct wl_resource *resour
         return;
     }
 
-    struct server_xdg_surface *xdg_surface = calloc(1, sizeof(*xdg_surface));
-    if (!xdg_surface) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_xdg_surface *xdg_surface = zalloc(1, sizeof(*xdg_surface));
 
     xdg_surface->resource =
         wl_resource_create(client, &xdg_surface_interface, wl_resource_get_version(resource), id);
@@ -446,11 +438,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     struct server_xdg_wm_base *xdg_wm_base = data;
 
-    struct server_xdg_client *xdg_client = calloc(1, sizeof(*xdg_client));
-    if (!xdg_client) {
-        wl_client_post_no_memory(client);
-        return;
-    }
+    struct server_xdg_client *xdg_client = zalloc(1, sizeof(*xdg_client));
 
     xdg_client->resource = wl_resource_create(client, &xdg_wm_base_interface, version, id);
     if (!xdg_client->resource) {
@@ -480,11 +468,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
 struct server_xdg_wm_base *
 server_xdg_wm_base_create(struct server *server) {
-    struct server_xdg_wm_base *xdg_wm_base = calloc(1, sizeof(*xdg_wm_base));
-    if (!xdg_wm_base) {
-        ww_log(LOG_ERROR, "failed to allocate server_xdg_wm_base");
-        return NULL;
-    }
+    struct server_xdg_wm_base *xdg_wm_base = zalloc(1, sizeof(*xdg_wm_base));
 
     xdg_wm_base->global = wl_global_create(server->display, &xdg_wm_base_interface,
                                            SRV_XDG_WM_BASE_VERSION, xdg_wm_base, on_global_bind);

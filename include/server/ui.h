@@ -119,7 +119,8 @@ void transaction_view_set_size(struct transaction_view *view, uint32_t width, ui
 void transaction_view_set_visible(struct transaction_view *view, bool visible);
 
 struct ui_rectangle *ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y,
-                                         uint32_t width, uint32_t height, const uint8_t rgba[static 4]);
+                                         uint32_t width, uint32_t height,
+                                         const uint8_t rgba[static 4]);
 void ui_rectangle_destroy(struct ui_rectangle *rect);
 void ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible);
 

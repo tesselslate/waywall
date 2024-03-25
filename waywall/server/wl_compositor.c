@@ -269,11 +269,7 @@ static void
 surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
-    struct server_surface_frame *frame = calloc(1, sizeof(*frame));
-    if (!frame) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_surface_frame *frame = zalloc(1, sizeof(*frame));
 
     frame->resource = wl_resource_create(client, &wl_callback_interface, 1, id);
     if (!frame->resource) {
@@ -361,11 +357,7 @@ static void
 compositor_create_region(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_compositor *compositor = wl_resource_get_user_data(resource);
 
-    struct server_region *region = calloc(1, sizeof(*region));
-    if (!region) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_region *region = zalloc(1, sizeof(*region));
 
     region->resource =
         wl_resource_create(client, &wl_region_interface, wl_resource_get_version(resource), id);
@@ -390,11 +382,7 @@ static void
 compositor_create_surface(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_compositor *compositor = wl_resource_get_user_data(resource);
 
-    struct server_surface *surface = calloc(1, sizeof(*surface));
-    if (!surface) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_surface *surface = zalloc(1, sizeof(*surface));
 
     surface->resource =
         wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
@@ -458,11 +446,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
 struct server_compositor *
 server_compositor_create(struct server *server) {
-    struct server_compositor *compositor = calloc(1, sizeof(*compositor));
-    if (!compositor) {
-        ww_log(LOG_ERROR, "failed to allocate server_compositor");
-        return NULL;
-    }
+    struct server_compositor *compositor = zalloc(1, sizeof(*compositor));
 
     compositor->global = wl_global_create(server->display, &wl_compositor_interface,
                                           SRV_COMPOSITOR_VERSION, compositor, on_global_bind);

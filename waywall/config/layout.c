@@ -139,22 +139,14 @@ unmarshal_layout(struct config *cfg, struct wall *wall) {
         return NULL;
     }
 
-    struct config_layout *layout = calloc(1, sizeof(*layout));
-    if (!layout) {
-        ww_log(LOG_ERROR, "failed to allocate config_layout");
-        return NULL;
-    }
+    struct config_layout *layout = zalloc(1, sizeof(*layout));
 
     layout->num_elements = lua_objlen(cfg->L, -1);
     if (layout->num_elements == 0) {
         return layout;
     }
 
-    layout->elements = calloc(layout->num_elements, sizeof(*layout->elements));
-    if (!layout->elements) {
-        ww_log(LOG_ERROR, "failed to allocate config_layout->entries");
-        goto fail_elements;
-    }
+    layout->elements = zalloc(layout->num_elements, sizeof(*layout->elements));
 
     size_t i = 0;
     lua_pushnil(cfg->L);
@@ -172,8 +164,6 @@ unmarshal_layout(struct config *cfg, struct wall *wall) {
 fail_element:
     lua_pop(cfg->L, 2);
     free(layout->elements);
-
-fail_elements:
     free(layout);
     return NULL;
 }

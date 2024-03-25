@@ -54,10 +54,7 @@ static const struct wl_buffer_interface server_buffer_impl = {
 struct server_buffer *
 server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,
                      const struct server_buffer_impl *impl, void *data) {
-    struct server_buffer *buffer = calloc(1, sizeof(*buffer));
-    if (!buffer) {
-        return NULL;
-    }
+    struct server_buffer *buffer = zalloc(1, sizeof(*buffer));
 
     buffer->resource = resource;
     buffer->remote = remote;
@@ -72,10 +69,7 @@ server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,
 
 struct server_buffer *
 server_buffer_create_invalid(struct wl_resource *resource) {
-    struct server_buffer *buffer = calloc(1, sizeof(*buffer));
-    if (!buffer) {
-        return NULL;
-    }
+    struct server_buffer *buffer = zalloc(1, sizeof(*buffer));
 
     buffer->resource = resource;
     buffer->impl = &invalid_buffer_impl;

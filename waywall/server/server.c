@@ -69,11 +69,7 @@ on_view_destroy(struct wl_listener *listener, void *data) {
 
 struct server *
 server_create(struct config *cfg) {
-    struct server *server = calloc(1, sizeof(*server));
-    if (!server) {
-        ww_log(LOG_ERROR, "failed to allocate server");
-        return NULL;
-    }
+    struct server *server = zalloc(1, sizeof(*server));
 
     server->cfg = cfg;
 

@@ -72,4 +72,13 @@ str_append(struct str *dst, const char *src) {
     return true;
 }
 
+static inline void *
+zalloc(size_t nmemb, size_t size) {
+    void *data = calloc(nmemb, size);
+    if (__builtin_expect(!data, 0)) {
+        ww_panic("allocation failed");
+    }
+    return data;
+}
+
 #endif

@@ -21,11 +21,7 @@ on_pointer_enter(struct wl_listener *listener, void *data) {
 
 struct server_cursor *
 server_cursor_create(struct server *server) {
-    struct server_cursor *cursor = calloc(1, sizeof(*cursor));
-    if (!cursor) {
-        ww_log(LOG_ERROR, "failed to allocate server_cursor");
-        return NULL;
-    }
+    struct server_cursor *cursor = zalloc(1, sizeof(*cursor));
 
     cursor->cfg = server->cfg;
     cursor->server = server;

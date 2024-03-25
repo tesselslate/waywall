@@ -178,11 +178,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
 struct server_relative_pointer *
 server_relative_pointer_create(struct server *server, struct config *cfg) {
-    struct server_relative_pointer *relative_pointer = calloc(1, sizeof(*relative_pointer));
-    if (!relative_pointer) {
-        ww_log(LOG_ERROR, "failed to allocate server_relative_pointer");
-        return NULL;
-    }
+    struct server_relative_pointer *relative_pointer = zalloc(1, sizeof(*relative_pointer));
 
     relative_pointer->cfg = cfg;
     relative_pointer->server = server;

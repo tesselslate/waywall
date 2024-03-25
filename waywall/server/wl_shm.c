@@ -73,11 +73,7 @@ shm_pool_create_buffer(struct wl_client *client, struct wl_resource *resource, u
         return;
     }
 
-    struct shm_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
-    if (!buffer_data) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct shm_buffer_data *buffer_data = zalloc(1, sizeof(*buffer_data));
 
     buffer_data->width = width;
     buffer_data->height = height;
@@ -148,11 +144,7 @@ shm_create_pool(struct wl_client *client, struct wl_resource *resource, uint32_t
                 int32_t size) {
     struct server_shm *shm = wl_resource_get_user_data(resource);
 
-    struct server_shm_pool *shm_pool = calloc(1, sizeof(*shm_pool));
-    if (!shm_pool) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_shm_pool *shm_pool = zalloc(1, sizeof(*shm_pool));
 
     shm_pool->resource =
         wl_resource_create(client, &wl_shm_pool_interface, wl_resource_get_version(resource), id);
@@ -223,11 +215,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
 struct server_shm *
 server_shm_create(struct server *server) {
-    struct server_shm *shm = calloc(1, sizeof(*shm));
-    if (!shm) {
-        ww_log(LOG_ERROR, "failed to allocate server_shm");
-        return NULL;
-    }
+    struct server_shm *shm = zalloc(1, sizeof(*shm));
 
     shm->global =
         wl_global_create(server->display, &wl_shm_interface, SRV_SHM_VERSION, shm, on_global_bind);

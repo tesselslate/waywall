@@ -177,10 +177,7 @@ l_reset(lua_State *L) {
             return 1;
         }
 
-        int *ids = calloc(n, sizeof(int));
-        if (!ids) {
-            return luaL_error(L, "failed to allocate IDs");
-        }
+        int *ids = zalloc(n, sizeof(int));
 
         lua_pushnil(L);
         for (size_t i = 0; i < n; i++) {

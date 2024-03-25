@@ -100,11 +100,7 @@ remote_buffer_manager_create(struct server *server) {
         return NULL;
     }
 
-    struct remote_buffer_manager *manager = calloc(1, sizeof(*manager));
-    if (!manager) {
-        ww_log(LOG_ERROR, "failed to allocate remote_buffer_manager");
-        return NULL;
-    }
+    struct remote_buffer_manager *manager = zalloc(1, sizeof(*manager));
 
     manager->fd = memfd_create("waywall-shm", MFD_CLOEXEC);
     if (manager->fd == -1) {

@@ -605,11 +605,7 @@ instance_create(struct server_view *view, struct inotify *inotify) {
         return NULL;
     }
 
-    struct instance *instance = calloc(1, sizeof(*instance));
-    if (!instance) {
-        ww_log(LOG_ERROR, "failed to allocate instance");
-        return NULL;
-    }
+    struct instance *instance = zalloc(1, sizeof(*instance));
 
     instance->dir = strdup(dir);
     instance->pid = pid;

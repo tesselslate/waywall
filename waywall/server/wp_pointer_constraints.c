@@ -239,11 +239,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 struct server_pointer_constraints *
 server_pointer_constraints_create(struct server *server, struct config *cfg) {
     struct server_pointer_constraints *pointer_constraints =
-        calloc(1, sizeof(*pointer_constraints));
-    if (!pointer_constraints) {
-        ww_log(LOG_ERROR, "failed to allocate server_pointer_constraints");
-        return NULL;
-    }
+        zalloc(1, sizeof(*pointer_constraints));
 
     pointer_constraints->cfg = cfg;
     pointer_constraints->server = server;

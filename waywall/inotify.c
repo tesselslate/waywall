@@ -39,11 +39,7 @@ tick_inotify(int fd, uint32_t mask, void *data) {
 
 struct inotify *
 inotify_create(struct wl_event_loop *loop) {
-    struct inotify *inotify = calloc(1, sizeof(*inotify));
-    if (!inotify) {
-        ww_log(LOG_ERROR, "failed to allocate inotify");
-        return NULL;
-    }
+    struct inotify *inotify = zalloc(1, sizeof(*inotify));
 
     inotify->fd = inotify_init1(IN_NONBLOCK | IN_CLOEXEC);
     if (inotify->fd == -1) {
@@ -58,18 +54,11 @@ inotify_create(struct wl_event_loop *loop) {
         goto fail_src;
     }
 
-    inotify->wd = calloc(8, sizeof(*inotify->wd));
-    if (!inotify->wd) {
-        ww_log(LOG_ERROR, "failed to allocate inotify watch descriptors");
-        goto fail_wd_alloc;
-    }
+    inotify->wd = zalloc(8, sizeof(*inotify->wd));
     inotify->len = 1; // Watch descriptors are allocated starting at 1.
     inotify->cap = 8;
 
     return inotify;
-
-fail_wd_alloc:
-    wl_event_source_remove(inotify->src);
 
 fail_src:
     close(inotify->fd);

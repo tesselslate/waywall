@@ -78,11 +78,7 @@ xdg_decoration_manager_get_toplevel_decoration(struct wl_client *client,
     struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(toplevel_resource);
 
     struct server_xdg_toplevel_decoration *toplevel_decoration =
-        calloc(1, sizeof(*toplevel_decoration));
-    if (!toplevel_decoration) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+        zalloc(1, sizeof(*toplevel_decoration));
 
     toplevel_decoration->xdg_toplevel = xdg_toplevel;
 
@@ -162,11 +158,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 struct server_xdg_decoration_manager *
 server_xdg_decoration_manager_create(struct server *server) {
     struct server_xdg_decoration_manager *xdg_decoration_manager =
-        calloc(1, sizeof(*xdg_decoration_manager));
-    if (!xdg_decoration_manager) {
-        ww_log(LOG_ERROR, "failed to allocate server_xdg_decoration_manager");
-        return NULL;
-    }
+        zalloc(1, sizeof(*xdg_decoration_manager));
 
     xdg_decoration_manager->global = wl_global_create(
         server->display, &zxdg_decoration_manager_v1_interface, SRV_XDG_DECORATION_MANAGER_VERSION,

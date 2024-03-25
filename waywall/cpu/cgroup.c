@@ -198,11 +198,7 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_thresho
         }
     }
 
-    struct cpu_cgroup *cpu = calloc(1, sizeof(*cpu));
-    if (!cpu) {
-        ww_log(LOG_ERROR, "failed to allocate cpu_cgroup");
-        goto fail_cpu;
-    }
+    struct cpu_cgroup *cpu = zalloc(1, sizeof(*cpu));
 
     cpu->config.preview_threshold = preview_threshold;
 
@@ -235,7 +231,6 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_thresho
 fail_group:
     free(cpu);
 
-fail_cpu:
 fail_weight:
     free(cgroup_base);
     return NULL;

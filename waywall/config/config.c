@@ -766,11 +766,7 @@ fail_loadbuffer:
 
 struct config *
 config_create() {
-    struct config *cfg = calloc(1, sizeof(*cfg));
-    if (!cfg) {
-        ww_log(LOG_ERROR, "failed to allocate config");
-        return NULL;
-    }
+    struct config *cfg = zalloc(1, sizeof(*cfg));
 
     // Copy the default configuration, and then heap allocate any strings as needed.
     *cfg = defaults;

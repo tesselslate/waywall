@@ -289,17 +289,9 @@ static void
 linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
 
-    struct dmabuf_buffer_data *buffer_data = calloc(1, sizeof(*buffer_data));
-    if (!buffer_data) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct dmabuf_buffer_data *buffer_data = zalloc(1, sizeof(*buffer_data));
 
-    struct server_linux_buffer_params *buffer_params = calloc(1, sizeof(*buffer_params));
-    if (!buffer_params) {
-        wl_resource_post_no_memory(resource);
-        goto fail_params;
-    }
+    struct server_linux_buffer_params *buffer_params = zalloc(1, sizeof(*buffer_params));
     buffer_params->data = buffer_data;
 
     buffer_params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
@@ -328,8 +320,6 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 fail_remote:
 fail_resource:
     free(buffer_params);
-
-fail_params:
     free(buffer_data);
 }
 
@@ -343,11 +333,7 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
                                   uint32_t id) {
     struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
 
-    struct server_linux_dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
-    if (!feedback) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_linux_dmabuf_feedback *feedback = zalloc(1, sizeof(*feedback));
 
     feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface,
                                             wl_resource_get_version(resource), id);
@@ -377,11 +363,7 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
     struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
-    struct server_linux_dmabuf_feedback *feedback = calloc(1, sizeof(*feedback));
-    if (!feedback) {
-        wl_resource_post_no_memory(resource);
-        return;
-    }
+    struct server_linux_dmabuf_feedback *feedback = zalloc(1, sizeof(*feedback));
 
     feedback->resource = wl_resource_create(client, &zwp_linux_dmabuf_feedback_v1_interface,
                                             wl_resource_get_version(resource), id);
@@ -451,11 +433,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
 struct server_linux_dmabuf *
 server_linux_dmabuf_create(struct server *server) {
-    struct server_linux_dmabuf *linux_dmabuf = calloc(1, sizeof(*linux_dmabuf));
-    if (!linux_dmabuf) {
-        ww_log(LOG_ERROR, "failed to allocate server_linux_dmabuf");
-        return NULL;
-    }
+    struct server_linux_dmabuf *linux_dmabuf = zalloc(1, sizeof(*linux_dmabuf));
 
     linux_dmabuf->global = wl_global_create(server->display, &zwp_linux_dmabuf_v1_interface,
                                             SRV_LINUX_DMABUF_VERSION, linux_dmabuf, on_global_bind);

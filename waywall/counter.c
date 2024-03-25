@@ -8,11 +8,7 @@
 
 struct counter *
 counter_create(const char *path) {
-    struct counter *counter = calloc(1, sizeof(*counter));
-    if (!counter) {
-        ww_log(LOG_ERROR, "failed to allocate counter");
-        return NULL;
-    }
+    struct counter *counter = zalloc(1, sizeof(*counter));
 
     counter->fd = -1;
     if (counter_set_file(counter, path) != 0) {

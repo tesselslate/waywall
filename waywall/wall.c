@@ -598,11 +598,7 @@ static const struct server_seat_listener seat_listener = {
 
 struct wall *
 wall_create(struct server *server, struct inotify *inotify, struct config *cfg) {
-    struct wall *wall = calloc(1, sizeof(*wall));
-    if (!wall) {
-        ww_log(LOG_ERROR, "failed to allocate wall");
-        return NULL;
-    }
+    struct wall *wall = zalloc(1, sizeof(*wall));
 
     wall->cfg = cfg;
     wall->server = server;
@@ -627,11 +623,7 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
         goto fail_cpu;
     }
 
-    wall->layout_rectangles.data = calloc(8, sizeof(*wall->layout_rectangles.data));
-    if (!wall->layout_rectangles.data) {
-        ww_log(LOG_ERROR, "failed to allocate layout rectangles");
-        goto fail_rectangles;
-    }
+    wall->layout_rectangles.data = zalloc(8, sizeof(*wall->layout_rectangles.data));
     wall->layout_rectangles.len = 0;
     wall->layout_rectangles.cap = 8;
 
@@ -655,9 +647,6 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     server_seat_set_listener(server->seat, &seat_listener, wall);
 
     return wall;
-
-fail_rectangles:
-    cpu_destroy(wall->cpu);
 
 fail_cpu:
     if (wall->counter) {

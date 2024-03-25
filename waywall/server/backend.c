@@ -141,11 +141,8 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
             return;
         }
 
-        struct seat_name *seat_name = calloc(1, sizeof(*seat_name));
-        if (!seat_name) {
-            ww_log(LOG_ERROR, "failed to allocate seat_name");
-            return;
-        }
+        struct seat_name *seat_name = zalloc(1, sizeof(*seat_name));
+
         seat_name->name = name;
 
         if (wl_list_empty(&backend->seat.names)) {
@@ -217,11 +214,7 @@ static const struct wl_registry_listener registry_listener = {
 
 struct server_backend *
 server_backend_create() {
-    struct server_backend *backend = calloc(1, sizeof(*backend));
-    if (!backend) {
-        ww_log(LOG_ERROR, "failed to allocate server_backend");
-        return NULL;
-    }
+    struct server_backend *backend = zalloc(1, sizeof(*backend));
 
     wl_list_init(&backend->seat.names);
     wl_array_init(&backend->shm_formats);

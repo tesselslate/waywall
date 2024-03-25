@@ -941,14 +941,11 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
 struct server_seat *
 server_seat_create(struct server *server, struct config *cfg) {
-    struct server_seat *seat = calloc(1, sizeof(*seat));
-    if (!seat) {
-        ww_log(LOG_ERROR, "failed to allocate server_seat");
-        return NULL;
-    }
+    struct server_seat *seat = zalloc(1, sizeof(*seat));
 
     seat->cfg = cfg;
     seat->server = server;
+
     seat->ctx = xkb_context_new(XKB_CONTEXT_NO_FLAGS);
     if (!seat->ctx) {
         ww_log(LOG_ERROR, "failed to create xkb_context");
@@ -958,17 +955,8 @@ server_seat_create(struct server *server, struct config *cfg) {
 
     // It's not necessary to calculate how many of each kind of remap there are. The number of
     // remaps a user might reasonably have is quite small.
-    seat->remaps.keys = calloc(cfg->input.remaps.count, sizeof(*seat->remaps.keys));
-    if (!seat->remaps.keys) {
-        ww_log(LOG_ERROR, "failed to allocate key remaps");
-        goto fail_key_remaps;
-    }
-
-    seat->remaps.buttons = calloc(cfg->input.remaps.count, sizeof(*seat->remaps.buttons));
-    if (!seat->remaps.buttons) {
-        ww_log(LOG_ERROR, "failed to allocate button remaps");
-        goto fail_button_remaps;
-    }
+    seat->remaps.keys = zalloc(cfg->input.remaps.count, sizeof(*seat->remaps.keys));
+    seat->remaps.buttons = zalloc(cfg->input.remaps.count, sizeof(*seat->remaps.buttons));
 
     for (size_t i = 0; i < cfg->input.remaps.count; i++) {
         struct config_remap *remap = &cfg->input.remaps.data[i];
@@ -1004,11 +992,7 @@ server_seat_create(struct server *server, struct config *cfg) {
 
     seat->keyboard.remote_km.fd = -1;
     seat->keyboard.pressed.cap = 8;
-    seat->keyboard.pressed.data = calloc(seat->keyboard.pressed.cap, sizeof(uint32_t));
-    if (!seat->keyboard.pressed.data) {
-        ww_log(LOG_ERROR, "failed to allocate pressed keys array");
-        goto fail_pressed_keys;
-    }
+    seat->keyboard.pressed.data = zalloc(seat->keyboard.pressed.cap, sizeof(uint32_t));
 
     wl_list_init(&seat->keyboards);
     wl_list_init(&seat->pointers);
@@ -1039,19 +1023,12 @@ server_seat_create(struct server *server, struct config *cfg) {
 
     return seat;
 
-fail_pressed_keys:
-    wl_global_destroy(seat->global);
-
 fail_global:
     close(seat->keyboard.local_km.fd);
 
 fail_keymap:
     free(seat->remaps.buttons);
-
-fail_button_remaps:
     free(seat->remaps.keys);
-
-fail_key_remaps:
     xkb_context_unref(seat->ctx);
 
 fail_xkb_context:

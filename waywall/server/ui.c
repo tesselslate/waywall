@@ -106,11 +106,7 @@ txn_apply_visible(struct transaction_view *txn_view, struct server_view *view,
 
 struct server_ui *
 server_ui_create(struct server *server, struct config *cfg) {
-    struct server_ui *ui = calloc(1, sizeof(*ui));
-    if (!ui) {
-        ww_log(LOG_ERROR, "failed to allocate server_ui");
-        return NULL;
-    }
+    struct server_ui *ui = zalloc(1, sizeof(*ui));
 
     ui->cfg = cfg;
     ui->server = server;
@@ -237,13 +233,9 @@ server_view_get_title(struct server_view *view) {
 struct server_view *
 server_view_create(struct server_ui *ui, struct server_surface *surface,
                    const struct server_view_impl *impl, struct wl_resource *impl_resource) {
-    struct server_view *view = calloc(1, sizeof(*view));
-    if (!view) {
-        return NULL;
-    }
+    struct server_view *view = zalloc(1, sizeof(*view));
 
     view->ui = ui;
-
     view->surface = surface;
 
     view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
@@ -330,11 +322,7 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
 
 struct transaction *
 transaction_create() {
-    struct transaction *txn = calloc(1, sizeof(*txn));
-    if (!txn) {
-        ww_log(LOG_ERROR, "failed to allocate transaction");
-        return NULL;
-    }
+    struct transaction *txn = zalloc(1, sizeof(*txn));
 
     wl_list_init(&txn->views);
 
@@ -354,13 +342,10 @@ transaction_destroy(struct transaction *txn) {
 
 struct transaction_view *
 transaction_get_view(struct transaction *txn, struct server_view *view) {
-    struct transaction_view *txn_view = calloc(1, sizeof(*txn_view));
-    if (!txn_view) {
-        ww_log(LOG_ERROR, "failed to allocate transaction_view");
-        return NULL;
-    }
+    struct transaction_view *txn_view = zalloc(1, sizeof(*txn_view));
 
     txn_view->view = view;
+
     wl_list_insert(&txn->views, &txn_view->link);
 
     return txn_view;
@@ -412,14 +397,9 @@ transaction_view_set_visible(struct transaction_view *view, bool visible) {
 struct ui_rectangle *
 ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y, uint32_t width, uint32_t height,
                     const uint8_t rgba[static 4]) {
-    struct ui_rectangle *rect = calloc(1, sizeof(*rect));
-    if (!rect) {
-        ww_log(LOG_ERROR, "failed to allocate ui_rectangle");
-        return NULL;
-    }
+    struct ui_rectangle *rect = zalloc(1, sizeof(*rect));
 
     rect->parent = ui;
-
     rect->x = x;
     rect->y = y;
 
