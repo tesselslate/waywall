@@ -96,11 +96,7 @@ inotify_subscribe(struct inotify *inotify, const char *path, uint32_t mask, inot
 
         ssize_t cap = inotify->cap * 2;
         void *data = realloc(inotify->wd, cap * sizeof(*inotify->wd));
-        if (!data) {
-            inotify_rm_watch(inotify->fd, wd);
-            ww_log(LOG_ERROR, "failed to reallocate wd array");
-            return -1;
-        }
+        check_alloc(data);
 
         inotify->wd = data;
         inotify->cap = cap;

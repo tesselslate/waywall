@@ -118,7 +118,7 @@ destroy_rectangles(struct wall *wall) {
     wall->layout_rectangles.len = 0;
 }
 
-static int
+static void
 add_rectangle(struct wall *wall, struct ui_rectangle *rect) {
     if (wall->layout_rectangles.cap == wall->layout_rectangles.len) {
         ww_assert(wall->layout_rectangles.cap < SSIZE_MAX / 2);
@@ -126,17 +126,13 @@ add_rectangle(struct wall *wall, struct ui_rectangle *rect) {
         ssize_t cap = wall->layout_rectangles.cap * 2;
         void *data =
             realloc(wall->layout_rectangles.data, cap * sizeof(*wall->layout_rectangles.data));
-        if (!data) {
-            ww_log(LOG_ERROR, "failed to reallocate layout rectangles");
-            return 1;
-        }
+        check_alloc(data);
 
         wall->layout_rectangles.data = data;
         wall->layout_rectangles.cap = cap;
     }
 
     wall->layout_rectangles.data[wall->layout_rectangles.len++] = rect;
-    return 0;
 }
 
 static void
@@ -206,10 +202,7 @@ layout_wall(struct wall *wall) {
             }
 
             ui_rectangle_set_visible(rect, true);
-            if (add_rectangle(wall, rect) != 0) {
-                transaction_destroy(txn);
-                return;
-            }
+            add_rectangle(wall, rect);
             break;
         }
     }

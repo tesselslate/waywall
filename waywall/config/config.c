@@ -381,18 +381,14 @@ parse_remap(const char *src, const char *dst, struct config_remap *remap) {
     return 0;
 }
 
-static int
+static void
 add_remap(struct config *cfg, struct config_remap remap) {
     void *data = realloc(cfg->input.remaps.data,
                          sizeof(*cfg->input.remaps.data) * (cfg->input.remaps.count + 1));
-    if (!data) {
-        ww_log(LOG_ERROR, "failed to reallocate remaps array");
-        return 1;
-    }
+    check_alloc(data);
 
     cfg->input.remaps.data = data;
     cfg->input.remaps.data[cfg->input.remaps.count++] = remap;
-    return 0;
 }
 
 static int
@@ -543,9 +539,7 @@ process_config_input_remaps(struct config *cfg) {
         if (parse_remap(src_input, dst_input, &remap) != 0) {
             return 1;
         }
-        if (add_remap(cfg, remap) != 0) {
-            return 1;
-        }
+        add_remap(cfg, remap);
 
         // Pop the value from the top of the stack.
         lua_pop(cfg->L, 1);

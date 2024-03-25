@@ -195,10 +195,7 @@ modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
 
             uint32_t *new_data = realloc(seat->keyboard.pressed.data,
                                          sizeof(uint32_t) * seat->keyboard.pressed.cap * 2);
-            if (!new_data) {
-                ww_log(LOG_WARN, "failed to reallocate pressed keys buffer - input dropped");
-                return false;
-            }
+            check_alloc(new_data);
 
             seat->keyboard.pressed.data = new_data;
             seat->keyboard.pressed.cap *= 2;
