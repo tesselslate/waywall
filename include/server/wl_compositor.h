@@ -9,6 +9,7 @@ struct server_compositor {
     struct wl_global *global;
 
     struct wl_compositor *remote;
+    struct wl_region *empty_region;
 
     struct wl_listener on_display_destroy;
 };

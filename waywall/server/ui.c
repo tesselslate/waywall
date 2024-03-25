@@ -115,6 +115,12 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->cfg = cfg;
     ui->server = server;
 
+    ui->empty_region = wl_compositor_create_region(server->backend->compositor);
+    if (!ui->empty_region) {
+        ww_log(LOG_ERROR, "failed to create empty region");
+        goto fail_empty_region;
+    }
+
     ui->background = remote_buffer_manager_color(server->remote_buf, ui->cfg->theme.background);
     if (!ui->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
@@ -168,12 +174,17 @@ fail_surface:
     remote_buffer_deref(ui->background);
 
 fail_background:
+    wl_region_destroy(ui->empty_region);
+
+fail_empty_region:
     free(ui);
     return NULL;
 }
 
 void
 server_ui_destroy(struct server_ui *ui) {
+    wl_region_destroy(ui->empty_region);
+
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
     wp_viewport_destroy(ui->viewport);
@@ -268,13 +279,13 @@ server_view_destroy(struct server_view *view) {
 
 void
 transaction_apply(struct server_ui *ui, struct transaction *txn) {
-    // TODO: transaction_apply is not actually atomic because the subsurfaces of each server_view
-    // are always in desynchronized mode
+    // TODO: transaction_apply is not actually atomic because the subsurfaces of each
+    // server_view are always in desynchronized mode
 
-    // TODO: not sure if it's worth trying to make window resizes adhere to frame perfection since
-    // it would be complicated to try and wait on all of the views + add a timeout to apply the
-    // layout anyway. dest_size at least ensures they always have the correct bounds even if they
-    // look stretched
+    // TODO: not sure if it's worth trying to make window resizes adhere to frame perfection
+    // since it would be complicated to try and wait on all of the views + add a timeout to
+    // apply the layout anyway. dest_size at least ensures they always have the correct bounds
+    // even if they look stretched
 
     struct transaction_view *txn_view;
     wl_list_for_each (txn_view, &txn->views, link) {

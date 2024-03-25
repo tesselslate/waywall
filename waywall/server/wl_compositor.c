@@ -415,9 +415,7 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     // We need to ensure that input events are never given to a child surface. See
     // `surface_set_input_region` for more details.
-    struct wl_region *region = wl_compositor_create_region(compositor->remote);
-    wl_surface_set_input_region(surface->remote, region);
-    wl_region_destroy(region);
+    wl_surface_set_input_region(surface->remote, compositor->empty_region);
 
     surface->parent = compositor;
     surface->current.buffer_scale = 1;
@@ -449,6 +447,8 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_compositor *compositor =
         wl_container_of(listener, compositor, on_display_destroy);
 
+    wl_region_destroy(compositor->empty_region);
+
     wl_global_destroy(compositor->global);
 
     wl_list_remove(&compositor->on_display_destroy.link);
@@ -473,6 +473,7 @@ server_compositor_create(struct server *server) {
     }
 
     compositor->remote = server->backend->compositor;
+    compositor->empty_region = wl_compositor_create_region(compositor->remote);
 
     compositor->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &compositor->on_display_destroy);

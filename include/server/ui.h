@@ -9,6 +9,8 @@ struct server_ui {
     struct config *cfg;
     struct server *server;
 
+    struct wl_region *empty_region;
+
     struct wl_buffer *background;
     struct wl_surface *surface;
     struct wp_viewport *viewport;
