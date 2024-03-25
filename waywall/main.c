@@ -135,30 +135,29 @@ int
 main(int argc, char **argv) {
     util_log_init();
 
+    char *cgroup_base = cgroup_get_base();
+    if (!cgroup_base) {
+        ww_log(LOG_ERROR, "failed to get cgroup base directory");
+        return 1;
+    }
+
     if (argc > 1) {
         if (strcmp(argv[1], "cpu") == 0) {
-            // TODO: Non-systemd support
-            ww_log(LOG_ERROR, "Non-systemd cgroups support is not implemented yet.");
+            cgroup_setup_dir(cgroup_base);
+            free(cgroup_base);
             return 1;
         }
     }
 
     set_realtime();
 
-    char *cgroup_base = cgroup_get_base_systemd();
-    if (!cgroup_base) {
-        ww_log(LOG_ERROR, "failed to get cgroup base directory");
-        return 1;
-    }
     switch (cgroup_setup_check(cgroup_base)) {
     case 0:
         break;
     case 1:
-        if (cgroup_setup_dir(cgroup_base) != 0) {
-            free(cgroup_base);
-            return 1;
-        }
-        break;
+        ww_log(LOG_ERROR, "cgroups are not prepared - run 'waywall cpu' with root privileges");
+        free(cgroup_base);
+        return 1;
     case -1:
         ww_log(LOG_ERROR, "failed to check cgroups");
         free(cgroup_base);

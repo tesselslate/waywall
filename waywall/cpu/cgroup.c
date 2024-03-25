@@ -176,8 +176,7 @@ set_group_weight(const char *base, const char *group, int weight) {
 
 struct cpu_manager *
 cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_threshold) {
-    // TODO: Non-systemd support
-    char *cgroup_base = cgroup_get_base_systemd();
+    char *cgroup_base = cgroup_get_base();
     if (!cgroup_base) {
         ww_log(LOG_ERROR, "failed to get cgroup base directory");
         return NULL;

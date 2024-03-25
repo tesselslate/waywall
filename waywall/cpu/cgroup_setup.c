@@ -9,7 +9,7 @@
 
 /*
  * cgroup_setup_check is designed to be run regardless of privilege level.
- * cgroup_setup_dir requires root privileges in environments without systemd.
+ * cgroup_setup_dir requires root privileges.
  *
  * It may be helpful to see the bash script upon which this code is based:
  *
@@ -27,9 +27,6 @@
  *      chown "$USERNAME" $CGROUP_DIR/$subgroup/cpu.weight
  *  done
  */
-
-// TODO: Non-systemd setups don't really work. We need to allow the user to move processes out of
-// the root cgroup and into the waywall cgroup, which is not ideal.
 
 #define PERMS_MESSAGE "elevated permissions are required"
 
@@ -75,26 +72,6 @@ get_user(uid_t *uid, gid_t *gid) {
 char *
 cgroup_get_base() {
     return strdup("/sys/fs/cgroup/waywall/");
-}
-
-char *
-cgroup_get_base_systemd() {
-    static_assert(sizeof(uid_t) < sizeof(int64_t));
-
-    uid_t uid;
-    gid_t gid;
-    if (get_user(&uid, &gid) == 1) {
-        return NULL;
-    }
-
-    char buf[PATH_MAX];
-    size_t n = snprintf(buf, STATIC_ARRLEN(buf),
-                        "/sys/fs/cgroup/user.slice/user-%" PRIi64 ".slice/user@%" PRIi64
-                        ".service/waywall/",
-                        (int64_t)uid, (int64_t)uid);
-    ww_assert(n <= STATIC_STRLEN(buf));
-
-    return strdup(buf);
 }
 
 int
@@ -151,6 +128,14 @@ cgroup_setup_dir(const char *base) {
     uid_t uid;
     gid_t gid;
     if (get_user(&uid, &gid) != 0) {
+        return 1;
+    }
+
+    // TODO: This is Not Good(tm). I have yet to find a better way to do this, though - perhaps the
+    // systemd route is worth going down at a later point, but reimplementing systemd-run is a lot
+    // of work.
+    if (chown("/sys/fs/cgroup/cgroup.procs", uid, gid) != 0) {
+        ww_log_errno(LOG_ERROR, "failed to chown /sys/fs/cgroup/cgroup.procs");
         return 1;
     }
 
