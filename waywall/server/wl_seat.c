@@ -925,6 +925,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     server_seat_keymap_destroy(&seat->keyboard.remote_km);
     free(seat->keyboard.pressed.data);
 
+    free(seat->remaps.buttons);
+    free(seat->remaps.keys);
+
     xkb_context_unref(seat->ctx);
 
     wl_list_remove(&seat->on_input_focus.link);
