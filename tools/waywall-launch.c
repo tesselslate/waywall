@@ -40,50 +40,6 @@ main(int argc, char **argv) {
 
     setenv("WAYLAND_DISPLAY", buf, 1);
 
-    // This is really not what systemd-run is designed to do, but it does get the instance to spawn
-    // in the right cgroup.
-    // - We need to pipe through standard I/O (--pipe)
-    // - We need to preserve the PWD of this process (--same-dir)
-    // - We need to run the instance in the user session (--user)
-    // - We need to run the instance in the waywall cgroup (--slice=waywall.slice)
-    // - We need to explicitly preserve all of the environment variables (the ungodly amount of
-    //   --setenv)
-    char **nargv = calloc(8192, sizeof(*nargv));
-    if (!nargv) {
-        perror("failed to allocate new argv");
-        return 1;
-    }
-
-    int i = 0;
-    nargv[i++] = "systemd-run";
-    nargv[i++] = "--pipe";
-    nargv[i++] = "--same-dir";
-    nargv[i++] = "--user";
-    nargv[i++] = "--slice=waywall.slice";
-    for (char **env = environ; *env; env++) {
-        if (i >= 8192) {
-            fprintf(stderr, "too many arguments\n");
-            return 1;
-        }
-        char *buf = calloc(strlen(*env) + strlen("--setenv=") + 1, 1);
-        if (!buf) {
-            perror("failed to allocate new environment variable arg");
-            return 1;
-        }
-        strcpy(buf, "--setenv=");
-        strcat(buf, *env);
-        nargv[i++] = buf;
-    }
-    for (char **arg = argv + 1; *arg; arg++) {
-        if (i >= 8192) {
-            fprintf(stderr, "too many arguments\n");
-            return 1;
-        }
-        nargv[i++] = *arg;
-    }
-    execvp("systemd-run", nargv);
-
-    fprintf(stderr, "waywall-launch: failed to call systemd-run. executing normally\n");
     execvp(argv[1], &argv[1]);
     perror("execvp failed");
 
