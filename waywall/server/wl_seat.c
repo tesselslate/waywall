@@ -180,6 +180,58 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
     util_log_va(level, fmtbuf.data, args, false);
 }
 
+static bool
+modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
+    if (state) {
+        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+            if (seat->keyboard.pressed.data[i] == keycode) {
+                ww_log(LOG_WARN, "duplicate key press event received");
+                return false;
+            }
+        }
+
+        if (seat->keyboard.pressed.len == seat->keyboard.pressed.cap) {
+            ww_assert(seat->keyboard.pressed.cap > 0);
+
+            uint32_t *new_data = realloc(seat->keyboard.pressed.data,
+                                         sizeof(uint32_t) * seat->keyboard.pressed.cap * 2);
+            if (!new_data) {
+                ww_log(LOG_WARN, "failed to reallocate pressed keys buffer - input dropped");
+                return false;
+            }
+
+            seat->keyboard.pressed.data = new_data;
+            seat->keyboard.pressed.cap *= 2;
+        }
+
+        seat->keyboard.pressed.data[seat->keyboard.pressed.len++] = keycode;
+        if (xkb_state_update_key(seat->keyboard.local_km.state, keycode + 8, XKB_KEY_DOWN) != 0) {
+            return true;
+        }
+    } else {
+        bool found = false;
+
+        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+            if (seat->keyboard.pressed.data[i] != keycode) {
+                continue;
+            }
+
+            memmove(seat->keyboard.pressed.data + i, seat->keyboard.pressed.data + i + 1,
+                    sizeof(uint32_t) * (seat->keyboard.pressed.len - i - 1));
+            seat->keyboard.pressed.len--;
+            found = true;
+            break;
+        }
+
+        if (found) {
+            if (xkb_state_update_key(seat->keyboard.local_km.state, keycode + 8, XKB_KEY_UP) != 0) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 static void
 send_keyboard_enter(struct server_seat *seat) {
     ww_assert(seat->input_focus);
@@ -269,6 +321,23 @@ send_keyboard_modifiers(struct server_seat *seat) {
 }
 
 static void
+send_pointer_button(struct server_seat *seat, uint32_t button, bool state) {
+    if (!seat->input_focus) {
+        return;
+    }
+
+    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
+    struct wl_resource *resource;
+    wl_resource_for_each(resource, &seat->pointers) {
+        if (wl_resource_get_client(resource) != client) {
+            continue;
+        }
+
+        wl_pointer_send_button(resource, next_serial(resource), current_time(), button, state);
+    }
+}
+
+static void
 send_pointer_enter(struct server_seat *seat) {
     ww_assert(seat->input_focus);
 
@@ -306,6 +375,54 @@ send_pointer_leave(struct server_seat *seat) {
 }
 
 static void
+process_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
+    bool modifiers_updated = modify_pressed_keys(seat, keycode, state);
+
+    if (modifiers_updated) {
+        send_keyboard_modifiers(seat);
+    }
+    send_keyboard_key(seat, keycode, state);
+}
+
+static void
+process_remap(struct server_seat *seat, struct server_seat_remap remap, bool state) {
+    switch (remap.type) {
+    case CONFIG_REMAP_BUTTON:
+        send_pointer_button(seat, remap.dst, state);
+        return;
+    case CONFIG_REMAP_KEY:
+        process_remap_key(seat, remap.dst, state);
+        return;
+    case CONFIG_REMAP_NONE:
+        ww_unreachable();
+    }
+}
+
+static bool
+try_remap_button(struct server_seat *seat, uint32_t button, bool state) {
+    for (size_t i = 0; i < seat->remaps.num_buttons; i++) {
+        if (seat->remaps.buttons[i].src == button) {
+            process_remap(seat, seat->remaps.buttons[i], state);
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool
+try_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
+    for (size_t i = 0; i < seat->remaps.num_keys; i++) {
+        if (seat->remaps.keys[i].src == keycode) {
+            if (seat->remaps.buttons[i].src == keycode) {
+                process_remap(seat, seat->remaps.buttons[i], state);
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+static void
 on_keyboard_enter(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface,
                   struct wl_array *keys) {
     // Unused.
@@ -316,65 +433,15 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
                 uint32_t state) {
     struct server_seat *seat = data;
 
-    bool local_state_updated = false;
-
-    // Update the pressed keys array.
-    switch ((enum wl_keyboard_key_state)state) {
-    case WL_KEYBOARD_KEY_STATE_PRESSED:
-        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
-            if (seat->keyboard.pressed.data[i] == key) {
-                ww_log(LOG_WARN, "duplicate key press event received");
-                return;
-            }
-        }
-
-        if (seat->keyboard.pressed.len == seat->keyboard.pressed.cap) {
-            ww_assert(seat->keyboard.pressed.cap > 0);
-
-            uint32_t *new_data = realloc(seat->keyboard.pressed.data,
-                                         sizeof(uint32_t) * seat->keyboard.pressed.cap * 2);
-            if (!new_data) {
-                ww_log(LOG_WARN, "failed to reallocate pressed keys buffer - input dropped");
-                return;
-            }
-
-            seat->keyboard.pressed.data = new_data;
-            seat->keyboard.pressed.cap *= 2;
-        }
-
-        seat->keyboard.pressed.data[seat->keyboard.pressed.len++] = key;
-        if (xkb_state_update_key(seat->keyboard.local_km.state, key + 8, XKB_KEY_DOWN) != 0) {
-            local_state_updated = true;
-        }
-        break;
-    case WL_KEYBOARD_KEY_STATE_RELEASED: {
-        bool found = false;
-
-        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
-            if (seat->keyboard.pressed.data[i] != key) {
-                continue;
-            }
-
-            memmove(seat->keyboard.pressed.data + i, seat->keyboard.pressed.data + i + 1,
-                    sizeof(uint32_t) * (seat->keyboard.pressed.len - i - 1));
-            seat->keyboard.pressed.len--;
-            found = true;
-            break;
-        }
-
-        if (found) {
-            if (xkb_state_update_key(seat->keyboard.local_km.state, key + 8, XKB_KEY_UP) != 0) {
-                local_state_updated = true;
-            }
-        }
-        break;
+    if (try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED)) {
+        return;
     }
-    }
+
+    bool modifiers_updated = modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 
     if (seat->listener) {
         // Only send a key event to the wall code if this keycode has an associated keysym.
         // TODO: Probably not worth it to send all keysyms?
-
         const xkb_keysym_t *syms;
 
         xkb_layout_index_t group =
@@ -394,7 +461,7 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         }
     }
 
-    if (local_state_updated) {
+    if (modifiers_updated) {
         send_keyboard_modifiers(seat);
     }
     send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
@@ -585,6 +652,10 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
                   uint32_t button, uint32_t state) {
     struct server_seat *seat = data;
 
+    if (try_remap_button(seat, button, state == WL_POINTER_BUTTON_STATE_PRESSED)) {
+        return;
+    }
+
     if (seat->listener) {
         bool consumed = seat->listener->button(seat->listener_data, button,
                                                state == WL_POINTER_BUTTON_STATE_PRESSED);
@@ -593,19 +664,7 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
         }
     }
 
-    if (!seat->input_focus) {
-        return;
-    }
-
-    struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
-    struct wl_resource *resource;
-    wl_resource_for_each(resource, &seat->pointers) {
-        if (wl_resource_get_client(resource) != client) {
-            continue;
-        }
-
-        wl_pointer_send_button(resource, next_serial(resource), current_time(), button, state);
-    }
+    send_pointer_button(seat, button, state == WL_POINTER_BUTTON_STATE_PRESSED);
 }
 
 static void
@@ -894,6 +953,40 @@ server_seat_create(struct server *server, struct config *cfg) {
     }
     xkb_context_set_log_fn(seat->ctx, xkb_log);
 
+    // It's not necessary to calculate how many of each kind of remap there are. The number of
+    // remaps a user might reasonably have is quite small.
+    seat->remaps.keys = calloc(cfg->input.remaps.count, sizeof(*seat->remaps.keys));
+    if (!seat->remaps.keys) {
+        ww_log(LOG_ERROR, "failed to allocate key remaps");
+        goto fail_key_remaps;
+    }
+
+    seat->remaps.buttons = calloc(cfg->input.remaps.count, sizeof(*seat->remaps.buttons));
+    if (!seat->remaps.buttons) {
+        ww_log(LOG_ERROR, "failed to allocate button remaps");
+        goto fail_button_remaps;
+    }
+
+    for (size_t i = 0; i < cfg->input.remaps.count; i++) {
+        struct config_remap *remap = &cfg->input.remaps.data[i];
+
+        struct server_seat_remap *dst = NULL;
+        switch (remap->src_type) {
+        case CONFIG_REMAP_BUTTON:
+            dst = &seat->remaps.buttons[seat->remaps.num_buttons++];
+            break;
+        case CONFIG_REMAP_KEY:
+            dst = &seat->remaps.keys[seat->remaps.num_keys++];
+            break;
+        default:
+            ww_unreachable();
+        }
+
+        dst->dst = remap->dst_data;
+        dst->src = remap->src_data;
+        dst->type = remap->dst_type;
+    }
+
     seat->keyboard.local_km.fd = -1;
     if (prepare_keymap(seat) != 0) {
         goto fail_keymap;
@@ -950,6 +1043,12 @@ fail_global:
     close(seat->keyboard.local_km.fd);
 
 fail_keymap:
+    free(seat->remaps.buttons);
+
+fail_button_remaps:
+    free(seat->remaps.keys);
+
+fail_key_remaps:
     xkb_context_unref(seat->ctx);
 
 fail_xkb_context:

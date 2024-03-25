@@ -49,6 +49,52 @@ static const struct config defaults = {
         },
 };
 
+#define K(x)                                                                                       \
+    { #x, KEY_##x }
+
+static const struct {
+    const char *name;
+    uint32_t value;
+} keycode_mappings[] = {
+    K(ESC),         K(1),          K(2),          K(3),
+    K(4),           K(5),          K(6),          K(7),
+    K(8),           K(9),          K(0),          K(MINUS),
+    K(EQUAL),       K(BACKSPACE),  K(TAB),        K(Q),
+    K(W),           K(E),          K(R),          K(T),
+    K(Y),           K(U),          K(I),          K(O),
+    K(P),           K(LEFTBRACE),  K(RIGHTBRACE), K(ENTER),
+    K(LEFTCTRL),    K(A),          K(S),          K(D),
+    K(F),           K(G),          K(H),          K(J),
+    K(K),           K(L),          K(SEMICOLON),  K(APOSTROPHE),
+    K(GRAVE),       K(LEFTSHIFT),  K(BACKSLASH),  K(Z),
+    K(X),           K(C),          K(V),          K(B),
+    K(N),           K(M),          K(COMMA),      K(DOT),
+    K(SLASH),       K(RIGHTSHIFT), K(KPASTERISK), K(LEFTALT),
+    K(SPACE),       K(CAPSLOCK),   K(F1),         K(F2),
+    K(F3),          K(F4),         K(F5),         K(F6),
+    K(F7),          K(F8),         K(F9),         K(F10),
+    K(NUMLOCK),     K(SCROLLLOCK), K(KP7),        K(KP8),
+    K(KP9),         K(KPMINUS),    K(KP4),        K(KP5),
+    K(KP6),         K(KPPLUS),     K(KP1),        K(KP2),
+    K(KP3),         K(KP0),        K(KPDOT),      K(ZENKAKUHANKAKU),
+    K(102ND),       K(F11),        K(F12),        K(RO),
+    K(KATAKANA),    K(HIRAGANA),   K(HENKAN),     K(KATAKANAHIRAGANA),
+    K(MUHENKAN),    K(KPJPCOMMA),  K(KPENTER),    K(RIGHTCTRL),
+    K(KPSLASH),     K(SYSRQ),      K(RIGHTALT),   K(LINEFEED),
+    K(HOME),        K(UP),         K(PAGEUP),     K(LEFT),
+    K(RIGHT),       K(END),        K(DOWN),       K(PAGEDOWN),
+    K(INSERT),      K(DELETE),     K(MACRO),      K(MUTE),
+    K(VOLUMEDOWN),  K(VOLUMEUP),   K(POWER),      K(KPEQUAL),
+    K(KPPLUSMINUS), K(PAUSE),      K(SCALE),      K(KPCOMMA),
+    K(HANGEUL),     K(HANJA),      K(YEN),        K(LEFTMETA),
+    K(RIGHTMETA),   K(F13),        K(F14),        K(F15),
+    K(F16),         K(F17),        K(F18),        K(F19),
+    K(F20),         K(F21),        K(F22),        K(F23),
+    K(F24),
+};
+
+#undef K
+
 static const struct {
     const char *name;
     uint32_t value;
@@ -301,6 +347,55 @@ fail:
 }
 
 static int
+parse_remap_half(const char *input, uint32_t *out_data, enum config_remap_type *out_type) {
+    for (size_t i = 0; i < STATIC_ARRLEN(keycode_mappings); i++) {
+        if (strcasecmp(keycode_mappings[i].name, input) == 0) {
+            *out_data = keycode_mappings[i].value;
+            *out_type = CONFIG_REMAP_KEY;
+            return 0;
+        }
+    }
+
+    for (size_t i = 0; i < STATIC_ARRLEN(button_mappings); i++) {
+        if (strcasecmp(button_mappings[i].name, input) == 0) {
+            *out_data = button_mappings[i].value;
+            *out_type = CONFIG_REMAP_BUTTON;
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static int
+parse_remap(const char *src, const char *dst, struct config_remap *remap) {
+    if (parse_remap_half(src, &remap->src_data, &remap->src_type) != 0) {
+        ww_log(LOG_ERROR, "unknown input '%s' for remapping", src);
+        return 1;
+    }
+    if (parse_remap_half(dst, &remap->dst_data, &remap->dst_type) != 0) {
+        ww_log(LOG_ERROR, "unknown output '%s' for remapping", src);
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
+add_remap(struct config *cfg, struct config_remap remap) {
+    void *data = realloc(cfg->input.remaps.data,
+                         sizeof(*cfg->input.remaps.data) * (cfg->input.remaps.count + 1));
+    if (!data) {
+        ww_log(LOG_ERROR, "failed to reallocate remaps array");
+        return 1;
+    }
+
+    cfg->input.remaps.data = data;
+    cfg->input.remaps.data[cfg->input.remaps.count++] = remap;
+    return 0;
+}
+
+static int
 process_config_actions(struct config *cfg) {
     ssize_t stack_start = lua_gettop(cfg->L);
 
@@ -418,7 +513,55 @@ process_config_general(struct config *cfg) {
 }
 
 static int
+process_config_input_remaps(struct config *cfg) {
+    ssize_t stack_start = lua_gettop(cfg->L);
+
+    lua_pushnil(cfg->L);
+    while (lua_next(cfg->L, -2)) {
+        // stack:
+        // - value (should be string)
+        // - key (should be string)
+        // - config.input.remaps
+        // - config.input
+        // - config
+
+        if (!lua_isstring(cfg->L, -2)) {
+            ww_log(LOG_ERROR, "non-string key '%s' found in remaps table",
+                   lua_tostring(cfg->L, -2));
+            return 1;
+        }
+        if (!lua_isstring(cfg->L, -1)) {
+            ww_log(LOG_ERROR, "non-string value for key '%s' found in remaps table",
+                   lua_tostring(cfg->L, -2));
+            return 1;
+        }
+
+        const char *src_input = lua_tostring(cfg->L, -2);
+        const char *dst_input = lua_tostring(cfg->L, -1);
+
+        struct config_remap remap = {0};
+        if (parse_remap(src_input, dst_input, &remap) != 0) {
+            return 1;
+        }
+        if (add_remap(cfg, remap) != 0) {
+            return 1;
+        }
+
+        // Pop the value from the top of the stack.
+        lua_pop(cfg->L, 1);
+    }
+
+    ww_assert(lua_gettop(cfg->L) == stack_start);
+
+    return 0;
+}
+
+static int
 process_config_input(struct config *cfg) {
+    if (get_table(cfg, "remaps", process_config_input_remaps, "input.remaps", false) != 0) {
+        return 1;
+    }
+
     if (get_string(cfg, "layout", &cfg->input.keymap.layout, "input.layout", false) != 0) {
         return 1;
     }
@@ -667,6 +810,10 @@ config_create() {
 
 void
 config_destroy(struct config *cfg) {
+    if (cfg->input.remaps.data) {
+        free(cfg->input.remaps.data);
+    }
+
     free(cfg->general.counter_path);
     free(cfg->input.keymap.layout);
     free(cfg->input.keymap.model);

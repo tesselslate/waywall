@@ -1,6 +1,7 @@
 #ifndef WAYWALL_SERVER_WL_SEAT_H
 #define WAYWALL_SERVER_WL_SEAT_H
 
+#include "config/config.h"
 #include <wayland-server-core.h>
 
 enum kb_modifier {
@@ -20,6 +21,14 @@ struct server_seat {
     struct config *cfg;
     struct server *server;
     struct xkb_context *ctx;
+
+    struct {
+        struct server_seat_remap {
+            enum config_remap_type type;
+            uint32_t src, dst;
+        } *keys, *buttons;
+        size_t num_keys, num_buttons;
+    } remaps;
 
     struct {
         struct wl_keyboard *remote;

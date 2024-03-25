@@ -2,6 +2,7 @@
 #define WAYWALL_CONFIG_CONFIG_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 struct wall;
@@ -27,6 +28,11 @@ struct config {
             char *options;
         } keymap;
 
+        struct {
+            struct config_remap *data;
+            size_t count;
+        } remaps;
+
         int repeat_rate, repeat_delay;
         double sens;
         bool confine;
@@ -47,6 +53,17 @@ struct config {
     } theme;
 
     struct lua_State *L;
+};
+
+enum config_remap_type {
+    CONFIG_REMAP_NONE,
+    CONFIG_REMAP_KEY,
+    CONFIG_REMAP_BUTTON,
+};
+
+struct config_remap {
+    enum config_remap_type src_type, dst_type;
+    uint32_t src_data, dst_data;
 };
 
 struct config *config_create();
