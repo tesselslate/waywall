@@ -3,7 +3,7 @@
     convenient to build a fully functional waywall configuration.
 
     The lower level Lua API can be found in `api.lua`.
-]]--
+]]
 
 local waywall = require("waywall")
 
@@ -155,7 +155,8 @@ M.wall = function(config, settings)
             local y = math.floor((i - 1) / state.width) * instance_height
 
             table.insert(layout, {
-                "instance", i,
+                "instance",
+                i,
                 x = x,
                 y = y,
                 w = instance_width,
@@ -164,7 +165,8 @@ M.wall = function(config, settings)
 
             if state.locked[i] then
                 table.insert(layout, {
-                    "rectangle", state.lock_color,
+                    "rectangle",
+                    state.lock_color,
                     x = x,
                     y = y,
                     w = instance_width,

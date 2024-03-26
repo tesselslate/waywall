@@ -2,7 +2,7 @@
     This file contains the Lua portion of the waywall API, including some
     documentation comments. See `waywall/config/api.c` for the relevant C
     code.
-]]--
+]]
 
 local priv = _G.priv_waywall
 

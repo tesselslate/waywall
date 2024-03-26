@@ -3,7 +3,7 @@
     API module is run first and inserts itself into `package.loaded`. This
     script is then called, and it in turn requires the user's `init.lua` to
     load their configuration.
-]]--
+]]
 
 -- Setup the environment for the user's configuration.
 local priv = _G.priv_waywall
@@ -15,7 +15,7 @@ _G.loadstring = nil
 
 _G.print = function(...)
     local str = nil
-    for _, v in ipairs({...}) do
+    for _, v in ipairs({ ... }) do
         if str then
             str = str .. " " .. tostring(v)
         else
