@@ -78,7 +78,7 @@ M.wall = function(config, settings)
             end
         end
 
-        waywall.play(i)
+        waywall.play(hovered)
     end
     wall.play = function()
         local hovered = waywall.hovered()
