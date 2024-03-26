@@ -43,6 +43,17 @@ l_active_instance(lua_State *L) {
 }
 
 static int
+l_current_time(lua_State *L) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint32_t time = (uint32_t)((uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
+
+    lua_pushinteger(L, time);
+
+    return 1;
+}
+
+static int
 l_goto_wall(lua_State *L) {
     struct wall *wall = get_wall(L);
 
@@ -289,6 +300,7 @@ l_log(lua_State *L) {
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_instance", l_active_instance},
+    {"current_time", l_current_time},
     {"goto_wall", l_goto_wall},
     {"hovered", l_hovered},
     {"instance", l_instance},

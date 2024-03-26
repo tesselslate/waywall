@@ -12,6 +12,11 @@ local M = {}
 -- @return The ID of the active instance, or nil if no instance is active.
 M.active_instance = priv.active_instance
 
+--- Get the current time, in milliseconds, with an arbitrary epoch.
+-- The epoch used by current_time is the same as what is given in instance
+-- state information, such as last_load and last_preview.
+M.current_time = priv.current_time
+
 --- Switch to the wall view.
 -- This function will throw an error if the user is already on the wall.
 M.goto_wall = priv.goto_wall
