@@ -18,9 +18,4 @@ The following runtime dependencies are required:
  - `wayland-protocols`
  - `xkbcommon`
 
-To build waywall, clone the repository and run the following commands:
-
-```sh
-meson setup build
-ninja -C build
-```
+To build waywall, clone the repository and run `make`.
