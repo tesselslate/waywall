@@ -19,30 +19,61 @@ M.wall = function(config, settings)
     if type(settings) ~= "table" then
         error("expected settings table")
     end
+
     if type(settings.width) ~= "number" then
         error("expected settings.width to be of type number")
     end
     if settings.width < 1 then
         error("expected settings.width to be at least 1")
     end
+
     if type(settings.height) ~= "number" then
         error("expected settings.height to be of type number")
     end
     if settings.height < 1 then
         error("expected settings.height to be at least 1")
     end
+
     if settings.lock_color and type(settings.lock_color) ~= "string" then
         error("expected settings.lock_color to be of type string")
+    end
+
+    if not settings.grace_period then
+        settings.grace_period = 0
+    end
+    if type(settings.grace_period) ~= "number" then
+        error("expected settings.grace_period to be of type number")
+    end
+    if settings.grace_period < 0 or settings.grace_period > 1000 then
+        error("expected settings.grace_period to be between 0 and 1000 ms")
     end
 
     -- Setup wall objects.
     local state = {
         locked = {},
+
         width = math.floor(settings.width),
         height = math.floor(settings.height),
         lock_color = settings.lock_color or "#00000099",
+
+        grace_period = math.floor(settings.grace_period),
     }
     local wall = {}
+
+    local function check_reset(instance)
+        if state.locked[instance] then
+            return false
+        end
+
+        local inst_state = waywall.instance(instance)
+        if inst_state.screen == "previewing" and state.grace_period > 0 then
+            if waywall.current_time() - inst_state.last_preview < state.grace_period then
+                return false
+            end
+        end
+
+        return true
+    end
 
     wall.is_locked = function(instance)
         return state.locked[instance]
@@ -73,7 +104,7 @@ M.wall = function(config, settings)
 
         local num_instances = waywall.num_instances()
         for i = 1, num_instances do
-            if i ~= hovered and not state.locked[i] then
+            if i ~= hovered and check_reset(i) then
                 waywall.reset(i)
             end
         end
@@ -98,7 +129,7 @@ M.wall = function(config, settings)
             return
         end
 
-        if not state.locked[hovered] then
+        if check_reset(hovered) then
             waywall.reset(hovered)
         end
     end
@@ -109,7 +140,7 @@ M.wall = function(config, settings)
 
         local num_instances = waywall.num_instances()
         for i = 1, num_instances do
-            if not state.locked[i] then
+            if check_reset(i) then
                 waywall.reset(i)
             end
         end
