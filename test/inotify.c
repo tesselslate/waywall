@@ -18,7 +18,7 @@ make_file(char *namebuf) {
 }
 
 static void
-listen(int wd, uint32_t mask, void *rawdata) {
+listen(int wd, uint32_t mask, const char *name, void *rawdata) {
     struct shared *data = rawdata;
     data->ok = true;
     wl_display_terminate(data->display);

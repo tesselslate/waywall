@@ -6,7 +6,7 @@
 
 struct wl_event_loop;
 
-typedef void (*inotify_func_t)(int wd, uint32_t mask, void *data);
+typedef void (*inotify_func_t)(int wd, uint32_t mask, const char *name, void *data);
 
 struct inotify {
     struct wl_event_source *src;

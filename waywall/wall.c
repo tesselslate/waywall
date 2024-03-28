@@ -252,7 +252,7 @@ process_action(struct wall *wall, struct config_action action) {
 }
 
 static void
-process_state_update(int wd, uint32_t mask, void *data) {
+process_state_update(int wd, uint32_t mask, const char *name, void *data) {
     struct wall *wall = data;
 
     int id = -1;
