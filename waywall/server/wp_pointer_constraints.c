@@ -14,7 +14,7 @@
 
 static void
 lock_pointer(struct server_pointer_constraints *pointer_constraints) {
-    if (pointer_constraints->cfg->input.confine) {
+    if (pointer_constraints->config.confine) {
         if (pointer_constraints->confined_pointer) {
             zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
             pointer_constraints->confined_pointer = NULL;
@@ -37,7 +37,7 @@ unlock_pointer(struct server_pointer_constraints *pointer_constraints) {
 
     wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
 
-    if (pointer_constraints->cfg->input.confine) {
+    if (pointer_constraints->config.confine) {
         pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
             pointer_constraints->remote, pointer_constraints->server->ui->surface,
             server_get_wl_pointer(pointer_constraints->server), NULL,
@@ -235,7 +235,6 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
     struct server_pointer_constraints *pointer_constraints =
         zalloc(1, sizeof(*pointer_constraints));
 
-    pointer_constraints->cfg = cfg;
     pointer_constraints->server = server;
 
     pointer_constraints->global =
@@ -258,6 +257,7 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
     pointer_constraints->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &pointer_constraints->on_display_destroy);
 
+    server_pointer_constraints_set_config(pointer_constraints, cfg);
     return pointer_constraints;
 }
 
@@ -270,7 +270,7 @@ server_pointer_constraints_set_config(struct server_pointer_constraints *pointer
     }
     // TODO: confine
 
-    pointer_constraints->cfg = cfg;
+    pointer_constraints->config.confine = cfg->input.confine;
 }
 
 void

@@ -3,13 +3,16 @@
 
 #include <wayland-server-core.h>
 
-struct server;
+struct config;
 
 struct server_relative_pointer {
     struct wl_global *global;
     struct wl_list objects; // wl_resource (zwp_relative_pointer_v1) link
 
-    struct config *cfg;
+    struct {
+        double sens;
+    } config;
+
     struct server *server;
     struct server_view *input_focus;
 
@@ -27,5 +30,7 @@ struct server_relative_pointer {
 
 struct server_relative_pointer *server_relative_pointer_create(struct server *server,
                                                                struct config *cfg);
+void server_relative_pointer_set_config(struct server_relative_pointer *relative_pointer,
+                                        struct config *cfg);
 
 #endif

@@ -4,8 +4,9 @@
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
+struct config;
+
 struct server {
-    struct config *cfg;
     struct wl_display *display;
     struct server_backend *backend;
     struct server_ui *ui;

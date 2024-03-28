@@ -22,8 +22,8 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
 
     // Boat eye relies on precise cursor positioning. Sending relative pointer motion events with
     // non-whole number values will cause boat eye to not work correctly.
-    relative_pointer->acc_x += wl_fixed_to_double(dx) * relative_pointer->cfg->input.sens;
-    relative_pointer->acc_y += wl_fixed_to_double(dy) * relative_pointer->cfg->input.sens;
+    relative_pointer->acc_x += wl_fixed_to_double(dx) * relative_pointer->config.sens;
+    relative_pointer->acc_y += wl_fixed_to_double(dy) * relative_pointer->config.sens;
 
     double x = trunc(relative_pointer->acc_x);
     relative_pointer->acc_x -= x;
@@ -171,7 +171,6 @@ struct server_relative_pointer *
 server_relative_pointer_create(struct server *server, struct config *cfg) {
     struct server_relative_pointer *relative_pointer = zalloc(1, sizeof(*relative_pointer));
 
-    relative_pointer->cfg = cfg;
     relative_pointer->server = server;
 
     relative_pointer->global =
@@ -193,5 +192,12 @@ server_relative_pointer_create(struct server *server, struct config *cfg) {
     relative_pointer->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &relative_pointer->on_display_destroy);
 
+    server_relative_pointer_set_config(relative_pointer, cfg);
     return relative_pointer;
+}
+
+void
+server_relative_pointer_set_config(struct server_relative_pointer *relative_pointer,
+                                   struct config *cfg) {
+    relative_pointer->config.sens = cfg->input.sens;
 }

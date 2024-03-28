@@ -105,13 +105,12 @@ struct server_ui *
 server_ui_create(struct server *server, struct config *cfg) {
     struct server_ui *ui = zalloc(1, sizeof(*ui));
 
-    ui->cfg = cfg;
     ui->server = server;
 
     ui->empty_region = wl_compositor_create_region(server->backend->compositor);
     check_alloc(ui->empty_region);
 
-    ui->background = remote_buffer_manager_color(server->remote_buf, ui->cfg->theme.background);
+    ui->background = remote_buffer_manager_color(server->remote_buf, cfg->theme.background);
     if (!ui->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
         goto fail_background;
@@ -166,6 +165,25 @@ server_ui_hide(struct server_ui *ui) {
     wl_surface_commit(ui->surface);
 
     ui->mapped = false;
+}
+
+int
+server_ui_set_config(struct server_ui *ui, struct config *cfg) {
+    struct wl_buffer *new_background =
+        remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
+    if (!new_background) {
+        ww_log(LOG_ERROR, "failed to create root buffer");
+        return 1;
+    }
+
+    wl_surface_attach(ui->surface, new_background, 0, 0);
+    wl_surface_commit(ui->surface);
+    wl_display_roundtrip(ui->server->backend->display);
+
+    remote_buffer_deref(ui->background);
+    ui->background = new_background;
+
+    return 0;
 }
 
 void

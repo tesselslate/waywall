@@ -3,13 +3,16 @@
 
 #include <wayland-server-core.h>
 
-struct server;
+struct config;
 
 struct server_pointer_constraints {
     struct wl_global *global;
     struct wl_list objects; // wl_resource (zwp_locked_pointer_v1 object) link
 
-    struct config *cfg;
+    struct {
+        bool confine;
+    } config;
+
     struct server *server;
     struct server_view *input_focus;
 
