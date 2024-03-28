@@ -186,13 +186,6 @@ server_destroy(struct server *server) {
 
 int
 server_set_config(struct server *server, struct config *cfg) {
-    // TODO: error handling
-
-    if (server_seat_set_config(server->seat, cfg) != 0) {
-        ww_log(LOG_ERROR, "failed to update seat config");
-        return 1;
-    }
-
     if (server_ui_set_config(server->ui, cfg) != 0) {
         ww_log(LOG_ERROR, "failed to update ui config");
         return 1;
@@ -204,11 +197,23 @@ server_set_config(struct server *server, struct config *cfg) {
         return 1;
     }
 
+    struct server_seat_config *seat_config = server_seat_config_create(server->seat, cfg);
+    if (!seat_config) {
+        ww_log(LOG_ERROR, "failed to create server seat config");
+        goto fail_seat_config;
+    }
+
     server_cursor_use_config(server->cursor, cursor_config);
+    server_seat_use_config(server->seat, seat_config);
+
     server_relative_pointer_set_config(server->relative_pointer, cfg);
     server_pointer_constraints_set_config(server->pointer_constraints, cfg);
 
     return 0;
+
+fail_seat_config:
+    server_cursor_config_destroy(cursor_config);
+    return 1;
 }
 
 struct wl_keyboard *

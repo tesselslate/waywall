@@ -58,107 +58,6 @@ get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     *y = seat->pointer.y - (double)seat->input_focus->y;
 }
 
-static struct server_seat_remaps
-remaps_create(struct config *cfg) {
-    // It's not necessary to calculate how many of each kind of remap there are. The number of
-    // remaps a user might reasonably have is quite small.
-    struct server_seat_remaps remaps = {0};
-    remaps.keys = zalloc(cfg->input.remaps.count, sizeof(*remaps.keys));
-    remaps.buttons = zalloc(cfg->input.remaps.count, sizeof(*remaps.buttons));
-
-    for (size_t i = 0; i < cfg->input.remaps.count; i++) {
-        struct config_remap *remap = &cfg->input.remaps.data[i];
-
-        struct server_seat_remap *dst = NULL;
-        switch (remap->src_type) {
-        case CONFIG_REMAP_BUTTON:
-            dst = &remaps.buttons[remaps.num_buttons++];
-            break;
-        case CONFIG_REMAP_KEY:
-            dst = &remaps.keys[remaps.num_keys++];
-            break;
-        default:
-            ww_unreachable();
-        }
-
-        dst->dst = remap->dst_data;
-        dst->src = remap->src_data;
-        dst->type = remap->dst_type;
-    }
-
-    return remaps;
-}
-
-static void
-remaps_destroy(struct server_seat_remaps remaps) {
-    free(remaps.buttons);
-    free(remaps.keys);
-}
-
-static int
-prepare_local_keymap(struct server_seat *seat, struct config *cfg) {
-    const struct xkb_rule_names rule_names = {
-        .layout = cfg->input.keymap.layout,
-        .model = cfg->input.keymap.model,
-        .rules = cfg->input.keymap.rules,
-        .variant = cfg->input.keymap.variant,
-        .options = cfg->input.keymap.options,
-    };
-
-    seat->keyboard.local_km.xkb =
-        xkb_keymap_new_from_names(seat->ctx, &rule_names, XKB_MAP_COMPILE_NO_FLAGS);
-    if (!seat->keyboard.local_km.xkb) {
-        ww_log(LOG_ERROR, "failed to create local XKB keymap");
-        return 1;
-    }
-
-    seat->keyboard.local_km.state = xkb_state_new(seat->keyboard.local_km.xkb);
-    if (!seat->keyboard.local_km.xkb) {
-        ww_log(LOG_ERROR, "failed to create local XKB state");
-        return 1;
-    }
-
-    char *keymap = xkb_keymap_get_as_string(seat->keyboard.local_km.xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
-    if (!keymap) {
-        ww_log(LOG_ERROR, "failed to get XKB keymap as string");
-        return 1;
-    }
-
-    seat->keyboard.local_km.size = strlen(keymap) + 1;
-    seat->keyboard.local_km.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
-    if (seat->keyboard.local_km.fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to create keymap memfd");
-        goto fail_memfd;
-    }
-
-    if (ftruncate(seat->keyboard.local_km.fd, seat->keyboard.local_km.size) == -1) {
-        ww_log_errno(LOG_ERROR, "failed to expand keymap memfd");
-        goto fail_truncate;
-    }
-
-    char *data = mmap(NULL, seat->keyboard.local_km.size + 1, PROT_READ | PROT_WRITE, MAP_SHARED,
-                      seat->keyboard.local_km.fd, 0);
-    if (data == MAP_FAILED) {
-        ww_log_errno(LOG_ERROR, "failed to mmap keymap memfd");
-        goto fail_mmap;
-    }
-
-    memcpy(data, keymap, seat->keyboard.local_km.size + 1);
-    ww_assert(munmap(data, seat->keyboard.local_km.size + 1) == 0);
-
-    free(keymap);
-    return 0;
-
-fail_mmap:
-fail_truncate:
-    close(seat->keyboard.local_km.fd);
-    seat->keyboard.local_km.fd = -1;
-
-fail_memfd:
-    free(keymap);
-    return 1;
-}
-
 static struct xkb_keymap *
 prepare_remote_km(struct xkb_context *ctx, int32_t fd, int32_t size) {
     char *data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -175,7 +74,7 @@ prepare_remote_km(struct xkb_context *ctx, int32_t fd, int32_t size) {
 }
 
 static void
-server_seat_keymap_destroy(const struct server_seat_keymap *keymap) {
+server_seat_keymap_destroy(struct server_seat_keymap *keymap) {
     if (keymap->fd >= 0) {
         close(keymap->fd);
     }
@@ -239,7 +138,7 @@ modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
         }
 
         seat->keyboard.pressed.data[seat->keyboard.pressed.len++] = keycode;
-        if (xkb_state_update_key(seat->keyboard.local_km.state, keycode + 8, XKB_KEY_DOWN) != 0) {
+        if (xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_DOWN) != 0) {
             return true;
         }
     } else {
@@ -258,7 +157,7 @@ modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
         }
 
         if (found) {
-            if (xkb_state_update_key(seat->keyboard.local_km.state, keycode + 8, XKB_KEY_UP) != 0) {
+            if (xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_UP) != 0) {
                 return true;
             }
         }
@@ -334,13 +233,13 @@ send_keyboard_modifiers(struct server_seat *seat) {
     }
 
     xkb_mod_mask_t depressed =
-        xkb_state_serialize_mods(seat->keyboard.local_km.state, XKB_STATE_MODS_DEPRESSED);
+        xkb_state_serialize_mods(seat->config->keymap.state, XKB_STATE_MODS_DEPRESSED);
     xkb_mod_mask_t latched =
-        xkb_state_serialize_mods(seat->keyboard.local_km.state, XKB_STATE_MODS_LATCHED);
+        xkb_state_serialize_mods(seat->config->keymap.state, XKB_STATE_MODS_LATCHED);
     xkb_mod_mask_t locked =
-        xkb_state_serialize_mods(seat->keyboard.local_km.state, XKB_STATE_MODS_LOCKED);
+        xkb_state_serialize_mods(seat->config->keymap.state, XKB_STATE_MODS_LOCKED);
     xkb_layout_index_t group =
-        xkb_state_serialize_layout(seat->keyboard.local_km.state, XKB_STATE_LAYOUT_EFFECTIVE);
+        xkb_state_serialize_layout(seat->config->keymap.state, XKB_STATE_LAYOUT_EFFECTIVE);
 
     struct wl_client *client = wl_resource_get_client(seat->input_focus->surface->resource);
     struct wl_resource *resource;
@@ -409,6 +308,16 @@ send_pointer_leave(struct server_seat *seat) {
 }
 
 static void
+reset_keyboard_state(struct server_seat *seat) {
+    for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        xkb_state_update_key(seat->keyboard.remote_km.state, seat->keyboard.pressed.data[i] + 8,
+                             XKB_KEY_UP);
+        send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
+    }
+    seat->keyboard.pressed.len = 0;
+}
+
+static void
 process_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
     bool modifiers_updated = modify_pressed_keys(seat, keycode, state);
 
@@ -434,9 +343,9 @@ process_remap(struct server_seat *seat, struct server_seat_remap remap, bool sta
 
 static bool
 try_remap_button(struct server_seat *seat, uint32_t button, bool state) {
-    for (size_t i = 0; i < seat->config.remaps.num_buttons; i++) {
-        if (seat->config.remaps.buttons[i].src == button) {
-            process_remap(seat, seat->config.remaps.buttons[i], state);
+    for (size_t i = 0; i < seat->config->remaps.num_buttons; i++) {
+        if (seat->config->remaps.buttons[i].src == button) {
+            process_remap(seat, seat->config->remaps.buttons[i], state);
             return true;
         }
     }
@@ -445,10 +354,10 @@ try_remap_button(struct server_seat *seat, uint32_t button, bool state) {
 
 static bool
 try_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
-    for (size_t i = 0; i < seat->config.remaps.num_keys; i++) {
-        if (seat->config.remaps.keys[i].src == keycode) {
-            if (seat->config.remaps.buttons[i].src == keycode) {
-                process_remap(seat, seat->config.remaps.buttons[i], state);
+    for (size_t i = 0; i < seat->config->remaps.num_keys; i++) {
+        if (seat->config->remaps.keys[i].src == keycode) {
+            if (seat->config->remaps.buttons[i].src == keycode) {
+                process_remap(seat, seat->config->remaps.buttons[i], state);
                 return true;
             }
         }
@@ -511,6 +420,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     }
 
     // TODO: handle errors somehow (not sure how to be honest)
+    // TODO: properly transfer state from previous remote keymap state
 
     if (seat->keyboard.remote_km.fd >= 0) {
         close(seat->keyboard.remote_km.fd);
@@ -546,12 +456,7 @@ static void
 on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface) {
     struct server_seat *seat = data;
 
-    for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
-        xkb_state_update_key(seat->keyboard.remote_km.state, seat->keyboard.pressed.data[i] + 8,
-                             XKB_KEY_UP);
-        send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
-    }
-    seat->keyboard.pressed.len = 0;
+    reset_keyboard_state(seat);
 }
 
 static void
@@ -886,12 +791,12 @@ seat_get_keyboard(struct wl_client *client, struct wl_resource *resource, uint32
     wl_list_insert(&seat->keyboards, wl_resource_get_link(keyboard_resource));
 
     wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                            seat->keyboard.local_km.fd, seat->keyboard.local_km.size);
+                            seat->config->keymap.fd, seat->config->keymap.size);
 
     int32_t rate =
-        seat->config.repeat_rate >= 0 ? seat->config.repeat_rate : seat->keyboard.repeat_rate;
+        seat->config->repeat_rate >= 0 ? seat->config->repeat_rate : seat->keyboard.repeat_rate;
     int32_t delay =
-        seat->config.repeat_delay >= 0 ? seat->config.repeat_delay : seat->keyboard.repeat_delay;
+        seat->config->repeat_delay >= 0 ? seat->config->repeat_delay : seat->keyboard.repeat_delay;
     wl_keyboard_send_repeat_info(keyboard_resource, rate, delay);
 }
 
@@ -944,13 +849,12 @@ static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_seat *seat = wl_container_of(listener, seat, on_display_destroy);
 
+    server_seat_config_destroy(seat->config);
+
     wl_global_destroy(seat->global);
 
-    server_seat_keymap_destroy(&seat->keyboard.local_km);
     server_seat_keymap_destroy(&seat->keyboard.remote_km);
     free(seat->keyboard.pressed.data);
-
-    remaps_destroy(seat->config.remaps);
 
     xkb_context_unref(seat->ctx);
 
@@ -975,13 +879,6 @@ server_seat_create(struct server *server, struct config *cfg) {
         goto fail_xkb_context;
     }
     xkb_context_set_log_fn(seat->ctx, xkb_log);
-
-    seat->config.remaps = remaps_create(cfg);
-
-    seat->keyboard.local_km.fd = -1;
-    if (prepare_local_keymap(seat, cfg) != 0) {
-        goto fail_keymap;
-    }
 
     seat->global = wl_global_create(server->display, &wl_seat_interface, SRV_SEAT_VERSION, seat,
                                     on_global_bind);
@@ -1018,11 +915,21 @@ server_seat_create(struct server *server, struct config *cfg) {
     seat->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &seat->on_display_destroy);
 
+    struct server_seat_config *config = server_seat_config_create(seat, cfg);
+    if (!config) {
+        ww_log(LOG_ERROR, "failed to create seat config");
+        goto fail_config;
+    }
+    server_seat_use_config(seat, config);
+
     return seat;
 
-fail_keymap:
-    free(seat->config.remaps.buttons);
-    free(seat->config.remaps.keys);
+fail_config:
+    wl_list_remove(&seat->on_display_destroy.link);
+    wl_list_remove(&seat->on_pointer.link);
+    wl_list_remove(&seat->on_keyboard.link);
+    wl_list_remove(&seat->on_input_focus.link);
+    free(seat->keyboard.pressed.data);
     xkb_context_unref(seat->ctx);
 
 fail_xkb_context:
@@ -1087,18 +994,6 @@ server_seat_send_keys(struct server_seat *seat, struct server_view *view, size_t
     wl_array_release(&wl_keys);
 }
 
-int
-server_seat_set_config(struct server_seat *seat, struct config *cfg) {
-    // TODO: switch keymap
-
-    remaps_destroy(seat->config.remaps);
-    seat->config.remaps = remaps_create(cfg);
-    seat->config.repeat_rate = cfg->input.repeat_rate;
-    seat->config.repeat_delay = cfg->input.repeat_delay;
-
-    return 0;
-}
-
 void
 server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
                          void *data) {
@@ -1106,4 +1001,130 @@ server_seat_set_listener(struct server_seat *seat, const struct server_seat_list
 
     seat->listener = listener;
     seat->listener_data = data;
+}
+
+void
+server_seat_use_config(struct server_seat *seat, struct server_seat_config *config) {
+    if (seat->config) {
+        server_seat_config_destroy(seat->config);
+    }
+    seat->config = config;
+
+    reset_keyboard_state(seat);
+
+    struct wl_resource *keyboard_resource;
+    wl_resource_for_each(keyboard_resource, &seat->keyboards) {
+        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
+                                config->keymap.fd, config->keymap.size);
+    }
+}
+
+struct server_seat_config *
+server_seat_config_create(struct server_seat *seat, struct config *cfg) {
+    struct server_seat_config *config = zalloc(1, sizeof(*config));
+
+    config->repeat_rate = cfg->input.repeat_rate;
+    config->repeat_delay = cfg->input.repeat_delay;
+
+    const struct xkb_rule_names rule_names = {
+        .layout = cfg->input.keymap.layout,
+        .model = cfg->input.keymap.model,
+        .rules = cfg->input.keymap.rules,
+        .variant = cfg->input.keymap.variant,
+        .options = cfg->input.keymap.options,
+    };
+
+    config->keymap.xkb =
+        xkb_keymap_new_from_names(seat->ctx, &rule_names, XKB_MAP_COMPILE_NO_FLAGS);
+    if (!config->keymap.xkb) {
+        ww_log(LOG_ERROR, "failed to create XKB keymap");
+        goto fail_keymap;
+    }
+
+    config->keymap.state = xkb_state_new(config->keymap.xkb);
+    if (!config->keymap.state) {
+        ww_log(LOG_ERROR, "failed to create XKB keymap state");
+        goto fail_state;
+    }
+
+    char *keymap_str = xkb_keymap_get_as_string(config->keymap.xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
+    if (!keymap_str) {
+        ww_log(LOG_ERROR, "failed to get XKB keymap as string");
+        goto fail_keymap_str;
+    }
+
+    config->keymap.size = strlen(keymap_str) + 1;
+    config->keymap.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
+    if (config->keymap.fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to create XKB keymap memfd");
+        goto fail_create_memfd;
+    }
+
+    if (ftruncate(config->keymap.fd, config->keymap.size) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to expand XKB keymap memfd");
+        goto fail_truncate_memfd;
+    }
+
+    char *data = mmap(NULL, config->keymap.size + 1, PROT_READ | PROT_WRITE, MAP_SHARED,
+                      config->keymap.fd, 0);
+    if (data == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to map XKB keymap memfd");
+        goto fail_map_memfd;
+    }
+
+    memcpy(data, keymap_str, config->keymap.size + 1);
+    ww_assert(munmap(data, config->keymap.size + 1) == 0);
+    free(keymap_str);
+
+    // It's not worth the effort to calculate how many of each kind of remap there are. The number
+    // of remaps a user might reasonably have is quite small.
+    config->remaps.keys = zalloc(cfg->input.remaps.count, sizeof(*config->remaps.keys));
+    config->remaps.buttons = zalloc(cfg->input.remaps.count, sizeof(*config->remaps.buttons));
+
+    for (size_t i = 0; i < cfg->input.remaps.count; i++) {
+        struct config_remap *remap = &cfg->input.remaps.data[i];
+
+        struct server_seat_remap *dst = NULL;
+        switch (remap->src_type) {
+        case CONFIG_REMAP_BUTTON:
+            dst = &config->remaps.buttons[config->remaps.num_buttons++];
+            break;
+        case CONFIG_REMAP_KEY:
+            dst = &config->remaps.keys[config->remaps.num_keys++];
+            break;
+        default:
+            ww_unreachable();
+        }
+
+        dst->dst = remap->dst_data;
+        dst->src = remap->src_data;
+        dst->type = remap->dst_type;
+    }
+
+    return config;
+
+fail_map_memfd:
+fail_truncate_memfd:
+    close(config->keymap.fd);
+
+fail_create_memfd:
+    free(keymap_str);
+
+fail_keymap_str:
+    xkb_state_unref(config->keymap.state);
+
+fail_state:
+    xkb_keymap_unref(config->keymap.xkb);
+
+fail_keymap:
+    free(config);
+    return NULL;
+}
+
+void
+server_seat_config_destroy(struct server_seat_config *config) {
+    free(config->remaps.keys);
+    free(config->remaps.buttons);
+    server_seat_keymap_destroy(&config->keymap);
+    free(config);
 }

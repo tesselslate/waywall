@@ -18,20 +18,10 @@ enum kb_modifier {
 struct server_seat {
     struct wl_global *global;
 
-    struct {
-        int repeat_rate, repeat_delay;
-
-        struct server_seat_remaps {
-            struct server_seat_remap {
-                enum config_remap_type type;
-                uint32_t src, dst;
-            } *keys, *buttons;
-            size_t num_keys, num_buttons;
-        } remaps;
-    } config;
-
     struct server *server;
     struct xkb_context *ctx;
+
+    struct server_seat_config *config;
 
     struct {
         struct wl_keyboard *remote;
@@ -41,7 +31,7 @@ struct server_seat {
             uint32_t size;
             struct xkb_keymap *xkb;
             struct xkb_state *state;
-        } local_km, remote_km;
+        } remote_km;
         int32_t repeat_rate, repeat_delay;
 
         uint8_t mod_indices[8];
@@ -74,6 +64,19 @@ struct server_seat {
     } events;
 };
 
+struct server_seat_config {
+    int repeat_rate, repeat_delay;
+    struct server_seat_keymap keymap;
+
+    struct {
+        struct server_seat_remap {
+            enum config_remap_type type;
+            uint32_t src, dst;
+        } *keys, *buttons;
+        size_t num_keys, num_buttons;
+    } remaps;
+};
+
 struct server_seat_listener {
     bool (*button)(void *data, uint32_t button, bool state);
     bool (*key)(void *data, uint32_t sym, bool state);
@@ -90,8 +93,11 @@ struct server_seat *server_seat_create(struct server *server, struct config *cfg
 void server_seat_send_click(struct server_seat *seat, struct server_view *view);
 void server_seat_send_keys(struct server_seat *seat, struct server_view *view, size_t num_keys,
                            const struct syn_key[static num_keys]);
-int server_seat_set_config(struct server_seat *seat, struct config *cfg);
 void server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
                               void *data);
+void server_seat_use_config(struct server_seat *seat, struct server_seat_config *config);
+
+struct server_seat_config *server_seat_config_create(struct server_seat *seat, struct config *cfg);
+void server_seat_config_destroy(struct server_seat_config *config);
 
 #endif
