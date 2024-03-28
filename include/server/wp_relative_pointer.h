@@ -30,7 +30,7 @@ struct server_relative_pointer {
 
 struct server_relative_pointer *server_relative_pointer_create(struct server *server,
                                                                struct config *cfg);
-void server_relative_pointer_set_config(struct server_relative_pointer *relative_pointer,
-                                        struct config *cfg);
+void server_relative_pointer_set_sens(struct server_relative_pointer *relative_pointer,
+                                      double sens);
 
 #endif

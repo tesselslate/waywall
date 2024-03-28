@@ -28,8 +28,8 @@ struct server_pointer_constraints {
 
 struct server_pointer_constraints *server_pointer_constraints_create(struct server *server,
                                                                      struct config *cfg);
-void server_pointer_constraints_set_config(struct server_pointer_constraints *pointer_constraints,
-                                           struct config *cfg);
+void server_pointer_constraints_set_confine(struct server_pointer_constraints *pointer_constraints,
+                                            bool confine);
 void server_pointer_constraints_set_hint(struct server_pointer_constraints *pointer_constraints,
                                          double x, double y);
 

@@ -677,10 +677,13 @@ wall_set_config(struct wall *wall, struct config *cfg) {
         }
     }
 
-    if (server_set_config(wall->server, cfg) != 0) {
-        ww_log(LOG_ERROR, "failed to update server config");
+    struct server_config *server_config = server_config_create(wall->server, cfg);
+    if (!server_config) {
+        ww_log(LOG_ERROR, "failed to create server config");
         return 1;
     }
+    server_use_config(wall->server, server_config);
+    server_config_destroy(server_config);
 
     wall->cfg = cfg;
     return 0;

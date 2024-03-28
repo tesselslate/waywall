@@ -192,12 +192,6 @@ server_relative_pointer_create(struct server *server, struct config *cfg) {
     relative_pointer->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &relative_pointer->on_display_destroy);
 
-    server_relative_pointer_set_config(relative_pointer, cfg);
-    return relative_pointer;
-}
-
-void
-server_relative_pointer_set_config(struct server_relative_pointer *relative_pointer,
-                                   struct config *cfg) {
     relative_pointer->config.sens = cfg->input.sens;
+    return relative_pointer;
 }

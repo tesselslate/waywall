@@ -177,43 +177,74 @@ server_destroy(struct server *server) {
 
     server_ui_destroy(server->ui);
     remote_buffer_manager_destroy(server->remote_buf);
-
     server_cursor_destroy(server->cursor);
-
     server_backend_destroy(server->backend);
+
     free(server);
 }
 
-int
-server_set_config(struct server *server, struct config *cfg) {
-    if (server_ui_set_config(server->ui, cfg) != 0) {
-        ww_log(LOG_ERROR, "failed to update ui config");
-        return 1;
+void
+server_use_config(struct server *server, struct server_config *config) {
+    ww_assert(!config->applied);
+
+    server_cursor_use_config(server->cursor, config->cursor);
+    server_seat_use_config(server->seat, config->seat);
+    server_ui_use_config(server->ui, config->ui);
+
+    server->relative_pointer->config.sens = config->sens;
+    server_pointer_constraints_set_confine(server->pointer_constraints, config->confine);
+
+    config->applied = true;
+}
+
+struct server_config *
+server_config_create(struct server *server, struct config *cfg) {
+    struct server_config *config = zalloc(1, sizeof(*config));
+
+    config->confine = cfg->input.confine;
+    config->sens = cfg->input.sens;
+
+    config->cursor = server_cursor_config_create(server->cursor, cfg);
+    if (!config->cursor) {
+        goto fail_cursor;
     }
 
-    struct server_cursor_config *cursor_config = server_cursor_config_create(server->cursor, cfg);
-    if (!cursor_config) {
-        ww_log(LOG_ERROR, "failed to create server cursor config");
-        return 1;
-    }
-
-    struct server_seat_config *seat_config = server_seat_config_create(server->seat, cfg);
-    if (!seat_config) {
+    config->seat = server_seat_config_create(server->seat, cfg);
+    if (!config->seat) {
         ww_log(LOG_ERROR, "failed to create server seat config");
-        goto fail_seat_config;
+        goto fail_seat;
     }
 
-    server_cursor_use_config(server->cursor, cursor_config);
-    server_seat_use_config(server->seat, seat_config);
+    config->ui = server_ui_config_create(server->ui, cfg);
+    if (!config->ui) {
+        ww_log(LOG_ERROR, "failed to create server ui config");
+        goto fail_ui;
+    }
 
-    server_relative_pointer_set_config(server->relative_pointer, cfg);
-    server_pointer_constraints_set_config(server->pointer_constraints, cfg);
+    return config;
 
-    return 0;
+fail_ui:
+    server_seat_config_destroy(config->seat);
 
-fail_seat_config:
-    server_cursor_config_destroy(cursor_config);
-    return 1;
+fail_seat:
+    server_cursor_config_destroy(config->cursor);
+
+fail_cursor:
+    free(config);
+    return NULL;
+}
+
+void
+server_config_destroy(struct server_config *config) {
+    if (config->applied) {
+        free(config);
+        return;
+    }
+
+    server_cursor_config_destroy(config->cursor);
+    server_seat_config_destroy(config->seat);
+    server_ui_config_destroy(config->ui);
+    free(config);
 }
 
 struct wl_keyboard *

@@ -36,9 +36,23 @@ struct server {
     } events;
 };
 
+struct server_config {
+    struct server_cursor_config *cursor;
+    struct server_seat_config *seat;
+    struct server_ui_config *ui;
+
+    bool confine;
+    double sens;
+
+    bool applied;
+};
+
 struct server *server_create(struct config *cfg);
 void server_destroy(struct server *server);
-int server_set_config(struct server *server, struct config *cfg);
+void server_use_config(struct server *server, struct server_config *config);
+
+struct server_config *server_config_create(struct server *server, struct config *cfg);
+void server_config_destroy(struct server_config *config);
 
 struct wl_keyboard *server_get_wl_keyboard(struct server *server);
 struct wl_pointer *server_get_wl_pointer(struct server *server);

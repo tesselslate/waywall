@@ -110,12 +110,6 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->empty_region = wl_compositor_create_region(server->backend->compositor);
     check_alloc(ui->empty_region);
 
-    ui->background = remote_buffer_manager_color(server->remote_buf, cfg->theme.background);
-    if (!ui->background) {
-        ww_log(LOG_ERROR, "failed to create root buffer");
-        goto fail_background;
-    }
-
     ui->surface = wl_compositor_create_surface(server->backend->compositor);
     check_alloc(ui->surface);
 
@@ -136,9 +130,20 @@ server_ui_create(struct server *server, struct config *cfg) {
     wl_signal_init(&ui->events.view_create);
     wl_signal_init(&ui->events.view_destroy);
 
+    struct server_ui_config *config = server_ui_config_create(ui, cfg);
+    if (!config) {
+        ww_log(LOG_ERROR, "failed to create server ui config");
+        goto fail_config;
+    }
+    server_ui_use_config(ui, config);
+
     return ui;
 
-fail_background:
+fail_config:
+    xdg_toplevel_destroy(ui->xdg_toplevel);
+    xdg_surface_destroy(ui->xdg_surface);
+    wp_viewport_destroy(ui->viewport);
+    wl_surface_destroy(ui->surface);
     wl_region_destroy(ui->empty_region);
     free(ui);
     return NULL;
@@ -146,13 +151,13 @@ fail_background:
 
 void
 server_ui_destroy(struct server_ui *ui) {
-    wl_region_destroy(ui->empty_region);
+    server_ui_config_destroy(ui->config);
 
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
     wp_viewport_destroy(ui->viewport);
     wl_surface_destroy(ui->surface);
-    remote_buffer_deref(ui->background);
+    wl_region_destroy(ui->empty_region);
 
     free(ui);
 }
@@ -167,23 +172,17 @@ server_ui_hide(struct server_ui *ui) {
     ui->mapped = false;
 }
 
-int
-server_ui_set_config(struct server_ui *ui, struct config *cfg) {
-    struct wl_buffer *new_background =
-        remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
-    if (!new_background) {
-        ww_log(LOG_ERROR, "failed to create root buffer");
-        return 1;
+void
+server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
+    if (ui->config) {
+        server_ui_config_destroy(ui->config);
     }
+    ui->config = config;
 
-    wl_surface_attach(ui->surface, new_background, 0, 0);
-    wl_surface_commit(ui->surface);
-    wl_display_roundtrip(ui->server->backend->display);
-
-    remote_buffer_deref(ui->background);
-    ui->background = new_background;
-
-    return 0;
+    if (ui->mapped) {
+        wl_surface_attach(ui->surface, ui->config->background, 0, 0);
+        wl_surface_commit(ui->surface);
+    }
 }
 
 void
@@ -196,7 +195,7 @@ server_ui_show(struct server_ui *ui) {
     wl_surface_commit(ui->surface);
     wl_display_roundtrip(display);
 
-    wl_surface_attach(ui->surface, ui->background, 0, 0);
+    wl_surface_attach(ui->surface, ui->config->background, 0, 0);
     wl_surface_commit(ui->surface);
     wl_display_roundtrip(display);
 
@@ -204,6 +203,26 @@ server_ui_show(struct server_ui *ui) {
     xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
 
     ui->mapped = true;
+}
+
+struct server_ui_config *
+server_ui_config_create(struct server_ui *ui, struct config *cfg) {
+    struct server_ui_config *config = zalloc(1, sizeof(*config));
+
+    config->background = remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
+    if (!config->background) {
+        ww_log(LOG_ERROR, "failed to create root buffer");
+        free(config);
+        return NULL;
+    }
+
+    return config;
+}
+
+void
+server_ui_config_destroy(struct server_ui_config *config) {
+    remote_buffer_deref(config->background);
+    free(config);
 }
 
 pid_t

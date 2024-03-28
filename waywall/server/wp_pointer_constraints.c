@@ -257,20 +257,20 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
     pointer_constraints->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &pointer_constraints->on_display_destroy);
 
-    server_pointer_constraints_set_config(pointer_constraints, cfg);
+    pointer_constraints->config.confine = cfg->input.confine;
     return pointer_constraints;
 }
 
 void
-server_pointer_constraints_set_config(struct server_pointer_constraints *pointer_constraints,
-                                      struct config *cfg) {
-    if (!cfg->input.confine && pointer_constraints->confined_pointer) {
+server_pointer_constraints_set_confine(struct server_pointer_constraints *pointer_constraints,
+                                       bool confine) {
+    if (!confine && pointer_constraints->confined_pointer) {
         zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
         pointer_constraints->confined_pointer = NULL;
     }
     // TODO: confine
 
-    pointer_constraints->config.confine = cfg->input.confine;
+    pointer_constraints->config.confine = confine;
 }
 
 void

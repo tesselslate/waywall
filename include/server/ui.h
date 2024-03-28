@@ -10,9 +10,10 @@ struct config;
 struct server_ui {
     struct server *server;
 
+    struct server_ui_config *config;
+
     struct wl_region *empty_region;
 
-    struct wl_buffer *background;
     struct wl_surface *surface;
     struct wp_viewport *viewport;
 
@@ -29,6 +30,10 @@ struct server_ui {
         struct wl_signal view_create;  // data: struct server_view *
         struct wl_signal view_destroy; // data: struct server_view *
     } events;
+};
+
+struct server_ui_config {
+    struct wl_buffer *background;
 };
 
 struct server_view {
@@ -97,8 +102,11 @@ struct ui_rectangle {
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
-int server_ui_set_config(struct server_ui *ui, struct config *cfg);
+void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 void server_ui_show(struct server_ui *ui);
+
+struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);
+void server_ui_config_destroy(struct server_ui_config *config);
 
 pid_t server_view_get_pid(struct server_view *view);
 char *server_view_get_title(struct server_view *view);

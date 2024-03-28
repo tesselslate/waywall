@@ -34,15 +34,18 @@ server_cursor_create(struct server *server, struct config *cfg) {
 
     struct server_cursor_config *config = server_cursor_config_create(cursor, cfg);
     if (!config) {
-        wl_surface_destroy(cursor->surface);
-        wl_list_remove(&cursor->on_pointer_enter.link);
-
-        free(cursor);
-        return NULL;
+        ww_log(LOG_ERROR, "failed to create server cursor config");
+        goto fail_config;
     }
     server_cursor_use_config(cursor, config);
 
     return cursor;
+
+fail_config:
+    wl_surface_destroy(cursor->surface);
+    wl_list_remove(&cursor->on_pointer_enter.link);
+    free(cursor);
+    return NULL;
 }
 
 void

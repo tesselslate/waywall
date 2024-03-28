@@ -917,7 +917,7 @@ server_seat_create(struct server *server, struct config *cfg) {
 
     struct server_seat_config *config = server_seat_config_create(seat, cfg);
     if (!config) {
-        ww_log(LOG_ERROR, "failed to create seat config");
+        ww_log(LOG_ERROR, "failed to create server seat config");
         goto fail_config;
     }
     server_seat_use_config(seat, config);
