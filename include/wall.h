@@ -46,6 +46,7 @@ struct wall {
 
 struct wall *wall_create(struct server *server, struct inotify *inotify, struct config *cfg);
 void wall_destroy(struct wall *wall);
+int wall_set_config(struct wall *wall, struct config *cfg);
 
 int wall_lua_get_hovered(struct wall *wall);
 int wall_lua_play(struct wall *wall, int id);

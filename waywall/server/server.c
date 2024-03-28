@@ -141,6 +141,7 @@ server_create(struct config *cfg) {
         goto fail_cursor;
     }
     if (server_cursor_use_theme(server->cursor, server->cfg->theme.cursor_theme,
+                                server->cfg->theme.cursor_icon,
                                 server->cfg->theme.cursor_size) != 0) {
         ww_log(LOG_ERROR, "failed to initialize cursor theme '%s'",
                server->cfg->theme.cursor_theme);
@@ -191,6 +192,25 @@ server_destroy(struct server *server) {
 
     server_backend_destroy(server->backend);
     free(server);
+}
+
+int
+server_set_config(struct server *server, struct config *cfg) {
+    if (server_seat_set_config(server->seat, cfg) != 0) {
+        ww_log(LOG_ERROR, "failed to update seat config");
+        return 1;
+    }
+
+    if (server_cursor_use_theme(server->cursor, cfg->theme.cursor_theme, cfg->theme.cursor_icon,
+                                cfg->theme.cursor_size) != 0) {
+        ww_log(LOG_ERROR, "failed to update cursor theme");
+        return 1;
+    }
+
+    // Configuration was successfully updated. Commit the changes.
+    server_pointer_constraints_set_config(server->pointer_constraints, cfg);
+    server->relative_pointer->cfg = cfg;
+    return 0;
 }
 
 struct wl_keyboard *

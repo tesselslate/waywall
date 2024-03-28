@@ -654,6 +654,39 @@ wall_destroy(struct wall *wall) {
 }
 
 int
+wall_set_config(struct wall *wall, struct config *cfg) {
+    // TODO: changing configurations should be an atomic operation
+
+    bool had_counter = !!wall->counter;
+    bool have_counter = (strcmp(cfg->general.counter_path, "") != 0);
+    if (had_counter && have_counter) {
+        if (counter_set_file(wall->counter, cfg->general.counter_path) != 0) {
+            ww_log(LOG_ERROR, "failed to update counter file");
+            return 1;
+        }
+    } else if (had_counter && !have_counter) {
+        counter_destroy(wall->counter);
+        wall->counter = NULL;
+    } else if (!had_counter && have_counter) {
+        wall->counter = counter_create(cfg->general.counter_path);
+        if (!wall->counter) {
+            ww_log(LOG_ERROR, "failed to create reset counter");
+            return 1;
+        }
+    }
+
+    // TODO: CPU weights
+
+    if (server_set_config(wall->server, cfg) != 0) {
+        ww_log(LOG_ERROR, "failed to update server config");
+        return 1;
+    }
+
+    wall->cfg = cfg;
+    return 0;
+}
+
+int
 wall_lua_get_hovered(struct wall *wall) {
     return ON_WALL(wall) ? get_hovered(wall) : -1;
 }

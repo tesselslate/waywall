@@ -37,6 +37,7 @@ struct server {
 
 struct server *server_create(struct config *cfg);
 void server_destroy(struct server *server);
+int server_set_config(struct server *server, struct config *cfg);
 
 struct wl_keyboard *server_get_wl_keyboard(struct server *server);
 struct wl_pointer *server_get_wl_pointer(struct server *server);

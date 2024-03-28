@@ -7,7 +7,6 @@
 struct server;
 
 struct server_cursor {
-    struct config *cfg;
     struct server *server;
 
     struct wl_cursor_theme *theme;
@@ -25,6 +24,7 @@ struct server_cursor *server_cursor_create(struct server *server);
 void server_cursor_destroy(struct server_cursor *cursor);
 void server_cursor_hide(struct server_cursor *cursor);
 void server_cursor_show(struct server_cursor *cursor);
-int server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size);
+int server_cursor_use_theme(struct server_cursor *cursor, const char *name, const char *icon,
+                            int size);
 
 #endif

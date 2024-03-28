@@ -243,6 +243,8 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
                          SRV_POINTER_CONSTRAINTS_VERSION, pointer_constraints, on_global_bind);
     check_alloc(pointer_constraints->global);
 
+    // TODO: Confine pointer on startup
+
     wl_list_init(&pointer_constraints->objects);
 
     pointer_constraints->remote = server->backend->pointer_constraints;
@@ -257,6 +259,18 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
     wl_display_add_destroy_listener(server->display, &pointer_constraints->on_display_destroy);
 
     return pointer_constraints;
+}
+
+void
+server_pointer_constraints_set_config(struct server_pointer_constraints *pointer_constraints,
+                                      struct config *cfg) {
+    if (!cfg->input.confine && pointer_constraints->confined_pointer) {
+        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
+        pointer_constraints->confined_pointer = NULL;
+    }
+    // TODO: confine
+
+    pointer_constraints->cfg = cfg;
 }
 
 void

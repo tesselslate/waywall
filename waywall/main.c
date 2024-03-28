@@ -30,9 +30,22 @@ struct waywall {
 
 static void
 handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
-    ww_log(LOG_INFO, "config modified %u %s", mask, name);
+    struct waywall *ww = data;
 
-    // TODO: reload
+    struct config *cfg = config_create();
+    if (config_load(cfg) != 0) {
+        ww_log(LOG_ERROR, "failed to load new config");
+        config_destroy(cfg);
+        return;
+    }
+
+    if (wall_set_config(ww->wall, cfg) == 0) {
+        config_destroy(ww->cfg);
+        ww->cfg = cfg;
+    } else {
+        ww_log(LOG_ERROR, "failed to apply new config");
+        config_destroy(cfg);
+    }
 }
 
 static int

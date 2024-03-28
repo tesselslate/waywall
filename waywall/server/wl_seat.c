@@ -1075,6 +1075,14 @@ server_seat_send_keys(struct server_seat *seat, struct server_view *view, size_t
     wl_array_release(&wl_keys);
 }
 
+int
+server_seat_set_config(struct server_seat *seat, struct config *cfg) {
+    // TODO: keymap, remaps
+    seat->cfg = cfg;
+
+    return 0;
+}
+
 void
 server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
                          void *data) {

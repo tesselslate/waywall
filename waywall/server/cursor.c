@@ -23,7 +23,6 @@ struct server_cursor *
 server_cursor_create(struct server *server) {
     struct server_cursor *cursor = zalloc(1, sizeof(*cursor));
 
-    cursor->cfg = server->cfg;
     cursor->server = server;
 
     cursor->surface = wl_compositor_create_surface(server->backend->compositor);
@@ -70,7 +69,31 @@ server_cursor_show(struct server_cursor *cursor) {
 }
 
 int
-server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size) {
+server_cursor_use_theme(struct server_cursor *cursor, const char *name, const char *icon,
+                        int size) {
+    struct wl_cursor_theme *theme = wl_cursor_theme_load(name, size, cursor->server->backend->shm);
+    if (!theme) {
+        ww_log(LOG_ERROR, "failed to load cursor theme '%s'", name);
+        return 1;
+    }
+
+    struct wl_cursor *wl_cursor = wl_cursor_theme_get_cursor(theme, icon);
+    if (!wl_cursor) {
+        ww_log(LOG_ERROR, "cursor theme '%s' does not contain '%s' cursor icon", name, icon);
+        goto fail_get_cursor;
+    }
+
+    // As of libwayland commit aa2a6d5, this should always be true.
+    ww_assert(wl_cursor->image_count > 0);
+
+    struct wl_cursor_image *image = wl_cursor->images[0];
+    struct wl_buffer *buffer = wl_cursor_image_get_buffer(image);
+    if (!buffer) {
+        ww_log(LOG_ERROR, "failed to get cursor image buffer");
+        goto fail_buffer;
+    }
+
+    // Commit the changes.
     if (cursor->theme) {
         wl_cursor_theme_destroy(cursor->theme);
         cursor->theme = NULL;
@@ -79,29 +102,9 @@ server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size
         cursor->buffer = NULL;
     }
 
-    cursor->theme = wl_cursor_theme_load(name, size, cursor->server->backend->shm);
-    if (!cursor->theme) {
-        ww_log(LOG_ERROR, "failed to load cursor theme '%s'", name);
-        return 1;
-    }
-
-    struct wl_cursor *wl_cursor =
-        wl_cursor_theme_get_cursor(cursor->theme, cursor->cfg->theme.cursor_icon);
-    if (!wl_cursor) {
-        ww_log(LOG_ERROR, "cursor theme '%s' does not contain '%s' cursor icon", name,
-               cursor->cfg->theme.cursor_icon);
-        goto fail_get_cursor;
-    }
-
-    // As of libwayland commit aa2a6d5, this should always be true.
-    ww_assert(wl_cursor->image_count > 0);
-
-    cursor->image = wl_cursor->images[0];
-    cursor->buffer = wl_cursor_image_get_buffer(cursor->image);
-    if (!cursor->buffer) {
-        ww_log(LOG_ERROR, "failed to get cursor image buffer");
-        goto fail_buffer;
-    }
+    cursor->theme = theme;
+    cursor->image = image;
+    cursor->buffer = buffer;
 
     if (cursor->show) {
         wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter,
@@ -114,7 +117,6 @@ server_cursor_use_theme(struct server_cursor *cursor, const char *name, int size
 
 fail_buffer:
 fail_get_cursor:
-    wl_cursor_theme_destroy(cursor->theme);
-    cursor->theme = NULL;
+    wl_cursor_theme_destroy(theme);
     return 1;
 }
