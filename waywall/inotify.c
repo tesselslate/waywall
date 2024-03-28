@@ -37,7 +37,8 @@ tick_inotify(int fd, uint32_t mask, void *data) {
                 continue;
             }
 
-            inotify->wd[event->wd].func(event->wd, event->mask, event->name, inotify->wd[event->wd].data);
+            inotify->wd[event->wd].func(event->wd, event->mask, event->name,
+                                        inotify->wd[event->wd].data);
         }
     }
 }
