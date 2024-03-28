@@ -133,15 +133,10 @@ server_create(struct config *cfg) {
         goto fail_globals;
     }
 
-    server->cursor = server_cursor_create(server);
+    server->cursor = server_cursor_create(server, cfg);
     if (!server->cursor) {
         ww_log(LOG_ERROR, "failed to initialize cursor");
         goto fail_cursor;
-    }
-    if (server_cursor_use_theme(server->cursor, cfg->theme.cursor_theme, cfg->theme.cursor_icon,
-                                cfg->theme.cursor_size) != 0) {
-        ww_log(LOG_ERROR, "failed to initialize cursor theme '%s'", cfg->theme.cursor_theme);
-        goto fail_cursor_theme;
     }
     server_cursor_show(server->cursor);
 
@@ -155,7 +150,6 @@ server_create(struct config *cfg) {
     return server;
 
 fail_ui:
-fail_cursor_theme:
     server_cursor_destroy(server->cursor);
 
 fail_cursor:
@@ -192,6 +186,8 @@ server_destroy(struct server *server) {
 
 int
 server_set_config(struct server *server, struct config *cfg) {
+    // TODO: error handling
+
     if (server_seat_set_config(server->seat, cfg) != 0) {
         ww_log(LOG_ERROR, "failed to update seat config");
         return 1;
@@ -202,12 +198,13 @@ server_set_config(struct server *server, struct config *cfg) {
         return 1;
     }
 
-    if (server_cursor_use_theme(server->cursor, cfg->theme.cursor_theme, cfg->theme.cursor_icon,
-                                cfg->theme.cursor_size) != 0) {
-        ww_log(LOG_ERROR, "failed to update cursor theme");
+    struct server_cursor_config *cursor_config = server_cursor_config_create(server->cursor, cfg);
+    if (!cursor_config) {
+        ww_log(LOG_ERROR, "failed to create server cursor config");
         return 1;
     }
 
+    server_cursor_use_config(server->cursor, cursor_config);
     server_relative_pointer_set_config(server->relative_pointer, cfg);
     server_pointer_constraints_set_config(server->pointer_constraints, cfg);
 
