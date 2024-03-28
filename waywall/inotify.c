@@ -28,11 +28,11 @@ tick_inotify(int fd, uint32_t mask, void *data) {
 
             ww_assert(event->wd >= 0 && event->wd <= inotify->len);
 
-            if (event->mask & IN_IGNORED) {
-                continue;
-            }
-
             if (!inotify->wd[event->wd].func) {
+                if (event->mask & IN_IGNORED) {
+                    continue;
+                }
+
                 ww_log(LOG_WARN, "received inotify event for NULL listener (wd=%d)", event->wd);
                 continue;
             }

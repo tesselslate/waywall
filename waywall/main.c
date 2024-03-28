@@ -32,6 +32,22 @@ static void
 handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
     struct waywall *ww = data;
 
+    // The file is gone and this watch descriptor should be removed from the list.
+    if (mask & IN_IGNORED) {
+        for (ssize_t i = 0; i < ww->config_wd.len; i++) {
+            if (ww->config_wd.data[i] != wd) {
+                continue;
+            }
+
+            memmove(ww->config_wd.data + i, ww->config_wd.data + i + 1,
+                    sizeof(int) * (ww->config_wd.len - i - 1));
+            ww->config_wd.len--;
+            return;
+        }
+
+        ww_panic("watch descriptor not present in array");
+    }
+
     struct config *cfg = config_create();
     if (config_load(cfg) != 0) {
         ww_log(LOG_ERROR, "failed to load new config");
