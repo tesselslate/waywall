@@ -3,14 +3,6 @@
 
 #include "cpu/cpu.h"
 
-struct cpu_cgroup_weights {
-    int idle;
-    int low;
-    int high;
-    int active;
-};
-
-struct cpu_manager *cpu_manager_create_cgroup(struct cpu_cgroup_weights weights,
-                                              int preview_threshold);
+struct cpu_manager *cpu_manager_create_cgroup(struct config *cfg);
 
 #endif

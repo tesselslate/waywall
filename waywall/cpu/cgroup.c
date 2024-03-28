@@ -1,4 +1,5 @@
 #include "cpu/cgroup.h"
+#include "config/config.h"
 #include "cpu/cgroup_setup.h"
 #include "cpu/cpu.h"
 #include "instance.h"
@@ -18,6 +19,7 @@ enum group {
 
 struct cpu_cgroup {
     struct cpu_manager manager;
+    char *base;
 
     struct {
         int preview_threshold;
@@ -31,6 +33,49 @@ struct cpu_cgroup {
         bool priority; // TODO: this wastes a ton of space with padding
     } instances[MAX_INSTANCES];
 };
+
+static int
+open_group_procs(const char *base, const char *group) {
+    struct str buf = {0};
+    ww_assert(str_append(&buf, base));
+    ww_assert(str_append(&buf, group));
+    ww_assert(str_append(&buf, "/cgroup.procs"));
+
+    int fd = open(buf.data, O_WRONLY);
+    if (fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
+        return 1;
+    }
+
+    return fd;
+}
+
+static int
+set_group_weight(const char *base, const char *group, int weight) {
+    struct str buf = {0};
+    ww_assert(str_append(&buf, base));
+    ww_assert(str_append(&buf, group));
+    ww_assert(str_append(&buf, "/cpu.weight"));
+
+    int fd = open(buf.data, O_WRONLY);
+    if (fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
+        return 1;
+    }
+
+    char weight_buf[32];
+    size_t n = snprintf(weight_buf, STATIC_ARRLEN(weight_buf), "%d", weight);
+    ww_assert(n <= STATIC_STRLEN(weight_buf));
+
+    if (write(fd, weight_buf, n) != (ssize_t)n) {
+        ww_log_errno(LOG_ERROR, "failed to write '%s'", buf.data);
+        close(fd);
+        return 1;
+    }
+
+    close(fd);
+    return 0;
+}
 
 static void
 set_group(struct cpu_cgroup *cpu, int id, enum group group) {
@@ -58,7 +103,33 @@ cpu_cgroup_destroy(struct cpu_manager *manager) {
         close(cpu->fds[i]);
     }
 
+    free(cpu->base);
     free(cpu);
+}
+
+static int
+cpu_cgroup_set_config(struct cpu_manager *manager, struct config *cfg) {
+    struct cpu_cgroup *cpu = (struct cpu_cgroup *)manager;
+
+    const struct {
+        const char *name;
+        int weight;
+    } groups[] = {
+        {"idle", cfg->cpu.weight_idle},
+        {"low", cfg->cpu.weight_low},
+        {"high", cfg->cpu.weight_high},
+        {"active", cfg->cpu.weight_active},
+    };
+
+    for (size_t i = 0; i < STATIC_ARRLEN(groups); i++) {
+        if (set_group_weight(cpu->base, groups[i].name, groups[i].weight) != 0) {
+            return 1;
+        }
+    }
+
+    cpu->config.preview_threshold = cfg->cpu.preview_threshold;
+
+    return 0;
 }
 
 static void
@@ -131,82 +202,26 @@ cpu_cgroup_update(struct cpu_manager *manager, int id, struct instance *instance
     }
 }
 
-static int
-open_group_procs(const char *base, const char *group) {
-    struct str buf = {0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, group));
-    ww_assert(str_append(&buf, "/cgroup.procs"));
-
-    int fd = open(buf.data, O_WRONLY);
-    if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
-        return 1;
-    }
-
-    return fd;
-}
-
-static int
-set_group_weight(const char *base, const char *group, int weight) {
-    struct str buf = {0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, group));
-    ww_assert(str_append(&buf, "/cpu.weight"));
-
-    int fd = open(buf.data, O_WRONLY);
-    if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
-        return 1;
-    }
-
-    char weight_buf[32];
-    size_t n = snprintf(weight_buf, STATIC_ARRLEN(weight_buf), "%d", weight);
-    ww_assert(n <= STATIC_STRLEN(weight_buf));
-
-    if (write(fd, weight_buf, n) != (ssize_t)n) {
-        ww_log_errno(LOG_ERROR, "failed to write '%s'", buf.data);
-        close(fd);
-        return 1;
-    }
-
-    close(fd);
-    return 0;
-}
-
 struct cpu_manager *
-cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_threshold) {
+cpu_manager_create_cgroup(struct config *cfg) {
     char *cgroup_base = cgroup_get_base();
     if (!cgroup_base) {
         ww_log(LOG_ERROR, "failed to get cgroup base directory");
         return NULL;
     }
 
-    const struct {
-        const char *name;
-        int weight;
-    } groups[] = {
-        {"idle", weights.idle},
-        {"low", weights.low},
-        {"high", weights.high},
-        {"active", weights.active},
-    };
-
-    for (size_t i = 0; i < STATIC_ARRLEN(groups); i++) {
-        if (set_group_weight(cgroup_base, groups[i].name, groups[i].weight) != 0) {
-            goto fail_weight;
-        }
-    }
-
     struct cpu_cgroup *cpu = zalloc(1, sizeof(*cpu));
+    cpu->base = cgroup_base;
 
-    cpu->config.preview_threshold = preview_threshold;
+    if (cpu_cgroup_set_config((struct cpu_manager *)cpu, cfg) != 0) {
+        goto fail_set_config;
+    }
 
     static const char *names[] = {"idle", "low", "high", "active"};
     static_assert(STATIC_ARRLEN(names) == STATIC_ARRLEN(cpu->fds));
 
     for (size_t i = 0; i < STATIC_ARRLEN(names); i++) {
-        cpu->fds[i] = open_group_procs(cgroup_base, names[i]);
+        cpu->fds[i] = open_group_procs(cpu->base, names[i]);
 
         if (cpu->fds[i] == -1) {
             for (size_t j = 0; j < i; j++) {
@@ -219,19 +234,19 @@ cpu_manager_create_cgroup(struct cpu_cgroup_weights weights, int preview_thresho
     cpu->last_active = -1;
 
     cpu->manager.destroy = cpu_cgroup_destroy;
+    cpu->manager.set_config = cpu_cgroup_set_config;
+
     cpu->manager.add = cpu_cgroup_add;
     cpu->manager.remove = cpu_cgroup_remove;
     cpu->manager.set_active = cpu_cgroup_set_active;
     cpu->manager.set_priority = cpu_cgroup_set_priority;
     cpu->manager.update = cpu_cgroup_update;
 
-    free(cgroup_base);
     return (struct cpu_manager *)cpu;
 
 fail_group:
+fail_set_config:
+    free(cpu->base);
     free(cpu);
-
-fail_weight:
-    free(cgroup_base);
     return NULL;
 }

@@ -574,12 +574,7 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
         }
     }
 
-    wall->cpu =
-        cpu_manager_create_cgroup((struct cpu_cgroup_weights){.idle = cfg->cpu.weight_idle,
-                                                              .low = cfg->cpu.weight_low,
-                                                              .high = cfg->cpu.weight_high,
-                                                              .active = cfg->cpu.weight_active},
-                                  cfg->cpu.preview_threshold);
+    wall->cpu = cpu_manager_create_cgroup(cfg);
     if (!wall->cpu) {
         ww_log(LOG_ERROR, "failed to create cpu manager");
         goto fail_cpu;
@@ -655,7 +650,7 @@ wall_destroy(struct wall *wall) {
 
 int
 wall_set_config(struct wall *wall, struct config *cfg) {
-    // TODO: changing configurations should be an atomic operation
+    // TODO: changing configurations should be as close to atomic as is reasonably possible
 
     bool had_counter = !!wall->counter;
     bool have_counter = (strcmp(cfg->general.counter_path, "") != 0);
@@ -675,7 +670,12 @@ wall_set_config(struct wall *wall, struct config *cfg) {
         }
     }
 
-    // TODO: CPU weights
+    if (wall->cpu) {
+        if (cpu_set_config(wall->cpu, cfg) != 0) {
+            ww_log(LOG_ERROR, "failed to update cpu config");
+            return 1;
+        }
+    }
 
     if (server_set_config(wall->server, cfg) != 0) {
         ww_log(LOG_ERROR, "failed to update server config");

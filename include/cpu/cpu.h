@@ -3,10 +3,12 @@
 
 #include <stdbool.h>
 
+struct config;
 struct instance;
 
 struct cpu_manager {
     void (*destroy)(struct cpu_manager *cpu);
+    int (*set_config)(struct cpu_manager *cpu, struct config *cfg);
 
     void (*add)(struct cpu_manager *cpu, int id, struct instance *instance);
     void (*remove)(struct cpu_manager *cpu, int id);
@@ -18,6 +20,11 @@ struct cpu_manager {
 static inline void
 cpu_destroy(struct cpu_manager *cpu) {
     cpu->destroy(cpu);
+}
+
+static inline int
+cpu_set_config(struct cpu_manager *cpu, struct config *cfg) {
+    return cpu->set_config(cpu, cfg);
 }
 
 static inline void
