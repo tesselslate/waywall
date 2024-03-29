@@ -16,6 +16,5 @@ void counter_destroy(struct counter *counter);
 
 void counter_commit(struct counter *counter);
 uint64_t counter_increment(struct counter *counter);
-int counter_set_file(struct counter *counter, const char *path);
 
 #endif
