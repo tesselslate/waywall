@@ -371,6 +371,8 @@ play_instance(struct wall *wall, int id) {
         cpu_set_active(wall->cpu, id);
     }
 
+    destroy_rectangles(wall);
+
     instance_unpause(wall->instances[id]);
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
