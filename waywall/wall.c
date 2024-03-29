@@ -115,6 +115,7 @@ static void
 add_rectangle(struct wall *wall, struct ui_rectangle *rect) {
     if (wall->layout_rectangles.cap == wall->layout_rectangles.len) {
         ww_assert(wall->layout_rectangles.cap < SSIZE_MAX / 2);
+        ww_assert(wall->layout_rectangles.cap > 0);
 
         ssize_t cap = wall->layout_rectangles.cap * 2;
         void *data =
