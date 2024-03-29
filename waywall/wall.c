@@ -383,6 +383,7 @@ play_instance(struct wall *wall, int id) {
     transaction_view_set_position(view, 0, 0);
     transaction_view_set_dest_size(view, wall->width, wall->height);
     transaction_view_set_size(view, wall->width, wall->height);
+    transaction_view_set_crop(view, -1, -1, -1, -1);
     transaction_view_set_visible(view, true);
 
     for (int i = 0; i < wall->num_instances; i++) {

@@ -49,6 +49,10 @@ struct server_surface {
 
     const struct server_surface_role *role;
     struct wl_resource *role_resource;
+
+    struct {
+        struct wl_signal commit; // data: struct server_surface *
+    } events;
 };
 
 struct server_surface_role {

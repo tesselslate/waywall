@@ -1,6 +1,7 @@
 #ifndef WAYWALL_SERVER_UI_H
 #define WAYWALL_SERVER_UI_H
 
+#include "server/box.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
@@ -45,10 +46,15 @@ struct server_view {
     struct wl_subsurface *subsurface;
     struct wp_viewport *viewport;
 
-    int32_t x, y;
+    struct {
+        uint32_t x, y;
+        struct box crop;
+    } state;
 
     const struct server_view_impl *impl;
     struct wl_resource *impl_resource;
+
+    struct wl_listener on_surface_commit;
 
     struct {
         struct wl_signal destroy; // data: NULL
@@ -72,9 +78,7 @@ struct transaction_view {
     struct server_view *view;
 
     uint32_t x, y, width, height, dest_width, dest_height;
-    struct {
-        uint32_t x, y, width, height;
-    } crop;
+    struct box crop;
     struct wl_surface *above;
     bool visible;
 
@@ -121,8 +125,8 @@ struct transaction *transaction_create();
 struct transaction_view *transaction_get_view(struct transaction *txn, struct server_view *view);
 void transaction_destroy(struct transaction *txn);
 void transaction_view_set_above(struct transaction_view *view, struct wl_surface *surface);
-void transaction_view_set_crop(struct transaction_view *view, uint32_t x, uint32_t y,
-                               uint32_t width, uint32_t height);
+void transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, int32_t width,
+                               int32_t height);
 void transaction_view_set_dest_size(struct transaction_view *view, uint32_t width, uint32_t height);
 void transaction_view_set_position(struct transaction_view *view, uint32_t x, uint32_t y);
 void transaction_view_set_size(struct transaction_view *view, uint32_t width, uint32_t height);

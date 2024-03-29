@@ -1,6 +1,7 @@
 #include "server/ui.h"
 #include "config/config.h"
 #include "server/backend.h"
+#include "server/buffer.h"
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
@@ -79,6 +80,28 @@ static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = on_xdg_surface_configure,
 };
 
+static void
+on_view_surface_commit(struct wl_listener *listener, void *data) {
+    struct server_view *view = wl_container_of(listener, view, on_surface_commit);
+
+    if (view->surface->pending.apply & SURFACE_STATE_ATTACH) {
+        uint32_t width, height;
+        server_buffer_get_size(view->surface->pending.buffer, &width, &height);
+
+        struct box c = view->state.crop;
+        bool ok = (c.x == -1);
+        if (c.x >= 0) {
+            bool x = (c.x + c.width <= (int32_t)width);
+            bool y = (c.y + c.height <= (int32_t)height);
+            ok = (x && y);
+        }
+        if (ok) {
+            wp_viewport_set_source(view->viewport, wl_fixed_from_int(c.x), wl_fixed_from_int(c.y),
+                                   wl_fixed_from_int(c.width), wl_fixed_from_int(c.height));
+        }
+    }
+}
+
 static inline void
 txn_apply_visible(struct transaction_view *txn_view, struct server_view *view,
                   struct server_ui *ui) {
@@ -91,13 +114,19 @@ txn_apply_visible(struct transaction_view *txn_view, struct server_view *view,
             ui->server->backend->subcompositor, view->surface->remote, view->ui->surface);
         check_alloc(view->subsurface);
 
-        wl_subsurface_set_position(view->subsurface, view->x, view->y);
+        wl_subsurface_set_position(view->subsurface, view->state.x, view->state.y);
         wl_surface_commit(view->surface->remote);
     } else {
         wl_subsurface_destroy(view->subsurface);
         wl_surface_commit(view->surface->remote);
         view->subsurface = NULL;
     }
+}
+
+static inline void
+get_view_size(struct server_view *view, uint32_t *width, uint32_t *height) {
+    ww_assert(view->surface->current.buffer);
+    server_buffer_get_size(view->surface->current.buffer, width, height);
 }
 
 struct server_ui *
@@ -245,8 +274,13 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
     check_alloc(view->viewport);
 
+    view->state.crop = (struct box){-1, -1, -1, -1};
+
     view->impl = impl;
     view->impl_resource = impl_resource;
+
+    view->on_surface_commit.notify = on_view_surface_commit;
+    wl_signal_add(&view->surface->events.commit, &view->on_surface_commit);
 
     wl_list_insert(&ui->views, &view->link);
 
@@ -266,26 +300,43 @@ server_view_destroy(struct server_view *view) {
         wl_subsurface_destroy(view->subsurface);
     }
     wp_viewport_destroy(view->viewport);
+    wl_list_remove(&view->on_surface_commit.link);
     wl_list_remove(&view->link);
     free(view);
 }
 
 void
 transaction_apply(struct server_ui *ui, struct transaction *txn) {
-    // TODO: not sure if it's worth trying to make window resizes adhere to frame perfection
-    // since it would be complicated to try and wait on all of the views + add a timeout to
-    // apply the layout anyway. dest_size at least ensures they always have the correct bounds
-    // even if they look stretched
+    // TODO: This system of delayed cropping to avoid getting killed by the host compositor is
+    // pretty bad. Ideally, this would be implemented with a proper transaction system that waits
+    // for all of the downstream clients to update themselves and then commits the new state, but
+    // that's a lot of work for relatively little benefit that I'm not interested in doing at the
+    // moment.
 
     struct transaction_view *txn_view;
     wl_list_for_each (txn_view, &txn->views, link) {
         struct server_view *view = txn_view->view;
 
         if (txn_view->apply & TXN_VIEW_CROP) {
-            wp_viewport_set_source(view->viewport, wl_fixed_from_int(txn_view->crop.x),
-                                   wl_fixed_from_int(txn_view->crop.y),
-                                   wl_fixed_from_int(txn_view->crop.width),
-                                   wl_fixed_from_int(txn_view->crop.height));
+            uint32_t width, height;
+            get_view_size(txn_view->view, &width, &height);
+
+            struct box c = txn_view->crop;
+            ww_assert(((c.x == -1) == (c.y == -1)) == ((c.width == -1) == (c.height == -1)));
+
+            bool ok = (c.x == -1);
+            if (c.x >= 0) {
+                bool x = (c.x + txn_view->crop.width <= (int32_t)width);
+                bool y = (c.y + txn_view->crop.height <= (int32_t)height);
+                ok = (x && y);
+            }
+            if (ok) {
+                wp_viewport_set_source(view->viewport, wl_fixed_from_int(c.x),
+                                       wl_fixed_from_int(c.y), wl_fixed_from_int(c.width),
+                                       wl_fixed_from_int(c.height));
+            }
+
+            txn_view->view->state.crop = txn_view->crop;
         }
         if (txn_view->apply & TXN_VIEW_DEST_SIZE) {
             wp_viewport_set_destination(view->viewport, txn_view->dest_width,
@@ -296,8 +347,8 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
                 wl_subsurface_set_position(view->subsurface, txn_view->x, txn_view->y);
             }
 
-            view->x = txn_view->x;
-            view->y = txn_view->y;
+            view->state.x = txn_view->x;
+            view->state.y = txn_view->y;
         }
         if (txn_view->apply & TXN_VIEW_SIZE) {
             view->impl->set_size(view->impl_resource, txn_view->width, txn_view->height);
@@ -306,7 +357,8 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
             txn_apply_visible(txn_view, view, ui);
         }
 
-        // TODO: Properly store Z order
+        // It's not necessary to store Z order within the view states because it is always
+        // reassigned whenever the wall module commits a new layout.
         if (txn_view->apply & TXN_VIEW_ABOVE) {
             ww_assert(txn_view->view->subsurface);
             wl_subsurface_place_above(txn_view->view->subsurface, txn_view->above);
@@ -362,8 +414,8 @@ transaction_view_set_above(struct transaction_view *view, struct wl_surface *sur
 }
 
 void
-transaction_view_set_crop(struct transaction_view *view, uint32_t x, uint32_t y, uint32_t width,
-                          uint32_t height) {
+transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, int32_t width,
+                          int32_t height) {
     view->crop.x = x;
     view->crop.y = y;
     view->crop.width = width;

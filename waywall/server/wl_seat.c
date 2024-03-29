@@ -54,8 +54,8 @@ static void
 get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     ww_assert(seat->input_focus);
 
-    *x = seat->pointer.x - (double)seat->input_focus->x;
-    *y = seat->pointer.y - (double)seat->input_focus->y;
+    *x = seat->pointer.x - (double)seat->input_focus->state.x;
+    *y = seat->pointer.y - (double)seat->input_focus->state.y;
 }
 
 static struct xkb_keymap *

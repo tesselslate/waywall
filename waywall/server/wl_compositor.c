@@ -152,6 +152,8 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         surface->role->commit(surface->role_resource);
     }
 
+    wl_signal_emit(&surface->events.commit, surface);
+
     // Check that the buffer size matches the buffer scale.
     {
         struct server_buffer *buffer = state->buffer ? state->buffer : surface->current.buffer;
@@ -372,6 +374,8 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     surface->parent = compositor;
     surface->current.buffer_scale = 1;
+
+    wl_signal_init(&surface->events.commit);
 }
 
 static const struct wl_compositor_interface compositor_impl = {
