@@ -36,6 +36,19 @@ M.wall = function(config, settings)
         error("expected settings.height to be at least 1")
     end
 
+    if not settings.grace_period then
+        settings.grace_period = 0
+    end
+    check_type(settings, "grace_period", "number")
+    if settings.grace_period < 0 or settings.grace_period > 1000 then
+        error("expected settings.grace_period to be between 0 and 1000 ms")
+    end
+
+    if not settings.bypass then
+        settings.bypass = false
+    end
+    check_type(settings, "bypass", "boolean")
+
     check_type(settings, "stretch_width", "number")
     if settings.stretch_width < 1 then
         error("expected settings.stretch_width to be at least 1")
@@ -50,24 +63,18 @@ M.wall = function(config, settings)
         error("expected settings.lock_color to be of type string")
     end
 
-    if not settings.grace_period then
-        settings.grace_period = 0
-    end
-    check_type(settings, "grace_period", "number")
-    if settings.grace_period < 0 or settings.grace_period > 1000 then
-        error("expected settings.grace_period to be between 0 and 1000 ms")
-    end
-
     -- Setup wall objects.
     local state = {
         locked = {},
 
         width = math.floor(settings.width),
         height = math.floor(settings.height),
+        grace_period = math.floor(settings.grace_period),
+        bypass = settings.bypass,
+
         stretch_width = math.floor(settings.stretch_width),
         stretch_height = math.floor(settings.stretch_height),
         lock_color = settings.lock_color or "#00000099",
-        grace_period = math.floor(settings.grace_period),
     }
     local wall = {}
 
@@ -160,6 +167,21 @@ M.wall = function(config, settings)
         local active = waywall.active_instance()
         if not active then
             return
+        end
+
+        if state.bypass then
+            for lock, _ in pairs(state.locked) do
+                local inst_state = waywall.instance(lock)
+                if inst_state.screen == "inworld" then
+                    state.locked[lock] = nil
+                    waywall.set_priority(lock, false)
+                    waywall.play(lock)
+
+                    waywall.reset(active)
+                    waywall.set_resolution(active, state.stretch_width, state.stretch_height)
+                    return
+                end
+            end
         end
 
         waywall.goto_wall()
