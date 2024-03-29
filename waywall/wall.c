@@ -650,43 +650,49 @@ wall_destroy(struct wall *wall) {
 
 int
 wall_set_config(struct wall *wall, struct config *cfg) {
-    // TODO: changing configurations should be as close to atomic as is reasonably possible
-
-    bool had_counter = !!wall->counter;
-    bool have_counter = (strcmp(cfg->general.counter_path, "") != 0);
-    if (had_counter && have_counter) {
-        if (counter_set_file(wall->counter, cfg->general.counter_path) != 0) {
-            ww_log(LOG_ERROR, "failed to update counter file");
-            return 1;
-        }
-    } else if (had_counter && !have_counter) {
-        counter_destroy(wall->counter);
-        wall->counter = NULL;
-    } else if (!had_counter && have_counter) {
-        wall->counter = counter_create(cfg->general.counter_path);
-        if (!wall->counter) {
-            ww_log(LOG_ERROR, "failed to create reset counter");
-            return 1;
-        }
-    }
-
-    if (wall->cpu) {
-        if (cpu_set_config(wall->cpu, cfg) != 0) {
-            ww_log(LOG_ERROR, "failed to update cpu config");
-            return 1;
+    struct counter *counter = NULL;
+    if (strcmp(wall->cfg->general.counter_path, cfg->general.counter_path) != 0) {
+        if (strlen(cfg->general.counter_path) > 0) {
+            counter = counter_create(cfg->general.counter_path);
+            if (!counter) {
+                ww_log(LOG_ERROR, "failed to create reset counter");
+                return 1;
+            }
         }
     }
 
     struct server_config *server_config = server_config_create(wall->server, cfg);
     if (!server_config) {
         ww_log(LOG_ERROR, "failed to create server config");
-        return 1;
+        goto fail_server;
     }
+
+    if (wall->cpu) {
+        if (cpu_set_config(wall->cpu, cfg) != 0) {
+            ww_log(LOG_ERROR, "failed to update cpu config");
+            goto fail_cpu;
+        }
+    }
+
     server_use_config(wall->server, server_config);
     server_config_destroy(server_config);
 
+    if (wall->counter) {
+        counter_destroy(wall->counter);
+    }
+    wall->counter = counter;
+
     wall->cfg = cfg;
     return 0;
+
+fail_cpu:
+    server_config_destroy(server_config);
+
+fail_server:
+    if (counter) {
+        counter_destroy(counter);
+    }
+    return 1;
 }
 
 int
