@@ -20,6 +20,7 @@ struct server_backend {
     struct wl_array shm_formats; // data: uint32_t
 
     struct wl_compositor *compositor;
+    struct wl_data_device_manager *data_device_manager;
     struct zwp_linux_dmabuf_v1 *linux_dmabuf;
     struct zwp_pointer_constraints_v1 *pointer_constraints;
     struct zwp_relative_pointer_manager_v1 *relative_pointer_manager;

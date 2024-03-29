@@ -8,6 +8,7 @@
 #include <wayland-client.h>
 
 #define USE_COMPOSITOR_VERSION 5
+#define USE_DATA_DEVICE_MANAGER_VERSION 1
 #define USE_LINUX_DMABUF_VERSION 4
 #define USE_POINTER_CONSTRAINTS_VERSION 1
 #define USE_RELATIVE_POINTER_MANAGER_VERSION 1
@@ -102,6 +103,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->compositor =
             wl_registry_bind(wl, name, &wl_compositor_interface, USE_COMPOSITOR_VERSION);
         ww_assert(backend->compositor);
+    } else if (strcmp(iface, wl_data_device_manager_interface.name) == 0) {
+        if (version < USE_DATA_DEVICE_MANAGER_VERSION) {
+            ww_log(LOG_ERROR, "host compostior provides outdated wl_data_device_manager (%d < %d)",
+                   version, USE_DATA_DEVICE_MANAGER_VERSION);
+            return;
+        }
+
+        backend->data_device_manager = wl_registry_bind(wl, name, &wl_data_device_manager_interface,
+                                                        USE_DATA_DEVICE_MANAGER_VERSION);
+        ww_assert(backend->data_device_manager);
     } else if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0) {
         if (version < USE_LINUX_DMABUF_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated zwp_linux_dmabuf (%d < %d)",
@@ -238,6 +249,10 @@ server_backend_create() {
         ww_log(LOG_ERROR, "host compositor does not provide wl_compositor");
         goto fail_registry;
     }
+    if (!backend->data_device_manager) {
+        ww_log(LOG_ERROR, "host compositor does not provide wl_data_device_manager");
+        goto fail_registry;
+    }
     if (!backend->linux_dmabuf) {
         ww_log(LOG_ERROR, "host compositor does not provide zwp_linux_dmabuf");
         goto fail_registry;
@@ -292,6 +307,7 @@ server_backend_destroy(struct server_backend *backend) {
     }
 
     wl_compositor_destroy(backend->compositor);
+    wl_data_device_manager_destroy(backend->data_device_manager);
     zwp_linux_dmabuf_v1_destroy(backend->linux_dmabuf);
     zwp_pointer_constraints_v1_destroy(backend->pointer_constraints);
     zwp_relative_pointer_manager_v1_destroy(backend->relative_pointer_manager);
