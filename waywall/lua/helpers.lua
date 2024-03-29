@@ -9,6 +9,12 @@ local waywall = require("waywall")
 
 local M = {}
 
+local function check_type(tbl, key, typ)
+    if type(tbl[key]) ~= typ then
+        error("expected " .. key .. " to be of type " .. typ)
+    end
+end
+
 --- Implements standard "wall" functionality in the user's configuration.
 -- This function replaces the `layout` table of the provided configuration.
 -- @param config The configuration table to modify.
@@ -20,18 +26,24 @@ M.wall = function(config, settings)
         error("expected settings table")
     end
 
-    if type(settings.width) ~= "number" then
-        error("expected settings.width to be of type number")
-    end
+    check_type(settings, "width", "number")
     if settings.width < 1 then
         error("expected settings.width to be at least 1")
     end
 
-    if type(settings.height) ~= "number" then
-        error("expected settings.height to be of type number")
-    end
+    check_type(settings, "height", "number")
     if settings.height < 1 then
         error("expected settings.height to be at least 1")
+    end
+
+    check_type(settings, "stretch_width", "number")
+    if settings.stretch_width < 1 then
+        error("expected settings.stretch_width to be at least 1")
+    end
+
+    check_type(settings, "stretch_height", "number")
+    if settings.stretch_height < 1 then
+        error("expected settings.stretch_height to be at least 1")
     end
 
     if settings.lock_color and type(settings.lock_color) ~= "string" then
@@ -41,9 +53,7 @@ M.wall = function(config, settings)
     if not settings.grace_period then
         settings.grace_period = 0
     end
-    if type(settings.grace_period) ~= "number" then
-        error("expected settings.grace_period to be of type number")
-    end
+    check_type(settings, "grace_period", "number")
     if settings.grace_period < 0 or settings.grace_period > 1000 then
         error("expected settings.grace_period to be between 0 and 1000 ms")
     end
@@ -54,8 +64,9 @@ M.wall = function(config, settings)
 
         width = math.floor(settings.width),
         height = math.floor(settings.height),
+        stretch_width = math.floor(settings.stretch_width),
+        stretch_height = math.floor(settings.stretch_height),
         lock_color = settings.lock_color or "#00000099",
-
         grace_period = math.floor(settings.grace_period),
     }
     local wall = {}
@@ -153,6 +164,7 @@ M.wall = function(config, settings)
 
         waywall.goto_wall()
         waywall.reset(active)
+        waywall.set_resolution(active, state.stretch_width, state.stretch_height)
     end
     wall.toggle_lock = function()
         local hovered = waywall.hovered()
