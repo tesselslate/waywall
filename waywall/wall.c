@@ -652,14 +652,14 @@ wall_destroy(struct wall *wall) {
 
 int
 wall_set_config(struct wall *wall, struct config *cfg) {
+    bool counter_updated = strcmp(wall->cfg->general.counter_path, cfg->general.counter_path);
     struct counter *counter = NULL;
-    if (strcmp(wall->cfg->general.counter_path, cfg->general.counter_path) != 0) {
-        if (strlen(cfg->general.counter_path) > 0) {
-            counter = counter_create(cfg->general.counter_path);
-            if (!counter) {
-                ww_log(LOG_ERROR, "failed to create reset counter");
-                return 1;
-            }
+
+    if (counter_updated && strlen(cfg->general.counter_path) > 0) {
+        counter = counter_create(cfg->general.counter_path);
+        if (!counter) {
+            ww_log(LOG_ERROR, "failed to create reset counter");
+            return 1;
         }
     }
 
@@ -679,10 +679,12 @@ wall_set_config(struct wall *wall, struct config *cfg) {
     server_use_config(wall->server, server_config);
     server_config_destroy(server_config);
 
-    if (wall->counter) {
-        counter_destroy(wall->counter);
+    if (counter_updated) {
+        if (wall->counter) {
+            counter_destroy(wall->counter);
+        }
+        wall->counter = counter;
     }
-    wall->counter = counter;
 
     wall->cfg = cfg;
     return 0;
