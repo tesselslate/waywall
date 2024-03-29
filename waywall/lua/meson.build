@@ -13,6 +13,6 @@ foreach lua : lua_files
     lua,
     input: lua,
     output: '@BASENAME@.h',
-    command: [luajit_program, '-b', '@INPUT@', '@OUTPUT@'],
+    command: [luajit_program, '-b', '-g', '@INPUT@', '@OUTPUT@'],
   )
 endforeach
