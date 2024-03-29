@@ -247,6 +247,22 @@ server_config_destroy(struct server_config *config) {
     free(config);
 }
 
+struct wl_data_device *
+server_get_wl_data_device(struct server *server) {
+    if (server->backend->seat.data_device) {
+        return server->backend->seat.data_device;
+    }
+
+    if (!server->backend->seat.remote) {
+        return NULL;
+    }
+
+    server->backend->seat.data_device = wl_data_device_manager_get_data_device(
+        server->backend->data_device_manager, server->backend->seat.remote);
+    ww_assert(server->backend->seat.data_device);
+    return server->backend->seat.data_device;
+}
+
 struct wl_keyboard *
 server_get_wl_keyboard(struct server *server) {
     if (server->backend->seat.keyboard) {

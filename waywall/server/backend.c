@@ -167,6 +167,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         }
 
         wl_list_insert(&backend->seat.names, &seat_name->link);
+        wl_signal_emit(&backend->events.seat_data_device, NULL);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
@@ -230,6 +231,7 @@ server_backend_create() {
     wl_list_init(&backend->seat.names);
     wl_array_init(&backend->shm_formats);
 
+    wl_signal_init(&backend->events.seat_data_device);
     wl_signal_init(&backend->events.seat_keyboard);
     wl_signal_init(&backend->events.seat_pointer);
     wl_signal_init(&backend->events.shm_format);

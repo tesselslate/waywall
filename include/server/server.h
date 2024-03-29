@@ -54,6 +54,7 @@ void server_use_config(struct server *server, struct server_config *config);
 struct server_config *server_config_create(struct server *server, struct config *cfg);
 void server_config_destroy(struct server_config *config);
 
+struct wl_data_device *server_get_wl_data_device(struct server *server);
 struct wl_keyboard *server_get_wl_keyboard(struct server *server);
 struct wl_pointer *server_get_wl_pointer(struct server *server);
 void server_set_pointer_pos(struct server *server, double x, double y);

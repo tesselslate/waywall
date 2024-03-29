@@ -14,6 +14,7 @@ struct server_backend {
         struct wl_seat *remote;
         uint32_t caps;
 
+        struct wl_data_device *data_device;
         struct wl_keyboard *keyboard;
         struct wl_pointer *pointer;
     } seat;
@@ -30,9 +31,10 @@ struct server_backend {
     struct xdg_wm_base *xdg_wm_base;
 
     struct {
-        struct wl_signal seat_keyboard; // data: NULL
-        struct wl_signal seat_pointer;  // data: NULL
-        struct wl_signal shm_format;    // data: uint32_t *
+        struct wl_signal seat_data_device; // data: NULL
+        struct wl_signal seat_keyboard;    // data: NULL
+        struct wl_signal seat_pointer;     // data: NULL
+        struct wl_signal shm_format;       // data: uint32_t *
     } events;
 };
 
