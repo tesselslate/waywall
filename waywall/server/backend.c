@@ -8,7 +8,7 @@
 #include <wayland-client.h>
 
 #define USE_COMPOSITOR_VERSION 5
-#define USE_DATA_DEVICE_MANAGER_VERSION 1
+#define USE_DATA_DEVICE_MANAGER_VERSION 2
 #define USE_LINUX_DMABUF_VERSION 4
 #define USE_POINTER_CONSTRAINTS_VERSION 1
 #define USE_RELATIVE_POINTER_MANAGER_VERSION 1
@@ -299,6 +299,9 @@ server_backend_destroy(struct server_backend *backend) {
     wl_array_release(&backend->shm_formats);
 
     if (backend->seat.remote) {
+        if (backend->seat.data_device) {
+            wl_data_device_release(backend->seat.data_device);
+        }
         if (backend->seat.keyboard) {
             wl_keyboard_release(backend->seat.keyboard);
         }
