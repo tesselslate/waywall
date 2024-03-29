@@ -320,7 +320,7 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
     // moment.
 
     struct transaction_view *txn_view;
-    wl_list_for_each (txn_view, &txn->views, link) {
+    wl_list_for_each_reverse (txn_view, &txn->views, link) {
         struct server_view *view = txn_view->view;
 
         if (txn_view->apply & TXN_VIEW_CROP) {
