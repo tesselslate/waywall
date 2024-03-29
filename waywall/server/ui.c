@@ -92,7 +92,6 @@ txn_apply_visible(struct transaction_view *txn_view, struct server_view *view,
         check_alloc(view->subsurface);
 
         wl_subsurface_set_position(view->subsurface, view->x, view->y);
-        wl_subsurface_set_desync(view->subsurface);
         wl_surface_commit(view->surface->remote);
     } else {
         wl_subsurface_destroy(view->subsurface);
@@ -273,9 +272,6 @@ server_view_destroy(struct server_view *view) {
 
 void
 transaction_apply(struct server_ui *ui, struct transaction *txn) {
-    // TODO: transaction_apply is not actually atomic because the subsurfaces of each
-    // server_view are always in desynchronized mode
-
     // TODO: not sure if it's worth trying to make window resizes adhere to frame perfection
     // since it would be complicated to try and wait on all of the views + add a timeout to
     // apply the layout anyway. dest_size at least ensures they always have the correct bounds
@@ -335,6 +331,9 @@ void
 transaction_destroy(struct transaction *txn) {
     struct transaction_view *txn_view, *tmp;
     wl_list_for_each_safe (txn_view, tmp, &txn->views, link) {
+        if (txn_view->view->subsurface) {
+            wl_subsurface_set_desync(txn_view->view->subsurface);
+        }
         wl_list_remove(&txn_view->link);
         free(txn_view);
     }
@@ -347,6 +346,9 @@ transaction_get_view(struct transaction *txn, struct server_view *view) {
     struct transaction_view *txn_view = zalloc(1, sizeof(*txn_view));
 
     txn_view->view = view;
+    if (view->subsurface) {
+        wl_subsurface_set_sync(view->subsurface);
+    }
 
     wl_list_insert(&txn->views, &txn_view->link);
 
@@ -448,7 +450,6 @@ ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible) {
         check_alloc(rect->subsurface);
 
         wl_subsurface_set_position(rect->subsurface, rect->x, rect->y);
-        wl_subsurface_set_desync(rect->subsurface);
         wl_surface_commit(rect->surface);
         wl_surface_commit(rect->parent->surface);
     } else {
