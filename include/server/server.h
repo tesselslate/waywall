@@ -21,6 +21,7 @@ struct server {
     struct remote_buffer_manager *remote_buf;
 
     struct server_compositor *compositor;
+    struct server_data_device_manager *data_device_manager;
     struct server_linux_dmabuf *linux_dmabuf;
     struct server_pointer_constraints *pointer_constraints;
     struct server_relative_pointer *relative_pointer;

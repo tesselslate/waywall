@@ -5,6 +5,7 @@
 #include "server/remote_buffer.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
+#include "server/wl_data_device_manager.h"
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
@@ -108,6 +109,10 @@ server_create(struct config *cfg) {
         goto fail_globals;
     }
 
+    server->data_device_manager = server_data_device_manager_create(server);
+    if (!server->data_device_manager) {
+        goto fail_globals;
+    }
     server->linux_dmabuf = server_linux_dmabuf_create(server);
     if (!server->linux_dmabuf) {
         goto fail_globals;
