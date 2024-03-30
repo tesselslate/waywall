@@ -82,8 +82,6 @@ data_offer_receive(struct wl_client *client, struct wl_resource *resource, const
         return;
     }
 
-    ww_log(LOG_INFO, "receive %s %d", mime_type, fd);
-
     wl_data_source_send_send(data_offer->source->resource, mime_type, fd);
     close(fd);
 }
@@ -110,7 +108,8 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
     struct server_data_device_manager *data_device_manager = src_device->parent;
 
     if (data_device_manager->selection.source) {
-        wl_resource_destroy(data_device_manager->selection.source->resource);
+        wl_data_source_send_cancelled(data_device_manager->selection.source->resource);
+        data_device_manager->selection.source = NULL;
     }
 
     // A NULL wl_data_source can be provided to unset the selection.
@@ -125,6 +124,8 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
         return;
     }
     data_source->prepared = true;
+
+    data_device_manager->selection.source = data_source;
 
     struct wl_client *focus_client = NULL;
     if (data_device_manager->input_focus) {
@@ -174,7 +175,8 @@ data_source_resource_destroy(struct wl_resource *resource) {
 
     struct server_data_device_manager *data_device_manager = data_source->parent;
     if (data_device_manager->selection.source == data_source) {
-        wl_data_source_send_cancelled(data_source->resource);
+        // TODO: It might be necessary to invalidate the associated offers?
+        data_device_manager->selection.source = NULL;
     }
 
     free(data_source);
@@ -276,10 +278,10 @@ on_input_focus(struct wl_listener *listener, void *data) {
         return;
     }
 
-    struct wl_client *client = wl_resource_get_client(view->surface->resource);
+    struct wl_client *focus_client = wl_resource_get_client(view->surface->resource);
     struct server_data_device *data_device;
     wl_list_for_each (data_device, &data_device_manager->devices, link) {
-        if (wl_resource_get_client(data_device->resource) != client) {
+        if (wl_resource_get_client(data_device->resource) != focus_client) {
             continue;
         }
 
