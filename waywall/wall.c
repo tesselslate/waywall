@@ -80,16 +80,6 @@ layout_active(struct wall *wall) {
             x = x >= 0 ? x : 0;
             y = y >= 0 ? y : 0;
 
-            // TODO: I think the compositor can throw a protocol error here when we do the crop? See
-            // the documentation for wp_viewport:
-            // > If src_x or src_y are negative, the bad_value protocol error is raised. Otherwise,
-            // > if the source rectangle is partially or completely outside of the non-NULL
-            // > wl_buffer, then the out_of_buffer protocol error is raised when the surface state
-            // > is applied. A NULL wl_buffer does not raise the out_of_buffer error.
-            //
-            // All of the subsurface logic will need an overhaul eventually anyway for the fabled
-            // Wayland ~frame perfection~
-
             transaction_view_set_position(view, x, y);
             transaction_view_set_dest_size(view, w, h);
             transaction_view_set_size(view, wall->active_res.w, wall->active_res.h);

@@ -101,9 +101,8 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         } else {
             // Just get rid of the source box entirely if the surface gets sized down so we don't
             // crash.
-            ww_log(LOG_WARN, "invalid crop box: (%ux%u+%u,%u) vs %ux%u surface", c.width, c.height,
-                   c.x, c.y, width, height);
-            wp_viewport_set_source(view->viewport, -1, -1, -1, -1);
+            wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
+                                   wl_fixed_from_int(-1), wl_fixed_from_int(-1));
         }
     }
 }
