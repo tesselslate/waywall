@@ -166,6 +166,7 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
 
     zwp_linux_buffer_params_v1_add(buffer_params->remote, fd, plane_idx, offset, stride,
                                    modifier_hi, modifier_lo);
+    close(fd);
 }
 
 static void
