@@ -45,6 +45,8 @@ struct server_seat {
         double x, y;
     } pointer;
 
+    uint32_t last_serial;
+
     struct server_view *input_focus;
     struct wl_listener on_input_focus;
 

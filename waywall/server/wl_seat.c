@@ -369,6 +369,7 @@ static void
 on_keyboard_enter(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface,
                   struct wl_array *keys) {
     struct server_seat *seat = data;
+    seat->last_serial = serial;
 
     wl_signal_emit_mutable(&seat->events.keyboard_enter, &serial);
 }
@@ -377,6 +378,7 @@ static void
 on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t time, uint32_t key,
                 uint32_t state) {
     struct server_seat *seat = data;
+    seat->last_serial = serial;
 
     if (try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED)) {
         return;
@@ -457,6 +459,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
 static void
 on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface) {
     struct server_seat *seat = data;
+    seat->last_serial = serial;
 
     reset_keyboard_state(seat);
 
@@ -467,6 +470,7 @@ static void
 on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t mods_depressed,
                       uint32_t mods_latched, uint32_t mods_locked, uint32_t group) {
     struct server_seat *seat = data;
+    seat->last_serial = serial;
 
     if (seat->listener) {
         if (!seat->keyboard.remote_km.state) {
@@ -594,6 +598,7 @@ static void
 on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t time,
                   uint32_t button, uint32_t state) {
     struct server_seat *seat = data;
+    seat->last_serial = serial;
 
     if (try_remap_button(seat, button, state == WL_POINTER_BUTTON_STATE_PRESSED)) {
         return;
@@ -614,6 +619,7 @@ static void
 on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_surface *surface,
                  wl_fixed_t surface_x, wl_fixed_t surface_y) {
     struct server_seat *seat = data;
+    seat->last_serial = serial;
 
     if (surface != seat->server->ui->surface) {
         ww_log(LOG_WARN, "received wl_pointer.enter for unknown surface");
@@ -646,7 +652,8 @@ on_pointer_frame(void *data, struct wl_pointer *wl) {
 
 static void
 on_pointer_leave(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_surface *surface) {
-    // Unused.
+    struct server_seat *seat = data;
+    seat->last_serial = serial;
 }
 
 static void
