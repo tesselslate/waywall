@@ -11,12 +11,22 @@ struct server_data_device_manager {
     struct {
         struct wl_data_device_manager *manager;
         struct wl_data_device *device;
-        struct remote_offer *selection_offer, *dnd_offer;
+        struct remote_offer *dnd_offer;
         struct remote_offer *pending_offers[8];
     } remote;
 
-    struct {
-        struct server_data_source *source;
+    struct server_selection {
+        enum server_selection_type {
+            SELECTION_NONE,
+            SELECTION_LOCAL,
+            SELECTION_REMOTE,
+        } type;
+        union {
+            void *none;
+            struct server_data_source *local;
+            struct remote_offer *remote;
+        } data;
+        uint64_t serial;
     } selection;
 
     struct wl_list devices; // server_data_device.link
@@ -37,11 +47,10 @@ struct server_data_device {
 };
 
 struct server_data_offer {
-    struct server_data_device *device;
-    struct server_data_source *source;
+    struct server_data_device *parent;
     struct wl_resource *resource;
 
-    struct wl_list link; // server_data_source.offers
+    struct server_selection selection;
 };
 
 struct server_data_source {
@@ -50,8 +59,6 @@ struct server_data_source {
 
     struct wl_list mime_types; // mime_type.link
     bool prepared;
-
-    struct wl_list offers; // server_data_offer.link
 };
 
 struct server_data_device_manager *server_data_device_manager_create(struct server *server);

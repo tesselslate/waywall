@@ -24,8 +24,17 @@ struct remote_offer {
 };
 
 static const struct wl_data_offer_interface data_offer_impl;
+
+static struct server_data_offer *create_local_offer(struct server_data_device *data_device,
+                                                    struct server_data_source *data_source);
+static struct server_data_offer *create_remote_offer(struct server_data_device *data_device,
+                                                     struct remote_offer *remote_offer);
 static void data_offer_resource_destroy(struct wl_resource *resource);
+static void destroy_previous_selection(struct server_data_device_manager *data_device_manager);
 static void remote_offer_destroy(struct remote_offer *offer);
+static void send_selection_offer(struct server_data_offer *offer);
+static void set_selection(struct server_data_device_manager *data_device_manager,
+                          enum server_selection_type type, void *data);
 
 static void
 on_data_offer_offer(void *data, struct wl_data_offer *offer, const char *type_str) {
@@ -110,30 +119,50 @@ on_data_device_motion(void *data, struct wl_data_device *data_device, uint32_t t
 }
 
 static void
-on_data_device_selection(void *data, struct wl_data_device *data_device,
+on_data_device_selection(void *data, struct wl_data_device *wl_data_device,
                          struct wl_data_offer *offer) {
     struct server_data_device_manager *data_device_manager = data;
 
-    if (data_device_manager->remote.selection_offer) {
-        remote_offer_destroy(data_device_manager->remote.selection_offer);
-        data_device_manager->remote.selection_offer = NULL;
-    }
+    destroy_previous_selection(data_device_manager);
 
     if (!offer) {
         return;
     }
 
+    struct remote_offer *remote_offer = NULL;
     for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
         struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
 
         if ((*slot)->wl == offer) {
-            data_device_manager->remote.selection_offer = *slot;
+            remote_offer = *slot;
             *slot = NULL;
-            return;
+            break;
         }
     }
 
-    ww_log(LOG_WARN, "received wl_data_device.selection with unknown offer");
+    if (!remote_offer) {
+        ww_log(LOG_WARN, "received wl_data_device.selection with unknown offer");
+        return;
+    }
+
+    set_selection(data_device_manager, SELECTION_REMOTE, remote_offer);
+
+    if (!data_device_manager->input_focus) {
+        return;
+    }
+    struct wl_client *focus_client =
+        wl_resource_get_client(data_device_manager->input_focus->surface->resource);
+
+    struct server_data_device *data_device;
+    wl_list_for_each (data_device, &data_device_manager->devices, link) {
+        // The new selection offer should be sent to the client with keyboard focus.
+        if (wl_resource_get_client(data_device->resource) != focus_client) {
+            continue;
+        }
+
+        struct server_data_offer *data_offer = create_remote_offer(data_device, remote_offer);
+        send_selection_offer(data_offer);
+    }
 }
 
 static const struct wl_data_device_listener data_device_listener = {
@@ -146,11 +175,18 @@ static const struct wl_data_device_listener data_device_listener = {
 };
 
 static struct server_data_offer *
-create_selection_offer(struct server_data_device *data_device,
-                       struct server_data_source *data_source) {
+create_local_offer(struct server_data_device *data_device, struct server_data_source *data_source) {
+    struct server_data_device_manager *data_device_manager = data_device->parent;
+    ww_assert(data_device_manager->selection.type == SELECTION_LOCAL);
+    ww_assert(data_device_manager->selection.data.local == data_source);
+
     struct server_data_offer *data_offer = zalloc(1, sizeof(*data_offer));
-    data_offer->device = data_device;
-    data_offer->source = data_source;
+    data_offer->parent = data_device;
+    data_offer->selection = (struct server_selection){
+        .type = SELECTION_LOCAL,
+        .data.local = data_source,
+        .serial = data_device_manager->selection.serial,
+    };
 
     data_offer->resource =
         wl_resource_create(wl_resource_get_client(data_device->resource), &wl_data_offer_interface,
@@ -159,9 +195,47 @@ create_selection_offer(struct server_data_device *data_device,
     wl_resource_set_implementation(data_offer->resource, &data_offer_impl, data_offer,
                                    data_offer_resource_destroy);
 
-    wl_list_insert(&data_source->offers, &data_offer->link);
+    return data_offer;
+}
+
+static struct server_data_offer *
+create_remote_offer(struct server_data_device *data_device, struct remote_offer *remote_offer) {
+    struct server_data_device_manager *data_device_manager = data_device->parent;
+    ww_assert(data_device_manager->selection.type == SELECTION_REMOTE);
+    ww_assert(data_device_manager->selection.data.remote == remote_offer);
+
+    struct server_data_offer *data_offer = zalloc(1, sizeof(*data_offer));
+    data_offer->parent = data_device;
+    data_offer->selection = (struct server_selection){
+        .type = SELECTION_REMOTE,
+        .data.remote = remote_offer,
+        .serial = data_device_manager->selection.serial,
+    };
+
+    data_offer->resource =
+        wl_resource_create(wl_resource_get_client(data_device->resource), &wl_data_offer_interface,
+                           wl_resource_get_version(data_device->resource), 0);
+    check_alloc(data_offer->resource);
+    wl_resource_set_implementation(data_offer->resource, &data_offer_impl, data_offer,
+                                   data_offer_resource_destroy);
 
     return data_offer;
+}
+
+static void
+destroy_previous_selection(struct server_data_device_manager *data_device_manager) {
+    switch (data_device_manager->selection.type) {
+    case SELECTION_NONE:
+        return;
+    case SELECTION_LOCAL:
+        wl_data_source_send_cancelled(data_device_manager->selection.data.local->resource);
+        break;
+    case SELECTION_REMOTE:
+        remote_offer_destroy(data_device_manager->selection.data.remote);
+        break;
+    }
+
+    set_selection(data_device_manager, SELECTION_NONE, NULL);
 }
 
 static void
@@ -180,12 +254,24 @@ remote_offer_destroy(struct remote_offer *offer) {
 
 static void
 send_selection_offer(struct server_data_offer *offer) {
-    struct server_data_device *data_device = offer->device;
+    struct server_data_device *data_device = offer->parent;
 
     wl_data_device_send_data_offer(data_device->resource, offer->resource);
 
+    struct wl_list *mime_types;
+    switch (offer->selection.type) {
+    case SELECTION_NONE:
+        ww_unreachable();
+    case SELECTION_LOCAL:
+        mime_types = &offer->selection.data.local->mime_types;
+        break;
+    case SELECTION_REMOTE:
+        mime_types = &offer->selection.data.remote->mime_types;
+        break;
+    }
+
     struct mime_type *mime_type;
-    wl_list_for_each (mime_type, &offer->source->mime_types, link) {
+    wl_list_for_each (mime_type, mime_types, link) {
         wl_data_offer_send_offer(offer->resource, mime_type->data);
     }
 
@@ -193,10 +279,31 @@ send_selection_offer(struct server_data_offer *offer) {
 }
 
 static void
+set_selection(struct server_data_device_manager *data_device_manager,
+              enum server_selection_type type, void *data) {
+    data_device_manager->selection.type = type;
+    data_device_manager->selection.serial++;
+
+    // There will never be 18 quintillion clipboard updates taking place.
+    ww_assert(data_device_manager->selection.serial < UINT64_MAX);
+
+    switch (type) {
+    case SELECTION_NONE:
+        data_device_manager->selection.data.none = data;
+        break;
+    case SELECTION_LOCAL:
+        data_device_manager->selection.data.local = data;
+        break;
+    case SELECTION_REMOTE:
+        data_device_manager->selection.data.remote = data;
+        break;
+    }
+}
+
+static void
 data_offer_resource_destroy(struct wl_resource *resource) {
     struct server_data_offer *data_offer = wl_resource_get_user_data(resource);
 
-    wl_list_remove(&data_offer->link);
     free(data_offer);
 }
 
@@ -215,13 +322,26 @@ static void
 data_offer_receive(struct wl_client *client, struct wl_resource *resource, const char *mime_type,
                    int32_t fd) {
     struct server_data_offer *data_offer = wl_resource_get_user_data(resource);
-    if (!data_offer->source) {
-        wl_client_post_implementation_error(
-            client, "wl_data_offer.receive cannot be called on invalidated offers");
+    struct server_selection *active_selection = &data_offer->parent->parent->selection;
+
+    // Check that the offer is still valid. If it is, get the data. If it isn't, don't send anything
+    // and close the pipe immediately.
+    if (active_selection->serial != data_offer->selection.serial) {
+        close(fd);
         return;
     }
 
-    wl_data_source_send_send(data_offer->source->resource, mime_type, fd);
+    switch (data_offer->selection.type) {
+    case SELECTION_NONE:
+        ww_unreachable();
+    case SELECTION_LOCAL:
+        wl_data_source_send_send(data_offer->selection.data.local->resource, mime_type, fd);
+        break;
+    case SELECTION_REMOTE:
+        wl_data_offer_receive(data_offer->selection.data.remote->wl, mime_type, fd);
+        break;
+    }
+
     close(fd);
 }
 
@@ -246,10 +366,7 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
     struct server_data_device *src_device = wl_resource_get_user_data(resource);
     struct server_data_device_manager *data_device_manager = src_device->parent;
 
-    if (data_device_manager->selection.source) {
-        wl_data_source_send_cancelled(data_device_manager->selection.source->resource);
-        data_device_manager->selection.source = NULL;
-    }
+    destroy_previous_selection(data_device_manager);
 
     // A NULL wl_data_source can be provided to unset the selection.
     if (!data_source_resource) {
@@ -265,12 +382,13 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
     }
     data_source->prepared = true;
 
-    data_device_manager->selection.source = data_source;
+    set_selection(data_device_manager, SELECTION_LOCAL, data_source);
 
-    struct wl_client *focus_client = NULL;
-    if (data_device_manager->input_focus) {
-        focus_client = wl_resource_get_client(data_device_manager->input_focus->surface->resource);
+    if (!data_device_manager->input_focus) {
+        return;
     }
+    struct wl_client *focus_client =
+        wl_resource_get_client(data_device_manager->input_focus->surface->resource);
 
     struct server_data_device *data_device;
     wl_list_for_each (data_device, &data_device_manager->devices, link) {
@@ -279,7 +397,7 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
             continue;
         }
 
-        struct server_data_offer *data_offer = create_selection_offer(data_device, data_source);
+        struct server_data_offer *data_offer = create_local_offer(data_device, data_source);
         send_selection_offer(data_offer);
     }
 }
@@ -308,15 +426,12 @@ data_source_resource_destroy(struct wl_resource *resource) {
         free(mime_type);
     }
 
-    struct server_data_offer *data_offer;
-    wl_list_for_each (data_offer, &data_source->offers, link) {
-        data_offer->source = NULL;
-    }
-
     struct server_data_device_manager *data_device_manager = data_source->parent;
-    if (data_device_manager->selection.source == data_source) {
-        // TODO: It might be necessary to invalidate the associated offers?
-        data_device_manager->selection.source = NULL;
+
+    if (data_device_manager->selection.type == SELECTION_LOCAL) {
+        if (data_device_manager->selection.data.local == data_source) {
+            set_selection(data_device_manager, SELECTION_NONE, NULL);
+        }
     }
 
     free(data_source);
@@ -368,7 +483,6 @@ data_device_manager_create_data_source(struct wl_client *client, struct wl_resou
 
     data_source->parent = data_device_manager;
     wl_list_init(&data_source->mime_types);
-    wl_list_init(&data_source->offers);
 }
 
 static void
@@ -425,12 +539,22 @@ on_input_focus(struct wl_listener *listener, void *data) {
             continue;
         }
 
-        if (data_device_manager->selection.source) {
-            struct server_data_offer *data_offer =
-                create_selection_offer(data_device, data_device_manager->selection.source);
-            send_selection_offer(data_offer);
-        } else {
+        switch (data_device_manager->selection.type) {
+        case SELECTION_NONE:
             wl_data_device_send_selection(data_device->resource, NULL);
+            break;
+        case SELECTION_LOCAL: {
+            struct server_data_offer *data_offer =
+                create_local_offer(data_device, data_device_manager->selection.data.local);
+            send_selection_offer(data_offer);
+            break;
+        }
+        case SELECTION_REMOTE: {
+            struct server_data_offer *data_offer =
+                create_remote_offer(data_device, data_device_manager->selection.data.remote);
+            send_selection_offer(data_offer);
+            break;
+        }
         }
     }
 }
@@ -440,9 +564,9 @@ on_keyboard_leave(struct wl_listener *listener, void *data) {
     struct server_data_device_manager *data_device_manager =
         wl_container_of(listener, data_device_manager, on_keyboard_leave);
 
-    if (data_device_manager->remote.selection_offer) {
-        remote_offer_destroy(data_device_manager->remote.selection_offer);
-        data_device_manager->remote.selection_offer = NULL;
+    if (data_device_manager->selection.type == SELECTION_REMOTE) {
+        remote_offer_destroy(data_device_manager->selection.data.remote);
+        set_selection(data_device_manager, SELECTION_NONE, NULL);
     }
 }
 
@@ -451,8 +575,8 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_data_device_manager *data_device_manager =
         wl_container_of(listener, data_device_manager, on_display_destroy);
 
-    if (data_device_manager->remote.selection_offer) {
-        remote_offer_destroy(data_device_manager->remote.selection_offer);
+    if (data_device_manager->selection.type == SELECTION_REMOTE) {
+        remote_offer_destroy(data_device_manager->selection.data.remote);
     }
     if (data_device_manager->remote.dnd_offer) {
         remote_offer_destroy(data_device_manager->remote.dnd_offer);
