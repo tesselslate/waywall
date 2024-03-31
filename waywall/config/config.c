@@ -684,7 +684,7 @@ process_config_theme(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
-    if (get_table(cfg, "actions", process_config_actions, "actions", false) != 0) {
+    if (get_table(cfg, "actions", process_config_actions, "actions", true) != 0) {
         return 1;
     }
 
