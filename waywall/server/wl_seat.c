@@ -368,7 +368,9 @@ try_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
 static void
 on_keyboard_enter(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl_surface *surface,
                   struct wl_array *keys) {
-    // Unused.
+    struct server_seat *seat = data;
+
+    wl_signal_emit_mutable(&seat->events.keyboard_enter, &serial);
 }
 
 static void
@@ -457,6 +459,8 @@ on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     struct server_seat *seat = data;
 
     reset_keyboard_state(seat);
+
+    wl_signal_emit_mutable(&seat->events.keyboard_leave, &serial);
 }
 
 static void
@@ -891,6 +895,8 @@ server_seat_create(struct server *server, struct config *cfg) {
     wl_list_init(&seat->keyboards);
     wl_list_init(&seat->pointers);
 
+    wl_signal_init(&seat->events.keyboard_enter);
+    wl_signal_init(&seat->events.keyboard_leave);
     wl_signal_init(&seat->events.pointer_enter);
 
     seat->on_input_focus.notify = on_input_focus;

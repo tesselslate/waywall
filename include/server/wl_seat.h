@@ -60,7 +60,9 @@ struct server_seat {
     struct wl_listener on_display_destroy;
 
     struct {
-        struct wl_signal pointer_enter; // data: uint32_t *
+        struct wl_signal keyboard_enter; // data: uint32_t *
+        struct wl_signal keyboard_leave; // data: uint32_t *
+        struct wl_signal pointer_enter;  // data: uint32_t *
     } events;
 };
 
