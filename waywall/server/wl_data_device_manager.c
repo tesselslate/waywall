@@ -5,6 +5,7 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
+#include "server/wl_seat.h"
 #include "util.h"
 #include <unistd.h>
 #include <wayland-client.h>
@@ -17,8 +18,132 @@ struct mime_type {
     char *data;
 };
 
+struct remote_offer {
+    struct wl_data_offer *wl;
+    struct wl_list mime_types; // mime_type.link
+};
+
 static const struct wl_data_offer_interface data_offer_impl;
 static void data_offer_resource_destroy(struct wl_resource *resource);
+static void remote_offer_destroy(struct remote_offer *offer);
+
+static void
+on_data_offer_offer(void *data, struct wl_data_offer *offer, const char *type_str) {
+    struct remote_offer *remote_offer = data;
+
+    struct mime_type *mime_type = zalloc(1, sizeof(*mime_type));
+    mime_type->data = strdup(type_str);
+    check_alloc(mime_type->data);
+
+    wl_list_insert(&remote_offer->mime_types, &mime_type->link);
+}
+
+static const struct wl_data_offer_listener data_offer_listener = {
+    .offer = on_data_offer_offer,
+};
+
+static void
+on_data_device_data_offer(void *data, struct wl_data_device *data_device,
+                          struct wl_data_offer *offer) {
+    struct server_data_device_manager *data_device_manager = data;
+
+    for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
+        struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
+        if (*slot) {
+            continue;
+        }
+
+        struct remote_offer *remote_offer = zalloc(1, sizeof(*remote_offer));
+        remote_offer->wl = offer;
+        wl_list_init(&remote_offer->mime_types);
+
+        wl_data_offer_add_listener(remote_offer->wl, &data_offer_listener, remote_offer);
+
+        *slot = remote_offer;
+        return;
+    }
+
+    ww_log(LOG_WARN, "remote compositor is providing too many wl_data_offers");
+}
+
+static void
+on_data_device_drop(void *data, struct wl_data_device *data_device) {
+    // Unused.
+}
+
+static void
+on_data_device_enter(void *data, struct wl_data_device *data_device, uint32_t serial,
+                     struct wl_surface *surface, wl_fixed_t x, wl_fixed_t y,
+                     struct wl_data_offer *offer) {
+    struct server_data_device_manager *data_device_manager = data;
+
+    if (data_device_manager->remote.dnd_offer) {
+        ww_panic("broken remote compositor - cannot have 2 concurrent DND data offers");
+    }
+
+    for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
+        struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
+
+        if ((*slot)->wl == offer) {
+            data_device_manager->remote.dnd_offer = *slot;
+            *slot = NULL;
+            return;
+        }
+    }
+
+    ww_log(LOG_WARN, "received wl_data_device.enter with unknown offer");
+}
+
+static void
+on_data_device_leave(void *data, struct wl_data_device *data_device) {
+    struct server_data_device_manager *data_device_manager = data;
+    ww_assert(data_device_manager->remote.dnd_offer);
+
+    remote_offer_destroy(data_device_manager->remote.dnd_offer);
+    data_device_manager->remote.dnd_offer = NULL;
+}
+
+static void
+on_data_device_motion(void *data, struct wl_data_device *data_device, uint32_t time, wl_fixed_t x,
+                      wl_fixed_t y) {
+    // Unused.
+}
+
+static void
+on_data_device_selection(void *data, struct wl_data_device *data_device,
+                         struct wl_data_offer *offer) {
+    struct server_data_device_manager *data_device_manager = data;
+
+    if (data_device_manager->remote.selection_offer) {
+        remote_offer_destroy(data_device_manager->remote.selection_offer);
+        data_device_manager->remote.selection_offer = NULL;
+    }
+
+    if (!offer) {
+        return;
+    }
+
+    for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
+        struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
+
+        if ((*slot)->wl == offer) {
+            data_device_manager->remote.selection_offer = *slot;
+            *slot = NULL;
+            return;
+        }
+    }
+
+    ww_log(LOG_WARN, "received wl_data_device.selection with unknown offer");
+}
+
+static const struct wl_data_device_listener data_device_listener = {
+    .data_offer = on_data_device_data_offer,
+    .drop = on_data_device_drop,
+    .enter = on_data_device_enter,
+    .leave = on_data_device_leave,
+    .motion = on_data_device_motion,
+    .selection = on_data_device_selection,
+};
 
 static struct server_data_offer *
 create_selection_offer(struct server_data_device *data_device,
@@ -37,6 +162,20 @@ create_selection_offer(struct server_data_device *data_device,
     wl_list_insert(&data_source->offers, &data_offer->link);
 
     return data_offer;
+}
+
+static void
+remote_offer_destroy(struct remote_offer *offer) {
+    wl_data_offer_destroy(offer->wl);
+
+    struct mime_type *mime_type, *tmp;
+    wl_list_for_each_safe (mime_type, tmp, &offer->mime_types, link) {
+        wl_list_remove(&mime_type->link);
+        free(mime_type->data);
+        free(mime_type);
+    }
+
+    free(offer);
 }
 
 static void
@@ -297,13 +436,38 @@ on_input_focus(struct wl_listener *listener, void *data) {
 }
 
 static void
+on_keyboard_leave(struct wl_listener *listener, void *data) {
+    struct server_data_device_manager *data_device_manager =
+        wl_container_of(listener, data_device_manager, on_keyboard_leave);
+
+    if (data_device_manager->remote.selection_offer) {
+        remote_offer_destroy(data_device_manager->remote.selection_offer);
+        data_device_manager->remote.selection_offer = NULL;
+    }
+}
+
+static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_data_device_manager *data_device_manager =
         wl_container_of(listener, data_device_manager, on_display_destroy);
 
+    if (data_device_manager->remote.selection_offer) {
+        remote_offer_destroy(data_device_manager->remote.selection_offer);
+    }
+    if (data_device_manager->remote.dnd_offer) {
+        remote_offer_destroy(data_device_manager->remote.dnd_offer);
+    }
+    for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
+        struct remote_offer *offer = data_device_manager->remote.pending_offers[i];
+        if (offer) {
+            remote_offer_destroy(offer);
+        }
+    }
+
     wl_global_destroy(data_device_manager->global);
 
     wl_list_remove(&data_device_manager->on_input_focus.link);
+    wl_list_remove(&data_device_manager->on_keyboard_leave.link);
     wl_list_remove(&data_device_manager->on_display_destroy.link);
 
     free(data_device_manager);
@@ -320,10 +484,18 @@ server_data_device_manager_create(struct server *server) {
     check_alloc(data_device_manager->global);
 
     data_device_manager->remote.manager = server->backend->data_device_manager;
-    // TODO: Do anything at all on the remote connection
+    data_device_manager->remote.device = server_get_wl_data_device(server);
+    ww_assert(data_device_manager->remote.device);
+    wl_data_device_add_listener(data_device_manager->remote.device, &data_device_listener,
+                                data_device_manager);
+
+    // TODO: Listen for data device changes
 
     data_device_manager->on_input_focus.notify = on_input_focus;
     wl_signal_add(&server->events.input_focus, &data_device_manager->on_input_focus);
+
+    data_device_manager->on_keyboard_leave.notify = on_keyboard_leave;
+    wl_signal_add(&server->seat->events.keyboard_leave, &data_device_manager->on_keyboard_leave);
 
     data_device_manager->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &data_device_manager->on_display_destroy);

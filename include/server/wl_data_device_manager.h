@@ -10,6 +10,9 @@ struct server_data_device_manager {
 
     struct {
         struct wl_data_device_manager *manager;
+        struct wl_data_device *device;
+        struct remote_offer *selection_offer, *dnd_offer;
+        struct remote_offer *pending_offers[8];
     } remote;
 
     struct {
@@ -20,6 +23,8 @@ struct server_data_device_manager {
 
     struct wl_listener on_input_focus;
     struct server_view *input_focus;
+
+    struct wl_listener on_keyboard_leave;
 
     struct wl_listener on_display_destroy;
 };
