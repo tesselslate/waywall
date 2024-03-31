@@ -119,8 +119,9 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
 
     struct server_data_source *data_source = wl_resource_get_user_data(data_source_resource);
     if (data_source->prepared) {
-        wl_resource_post_error(resource, WL_DATA_DEVICE_ERROR_USED_SOURCE,
-                               "cannot reuse wl_data_source for wl_data_device.set_selection");
+        // TODO: Where is this error code??? I don't see it in wayland.xml for Wayland 1.22
+        wl_client_post_implementation_error(
+            client, "cannot reuse wl_data_source for wl_data_device.set_selection");
         return;
     }
     data_source->prepared = true;
