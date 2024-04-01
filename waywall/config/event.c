@@ -21,7 +21,7 @@ config_signal_death(struct config *cfg, struct wall *wall, int id) {
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
-        lua_pushinteger(cfg->L, id);
+        lua_pushinteger(cfg->L, id + 1);
         if (lua_pcall(cfg->L, 1, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'death' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
@@ -41,7 +41,7 @@ config_signal_preview_percent(struct config *cfg, struct wall *wall, int id, int
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
-        lua_pushinteger(cfg->L, id);
+        lua_pushinteger(cfg->L, id + 1);
         lua_pushinteger(cfg->L, percent);
         if (lua_pcall(cfg->L, 2, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'preview_percent' event listener: '%s'",
@@ -62,7 +62,7 @@ config_signal_preview_start(struct config *cfg, struct wall *wall, int id) {
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
-        lua_pushinteger(cfg->L, id);
+        lua_pushinteger(cfg->L, id + 1);
         if (lua_pcall(cfg->L, 1, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'preview_start' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
@@ -103,7 +103,7 @@ config_signal_spawn(struct config *cfg, struct wall *wall, int id) {
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
-        lua_pushinteger(cfg->L, id);
+        lua_pushinteger(cfg->L, id + 1);
         if (lua_pcall(cfg->L, 1, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'spawn' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
