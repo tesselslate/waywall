@@ -316,11 +316,14 @@ M.wall = function(settings)
         end
 
         local num_instances = waywall.num_instances()
+        local to_reset = {}
         for i = 1, num_instances do
             if check_reset(i) then
-                waywall.reset(i)
+                table.insert(to_reset, i)
             end
         end
+
+        waywall.reset(to_reset)
     end
     wall.reset_ingame = function()
         local active = waywall.active_instance()
