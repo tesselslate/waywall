@@ -248,6 +248,10 @@ M.wall = function(settings)
         waywall.set_layout(layout)
     end
 
+    local function install()
+        update()
+    end
+
     wall.is_locked = function(instance)
         return state.locked[instance]
     end
@@ -359,6 +363,7 @@ M.wall = function(settings)
     -- Assign the wall event listeners. Error if there was already a set of registered listeners.
     local previous = waywall.listen({
         death = update,
+        install = install,
         resize = update,
         spawn = update,
     })

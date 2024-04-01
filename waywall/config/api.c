@@ -137,7 +137,8 @@ l_listen(lua_State *L) {
     luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
 
     // Copy the functions from the provided table.
-    const char *functions[] = {"death", "preview_percent", "preview_start", "resize", "spawn"};
+    const char *functions[] = {"death",         "install", "preview_percent",
+                               "preview_start", "resize",  "spawn"};
 
     lua_newtable(L);
     for (size_t i = 0; i < STATIC_ARRLEN(functions); i++) {
@@ -169,6 +170,37 @@ l_listen(lua_State *L) {
     lua_pushlightuserdata(L, (void *)&config_registry_keys.events);
     lua_pushvalue(L, -3);
     lua_rawset(L, LUA_REGISTRYINDEX);
+
+    // Call the `install` event handler if the wall global has been set (i.e. this call to `listen`
+    // is not a result of the configuration being loaded.)
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.wall);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    bool has_wall = !lua_isnil(L, -1);
+    lua_pop(L, 1);
+
+    if (has_wall) {
+        ssize_t stack_start = lua_gettop(L);
+
+        lua_pushstring(L, "install");
+        lua_rawget(L, 1);
+
+        switch (lua_type(L, -1)) {
+        case LUA_TFUNCTION:
+            if (lua_pcall(L, 0, 0, 0) != 0) {
+                ww_log(LOG_ERROR, "failed to call 'install' event listener: '%s'",
+                       lua_tostring(L, -1));
+                lua_pop(L, 1);
+            }
+            break;
+        case LUA_TNIL:
+            lua_pop(L, 1);
+            break;
+        default:
+            ww_unreachable();
+        }
+
+        ww_assert(lua_gettop(L) == stack_start);
+    }
 
     // There is garbage further down the stack, but the previous table is now at the top.
     // We can return and Lua will take care of it.
