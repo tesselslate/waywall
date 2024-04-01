@@ -25,6 +25,7 @@ get_wall(lua_State *L) {
     luaL_checkudata(L, -1, METATABLE_WALL);
 
     struct wall **wall = lua_touserdata(L, -1);
+    lua_pop(L, 1);
     return *wall;
 }
 
