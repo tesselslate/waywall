@@ -3,14 +3,16 @@
 
 #include <wayland-server-core.h>
 
-struct server;
-
 struct server_data_device_manager {
     struct wl_global *global;
+
+    struct server *server;
 
     struct {
         struct wl_data_device_manager *manager;
         struct wl_data_device *device;
+        struct wl_data_source *source;
+
         struct remote_offer *dnd_offer;
         struct remote_offer *pending_offers[8];
     } remote;

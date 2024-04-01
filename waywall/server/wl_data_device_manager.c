@@ -93,7 +93,7 @@ on_data_device_enter(void *data, struct wl_data_device *data_device, uint32_t se
     for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
         struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
 
-        if ((*slot)->wl == offer) {
+        if (*slot && (*slot)->wl == offer) {
             data_device_manager->remote.dnd_offer = *slot;
             *slot = NULL;
             return;
@@ -123,6 +123,22 @@ on_data_device_selection(void *data, struct wl_data_device *wl_data_device,
                          struct wl_data_offer *offer) {
     struct server_data_device_manager *data_device_manager = data;
 
+    // Wayland compositors will helpfully offer up the clipboard content we have just provided in
+    // the event that we bound a wl_data_source to the clipboard. In that case, ignore the remote
+    // offer.
+    if (data_device_manager->remote.source) {
+        for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
+            struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
+
+            if (*slot && (*slot)->wl == offer) {
+                remote_offer_destroy(*slot);
+                *slot = NULL;
+                break;
+            }
+        }
+        return;
+    }
+
     destroy_previous_selection(data_device_manager);
 
     if (!offer) {
@@ -133,7 +149,7 @@ on_data_device_selection(void *data, struct wl_data_device *wl_data_device,
     for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
         struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
 
-        if ((*slot)->wl == offer) {
+        if (*slot && (*slot)->wl == offer) {
             remote_offer = *slot;
             *slot = NULL;
             break;
@@ -172,6 +188,44 @@ static const struct wl_data_device_listener data_device_listener = {
     .leave = on_data_device_leave,
     .motion = on_data_device_motion,
     .selection = on_data_device_selection,
+};
+
+static void
+on_data_source_cancelled(void *data, struct wl_data_source *data_source) {
+    struct server_data_device_manager *data_device_manager = data;
+    if (data_device_manager->remote.source == data_source) {
+        data_device_manager->remote.source = NULL;
+    }
+
+    wl_data_source_destroy(data_source);
+}
+
+static void
+on_data_source_send(void *data, struct wl_data_source *data_source, const char *mime_type,
+                    int32_t fd) {
+    struct server_data_device_manager *data_device_manager = data;
+
+    if (data_device_manager->remote.source != data_source) {
+        close(fd);
+        return;
+    }
+    if (data_device_manager->selection.type != SELECTION_LOCAL) {
+        ww_panic("TODO");
+    }
+
+    wl_data_source_send_send(data_device_manager->selection.data.local->resource, mime_type, fd);
+    close(fd);
+}
+
+static void
+on_data_source_target(void *data, struct wl_data_source *data_source, const char *mime_type) {
+    ww_log(LOG_ERROR, "received wl_data_source.target on a clipboard source");
+}
+
+static const struct wl_data_source_listener data_source_listener = {
+    .cancelled = on_data_source_cancelled,
+    .send = on_data_source_send,
+    .target = on_data_source_target,
 };
 
 static struct server_data_offer *
@@ -370,6 +424,8 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
 
     // A NULL wl_data_source can be provided to unset the selection.
     if (!data_source_resource) {
+        wl_data_device_set_selection(data_device_manager->remote.device, NULL,
+                                     data_device_manager->server->seat->last_serial);
         return;
     }
 
@@ -383,6 +439,20 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
     data_source->prepared = true;
 
     set_selection(data_device_manager, SELECTION_LOCAL, data_source);
+
+    data_device_manager->remote.source =
+        wl_data_device_manager_create_data_source(data_device_manager->remote.manager);
+    wl_data_source_add_listener(data_device_manager->remote.source, &data_source_listener,
+                                data_device_manager);
+
+    struct mime_type *mime_type;
+    wl_list_for_each (mime_type, &data_source->mime_types, link) {
+        wl_data_source_offer(data_device_manager->remote.source, mime_type->data);
+    }
+
+    wl_data_device_set_selection(data_device_manager->remote.device,
+                                 data_device_manager->remote.source,
+                                 data_device_manager->server->seat->last_serial);
 
     if (!data_device_manager->input_focus) {
         return;
@@ -431,6 +501,8 @@ data_source_resource_destroy(struct wl_resource *resource) {
     if (data_device_manager->selection.type == SELECTION_LOCAL) {
         if (data_device_manager->selection.data.local == data_source) {
             set_selection(data_device_manager, SELECTION_NONE, NULL);
+            wl_data_device_set_selection(data_device_manager->remote.device, NULL,
+                                         data_device_manager->server->seat->last_serial);
         }
     }
 
@@ -578,6 +650,10 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     if (data_device_manager->selection.type == SELECTION_REMOTE) {
         remote_offer_destroy(data_device_manager->selection.data.remote);
     }
+
+    if (data_device_manager->remote.source) {
+        wl_data_source_destroy(data_device_manager->remote.source);
+    }
     if (data_device_manager->remote.dnd_offer) {
         remote_offer_destroy(data_device_manager->remote.dnd_offer);
     }
@@ -606,6 +682,8 @@ server_data_device_manager_create(struct server *server) {
         wl_global_create(server->display, &wl_data_device_manager_interface,
                          SRV_DATA_DEVICE_MANAGER_VERSION, data_device_manager, on_global_bind);
     check_alloc(data_device_manager->global);
+
+    data_device_manager->server = server;
 
     data_device_manager->remote.manager = server->backend->data_device_manager;
     data_device_manager->remote.device = server_get_wl_data_device(server);
