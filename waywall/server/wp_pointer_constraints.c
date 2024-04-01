@@ -264,11 +264,23 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
 void
 server_pointer_constraints_set_confine(struct server_pointer_constraints *pointer_constraints,
                                        bool confine) {
-    if (!confine && pointer_constraints->confined_pointer) {
+    if (confine == pointer_constraints->config.confine) {
+        return;
+    }
+
+    bool confined = !!pointer_constraints->confined_pointer;
+    bool locked = !!pointer_constraints->locked_pointer;
+
+    if (!confine && confined) {
         zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
         pointer_constraints->confined_pointer = NULL;
+    } else if (confine && (!confined && !locked)) {
+        pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+            pointer_constraints->remote, pointer_constraints->server->ui->surface,
+            server_get_wl_pointer(pointer_constraints->server), NULL,
+            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        ww_assert(pointer_constraints->confined_pointer);
     }
-    // TODO: confine
 
     pointer_constraints->config.confine = confine;
 }
