@@ -15,11 +15,144 @@ local function check_type(tbl, key, typ)
     end
 end
 
+local function generate_wall(width, height)
+    local num_instances = waywall.num_instances()
+    local win_width, win_height = waywall.window_size()
+
+    -- The window is closed. Don't generate a layout.
+    if win_width == 0 or win_height == 0 then
+        return nil
+    end
+
+    local inst_width = math.floor(win_width / width)
+    local inst_height = math.floor(win_height / height)
+
+    local layout = {}
+
+    for i = 1, num_instances do
+        local x = ((i - 1) % width) * inst_width
+        local y = math.floor((i - 1) / width) * inst_height
+
+        table.insert(layout, {
+            "instance",
+            i,
+            x = x,
+            y = y,
+            w = inst_width,
+            h = inst_height,
+        })
+    end
+
+    return layout
+end
+
+--- Provides a simple benchmark implementation.
+-- @param settings The benchmark settings to use.
+-- @return benchmark An object which can be used to stop and start benchmarking.
+M.benchmark = function(settings)
+    if type(settings) ~= "table" then
+        error("expected settings table")
+    end
+
+    if not settings.count then
+        settings.count = 2000
+    end
+    check_type(settings, "count", "number")
+    if settings.count < 1 then
+        error("expected settings.count to be at least 1")
+    end
+
+    local state = {
+        count = settings.count,
+    }
+    local benchmark = {}
+
+    local function finish()
+        local resets = state.count - state.run.remaining
+        local seconds = (waywall.current_time() - state.run.start_time) / 1000
+
+        print(
+            string.format(
+                "Completed %d resets in %.2f seconds (%.2f/s)",
+                resets,
+                seconds,
+                resets / seconds
+            )
+        )
+
+        waywall.listen(state.run.prev)
+        state.run = nil
+    end
+
+    local function reset(instance)
+        if instance > state.run.inst_count then
+            return
+        end
+
+        if not waywall.reset(instance, false) then
+            print("Failed to reset instance " .. instance)
+            return
+        end
+
+        state.run.remaining = state.run.remaining - 1
+        if state.run.remaining == 0 then
+            finish()
+        end
+    end
+
+    local function update()
+        local size = math.ceil(math.sqrt(waywall.num_instances()))
+        local layout = generate_wall(size, size)
+
+        if layout then
+            waywall.set_layout(layout)
+        end
+    end
+
+    benchmark.start = function()
+        if state.run then
+            error("Benchmark already running")
+        end
+        if waywall.num_instances() == 0 then
+            error("Cannot start benchmark with no instances")
+        end
+
+        state.run = {}
+        state.run.prev = waywall.listen({
+            death = update,
+            preview_start = reset,
+            resize = update,
+            spawn = update,
+        })
+
+        update()
+
+        state.run.inst_count = waywall.num_instances()
+        state.run.remaining = state.count
+        state.run.start_time = waywall.current_time()
+
+        for i = 1, state.run.inst_count do
+            if waywall.reset(i, false) then
+                state.run.remaining = state.run.remaining - 1
+            end
+        end
+    end
+
+    benchmark.stop = function()
+        if not state.run then
+            error("Benchmark is not running")
+        end
+
+        finish()
+    end
+
+    return benchmark
+end
+
 --- Provides a basic static wall implementation.
 -- @param settings The wall settings to use.
 -- @return wall An object which can be used to query and modify the wall state.
 M.wall = function(settings)
-    -- Process settings.
     if type(settings) ~= "table" then
         error("expected settings table")
     end
@@ -92,42 +225,24 @@ M.wall = function(settings)
     end
 
     local function update()
-        local num_instances = waywall.num_instances()
-        local win_width, win_height = waywall.window_size()
-
-        -- The window is closed. Don't bother updating the layout.
-        if win_width == 0 or win_height == 0 then
-            return {}
+        local layout = generate_wall(state.width, state.height)
+        if not layout then
+            return
         end
 
-        local instance_width = math.floor(win_width / state.width)
-        local instance_height = math.floor(win_height / state.height)
+        local win_width, win_height = waywall.window_size()
+        local inst_width = math.floor(win_width / state.width)
+        local inst_height = math.floor(win_height / state.height)
 
-        local layout = {}
-
-        for i = 1, num_instances do
-            local x = ((i - 1) % state.width) * instance_width
-            local y = math.floor((i - 1) / state.width) * instance_height
-
+        for i, _ in pairs(state.locked) do
             table.insert(layout, {
-                "instance",
-                i,
-                x = x,
-                y = y,
-                w = instance_width,
-                h = instance_height,
+                "rectangle",
+                state.lock_color,
+                x = ((i - 1) % state.width) * inst_width,
+                y = math.floor((i - 1) / state.width) * inst_height,
+                w = inst_width,
+                h = inst_height,
             })
-
-            if state.locked[i] then
-                table.insert(layout, {
-                    "rectangle",
-                    state.lock_color,
-                    x = x,
-                    y = y,
-                    w = instance_width,
-                    h = instance_height,
-                })
-            end
         end
 
         waywall.set_layout(layout)
