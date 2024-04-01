@@ -33,6 +33,11 @@ M.hovered = priv.hovered
 -- @return state A table containing the state of the instance.
 M.instance = priv.instance
 
+--- Replace the existing set of event handlers (if any) with the provided ones.
+-- @param handlers The new set of event handlers to use.
+-- @return previous The previous set of event handlers.
+M.listen = priv.listen
+
 --- Get the number of currently running instances.
 -- @return The number of instances.
 M.num_instances = priv.num_instances
@@ -43,14 +48,6 @@ M.num_instances = priv.num_instances
 -- the given instance is already active.
 M.play = priv.play
 
---- Requests that the layout generator's `manual` function is called.
--- Not providing a data argument, or passing nil, will result in the `manual`
--- function not being called.
--- If more than one call is made to this function before control returns to C
--- code, only the last call matters.
--- @param data The data to pass to the `manual` function.
-M.request_layout = priv.request_layout
-
 --- Reset the given instance(s).
 -- The caller can provide either a number (single instance ID), or an array
 -- containing one or more instance IDs.
@@ -59,6 +56,10 @@ M.request_layout = priv.request_layout
 -- @param count Optional. If `false` is provided, the reset will not be counted.
 -- @return The number of instances which were actually reset.
 M.reset = priv.reset
+
+--- Updates the current wall layout to the provided one.
+-- @param layout The table containing the new layout.
+M.set_layout = priv.set_layout
 
 --- Updates the CPU priority of the given instance.
 -- @param instance The instance to update priority for.

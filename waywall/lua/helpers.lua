@@ -15,12 +15,10 @@ local function check_type(tbl, key, typ)
     end
 end
 
---- Implements standard "wall" functionality in the user's configuration.
--- This function replaces the `layout` table of the provided configuration.
--- @param config The configuration table to modify.
+--- Provides a basic static wall implementation.
 -- @param settings The wall settings to use.
 -- @return wall An object which can be used to query and modify the wall state.
-M.wall = function(config, settings)
+M.wall = function(settings)
     -- Process settings.
     if type(settings) ~= "table" then
         error("expected settings table")
@@ -93,6 +91,48 @@ M.wall = function(config, settings)
         return true
     end
 
+    local function update()
+        local num_instances = waywall.num_instances()
+        local win_width, win_height = waywall.window_size()
+
+        -- The window is closed. Don't bother updating the layout.
+        if win_width == 0 or win_height == 0 then
+            return {}
+        end
+
+        local instance_width = math.floor(win_width / state.width)
+        local instance_height = math.floor(win_height / state.height)
+
+        local layout = {}
+
+        for i = 1, num_instances do
+            local x = ((i - 1) % state.width) * instance_width
+            local y = math.floor((i - 1) / state.width) * instance_height
+
+            table.insert(layout, {
+                "instance",
+                i,
+                x = x,
+                y = y,
+                w = instance_width,
+                h = instance_height,
+            })
+
+            if state.locked[i] then
+                table.insert(layout, {
+                    "rectangle",
+                    state.lock_color,
+                    x = x,
+                    y = y,
+                    w = instance_width,
+                    h = instance_height,
+                })
+            end
+        end
+
+        waywall.set_layout(layout)
+    end
+
     wall.is_locked = function(instance)
         return state.locked[instance]
     end
@@ -102,7 +142,7 @@ M.wall = function(config, settings)
         end
 
         state.locked[instance] = true
-        waywall.request_layout("lock")
+        update()
         waywall.set_priority(instance, true)
     end
     wall.unlock = function(instance)
@@ -111,7 +151,7 @@ M.wall = function(config, settings)
         end
 
         state.locked[instance] = nil
-        waywall.request_layout("unlock")
+        update()
         waywall.set_priority(instance, false)
     end
     wall.focus_reset = function()
@@ -201,55 +241,16 @@ M.wall = function(config, settings)
         end
     end
 
-    local function generate()
-        local num_instances = waywall.num_instances()
-        local win_width, win_height = waywall.window_size()
+    -- Assign the wall event listeners. Error if there was already a set of registered listeners.
+    local previous = waywall.listen({
+        death = update,
+        resize = update,
+        spawn = update,
+    })
 
-        -- The window is closed. Don't bother updating the layout.
-        if win_width == 0 or win_height == 0 then
-            return {}
-        end
-
-        local instance_width = math.floor(win_width / state.width)
-        local instance_height = math.floor(win_height / state.height)
-
-        local layout = {}
-
-        for i = 1, num_instances do
-            local x = ((i - 1) % state.width) * instance_width
-            local y = math.floor((i - 1) / state.width) * instance_height
-
-            table.insert(layout, {
-                "instance",
-                i,
-                x = x,
-                y = y,
-                w = instance_width,
-                h = instance_height,
-            })
-
-            if state.locked[i] then
-                table.insert(layout, {
-                    "rectangle",
-                    state.lock_color,
-                    x = x,
-                    y = y,
-                    w = instance_width,
-                    h = instance_height,
-                })
-            end
-        end
-
-        return layout
+    if next(previous) ~= nil then
+        error("overwrote event listeners")
     end
-
-    -- Do not maintain the layout table if it exists.
-    config.layout = {
-        death = generate,
-        manual = generate,
-        resize = generate,
-        spawn = generate,
-    }
 
     return wall
 end

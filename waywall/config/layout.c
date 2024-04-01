@@ -1,14 +1,10 @@
 #include "config/layout.h"
-#include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
 #include "util.h"
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
-#include <luajit-2.1/lualib.h>
-#include <stddef.h>
-#include <stdlib.h>
 
 static int
 get_int32(lua_State *L, const char *key, int32_t *dst) {
@@ -177,179 +173,14 @@ config_layout_destroy(struct config_layout *layout) {
 }
 
 struct config_layout *
-config_layout_request_death(struct config *cfg, struct wall *wall, int id) {
-    if (!cfg->layout.handle_death) {
-        return NULL;
-    }
-
-    config_api_set_wall(cfg, wall);
-
+config_layout_get(struct config *cfg, struct wall *wall) {
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
-    lua_pushstring(cfg->L, "death");
-    lua_rawget(cfg->L, -2);
-
-    ww_assert(lua_isfunction(cfg->L, -1));
-    lua_pushinteger(cfg->L, id);
-    if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call layout.death: '%s'", lua_tostring(cfg->L, -1));
-
-        lua_settop(cfg->L, 0);
-        return NULL;
-    }
-
-    struct config_layout *layout = unmarshal_layout(cfg, wall);
-
-    lua_settop(cfg->L, 0);
-    return layout;
-}
-
-struct config_layout *
-config_layout_request_manual(struct config *cfg, struct wall *wall) {
-    if (!cfg->layout.handle_manual) {
-        return NULL;
-    }
-
-    config_api_set_wall(cfg, wall);
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout_reason);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
 
     if (lua_isnil(cfg->L, -1)) {
-        lua_pop(cfg->L, 1);
         return NULL;
     }
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
-    lua_pushstring(cfg->L, "manual");
-    lua_rawget(cfg->L, -2);
-
-    ww_assert(lua_isfunction(cfg->L, -1));
-    lua_pushvalue(cfg->L, -2);
-    if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call layout.manual: '%s'", lua_tostring(cfg->L, -1));
-
-        lua_settop(cfg->L, 0);
-        return NULL;
-    }
-
-    struct config_layout *layout = unmarshal_layout(cfg, wall);
-
-    lua_settop(cfg->L, 0);
-    return layout;
-}
-
-struct config_layout *
-config_layout_request_preview_percent(struct config *cfg, struct wall *wall, int id, int percent) {
-    if (!cfg->layout.handle_preview_percent) {
-        return NULL;
-    }
-
-    config_api_set_wall(cfg, wall);
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
-    lua_pushstring(cfg->L, "preview_percent");
-    lua_rawget(cfg->L, -2);
-
-    ww_assert(lua_isfunction(cfg->L, -1));
-    lua_pushinteger(cfg->L, id);
-    lua_pushinteger(cfg->L, percent);
-    if (lua_pcall(cfg->L, 2, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call layout.preview_percent: '%s'", lua_tostring(cfg->L, -1));
-
-        lua_settop(cfg->L, 0);
-        return NULL;
-    }
-
-    struct config_layout *layout = unmarshal_layout(cfg, wall);
-
-    lua_settop(cfg->L, 0);
-    return layout;
-}
-
-struct config_layout *
-config_layout_request_preview_start(struct config *cfg, struct wall *wall, int id) {
-    if (!cfg->layout.handle_preview_start) {
-        return NULL;
-    }
-
-    config_api_set_wall(cfg, wall);
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
-    lua_pushstring(cfg->L, "preview_start");
-    lua_rawget(cfg->L, -2);
-
-    ww_assert(lua_isfunction(cfg->L, -1));
-    lua_pushinteger(cfg->L, id);
-    if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call layout.preview_start: '%s'", lua_tostring(cfg->L, -1));
-
-        lua_settop(cfg->L, 0);
-        return NULL;
-    }
-
-    struct config_layout *layout = unmarshal_layout(cfg, wall);
-
-    lua_settop(cfg->L, 0);
-    return layout;
-}
-
-struct config_layout *
-config_layout_request_resize(struct config *cfg, struct wall *wall, int width, int height) {
-    if (!cfg->layout.handle_resize) {
-        return NULL;
-    }
-
-    config_api_set_wall(cfg, wall);
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
-    lua_pushstring(cfg->L, "resize");
-    lua_rawget(cfg->L, -2);
-
-    ww_assert(lua_isfunction(cfg->L, -1));
-    lua_pushinteger(cfg->L, width);
-    lua_pushinteger(cfg->L, height);
-    if (lua_pcall(cfg->L, 2, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call layout.resize: '%s'", lua_tostring(cfg->L, -1));
-
-        lua_settop(cfg->L, 0);
-        return NULL;
-    }
-
-    struct config_layout *layout = unmarshal_layout(cfg, wall);
-
-    lua_settop(cfg->L, 0);
-    return layout;
-}
-
-struct config_layout *
-config_layout_request_spawn(struct config *cfg, struct wall *wall, int id) {
-    if (!cfg->layout.handle_spawn) {
-        return NULL;
-    }
-
-    config_api_set_wall(cfg, wall);
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
-    lua_pushstring(cfg->L, "spawn");
-    lua_rawget(cfg->L, -2);
-
-    ww_assert(lua_isfunction(cfg->L, -1));
-    lua_pushinteger(cfg->L, id);
-    if (lua_pcall(cfg->L, 1, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call layout.spawn: '%s'", lua_tostring(cfg->L, -1));
-
-        lua_settop(cfg->L, 0);
-        return NULL;
-    }
-
-    struct config_layout *layout = unmarshal_layout(cfg, wall);
-
-    lua_settop(cfg->L, 0);
-    return layout;
+    ww_assert(lua_istable(cfg->L, -1));
+    return unmarshal_layout(cfg, wall);
 }

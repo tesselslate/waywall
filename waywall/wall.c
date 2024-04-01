@@ -1,6 +1,7 @@
 #include "wall.h"
 #include "config/action.h"
 #include "config/config.h"
+#include "config/event.h"
 #include "config/layout.h"
 #include "counter.h"
 #include "cpu/cgroup.h"
@@ -235,7 +236,7 @@ process_action(struct wall *wall, struct config_action action) {
     bool consumed = (config_action_try(wall->cfg, wall, action) != 0);
 
     if (consumed) {
-        struct config_layout *layout = config_layout_request_manual(wall->cfg, wall);
+        struct config_layout *layout = config_layout_get(wall->cfg, wall);
         change_layout(wall, layout);
     }
 
@@ -266,12 +267,13 @@ process_state_update(int wd, uint32_t mask, const char *name, void *data) {
     }
 
     if (screen != SCREEN_PREVIEWING && wall->instances[id]->state.screen == SCREEN_PREVIEWING) {
-        struct config_layout *layout = config_layout_request_preview_start(wall->cfg, wall, id);
+        config_signal_preview_start(wall->cfg, wall, id);
+        struct config_layout *layout = config_layout_get(wall->cfg, wall);
         change_layout(wall, layout);
     } else if (wall->instances[id]->state.screen == SCREEN_PREVIEWING &&
                percent != wall->instances[id]->state.data.percent) {
-        struct config_layout *layout = config_layout_request_preview_percent(
-            wall->cfg, wall, id, wall->instances[id]->state.data.percent);
+        config_signal_preview_percent(wall->cfg, wall, id, wall->instances[id]->state.data.percent);
+        struct config_layout *layout = config_layout_get(wall->cfg, wall);
         change_layout(wall, layout);
     }
 }
@@ -294,7 +296,8 @@ add_instance(struct wall *wall, struct instance *instance) {
     int id = wall->num_instances;
     wall->instances[wall->num_instances++] = instance;
 
-    struct config_layout *layout = config_layout_request_spawn(wall->cfg, wall, id);
+    config_signal_spawn(wall->cfg, wall, id);
+    struct config_layout *layout = config_layout_get(wall->cfg, wall);
     change_layout(wall, layout);
 
     if (wall->cpu) {
@@ -345,7 +348,8 @@ remove_instance(struct wall *wall, int id) {
         focus_wall(wall);
     }
 
-    struct config_layout *layout = config_layout_request_death(wall->cfg, wall, id);
+    config_signal_death(wall->cfg, wall, id);
+    struct config_layout *layout = config_layout_get(wall->cfg, wall);
     if (layout) {
         change_layout(wall, layout);
     } else {
@@ -421,11 +425,11 @@ on_resize(struct wl_listener *listener, void *data) {
     wall->width = new_width;
     wall->height = new_height;
 
-    if (ON_WALL(wall)) {
-        struct config_layout *layout =
-            config_layout_request_resize(wall->cfg, wall, wall->width, wall->height);
-        change_layout(wall, layout);
-    } else {
+    config_signal_resize(wall->cfg, wall, wall->width, wall->height);
+    struct config_layout *layout = config_layout_get(wall->cfg, wall);
+    change_layout(wall, layout);
+
+    if (!ON_WALL(wall)) {
         layout_active(wall);
     }
 

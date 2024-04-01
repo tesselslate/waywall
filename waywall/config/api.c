@@ -128,6 +128,54 @@ l_instance(lua_State *L) {
 }
 
 static int
+l_listen(lua_State *L) {
+    int argc = lua_gettop(L);
+
+    if (argc != 1) {
+        return luaL_error(L, "expected one table argument");
+    }
+    luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
+
+    // Copy the functions from the provided table.
+    const char *functions[] = {"death", "preview_percent", "preview_start", "resize", "spawn"};
+
+    lua_newtable(L);
+    for (size_t i = 0; i < STATIC_ARRLEN(functions); i++) {
+        lua_pushstring(L, functions[i]);
+        lua_rawget(L, -3);
+
+        switch (lua_type(L, -1)) {
+        case LUA_TFUNCTION:
+            lua_pushstring(L, functions[i]);
+            lua_pushvalue(L, -2);
+            lua_rawset(L, -4);
+            break;
+        case LUA_TNIL:
+            break;
+        default:
+            ww_log(LOG_ERROR, "expected '%s' to be of type 'function', was '%s'", functions[i],
+                   luaL_typename(L, -1));
+            return 1;
+        }
+
+        lua_pop(L, 1);
+    }
+
+    // Store the previous set of event handlers.
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.events);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+
+    // Set the new event handlers.
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.events);
+    lua_pushvalue(L, -3);
+    lua_rawset(L, LUA_REGISTRYINDEX);
+
+    // There is garbage further down the stack, but the previous table is now at the top.
+    // We can return and Lua will take care of it.
+    return 1;
+}
+
+static int
 l_num_instances(lua_State *L) {
     struct wall *wall = get_wall(L);
 
@@ -145,22 +193,6 @@ l_play(lua_State *L) {
     if (!ok) {
         return luaL_error(L, "instance %d already active", id);
     }
-
-    return 0;
-}
-
-static int
-l_request_layout(lua_State *L) {
-    int argc = lua_gettop(L);
-    if (argc > 1) {
-        return luaL_error(L, "expected at most 1 argument, received %d", argc);
-    } else if (argc == 0) {
-        lua_pushnil(L);
-    }
-
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.layout_reason);
-    lua_pushvalue(L, 1);
-    lua_rawset(L, LUA_REGISTRYINDEX);
 
     return 0;
 }
@@ -232,6 +264,22 @@ l_reset(lua_State *L) {
     default:
         return luaL_argerror(L, 1, "expected number or table");
     }
+}
+
+static int
+l_set_layout(lua_State *L) {
+    int argc = lua_gettop(L);
+
+    if (argc != 1) {
+        return luaL_error(L, "expected one table argument");
+    }
+    luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
+
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.layout);
+    lua_pushvalue(L, 1);
+    lua_rawset(L, LUA_REGISTRYINDEX);
+
+    return 0;
 }
 
 static int
@@ -320,10 +368,11 @@ static const struct luaL_Reg lua_lib[] = {
     {"goto_wall", l_goto_wall},
     {"hovered", l_hovered},
     {"instance", l_instance},
+    {"listen", l_listen},
     {"num_instances", l_num_instances},
     {"play", l_play},
-    {"request_layout", l_request_layout},
     {"reset", l_reset},
+    {"set_layout", l_set_layout},
     {"set_priority", l_set_priority},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
@@ -340,6 +389,10 @@ config_api_init(struct config *cfg) {
     lua_getglobal(cfg->L, "_G");
     luaL_register(cfg->L, "priv_waywall", lua_lib);
     lua_pop(cfg->L, 2);
+
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
+    lua_newtable(cfg->L);
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
     if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_api, luaJIT_BC_api_SIZE, "__api") != 0) {
         ww_log(LOG_ERROR, "failed to load internal api chunk");

@@ -38,14 +38,6 @@ struct config {
         bool confine;
     } input;
     struct {
-        bool handle_death;
-        bool handle_manual;
-        bool handle_preview_percent;
-        bool handle_preview_start;
-        bool handle_resize;
-        bool handle_spawn;
-    } layout;
-    struct {
         uint8_t background[4];
         char *cursor_theme;
         char *cursor_icon;
