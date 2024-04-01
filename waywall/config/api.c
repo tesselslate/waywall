@@ -151,10 +151,10 @@ l_play(lua_State *L) {
 
 static int
 l_request_layout(lua_State *L) {
-    ssize_t nargs = lua_gettop(L);
-    if (nargs > 1) {
-        return luaL_error(L, "expected at most 1 argument, received %d", lua_gettop(L));
-    } else if (nargs == 0) {
+    int argc = lua_gettop(L);
+    if (argc > 1) {
+        return luaL_error(L, "expected at most 1 argument, received %d", argc);
+    } else if (argc == 0) {
         lua_pushnil(L);
     }
 
@@ -169,12 +169,27 @@ static int
 l_reset(lua_State *L) {
     struct wall *wall = get_wall(L);
 
+    int argc = lua_gettop(L);
+    if (argc > 2) {
+        return luaL_error(L, "too many arguments: %d > 2", argc);
+    } else if (argc == 0) {
+        return luaL_error(L, "at least one argument is required");
+    }
+
+    bool count = true;
+    if (argc == 2) {
+        if (lua_type(L, 2) != LUA_TBOOLEAN) {
+            return luaL_argerror(L, 2, "expected boolean");
+        }
+        count = lua_toboolean(L, 2);
+    }
+
     switch (lua_type(L, 1)) {
     case LUA_TNUMBER: {
         int id = luaL_checkinteger(L, 1);
         luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
 
-        if (wall_lua_reset_one(wall, id - 1) == 0) {
+        if (wall_lua_reset_one(wall, count, id - 1) == 0) {
             lua_pushinteger(L, 1);
         } else {
             lua_pushinteger(L, 0);
@@ -210,7 +225,7 @@ l_reset(lua_State *L) {
             lua_pop(L, 1);
         }
 
-        lua_pushinteger(L, wall_lua_reset_many(wall, n, ids));
+        lua_pushinteger(L, wall_lua_reset_many(wall, count, n, ids));
         free(ids);
         return 1;
     }
