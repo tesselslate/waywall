@@ -21,6 +21,7 @@ struct server_pointer_constraints {
     struct zwp_locked_pointer_v1 *locked_pointer;
 
     struct wl_listener on_input_focus;
+    struct wl_listener on_map_status;
     struct wl_listener on_pointer;
 
     struct wl_listener on_display_destroy;

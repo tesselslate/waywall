@@ -189,6 +189,28 @@ on_input_focus(struct wl_listener *listener, void *data) {
 }
 
 static void
+on_map_status(struct wl_listener *listener, void *data) {
+    struct server_pointer_constraints *pointer_constraints =
+        wl_container_of(listener, pointer_constraints, on_map_status);
+
+    bool mapped = *(bool *)data;
+
+    if (mapped) {
+        server_pointer_constraints_set_confine(pointer_constraints,
+                                               pointer_constraints->config.confine);
+    } else {
+        if (pointer_constraints->confined_pointer) {
+            zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
+            pointer_constraints->confined_pointer = NULL;
+        }
+        if (pointer_constraints->locked_pointer) {
+            zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
+            pointer_constraints->locked_pointer = NULL;
+        }
+    }
+}
+
+static void
 on_pointer(struct wl_listener *listener, void *data) {
     struct server_pointer_constraints *pointer_constraints =
         wl_container_of(listener, pointer_constraints, on_pointer);
@@ -224,6 +246,7 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     }
 
     wl_list_remove(&pointer_constraints->on_input_focus.link);
+    wl_list_remove(&pointer_constraints->on_map_status.link);
     wl_list_remove(&pointer_constraints->on_pointer.link);
     wl_list_remove(&pointer_constraints->on_display_destroy.link);
 
@@ -242,14 +265,15 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
                          SRV_POINTER_CONSTRAINTS_VERSION, pointer_constraints, on_global_bind);
     check_alloc(pointer_constraints->global);
 
-    // TODO: Confine pointer on startup
-
     wl_list_init(&pointer_constraints->objects);
 
     pointer_constraints->remote = server->backend->pointer_constraints;
 
     pointer_constraints->on_input_focus.notify = on_input_focus;
     wl_signal_add(&server->events.input_focus, &pointer_constraints->on_input_focus);
+
+    pointer_constraints->on_map_status.notify = on_map_status;
+    wl_signal_add(&server->events.map_status, &pointer_constraints->on_map_status);
 
     pointer_constraints->on_pointer.notify = on_pointer;
     wl_signal_add(&server->backend->events.seat_pointer, &pointer_constraints->on_pointer);
@@ -264,10 +288,6 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
 void
 server_pointer_constraints_set_confine(struct server_pointer_constraints *pointer_constraints,
                                        bool confine) {
-    if (confine == pointer_constraints->config.confine) {
-        return;
-    }
-
     bool confined = !!pointer_constraints->confined_pointer;
     bool locked = !!pointer_constraints->locked_pointer;
 
