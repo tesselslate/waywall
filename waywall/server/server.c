@@ -73,6 +73,7 @@ server_create(struct config *cfg) {
     struct server *server = zalloc(1, sizeof(*server));
 
     wl_signal_init(&server->events.input_focus);
+    wl_signal_init(&server->events.map_status);
     wl_signal_init(&server->events.pointer_lock);   // used by pointer constraints
     wl_signal_init(&server->events.pointer_unlock); // used by pointer constraints
 

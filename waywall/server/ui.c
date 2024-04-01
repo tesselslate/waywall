@@ -159,7 +159,6 @@ server_ui_create(struct server *server, struct config *cfg) {
 
     wl_list_init(&ui->views);
 
-    wl_signal_init(&ui->events.map_status);
     wl_signal_init(&ui->events.resize);
     wl_signal_init(&ui->events.view_create);
     wl_signal_init(&ui->events.view_destroy);
@@ -204,7 +203,7 @@ server_ui_hide(struct server_ui *ui) {
     wl_surface_commit(ui->surface);
 
     ui->mapped = false;
-    wl_signal_emit_mutable(&ui->events.map_status, &ui->mapped);
+    wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
 }
 
 void
@@ -238,7 +237,7 @@ server_ui_show(struct server_ui *ui) {
     xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
 
     ui->mapped = true;
-    wl_signal_emit_mutable(&ui->events.map_status, &ui->mapped);
+    wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
 }
 
 struct server_ui_config *
