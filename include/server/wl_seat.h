@@ -4,6 +4,8 @@
 #include "config/config.h"
 #include <wayland-server-core.h>
 
+struct xkb_rule_names;
+
 enum kb_modifier {
     KB_MOD_SHIFT = (1 << 0),
     KB_MOD_CAPS = (1 << 1),
@@ -103,5 +105,7 @@ void server_seat_use_config(struct server_seat *seat, struct server_seat_config 
 
 struct server_seat_config *server_seat_config_create(struct server_seat *seat, struct config *cfg);
 void server_seat_config_destroy(struct server_seat_config *config);
+
+int server_seat_lua_set_keymap(struct server_seat *seat, const struct xkb_rule_names *rule_names);
 
 #endif

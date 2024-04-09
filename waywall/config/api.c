@@ -7,11 +7,13 @@
 #include "lua/helpers.h"
 #include "server/server.h"
 #include "server/ui.h"
+#include "server/wl_seat.h"
 #include "util.h"
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
 #include <time.h>
+#include <xkbcommon/xkbcommon.h>
 
 static inline uint32_t
 timespec_ms(struct timespec *ts) {
@@ -299,6 +301,67 @@ l_reset(lua_State *L) {
 }
 
 static int
+l_set_keymap(lua_State *L) {
+    struct wall *wall = get_wall(L);
+
+    int argc = lua_gettop(L);
+    if (argc != 1) {
+        return luaL_error(L, "expected one table argument");
+    }
+    luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
+
+    struct xkb_rule_names rule_names = {0};
+
+    const struct {
+        const char *key;
+        const char **value;
+    } mappings[] = {
+        {"layout", &rule_names.layout},   {"model", &rule_names.model},
+        {"rules", &rule_names.rules},     {"variant", &rule_names.variant},
+        {"options", &rule_names.options},
+    };
+
+    char *strings[STATIC_ARRLEN(mappings)] = {0};
+
+    for (size_t i = 0; i < STATIC_ARRLEN(mappings); i++) {
+        lua_pushstring(L, mappings[i].key);
+        lua_rawget(L, 1);
+
+        switch (lua_type(L, -1)) {
+        case LUA_TSTRING: {
+            char *value = strdup(lua_tostring(L, -1));
+            check_alloc(value);
+            strings[i] = value;
+            *mappings[i].value = value;
+            break;
+        }
+        case LUA_TNIL:
+            break;
+        default:
+            ww_log(LOG_ERROR, "expected '%s' to be of type 'string' or 'nil', was '%s'",
+                   mappings[i].key, luaL_typename(L, -1));
+            for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
+                if (strings[i]) {
+                    free(strings[i]);
+                }
+            }
+            return 1;
+        }
+
+        lua_pop(L, 1);
+    }
+
+    server_seat_lua_set_keymap(wall->server->seat, &rule_names);
+    for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
+        if (strings[i]) {
+            free(strings[i]);
+        }
+    }
+
+    return 0;
+}
+
+static int
 l_set_layout(lua_State *L) {
     int argc = lua_gettop(L);
 
@@ -404,6 +467,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"num_instances", l_num_instances},
     {"play", l_play},
     {"reset", l_reset},
+    {"set_keymap", l_set_keymap},
     {"set_layout", l_set_layout},
     {"set_priority", l_set_priority},
     {"set_resolution", l_set_resolution},

@@ -57,6 +57,11 @@ M.play = priv.play
 -- @return The number of instances which were actually reset.
 M.reset = priv.reset
 
+--- Attempts to update the current keymap to one with the specified settings.
+-- @param keymap The keymap options (layout, model, rules, variants, and options
+-- are valid keys.)
+M.set_keymap = priv.set_keymap
+
 --- Updates the current wall layout to the provided one.
 -- @param layout The table containing the new layout.
 M.set_layout = priv.set_layout

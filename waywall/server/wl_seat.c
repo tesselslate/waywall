@@ -1158,3 +1158,17 @@ server_seat_config_destroy(struct server_seat_config *config) {
     server_seat_keymap_destroy(&config->keymap);
     free(config);
 }
+
+int
+server_seat_lua_set_keymap(struct server_seat *seat, const struct xkb_rule_names *rule_names) {
+    struct server_seat_keymap keymap = {0};
+
+    if (prepare_local_keymap(seat, rule_names, &keymap) != 0) {
+        return 1;
+    }
+
+    server_seat_keymap_destroy(&seat->config->keymap);
+    use_local_keymap(seat, keymap);
+
+    return 0;
+}
