@@ -156,9 +156,8 @@ l_listen(lua_State *L) {
         case LUA_TNIL:
             break;
         default:
-            ww_log(LOG_ERROR, "expected '%s' to be of type 'function', was '%s'", functions[i],
-                   luaL_typename(L, -1));
-            return 1;
+            return luaL_error(L, "expected '%s' to be of type 'function', was '%s'", functions[i],
+                              luaL_typename(L, -1));
         }
 
         lua_pop(L, 1);
@@ -338,20 +337,21 @@ l_set_keymap(lua_State *L) {
         case LUA_TNIL:
             break;
         default:
-            ww_log(LOG_ERROR, "expected '%s' to be of type 'string' or 'nil', was '%s'",
-                   mappings[i].key, luaL_typename(L, -1));
             for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
                 if (strings[i]) {
                     free(strings[i]);
                 }
             }
-            return 1;
+
+            return luaL_error(L, "expected '%s' to be of type 'string' or 'nil', was '%s'",
+                              mappings[i].key, luaL_typename(L, -1));
         }
 
         lua_pop(L, 1);
     }
 
     server_seat_lua_set_keymap(wall->server->seat, &rule_names);
+
     for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
         if (strings[i]) {
             free(strings[i]);
