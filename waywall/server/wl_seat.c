@@ -58,8 +58,69 @@ get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     *y = seat->pointer.y - (double)seat->input_focus->state.y;
 }
 
+static int
+prepare_local_keymap(struct server_seat *seat, const struct xkb_rule_names *rule_names,
+                     struct server_seat_keymap *km) {
+    km->xkb = xkb_keymap_new_from_names(seat->ctx, rule_names, XKB_MAP_COMPILE_NO_FLAGS);
+    if (!km->xkb) {
+        ww_log(LOG_ERROR, "failed to create XKB keymap");
+        goto fail_keymap;
+    }
+
+    km->state = xkb_state_new(km->xkb);
+    if (!km->state) {
+        ww_log(LOG_ERROR, "failed to create XKB state");
+        goto fail_state;
+    }
+
+    char *km_str = xkb_keymap_get_as_string(km->xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
+    if (!km_str) {
+        ww_log(LOG_ERROR, "failed to get XKB keymap string");
+        goto fail_keymap_string;
+    }
+
+    km->size = strlen(km_str) + 1;
+    km->fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
+    if (km->fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to create XKB keymap memfd");
+        goto fail_create_memfd;
+    }
+    if (ftruncate(km->fd, km->size) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to expand XKB keymap memfd");
+        goto fail_truncate_memfd;
+    }
+
+    char *data = mmap(NULL, km->size, PROT_READ | PROT_WRITE, MAP_SHARED, km->fd, 0);
+    if (data == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to map XKB keymap memfd");
+        goto fail_map_memfd;
+    }
+
+    memcpy(data, km_str, km->size);
+    ww_assert(munmap(data, km->size) == 0);
+    free(km_str);
+
+    return 0;
+
+fail_map_memfd:
+fail_truncate_memfd:
+    close(km->fd);
+
+fail_create_memfd:
+    free(km_str);
+
+fail_keymap_string:
+    xkb_state_unref(km->state);
+
+fail_state:
+    xkb_keymap_unref(km->xkb);
+
+fail_keymap:
+    return 1;
+}
+
 static struct xkb_keymap *
-prepare_remote_km(struct xkb_context *ctx, int32_t fd, int32_t size) {
+prepare_remote_keymap(struct xkb_context *ctx, int32_t fd, int32_t size) {
     char *data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (data == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap keymap data");
@@ -318,6 +379,19 @@ reset_keyboard_state(struct server_seat *seat) {
 }
 
 static void
+use_local_keymap(struct server_seat *seat, struct server_seat_keymap keymap) {
+    seat->config->keymap = keymap;
+
+    reset_keyboard_state(seat);
+
+    struct wl_resource *keyboard_resource;
+    wl_resource_for_each(keyboard_resource, &seat->keyboards) {
+        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, keymap.fd,
+                                keymap.size);
+    }
+}
+
+static void
 process_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
     bool modifiers_updated = modify_pressed_keys(seat, keycode, state);
 
@@ -439,7 +513,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     seat->keyboard.remote_km.fd = fd;
     seat->keyboard.remote_km.size = size;
 
-    seat->keyboard.remote_km.xkb = prepare_remote_km(seat->ctx, fd, size);
+    seat->keyboard.remote_km.xkb = prepare_remote_keymap(seat->ctx, fd, size);
     if (!seat->keyboard.remote_km.xkb) {
         ww_log(LOG_ERROR, "failed to create remote keymap");
         return;
@@ -1023,13 +1097,7 @@ server_seat_use_config(struct server_seat *seat, struct server_seat_config *conf
     }
     seat->config = config;
 
-    reset_keyboard_state(seat);
-
-    struct wl_resource *keyboard_resource;
-    wl_resource_for_each(keyboard_resource, &seat->keyboards) {
-        wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1,
-                                config->keymap.fd, config->keymap.size);
-    }
+    use_local_keymap(seat, seat->config->keymap);
 }
 
 struct server_seat_config *
@@ -1047,47 +1115,9 @@ server_seat_config_create(struct server_seat *seat, struct config *cfg) {
         .options = cfg->input.keymap.options,
     };
 
-    config->keymap.xkb =
-        xkb_keymap_new_from_names(seat->ctx, &rule_names, XKB_MAP_COMPILE_NO_FLAGS);
-    if (!config->keymap.xkb) {
-        ww_log(LOG_ERROR, "failed to create XKB keymap");
+    if (prepare_local_keymap(seat, &rule_names, &config->keymap) != 0) {
         goto fail_keymap;
     }
-
-    config->keymap.state = xkb_state_new(config->keymap.xkb);
-    if (!config->keymap.state) {
-        ww_log(LOG_ERROR, "failed to create XKB keymap state");
-        goto fail_state;
-    }
-
-    char *keymap_str = xkb_keymap_get_as_string(config->keymap.xkb, XKB_KEYMAP_FORMAT_TEXT_V1);
-    if (!keymap_str) {
-        ww_log(LOG_ERROR, "failed to get XKB keymap as string");
-        goto fail_keymap_str;
-    }
-
-    config->keymap.size = strlen(keymap_str) + 1;
-    config->keymap.fd = memfd_create("waywall-keymap", MFD_CLOEXEC);
-    if (config->keymap.fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to create XKB keymap memfd");
-        goto fail_create_memfd;
-    }
-
-    if (ftruncate(config->keymap.fd, config->keymap.size) == -1) {
-        ww_log_errno(LOG_ERROR, "failed to expand XKB keymap memfd");
-        goto fail_truncate_memfd;
-    }
-
-    char *data = mmap(NULL, config->keymap.size + 1, PROT_READ | PROT_WRITE, MAP_SHARED,
-                      config->keymap.fd, 0);
-    if (data == MAP_FAILED) {
-        ww_log_errno(LOG_ERROR, "failed to map XKB keymap memfd");
-        goto fail_map_memfd;
-    }
-
-    memcpy(data, keymap_str, config->keymap.size + 1);
-    ww_assert(munmap(data, config->keymap.size + 1) == 0);
-    free(keymap_str);
 
     // It's not worth the effort to calculate how many of each kind of remap there are. The number
     // of remaps a user might reasonably have is quite small.
@@ -1115,19 +1145,6 @@ server_seat_config_create(struct server_seat *seat, struct config *cfg) {
     }
 
     return config;
-
-fail_map_memfd:
-fail_truncate_memfd:
-    close(config->keymap.fd);
-
-fail_create_memfd:
-    free(keymap_str);
-
-fail_keymap_str:
-    xkb_state_unref(config->keymap.state);
-
-fail_state:
-    xkb_keymap_unref(config->keymap.xkb);
 
 fail_keymap:
     free(config);
