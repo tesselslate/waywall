@@ -1,4 +1,6 @@
 #include "config/internal.h"
+#include "config/config.h"
+#include "util.h"
 #include <luajit-2.1/lauxlib.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -6,6 +8,13 @@
 #include <string.h>
 
 const struct config_registry_keys config_registry_keys = {0};
+
+#define MAX_INSTRUCTIONS 50000000
+
+static void
+pcall_hook(struct lua_State *L, struct lua_Debug *dbg) {
+    luaL_error(L, "instruction count exceeded");
+}
 
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
@@ -72,4 +81,19 @@ config_parse_hex(uint8_t rgba[static 4], const char *raw) {
     rgba[3] = a;
 
     return 0;
+}
+
+int
+config_pcall(struct config *cfg, int nargs, int nresults, int errfunc) {
+    if (cfg->use_hook) {
+        lua_sethook(cfg->L, pcall_hook, LUA_MASKCOUNT, MAX_INSTRUCTIONS);
+    }
+
+    int ret = lua_pcall(cfg->L, nargs, nresults, errfunc);
+
+    if (cfg->use_hook) {
+        lua_sethook(cfg->L, NULL, 0, 0);
+    }
+
+    return ret;
 }

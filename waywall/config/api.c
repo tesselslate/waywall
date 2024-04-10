@@ -498,7 +498,7 @@ config_api_init(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to load internal api chunk");
         goto fail_loadbuffer;
     }
-    if (lua_pcall(cfg->L, 0, 0, 0) != 0) {
+    if (config_pcall(cfg, 0, 0, 0) != 0) {
         ww_log(LOG_ERROR, "failed to load API: '%s'", lua_tostring(cfg->L, -1));
         goto fail_pcall;
     }
@@ -508,7 +508,7 @@ config_api_init(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to load internal api helpers chunk");
         goto fail_loadbuffer_helpers;
     }
-    if (lua_pcall(cfg->L, 0, 0, 0) != 0) {
+    if (config_pcall(cfg, 0, 0, 0) != 0) {
         ww_log(LOG_ERROR, "failed to load API helpers: '%s'", lua_tostring(cfg->L, -1));
         goto fail_pcall_helpers;
     }

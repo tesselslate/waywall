@@ -661,7 +661,7 @@ load_config(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to load internal init chunk");
         goto fail_loadbuffer;
     }
-    if (lua_pcall(cfg->L, 0, 1, 0) != 0) {
+    if (config_pcall(cfg, 0, 1, 0) != 0) {
         ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->L, -1));
         goto fail_pcall;
     }
@@ -752,6 +752,19 @@ config_load(struct config *cfg) {
     if (!cfg->L) {
         ww_log(LOG_ERROR, "failed to create lua VM");
         return 1;
+    }
+
+    bool jit_enabled = !!getenv("WAYWALL_USE_JIT");
+    bool hook_disabled = !!getenv("WAYWALL_DISABLE_HOOK");
+
+    if (!jit_enabled) {
+        if (!luaJIT_setmode(cfg->L, 0, LUAJIT_MODE_OFF)) {
+            ww_log(LOG_WARN, "failed to disable the JIT");
+        }
+
+        if (!hook_disabled) {
+            cfg->use_hook = true;
+        }
     }
 
     luaL_newmetatable(cfg->L, METATABLE_WALL);

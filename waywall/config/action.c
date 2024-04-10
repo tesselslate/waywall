@@ -20,7 +20,7 @@ config_action_try(struct config *cfg, struct wall *wall, struct config_action ac
     case LUA_TFUNCTION:
         config_api_set_wall(cfg, wall);
 
-        if (lua_pcall(cfg->L, 0, 0, 0) != 0) {
+        if (config_pcall(cfg, 0, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to perform action: '%s'", lua_tostring(cfg->L, -1));
             return -1;
         }

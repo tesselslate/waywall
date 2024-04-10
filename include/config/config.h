@@ -45,6 +45,7 @@ struct config {
     } theme;
 
     struct lua_State *L;
+    bool use_hook;
 };
 
 enum config_remap_type {

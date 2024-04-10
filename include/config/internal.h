@@ -18,5 +18,6 @@ extern const struct config_registry_keys {
 void config_dump_stack(struct lua_State *L);
 void config_encode_bind(char buf[static BIND_BUFLEN], struct config_action action);
 int config_parse_hex(uint8_t rgba[static 4], const char *raw);
+int config_pcall(struct config *cfg, int nargs, int nresults, int errfunc);
 
 #endif
