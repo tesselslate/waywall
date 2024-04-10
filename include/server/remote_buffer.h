@@ -6,17 +6,7 @@
 #include <sys/types.h>
 #include <wayland-server-core.h>
 
-#define REMOTE_BUFFER_MAX_COLORS 64
-
 struct server;
-
-struct remote_buffer {
-    struct wl_buffer *wl;
-
-    uint32_t width, height, stride;
-    size_t offset;
-    ssize_t rc;
-};
 
 struct remote_buffer_manager {
     struct wl_shm_pool *pool;
@@ -24,10 +14,7 @@ struct remote_buffer_manager {
     int32_t fd;
     size_t size, ptr;
 
-    struct {
-        struct remote_buffer buf;
-        uint32_t argb;
-    } colors[REMOTE_BUFFER_MAX_COLORS];
+    struct wl_list color_pools; // color_pool.link
 };
 
 struct remote_buffer_manager *remote_buffer_manager_create(struct server *server);

@@ -15,7 +15,28 @@
 #include <wayland-client.h>
 #include <wayland-server-core.h>
 
+#define COLOR_POOL_SIZE 64
 #define POOL_INITIAL_SIZE 16384
+
+struct slot {
+    size_t offset;
+    ssize_t rc;
+};
+
+struct color_pool {
+    struct wl_list link; // remote_buffer_manager.color_pools
+
+    size_t offset;
+    struct slot slots[COLOR_POOL_SIZE];
+    uint32_t colors[COLOR_POOL_SIZE];
+};
+
+struct color_result {
+    struct {
+        struct color_pool *pool;
+        size_t index;
+    } empty, equal;
+};
 
 static inline void
 assign_rgba(char *dst, const uint8_t src[static 4]) {
@@ -28,6 +49,10 @@ assign_rgba(char *dst, const uint8_t src[static 4]) {
 static int
 expand(struct remote_buffer_manager *manager, size_t min) {
     ww_assert(min < SIZE_MAX / 2);
+
+    if (min < manager->size) {
+        return 0;
+    }
 
     size_t prev = manager->size;
     do {
@@ -56,32 +81,40 @@ fail_truncate:
     return 1;
 }
 
-static void
-make_color(struct remote_buffer_manager *manager, struct remote_buffer *buf,
-           const uint8_t rgba[static 4]) {
-    static_assert(sizeof(uint32_t) == 4);
+static struct color_result
+find_color_slot(struct remote_buffer_manager *manager, uint32_t rgba) {
+    struct color_result result = {0};
 
-    // Ensure there is space to create a fresh buffer.
-    if (manager->ptr + 4 >= manager->size) {
-        if (expand(manager, manager->ptr + 4) != 0) {
-            ww_log(LOG_ERROR, "failed to expand shm pool for color buffer");
-            return;
+    struct color_pool *pool;
+    wl_list_for_each (pool, &manager->color_pools, link) {
+        for (size_t i = 0; i < COLOR_POOL_SIZE; i++) {
+            bool unused = (pool->slots[i].rc == 0);
+
+            if (pool->colors[i] == rgba) {
+                result.equal.pool = pool;
+                result.equal.index = i;
+
+                return result;
+            }
+
+            if (unused) {
+                result.empty.pool = pool;
+                result.empty.index = i;
+                continue;
+            }
         }
     }
 
-    buf->width = 1;
-    buf->height = 1;
-    buf->stride = 4;
-    buf->offset = manager->ptr;
-    manager->ptr += 4;
+    return result;
+}
 
-    assign_rgba(manager->data + buf->offset, rgba);
-
-    buf->wl =
-        wl_shm_pool_create_buffer(manager->pool, buf->offset, 1, 1, 4, WL_SHM_FORMAT_ARGB8888);
-    ww_assert(buf->wl);
-
-    wl_buffer_set_user_data(buf->wl, buf);
+static inline struct wl_buffer *
+make_color_buffer(struct remote_buffer_manager *manager, struct slot *slot) {
+    struct wl_buffer *buffer =
+        wl_shm_pool_create_buffer(manager->pool, slot->offset, 1, 1, 4, WL_SHM_FORMAT_ARGB8888);
+    check_alloc(buffer);
+    wl_buffer_set_user_data(buffer, slot);
+    return buffer;
 }
 
 struct remote_buffer_manager *
@@ -123,6 +156,8 @@ remote_buffer_manager_create(struct server *server) {
     manager->pool = wl_shm_create_pool(server->backend->shm, manager->fd, manager->size);
     check_alloc(manager->pool);
 
+    wl_list_init(&manager->color_pools);
+
     return manager;
 
 fail_mmap:
@@ -136,66 +171,62 @@ fail_memfd:
 
 struct wl_buffer *
 remote_buffer_manager_color(struct remote_buffer_manager *manager, const uint8_t rgba[static 4]) {
-    uint32_t argb = (uint32_t)rgba[0] | ((uint32_t)rgba[1] << 8) | ((uint32_t)rgba[2] << 16) |
-                    ((uint32_t)rgba[3] << 24);
+    uint32_t rgba_u32 = (uint32_t)rgba[0] | ((uint32_t)rgba[1] << 8) | ((uint32_t)rgba[2] << 16) |
+                        ((uint32_t)rgba[3] << 24);
 
-    // Check for a buffer with this color first.
-    for (size_t i = 0; i < STATIC_ARRLEN(manager->colors); i++) {
-        if (manager->colors[i].argb != argb) {
-            continue;
-        }
+    struct color_result found_slots = find_color_slot(manager, rgba_u32);
+    if (found_slots.equal.pool) {
+        struct color_pool *pool = found_slots.equal.pool;
+        size_t idx = found_slots.equal.index;
 
-        // In the case that the provided RGBA value is #00000000, the buffer may not be prepared
-        // yet.
-        if (!manager->colors[i].buf.wl) {
-            make_color(manager, &manager->colors[i].buf, rgba);
+        pool->slots[idx].rc++;
+        return make_color_buffer(manager, &pool->slots[idx]);
+    } else if (found_slots.empty.pool) {
+        struct color_pool *pool = found_slots.empty.pool;
+        size_t idx = found_slots.empty.index;
+
+        pool->slots[idx].rc = 1;
+        pool->colors[idx] = rgba_u32;
+        pool->slots[idx].offset = pool->offset + idx * 4;
+
+        assign_rgba(manager->data + pool->slots[idx].offset, rgba);
+        return make_color_buffer(manager, &pool->slots[idx]);
+    } else {
+        // Create a new pool and insert it into the list.
+        struct color_pool *pool = zalloc(1, sizeof(*pool));
+
+        pool->offset = manager->ptr;
+        size_t new_ptr = manager->ptr + COLOR_POOL_SIZE * 4;
+        if (expand(manager, new_ptr) != 0) {
+            free(pool);
+            return NULL;
         }
-        struct wl_buffer *buffer = manager->colors[i].buf.wl;
-        if (buffer) {
-            manager->colors[i].buf.rc++;
-        }
-        return buffer;
+        manager->ptr = new_ptr;
+
+        wl_list_insert(&manager->color_pools, &pool->link);
+
+        // Use an empty slot from the newly created pool.
+        pool->slots[0].rc = 1;
+        pool->colors[0] = rgba_u32;
+        pool->slots[0].offset = pool->offset;
+
+        assign_rgba(manager->data + pool->slots[0].offset, rgba);
+        return make_color_buffer(manager, &pool->slots[0]);
     }
-
-    // Otherwise, attempt to find a free slot.
-    for (size_t i = 0; i < STATIC_ARRLEN(manager->colors); i++) {
-        if (manager->colors[i].buf.rc > 0) {
-            continue;
-        }
-        manager->colors[i].argb = argb;
-
-        // If there is existing backing storage, rewrite it.
-        struct remote_buffer *buf = &manager->colors[i].buf;
-        if (buf->wl) {
-            assign_rgba(manager->data + buf->offset, rgba);
-
-            manager->colors[i].buf.rc++;
-            return buf->wl;
-        }
-
-        // Otherwise, create a new buffer.
-        make_color(manager, &manager->colors[i].buf, rgba);
-        struct wl_buffer *buffer = manager->colors[i].buf.wl;
-        if (buffer) {
-            manager->colors[i].buf.rc++;
-        }
-        return buffer;
-    }
-
-    return NULL;
 }
 
 void
 remote_buffer_manager_destroy(struct remote_buffer_manager *manager) {
-    // All buffers should no longer be in use at this point.
-    for (size_t i = 0; i < STATIC_ARRLEN(manager->colors); i++) {
-        if (manager->colors[i].buf.rc > 0) {
-            ww_panic("remote buffer still in use");
+    struct color_pool *pool, *tmp;
+    wl_list_for_each_safe (pool, tmp, &manager->color_pools, link) {
+        for (size_t i = 0; i < COLOR_POOL_SIZE; i++) {
+            if (pool->slots[i].rc > 0) {
+                ww_panic("remote color buffer still in use");
+            }
         }
 
-        if (manager->colors[i].buf.wl) {
-            wl_buffer_destroy(manager->colors[i].buf.wl);
-        }
+        wl_list_remove(&pool->link);
+        free(pool);
     }
 
     wl_shm_pool_destroy(manager->pool);
@@ -206,9 +237,10 @@ remote_buffer_manager_destroy(struct remote_buffer_manager *manager) {
 
 void
 remote_buffer_deref(struct wl_buffer *buffer) {
-    struct remote_buffer *buf = wl_buffer_get_user_data(buffer);
-    ww_assert(buf);
-    ww_assert(buf->rc > 0);
+    struct slot *slot = wl_buffer_get_user_data(buffer);
+    ww_assert(slot);
+    ww_assert(slot->rc > 0);
 
-    buf->rc--;
+    slot->rc--;
+    wl_buffer_destroy(buffer);
 }
