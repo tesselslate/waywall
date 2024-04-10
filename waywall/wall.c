@@ -215,20 +215,33 @@ change_layout(struct wall *wall, struct config_layout *layout) {
 static void
 fixup_layout(struct wall *wall, int id) {
     // This function is called when an instance dies and there is no new layout from the user's
-    // layout generator. In this case, we may need to shift some instance IDs in the layout to
-    // ensure that it can continue being used.
+    // layout generator. In this case, we will need to shift instance IDs of any later instances
+    // (those with higher IDs) and remove the element containing the instance that died if one
+    // exists.
     if (!wall->layout) {
         return;
     }
 
+    size_t w = 0;
     for (size_t i = 0; i < wall->layout->num_elements; i++) {
         struct config_layout_element *elem = &wall->layout->elements[i];
-        if (elem->type == LAYOUT_ELEMENT_INSTANCE) {
-            if (elem->data.instance > id) {
+
+        switch (elem->type) {
+        case LAYOUT_ELEMENT_INSTANCE:
+            if (elem->data.instance == id) {
+                continue;
+            } else if (elem->data.instance > id) {
                 elem->data.instance--;
+                wall->layout->elements[w++] = *elem;
             }
+            break;
+        default:
+            wall->layout->elements[w++] = *elem;
+            break;
         }
     }
+
+    wall->layout->num_elements = w;
 }
 
 static bool
@@ -344,6 +357,7 @@ remove_instance(struct wall *wall, int id) {
             sizeof(struct instance *) * (wall->num_instances - id - 1));
     wall->num_instances--;
 
+    fixup_layout(wall, id);
     if (wall->active_instance == id) {
         focus_wall(wall);
     }
@@ -352,8 +366,6 @@ remove_instance(struct wall *wall, int id) {
     struct config_layout *layout = config_layout_get(wall->cfg, wall);
     if (layout) {
         change_layout(wall, layout);
-    } else {
-        fixup_layout(wall, id);
     }
 }
 
