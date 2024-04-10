@@ -24,7 +24,11 @@ static struct wall *
 get_wall(lua_State *L) {
     lua_pushlightuserdata(L, (void *)&config_registry_keys.wall);
     lua_gettable(L, LUA_REGISTRYINDEX);
-    luaL_checkudata(L, -1, METATABLE_WALL);
+
+    if (!luaL_testudata(L, -1, METATABLE_WALL)) {
+        luaL_error(L, "this function cannot be called at startup");
+        ww_unreachable();
+    }
 
     struct wall **wall = lua_touserdata(L, -1);
     lua_pop(L, 1);
