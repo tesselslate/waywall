@@ -106,8 +106,8 @@ struct ui_rectangle {
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
-void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 void server_ui_show(struct server_ui *ui);
+void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 
 struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);
 void server_ui_config_destroy(struct server_ui_config *config);

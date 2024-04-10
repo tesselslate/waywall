@@ -207,19 +207,6 @@ server_ui_hide(struct server_ui *ui) {
 }
 
 void
-server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
-    if (ui->config) {
-        server_ui_config_destroy(ui->config);
-    }
-    ui->config = config;
-
-    if (ui->mapped) {
-        wl_surface_attach(ui->surface, ui->config->background, 0, 0);
-        wl_surface_commit(ui->surface);
-    }
-}
-
-void
 server_ui_show(struct server_ui *ui) {
     ww_assert(!ui->mapped);
 
@@ -238,6 +225,20 @@ server_ui_show(struct server_ui *ui) {
 
     ui->mapped = true;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
+}
+
+void
+server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
+    if (ui->config) {
+        server_ui_config_destroy(ui->config);
+    }
+    ui->config = config;
+
+    if (ui->mapped) {
+        wl_surface_attach(ui->surface, config->background, 0, 0);
+        wl_surface_damage_buffer(ui->surface, 0, 0, INT32_MAX, INT32_MAX);
+        wl_surface_commit(ui->surface);
+    }
 }
 
 struct server_ui_config *
