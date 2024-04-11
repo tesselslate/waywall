@@ -8,10 +8,33 @@
 -- Setup the environment for the user's configuration.
 local priv = _G.priv_waywall
 
+local orig_pcall = _G.pcall
+local orig_xpcall = _G.xpcall
+
 _G.priv_waywall = nil
 _G.load = nil
 _G.loadfile = nil
 _G.loadstring = nil
+
+_G.pcall = function(fn, ...)
+    local ret = { orig_pcall(fn, ...) }
+
+    if not ret[1] and ret[2] == "instruction count exceeded" then
+        error("instruction count exceeded")
+    end
+
+    return unpack(ret)
+end
+
+_G.xpcall = function(fn, msgh, ...)
+    local ret = { orig_xpcall(fn, msgh, ...) }
+
+    if not ret[1] and ret[2] == "instruction count exceeded" then
+        error("instruction count exceeded")
+    end
+
+    return unpack(ret)
+end
 
 _G.print = function(...)
     local str = nil
