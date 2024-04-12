@@ -24,7 +24,7 @@ struct waywall {
     struct inotify *inotify;
     struct wall *wall;
 
-    struct str config_path;
+    str config_path;
     int config_dir_wd;
     struct {
         int *data;
@@ -70,17 +70,17 @@ handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
 
 static int
 add_config_watch(struct waywall *ww, const char *name) {
-    struct str buf = ww->config_path;
-    if (!str_append(&buf, name)) {
-        ww_log(LOG_ERROR, "path too long for config file '%s'", name);
-        return 1;
-    }
+    str path = str_new();
+    path = str_append(path, ww->config_path);
+    path = str_append(path, name);
 
-    int wd = inotify_subscribe(ww->inotify, buf.data, IN_CLOSE_WRITE, handle_config_file, ww);
+    int wd = inotify_subscribe(ww->inotify, path, IN_CLOSE_WRITE, handle_config_file, ww);
     if (wd == -1) {
-        ww_log(LOG_ERROR, "failed to watch config file '%s'", name);
+        ww_log(LOG_ERROR, "failed to watch config file '%s'", path);
+        str_free(path);
         return 1;
     }
+    str_free(path);
 
     if (ww->config_wd.len == ww->config_wd.cap) {
         ww_assert(ww->config_wd.cap > 0);
@@ -139,18 +139,12 @@ handle_config_dir(int wd, uint32_t mask, const char *name, void *data) {
 
 static int
 config_subscribe(struct waywall *ww) {
-    struct str *config_dir = &ww->config_path;
+    ww->config_path = str_new();
 
     const char *env = getenv("XDG_CONFIG_HOME");
     if (env) {
-        if (!str_append(config_dir, env)) {
-            ww_log(LOG_ERROR, "config path too long");
-            return 1;
-        }
-        if (!str_append(config_dir, "/waywall/")) {
-            ww_log(LOG_ERROR, "config path too long");
-            return 1;
-        }
+        ww->config_path = str_append(ww->config_path, env);
+        ww->config_path = str_append(ww->config_path, "/waywall/");
     } else {
         env = getenv("HOME");
         if (!env) {
@@ -158,18 +152,12 @@ config_subscribe(struct waywall *ww) {
             return 1;
         }
 
-        if (!str_append(config_dir, env)) {
-            ww_log(LOG_ERROR, "config path too long");
-            return 1;
-        }
-        if (!str_append(config_dir, "/.config/waywall/")) {
-            ww_log(LOG_ERROR, "config path too long");
-            return 1;
-        }
+        ww->config_path = str_append(ww->config_path, env);
+        ww->config_path = str_append(ww->config_path, "/.config/waywall/");
     }
 
     ww->config_dir_wd =
-        inotify_subscribe(ww->inotify, config_dir->data, IN_CREATE | IN_DELETE | IN_DELETE_SELF,
+        inotify_subscribe(ww->inotify, ww->config_path, IN_CREATE | IN_DELETE | IN_DELETE_SELF,
                           handle_config_dir, ww);
     if (ww->config_dir_wd == -1) {
         ww_log(LOG_ERROR, "failed to watch config dir");
@@ -180,9 +168,9 @@ config_subscribe(struct waywall *ww) {
     ww->config_wd.len = 0;
     ww->config_wd.cap = 8;
 
-    DIR *dir = opendir(config_dir->data);
+    DIR *dir = opendir(ww->config_path);
     if (!dir) {
-        ww_log(LOG_ERROR, "failed to open config dir '%s'", config_dir->data);
+        ww_log(LOG_ERROR, "failed to open config dir '%s'", ww->config_path);
         goto fail_opendir;
     }
 
@@ -220,6 +208,7 @@ config_unsubscribe(struct waywall *ww) {
         inotify_unsubscribe(ww->inotify, ww->config_wd.data[i]);
     }
     free(ww->config_wd.data);
+    str_free(ww->config_path);
 }
 
 static int
@@ -329,6 +318,7 @@ fail_socket:
 
 fail_watch_config:
     wall_destroy(ww.wall);
+    str_free(ww.config_path);
 
 fail_wall:
     inotify_destroy(ww.inotify);

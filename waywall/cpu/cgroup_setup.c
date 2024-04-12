@@ -87,20 +87,24 @@ cgroup_setup_check(const char *base) {
 
     for (size_t i = 0; i < STATIC_ARRLEN(subgroups); i++) {
         for (size_t j = 0; j < STATIC_ARRLEN(files); j++) {
-            struct str buf = {0};
-            ww_assert(str_append(&buf, base));
-            ww_assert(str_append(&buf, subgroups[i]));
-            ww_assert(str_append(&buf, files[j]));
+            str path = str_new();
+            path = str_append(path, base);
+            path = str_append(path, subgroups[i]);
+            path = str_append(path, files[j]);
 
             struct stat fstat = {0};
-            if (stat(buf.data, &fstat) != 0) {
+            if (stat(path, &fstat) != 0) {
                 if (errno == ENOENT) {
+                    str_free(path);
                     return 1;
                 } else {
-                    ww_log_errno(LOG_ERROR, "stat '%s'", buf.data);
+                    ww_log_errno(LOG_ERROR, "stat '%s'", path);
+                    str_free(path);
                     return -1;
                 }
             }
+
+            str_free(path);
 
             if (fstat.st_uid != euid && fstat.st_gid != egid) {
                 return 1;
@@ -108,19 +112,22 @@ cgroup_setup_check(const char *base) {
         }
     }
 
-    struct str buf = {0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, "cgroup.procs"));
+    str path = str_new();
+    path = str_append(path, base);
+    path = str_append(path, "cgroup.procs");
 
     struct stat fstat = {0};
-    if (stat(buf.data, &fstat) != 0) {
+    if (stat(path, &fstat) != 0) {
         if (errno == ENOENT) {
+            str_free(path);
             return 1;
         } else {
-            ww_log_errno(LOG_ERROR, "stat '%s'", buf.data);
+            ww_log_errno(LOG_ERROR, "stat '%s'", path);
+            str_free(path);
             return -1;
         }
     }
+    str_free(path);
 
     return 0;
 }
@@ -150,16 +157,18 @@ cgroup_setup_dir(const char *base) {
         return 1;
     }
 
-    struct str buf = {0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, "cgroup.subtree_control"));
-    int fd = open(buf.data, O_WRONLY, 0644);
+    str path = str_new();
+    path = str_append(path, base);
+    path = str_append(path, "cgroup.subtree_control");
+    int fd = open(path, O_WRONLY, 0644);
     if (fd == -1) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
+            str_free(path);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
+        str_free(path);
         return 1;
     }
 
@@ -167,52 +176,66 @@ cgroup_setup_dir(const char *base) {
     if (write(fd, subtree, STATIC_STRLEN(subtree)) != STATIC_STRLEN(subtree)) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
+            str_free(path);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to write '%s'", buf.data);
+        ww_log_errno(LOG_ERROR, "failed to write '%s'", path);
+        str_free(path);
         return 1;
     }
 
-    buf = (struct str){0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, "cgroup.procs"));
-    if (chown(buf.data, uid, gid) != 0) {
+    str_clear(path);
+    path = str_append(path, base);
+    path = str_append(path, "cgroup.procs");
+    if (chown(path, uid, gid) != 0) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
+            str_free(path);
             return 1;
         }
-        ww_log_errno(LOG_ERROR, "failed to chown '%s'", buf.data);
+        ww_log_errno(LOG_ERROR, "failed to chown '%s'", path);
+        str_free(path);
         return 1;
     }
 
     for (size_t i = 0; i < STATIC_ARRLEN(subgroups); i++) {
-        const char *subgroup = subgroups[i];
-        struct str buf = {0};
-        ww_assert(str_append(&buf, base));
-        ww_assert(str_append(&buf, subgroup));
+        str_clear(path);
+        path = str_append(path, base);
+        path = str_append(path, subgroups[i]);
 
-        if (mkdir(buf.data, 0755) != 0 && errno != EEXIST) {
+        if (mkdir(path, 0755) != 0 && errno != EEXIST) {
             if (errno == EPERM || errno == EACCES) {
                 ww_log(LOG_ERROR, PERMS_MESSAGE);
+                str_free(path);
                 return 1;
             }
-            ww_log_errno(LOG_ERROR, "failed to create subgroup directory '%s'", buf.data);
+            ww_log_errno(LOG_ERROR, "failed to create subgroup directory '%s'", path);
+            str_free(path);
             return 1;
         }
 
         for (size_t j = 0; j < STATIC_ARRLEN(files); j++) {
-            struct str buf2 = buf;
-            ww_assert(str_append(&buf2, files[j]));
+            str subpath = str_new();
+            subpath = str_append(subpath, path);
+            subpath = str_append(subpath, files[j]);
 
-            if (chown(buf2.data, uid, gid) != 0) {
+            if (chown(subpath, uid, gid) != 0) {
                 if (errno == EPERM || errno == EACCES) {
                     ww_log(LOG_ERROR, PERMS_MESSAGE);
+                    str_free(subpath);
+                    str_free(path);
                     return 1;
                 }
-                ww_log_errno(LOG_ERROR, "failed to chown '%s'", buf2.data);
+                ww_log_errno(LOG_ERROR, "failed to chown '%s'", subpath);
+                str_free(subpath);
+                str_free(path);
                 return 1;
             }
+
+            str_free(subpath);
         }
+
+        str_free(path);
     }
 
     return 0;

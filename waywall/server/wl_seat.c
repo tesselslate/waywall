@@ -169,14 +169,12 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
         break;
     }
 
-    struct str fmtbuf = {0};
-    ww_assert(str_append(&fmtbuf, "(XKB): "));
-    if (!str_append(&fmtbuf, fmt)) {
-        ww_log(LOG_ERROR, "received oversized format string from XKB");
-        return;
-    }
+    str logline = str_new();
+    str_append(logline, "(XKB): ");
+    str_append(logline, fmt);
 
-    util_log_va(level, fmtbuf.data, args, false);
+    util_log_va(level, logline, args, false);
+    str_free(logline);
 }
 
 static bool

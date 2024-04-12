@@ -1,6 +1,7 @@
 #ifndef WAYWALL_INSTANCE_H
 #define WAYWALL_INSTANCE_H
 
+#include "util/str.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/time.h>
@@ -61,7 +62,7 @@ struct instance {
 
 struct instance *instance_create(struct server_view *view, struct inotify *inotify);
 void instance_destroy(struct instance *instance);
-char *instance_get_state_path(struct instance *instance);
+str instance_get_state_path(struct instance *instance);
 bool instance_reset(struct instance *instance);
 void instance_state_update(struct instance *instance);
 void instance_unpause(struct instance *instance);

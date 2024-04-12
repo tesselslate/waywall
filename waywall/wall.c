@@ -296,11 +296,8 @@ process_state_update(int wd, uint32_t mask, const char *name, void *data) {
 
 static void
 add_instance(struct wall *wall, struct instance *instance) {
-    char *state_path = instance_get_state_path(instance);
-    if (!state_path) {
-        ww_log(LOG_ERROR, "failed to get instance state path");
-        goto fail_state_path;
-    }
+    str state_path = instance_get_state_path(instance);
+    ww_assert(state_path);
 
     int wd = inotify_subscribe(wall->inotify, state_path, IN_MODIFY, process_state_update, wall);
     if (wd == -1) {
@@ -320,13 +317,11 @@ add_instance(struct wall *wall, struct instance *instance) {
         cpu_add(wall->cpu, id, instance);
     }
 
-    free(state_path);
+    str_free(state_path);
     return;
 
 fail_wd:
-    free(state_path);
-
-fail_state_path:
+    str_free(state_path);
     instance_destroy(instance);
 }
 

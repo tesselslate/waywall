@@ -317,20 +317,14 @@ process_mod_zip(const char *path, struct instance_mods *mods) {
 
 static int
 get_mods(const char *dirname, struct instance_mods *mods) {
-    struct str dirbuf = {0};
-    if (!str_append(&dirbuf, dirname)) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return 1;
-    }
-    if (!str_append(&dirbuf, "/mods/")) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return 1;
-    }
+    str dirpath = str_new();
+    dirpath = str_append(dirpath, dirname);
+    dirpath = str_append(dirpath, "/mods/");
 
-    DIR *dir = opendir(dirbuf.data);
+    DIR *dir = opendir(dirpath);
     if (!dir) {
-        ww_log_errno(LOG_ERROR, "failed to open instance mods dir '%s'", dirbuf.data);
-        return 1;
+        ww_log_errno(LOG_ERROR, "failed to open instance mods dir '%s'", dirpath);
+        goto fail_dir;
     }
 
     struct dirent *dirent;
@@ -344,76 +338,69 @@ get_mods(const char *dirname, struct instance_mods *mods) {
             continue;
         }
 
-        struct str modbuf = {0};
-        if (!str_append(&modbuf, dirbuf.data)) {
-            ww_log(LOG_ERROR, "instance path too long");
-            closedir(dir);
-            return 1;
-        }
-        if (!str_append(&modbuf, dirent->d_name)) {
-            ww_log(LOG_ERROR, "instance path too long");
-            closedir(dir);
-            return 1;
+        str modpath = str_new();
+        modpath = str_append(modpath, dirpath);
+        modpath = str_append(modpath, dirent->d_name);
+
+        if (process_mod_zip(modpath, mods) != 0) {
+            str_free(modpath);
+            goto fail_zip;
         }
 
-        if (process_mod_zip(modbuf.data, mods) != 0) {
-            closedir(dir);
-            return 1;
-        }
+        str_free(modpath);
     }
 
     closedir(dir);
+    str_free(dirpath);
     return 0;
+
+fail_zip:
+    closedir(dir);
+
+fail_dir:
+    str_free(dirpath);
+    return 1;
 }
 
 static int
 get_options(const char *dirname, struct instance_mods mods, struct instance_options *opts) {
-    struct str pathbuf = {0};
-    if (!str_append(&pathbuf, dirname)) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return 1;
-    }
-    if (!str_append(&pathbuf, "/options.txt")) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return 1;
-    }
+    str path = str_new();
+    path = str_append(path, dirname);
+    path = str_append(path, "/options.txt");
 
-    FILE *file = fopen(pathbuf.data, "r");
+    FILE *file = fopen(path, "r");
     if (!file) {
-        ww_log_errno(LOG_ERROR, "failed to open '%s'", pathbuf.data);
-        return 1;
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
+        goto fail_fopen;
     }
 
     if (read_options(file, opts) != 0) {
-        fclose(file);
+        goto fail_read;
         return 1;
     }
     fclose(file);
 
     if (mods.standard_settings) {
-        pathbuf = (struct str){0};
-        ww_assert(str_append(&pathbuf, dirname));
-        if (!str_append(&pathbuf, "/config/standardoptions.txt")) {
-            ww_log(LOG_ERROR, "instance path too long");
-            return 1;
-        }
+        str_clear(path);
+        path = str_append(path, dirname);
+        path = str_append(path, "/config/standardoptions.txt");
 
         // Follow the StandardSettings file chain, if there is one.
-        file = fopen(pathbuf.data, "r");
+        file = fopen(path, "r");
         if (!file) {
-            ww_log_errno(LOG_ERROR, "failed to open '%s'", pathbuf.data);
-            return 1;
+            ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
+            goto fail_fopen;
         }
 
         for (;;) {
             char buf[4096];
             if (fgets(buf, STATIC_ARRLEN(buf), file) == NULL) {
                 if (feof(file)) {
-                    ww_log(LOG_ERROR, "nothing to read from '%s'", pathbuf.data);
-                    return 1;
+                    ww_log(LOG_ERROR, "nothing to read from '%s'", path);
+                    goto fail_read;
                 } else {
-                    ww_log_errno(LOG_ERROR, "failed to read '%s'", pathbuf.data);
-                    return 1;
+                    ww_log_errno(LOG_ERROR, "failed to read '%s'", path);
+                    goto fail_read;
                 }
             }
 
@@ -425,8 +412,8 @@ get_options(const char *dirname, struct instance_mods mods, struct instance_opti
             struct stat fstat;
             if (stat(buf, &fstat) != 0) {
                 if (fseek(file, 0, SEEK_SET) == -1) {
-                    ww_log_errno(LOG_ERROR, "failed to seek to start of '%s'", pathbuf.data);
-                    return 1;
+                    ww_log_errno(LOG_ERROR, "failed to seek to start of '%s'", path);
+                    goto fail_read;
                 }
                 break;
             }
@@ -435,18 +422,26 @@ get_options(const char *dirname, struct instance_mods mods, struct instance_opti
             file = fopen(buf, "r");
             if (!file) {
                 ww_log_errno(LOG_ERROR, "failed to open '%s'", buf);
-                return 1;
+                goto fail_fopen;
             }
         }
 
         if (read_options(file, opts) != 0) {
-            fclose(file);
-            return 1;
+            goto fail_read;
         }
         fclose(file);
     }
 
+    str_free(path);
+
     return 0;
+
+fail_read:
+    fclose(file);
+
+fail_fopen:
+    str_free(path);
+    return 1;
 }
 
 static int
@@ -478,23 +473,19 @@ get_version(struct server_view *view) {
 
 static int
 open_state_file(const char *dir, struct instance_mods mods) {
-    struct str pathbuf = {0};
-    if (!str_append(&pathbuf, dir)) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return -1;
-    }
-
     const char *file = mods.state_output ? "/wpstateout.txt" : "/logs/latest.log";
-    if (!str_append(&pathbuf, file)) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return -1;
-    }
 
-    int fd = open(pathbuf.data, O_RDONLY | O_CLOEXEC);
+    str path = str_new();
+    path = str_append(path, dir);
+    path = str_append(path, file);
+
+    int fd = open(path, O_RDONLY | O_CLOEXEC);
     if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to open state file '%s'", pathbuf.data);
+        ww_log_errno(LOG_ERROR, "failed to open state file '%s'", path);
+        str_free(path);
         return -1;
     }
+    str_free(path);
 
     return fd;
 }
@@ -633,21 +624,15 @@ instance_destroy(struct instance *instance) {
     free(instance);
 }
 
-char *
+str
 instance_get_state_path(struct instance *instance) {
-    struct str pathbuf = {0};
-    if (!str_append(&pathbuf, instance->dir)) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return NULL;
-    }
-
     const char *file = instance->mods.state_output ? "/wpstateout.txt" : "/logs/latest.log";
-    if (!str_append(&pathbuf, file)) {
-        ww_log(LOG_ERROR, "instance path too long");
-        return NULL;
-    }
 
-    return strdup(pathbuf.data);
+    str path = str_new();
+    path = str_append(path, instance->dir);
+    path = str_append(path, file);
+
+    return path;
 }
 
 bool

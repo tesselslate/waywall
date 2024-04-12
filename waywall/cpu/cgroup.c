@@ -39,30 +39,33 @@ struct cpu_cgroup {
 
 static int
 open_group_procs(const char *base, const char *group) {
-    struct str buf = {0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, group));
-    ww_assert(str_append(&buf, "/cgroup.procs"));
+    str path = str_new();
+    path = str_append(path, base);
+    path = str_append(path, group);
+    path = str_append(path, "/cgroup.procs");
 
-    int fd = open(buf.data, O_WRONLY);
+    int fd = open(path, O_WRONLY);
     if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
+        str_free(path);
         return 1;
     }
+    str_free(path);
 
     return fd;
 }
 
 static int
 set_group_weight(const char *base, const char *group, int weight) {
-    struct str buf = {0};
-    ww_assert(str_append(&buf, base));
-    ww_assert(str_append(&buf, group));
-    ww_assert(str_append(&buf, "/cpu.weight"));
+    str path = str_new();
+    path = str_append(path, base);
+    path = str_append(path, group);
+    path = str_append(path, "/cpu.weight");
 
-    int fd = open(buf.data, O_WRONLY);
+    int fd = open(path, O_WRONLY);
     if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to open '%s'", buf.data);
+        ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
+        str_free(path);
         return 1;
     }
 
@@ -71,11 +74,13 @@ set_group_weight(const char *base, const char *group, int weight) {
     ww_assert(n <= STATIC_STRLEN(weight_buf));
 
     if (write(fd, weight_buf, n) != (ssize_t)n) {
-        ww_log_errno(LOG_ERROR, "failed to write '%s'", buf.data);
+        ww_log_errno(LOG_ERROR, "failed to write '%s'", path);
+        str_free(path);
         close(fd);
         return 1;
     }
 
+    str_free(path);
     close(fd);
     return 0;
 }
