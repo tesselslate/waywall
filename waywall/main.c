@@ -2,12 +2,16 @@
 #include "cpu/cgroup_setup.h"
 #include "inotify.h"
 #include "server/server.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
+#include "util/str.h"
 #include "wall.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
 #include <unistd.h>

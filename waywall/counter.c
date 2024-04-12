@@ -1,9 +1,12 @@
 #include "counter.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
 #include <fcntl.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <unistd.h>
 
 static int

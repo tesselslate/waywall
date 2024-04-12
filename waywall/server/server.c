@@ -13,7 +13,8 @@
 #include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
 #include <string.h>
 #include <wayland-client.h>
 #include <wayland-cursor.h>

@@ -1,7 +1,7 @@
 #ifndef WAYWALL_SERVER_SERIAL_H
 #define WAYWALL_SERVER_SERIAL_H
 
-#include "util.h"
+#include "util/prelude.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>

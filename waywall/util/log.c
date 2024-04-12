@@ -1,7 +1,7 @@
-#include "util.h"
+#include "util/log.h"
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdio.h>
-#include <stdnoreturn.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -59,10 +59,4 @@ util_log_va(enum ww_log_level level, const char *fmt, va_list args, bool newline
     if (newline) {
         fprintf(stderr, "%s\n", color_reset);
     }
-}
-
-noreturn void
-util_panic(const char *file, int line, const char *msg) {
-    fprintf(stderr, "[%s:%d] %s\n", file, line, msg);
-    exit(1);
 }

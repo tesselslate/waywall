@@ -1,12 +1,13 @@
-#define _GNU_SOURCE
-
 #include "server/wl_data_device_manager.h"
 #include "server/backend.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
+#include <string.h>
 #include <unistd.h>
 #include <wayland-client.h>
 #include <wayland-server.h>

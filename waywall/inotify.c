@@ -1,5 +1,7 @@
 #include "inotify.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
 #include <limits.h>
 #include <stdalign.h>
 #include <sys/inotify.h>

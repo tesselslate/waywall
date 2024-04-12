@@ -1,6 +1,5 @@
 #include "config/internal.h"
 #include "config/config.h"
-#include "util.h"
 #include <luajit-2.1/lauxlib.h>
 #include <stdbool.h>
 #include <stddef.h>

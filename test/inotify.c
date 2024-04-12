@@ -1,7 +1,8 @@
 #include "inotify.h"
-#include "util.h"
+#include "util/prelude.h"
 #include <fcntl.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <wayland-server-core.h>

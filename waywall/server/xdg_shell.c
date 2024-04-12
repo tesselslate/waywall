@@ -2,9 +2,11 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/str.h"
 #include "xdg-shell-server-protocol.h"
 #include <stdlib.h>
+#include <string.h>
 
 /*
  * TODO: It may be worth implementing ping/pong support at a later date to detect if instances

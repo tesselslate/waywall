@@ -1,5 +1,7 @@
 #include "cpu/cgroup_setup.h"
-#include "util.h"
+#include "util/log.h"
+#include "util/prelude.h"
+#include "util/str.h"
 #include <fcntl.h>
 #include <inttypes.h>
 #include <pwd.h>

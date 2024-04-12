@@ -1,5 +1,6 @@
 test_sources = [
-  '../waywall/util.c',
+  '../waywall/util/log.c',
+  '../waywall/util/prelude.c',
 ]
 
 test(

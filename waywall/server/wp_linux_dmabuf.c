@@ -5,7 +5,9 @@
 #include "server/buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/prelude.h"
+#include <stdlib.h>
 #include <unistd.h>
 
 /*

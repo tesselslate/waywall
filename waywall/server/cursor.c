@@ -3,7 +3,8 @@
 #include "server/backend.h"
 #include "server/server.h"
 #include "server/wl_seat.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 

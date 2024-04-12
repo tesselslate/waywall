@@ -1,7 +1,9 @@
 #include "config/layout.h"
 #include "config/config.h"
 #include "config/internal.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>

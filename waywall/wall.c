@@ -13,7 +13,10 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
+#include <limits.h>
 #include <linux/input-event-codes.h>
 #include <sys/inotify.h>
 #include <xkbcommon/xkbcommon.h>

@@ -9,7 +9,9 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/str.h"
 #include <linux/input-event-codes.h>
 #include <time.h>
 #include <unistd.h>

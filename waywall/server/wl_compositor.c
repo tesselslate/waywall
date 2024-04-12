@@ -2,8 +2,9 @@
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
-#include "util.h"
+#include "util/alloc.h"
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <wayland-client.h>
 #include <wayland-server.h>

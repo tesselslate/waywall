@@ -3,7 +3,10 @@
 #include "cpu/cgroup_setup.h"
 #include "cpu/cpu.h"
 #include "instance.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
+#include "util/str.h"
 #include "wall.h"
 #include <fcntl.h>
 #include <stdio.h>

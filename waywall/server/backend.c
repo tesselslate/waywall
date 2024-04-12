@@ -2,9 +2,11 @@
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <string.h>
 #include <wayland-client.h>
 
 #define USE_COMPOSITOR_VERSION 5

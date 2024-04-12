@@ -5,7 +5,9 @@
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <wayland-client.h>

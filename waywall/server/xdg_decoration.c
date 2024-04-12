@@ -2,7 +2,7 @@
 #include "server/server.h"
 #include "server/wl_compositor.h"
 #include "server/xdg_shell.h"
-#include "util.h"
+#include "util/alloc.h"
 #include "xdg-decoration-unstable-v1-server-protocol.h"
 
 #define SRV_XDG_DECORATION_MANAGER_VERSION 1

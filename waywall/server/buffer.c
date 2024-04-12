@@ -1,5 +1,6 @@
 #include "server/buffer.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/prelude.h"
 #include <stdlib.h>
 #include <wayland-client.h>
 

@@ -5,7 +5,8 @@
 #include "server/backend.h"
 #include "server/remote_buffer.h"
 #include "server/server.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
 #include <fcntl.h>
 #include <stddef.h>
 #include <stdint.h>

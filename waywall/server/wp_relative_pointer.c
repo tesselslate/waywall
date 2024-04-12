@@ -6,7 +6,7 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
-#include "util.h"
+#include "util/alloc.h"
 
 #define SRV_RELATIVE_POINTER_VERSION 1
 

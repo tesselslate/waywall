@@ -1,5 +1,5 @@
 #include "server/serial.h"
-#include "util.h"
+#include "util/prelude.h"
 
 int
 main() {

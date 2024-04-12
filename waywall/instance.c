@@ -3,12 +3,16 @@
 #include "server/fake_input.h"
 #include "server/server.h"
 #include "server/ui.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
+#include "util/str.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <linux/input-event-codes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 #include <sys/inotify.h>

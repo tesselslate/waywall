@@ -4,7 +4,9 @@
 #include "config/internal.h"
 #include "lua/init.h"
 #include "server/wl_seat.h"
-#include "util.h"
+#include "util/alloc.h"
+#include "util/log.h"
+#include "util/prelude.h"
 #include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/luajit.h>

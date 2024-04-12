@@ -2,7 +2,8 @@
 #include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
-#include "util.h"
+#include "util/log.h"
+#include "util/prelude.h"
 #include <luajit-2.1/lua.h>
 
 static void
