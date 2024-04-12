@@ -1,7 +1,7 @@
 #ifndef WAYWALL_SERVER_UI_H
 #define WAYWALL_SERVER_UI_H
 
-#include "server/box.h"
+#include "util/box.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>

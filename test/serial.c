@@ -1,4 +1,4 @@
-#include "server/serial.h"
+#include "util/serial.h"
 #include "util/prelude.h"
 
 int

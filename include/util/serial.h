@@ -1,5 +1,5 @@
-#ifndef WAYWALL_SERVER_SERIAL_H
-#define WAYWALL_SERVER_SERIAL_H
+#ifndef WAYWALL_UTIL_SERIAL_H
+#define WAYWALL_UTIL_SERIAL_H
 
 #include "util/prelude.h"
 #include <stddef.h>

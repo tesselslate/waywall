@@ -1,5 +1,5 @@
-#ifndef WAYWALL_SERVER_BOX_H
-#define WAYWALL_SERVER_BOX_H
+#ifndef WAYWALL_UTIL_BOX_H
+#define WAYWALL_UTIL_BOX_H
 
 #include <stdint.h>
 

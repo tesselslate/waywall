@@ -1,7 +1,7 @@
 #ifndef WAYWALL_SERVER_XDG_SHELL_H
 #define WAYWALL_SERVER_XDG_SHELL_H
 
-#include "server/serial.h"
+#include "util/serial.h"
 #include <wayland-server-core.h>
 
 struct server;
