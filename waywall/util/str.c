@@ -9,7 +9,7 @@ struct hdr {
 #define HDRSZ sizeof(struct hdr)
 
 #define strhdr(str) ((struct hdr *)((char *)str - HDRSZ))
-#define hdrstr(hdr) ((str)((char *)hdr + HDRSZ))
+#define hdrstr(hdr) ((hdr)->data)
 
 str
 str_append(str dst, const char *src) {
@@ -20,6 +20,7 @@ str_append(str dst, const char *src) {
     if (hdst->cap < need_cap) {
         hdst = realloc(hdst, HDRSZ + need_cap);
         check_alloc(hdst);
+        hdst->cap = need_cap;
     }
 
     memcpy(hdst->data + hdst->len, src, srclen);

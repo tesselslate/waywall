@@ -1,6 +1,7 @@
 #ifndef WAYWALL_UTIL_PRELUDE_H
 #define WAYWALL_UTIL_PRELUDE_H
 
+#include <stdbool.h>
 #include <stdnoreturn.h>
 
 #define STATIC_ARRLEN(x) (sizeof((x)) / sizeof((x)[0]))
