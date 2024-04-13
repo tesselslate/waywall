@@ -234,9 +234,9 @@ cgroup_setup_dir(const char *base) {
 
             str_free(subpath);
         }
-
-        str_free(path);
     }
+
+    str_free(path);
 
     return 0;
 }
