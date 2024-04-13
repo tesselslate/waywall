@@ -155,8 +155,8 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
     }
 
     str logline = str_new();
-    str_append(logline, "(XKB): ");
-    str_append(logline, fmt);
+    logline = str_append(logline, "(XKB): ");
+    logline = str_append(logline, fmt);
 
     util_log_va(level, logline, args, false);
     str_free(logline);
@@ -489,8 +489,8 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     }
 
     struct xkb_keymap *keymap = xkb_keymap_new_from_string(
-        seat->ctx, data, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
-    ww_assert(munmap(data, size) == 0);
+        seat->ctx, km_str, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
+    ww_assert(munmap(km_str, size) == 0);
     if (!keymap) {
         return;
     }
