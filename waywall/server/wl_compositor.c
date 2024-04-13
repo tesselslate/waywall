@@ -118,8 +118,7 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
     struct server_surface *surface = wl_resource_get_user_data(resource);
     struct server_buffer *buffer = server_buffer_from_resource(buffer_resource);
 
-    // TODO: handle (reject?) invalid buffers from dmabuf
-    if (strcmp(buffer->impl->name, "invalid") == 0) {
+    if (server_buffer_is_invalid(buffer)) {
         wl_client_post_implementation_error(client, "cannot attach invalid buffer");
         return;
     }

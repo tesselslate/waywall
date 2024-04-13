@@ -91,6 +91,11 @@ server_buffer_get_size(struct server_buffer *buffer, uint32_t *width, uint32_t *
     buffer->impl->size(buffer->data, width, height);
 }
 
+bool
+server_buffer_is_invalid(struct server_buffer *buffer) {
+    return (strcmp(buffer->impl->name, invalid_buffer_impl.name) == 0);
+}
+
 void
 server_buffer_validate(struct server_buffer *buffer, struct wl_buffer *remote,
                        const struct server_buffer_impl *impl, void *data) {
