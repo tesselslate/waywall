@@ -121,21 +121,6 @@ fail_keymap:
     return 1;
 }
 
-static struct xkb_keymap *
-prepare_remote_keymap(struct xkb_context *ctx, int32_t fd, int32_t size) {
-    char *data = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (data == MAP_FAILED) {
-        ww_log_errno(LOG_ERROR, "failed to mmap keymap data");
-        return NULL;
-    }
-
-    struct xkb_keymap *keymap =
-        xkb_keymap_new_from_string(ctx, data, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
-
-    ww_assert(munmap(data, size) == 0);
-    return keymap;
-}
-
 static void
 server_seat_keymap_destroy(struct server_seat_keymap *keymap) {
     if (keymap->fd >= 0) {
@@ -371,7 +356,7 @@ send_pointer_leave(struct server_seat *seat) {
 static void
 reset_keyboard_state(struct server_seat *seat) {
     for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
-        xkb_state_update_key(seat->keyboard.remote_km.state, seat->keyboard.pressed.data[i] + 8,
+        xkb_state_update_key(seat->config->keymap.state, seat->keyboard.pressed.data[i] + 8,
                              XKB_KEY_UP);
         send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
     }
@@ -462,7 +447,6 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
 
     if (seat->listener) {
         // Only send a key event to the wall code if this keycode has an associated keysym.
-        // TODO: Probably not worth it to send all keysyms?
         const xkb_keysym_t *syms;
 
         xkb_layout_index_t group =
@@ -497,30 +481,38 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
         return;
     }
 
-    // TODO: handle errors somehow (not sure how to be honest)
-    // TODO: properly transfer state from previous remote keymap state
+    // Prepare new keymap.
+    char *km_str = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (km_str == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to mmap keymap data");
+        return;
+    }
 
+    struct xkb_keymap *keymap = xkb_keymap_new_from_string(
+        seat->ctx, data, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
+    ww_assert(munmap(data, size) == 0);
+    if (!keymap) {
+        return;
+    }
+
+    // Release resources associated with the previous keymap, if any.
     if (seat->keyboard.remote_km.fd >= 0) {
         close(seat->keyboard.remote_km.fd);
     }
     if (seat->keyboard.remote_km.state) {
         xkb_state_unref(seat->keyboard.remote_km.state);
-        seat->keyboard.remote_km.state = NULL;
     }
     if (seat->keyboard.remote_km.xkb) {
         xkb_keymap_unref(seat->keyboard.remote_km.xkb);
     }
+
+    // Apply the new keymap.
+    seat->keyboard.remote_km.xkb = keymap;
     seat->keyboard.remote_km.fd = fd;
     seat->keyboard.remote_km.size = size;
 
-    seat->keyboard.remote_km.xkb = prepare_remote_keymap(seat->ctx, fd, size);
-    if (!seat->keyboard.remote_km.xkb) {
-        ww_log(LOG_ERROR, "failed to create remote keymap");
-        return;
-    }
-
     seat->keyboard.remote_km.state = xkb_state_new(seat->keyboard.remote_km.xkb);
-    ww_assert(seat->keyboard.remote_km.state);
+    check_alloc(seat->keyboard.remote_km.state);
 
     for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mod_indices); i++) {
         size_t mod = xkb_keymap_mod_get_index(seat->keyboard.remote_km.xkb, mod_names[i]);
