@@ -211,7 +211,9 @@ on_data_source_send(void *data, struct wl_data_source *data_source, const char *
         return;
     }
     if (data_device_manager->selection.type != SELECTION_LOCAL) {
-        ww_panic("TODO");
+        ww_log(LOG_WARN, "received wl_data_source.send when no local selection was present");
+        close(fd);
+        return;
     }
 
     wl_data_source_send_send(data_device_manager->selection.data.local->resource, mime_type, fd);
@@ -432,7 +434,8 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
 
     struct server_data_source *data_source = wl_resource_get_user_data(data_source_resource);
     if (data_source->prepared) {
-        // TODO: Where is this error code??? I don't see it in wayland.xml for Wayland 1.22
+        // There's an error code (wl_data_device.used_source) which is intended to be used for this
+        // purpose, but it was merged into the Wayland upstream relatively recently (April 2023.)
         wl_client_post_implementation_error(
             client, "cannot reuse wl_data_source for wl_data_device.set_selection");
         return;
