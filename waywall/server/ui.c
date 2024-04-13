@@ -86,10 +86,10 @@ static void
 on_view_surface_commit(struct wl_listener *listener, void *data) {
     struct server_view *view = wl_container_of(listener, view, on_surface_commit);
 
-    if (view->surface->pending.apply & SURFACE_STATE_ATTACH) {
-        uint32_t width, height;
-        server_buffer_get_size(view->surface->pending.buffer, &width, &height);
+    uint32_t width, height;
+    server_buffer_get_size(view->surface->pending.buffer, &width, &height);
 
+    if (view->surface->pending.apply & SURFACE_STATE_ATTACH) {
         struct box c = view->state.crop;
         bool ok = (c.x == -1);
         if (c.x >= 0) {
@@ -107,6 +107,9 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
                                    wl_fixed_from_int(-1), wl_fixed_from_int(-1));
         }
     }
+
+    uint32_t size[2] = {width, height};
+    wl_signal_emit_mutable(&view->events.resize, size);
 }
 
 static inline void
@@ -295,6 +298,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     wl_list_insert(&ui->views, &view->link);
 
     wl_signal_init(&view->events.destroy);
+    wl_signal_init(&view->events.resize);
 
     wl_signal_emit_mutable(&ui->events.view_create, view);
 
