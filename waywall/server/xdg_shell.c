@@ -299,8 +299,6 @@ xdg_surface_ack_configure(struct wl_client *client, struct wl_resource *resource
     }
 
     xdg_surface->initial_ack = true;
-
-    // TODO: ensure that window bounds have actually changed
 }
 
 static void
