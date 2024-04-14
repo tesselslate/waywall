@@ -106,6 +106,18 @@ struct transaction_view {
         TXN_VIEW_SIZE = (1 << 4),
         TXN_VIEW_VISIBLE = (1 << 5),
     } apply;
+
+    // The behavior only applies for asynchronous operations (i.e. surface resizing) which may not
+    // complete in a timely fashion.
+    enum transaction_behavior {
+        // All asynchronous operations should complete before the timeout, but the transaction can
+        // still be finalized if they do not. This is the default behavior.
+        TXN_BEHAVIOR_DEFER = 0,
+
+        // Do not wait for any asynchronous operations to complete before finalizing the
+        // transaction.
+        TXN_BEHAVIOR_ASYNC,
+    } behavior;
 };
 
 struct ui_rectangle {
@@ -140,6 +152,8 @@ void transaction_apply(struct server_ui *ui, struct transaction *txn);
 struct transaction *transaction_create();
 struct transaction_view *transaction_get_view(struct transaction *txn, struct server_view *view);
 void transaction_view_set_above(struct transaction_view *view, struct wl_surface *surface);
+void transaction_view_set_behavior(struct transaction_view *view,
+                                   enum transaction_behavior behavior);
 void transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, int32_t width,
                                int32_t height);
 void transaction_view_set_dest_size(struct transaction_view *view, uint32_t width, uint32_t height);
