@@ -22,7 +22,7 @@ struct server_ui {
     struct xdg_toplevel *xdg_toplevel;
 
     int32_t width, height;
-    bool mapped;
+    bool mapped, resize;
 
     struct wl_list views; // server_view.link
 

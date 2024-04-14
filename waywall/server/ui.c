@@ -80,7 +80,7 @@ on_xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
         ui->height = DEFAULT_HEIGHT;
     }
 
-    wl_signal_emit(&ui->events.resize, NULL);
+    ui->resize = true;
 }
 
 static void
@@ -110,6 +110,11 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
     wp_viewport_set_destination(ui->viewport, ui->width, ui->height);
 
     xdg_surface_ack_configure(xdg_surface, serial);
+
+    if (ui->resize) {
+        wl_signal_emit(&ui->events.resize, NULL);
+        ui->resize = false;
+    }
     wl_surface_commit(ui->surface);
 }
 
