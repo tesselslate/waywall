@@ -123,11 +123,13 @@ pointer_constraints_lock_pointer(struct wl_client *client, struct wl_resource *r
     wl_resource_set_implementation(locked_pointer_resource, &locked_pointer_impl,
                                    pointer_constraints, locked_pointer_resource_destroy);
 
-    struct wl_client *focus_client =
-        wl_resource_get_client(pointer_constraints->input_focus->surface->resource);
-    if (client == focus_client) {
-        if (!pointer_constraints->locked_pointer) {
-            lock_pointer(pointer_constraints);
+    if (pointer_constraints->input_focus) {
+        struct wl_client *focus_client =
+            wl_resource_get_client(pointer_constraints->input_focus->surface->resource);
+        if (client == focus_client) {
+            if (!pointer_constraints->locked_pointer) {
+                lock_pointer(pointer_constraints);
+            }
         }
     }
 
