@@ -26,6 +26,8 @@ struct server_ui {
 
     struct wl_list views; // server_view.link
 
+    struct transaction *inflight_txn;
+
     struct {
         struct wl_signal resize;       // data: NULL
         struct wl_signal view_create;  // data: struct server_view *
@@ -71,12 +73,25 @@ struct server_view_impl {
 };
 
 struct transaction {
-    struct wl_list views; // transaction_view.link
+    struct server_ui *ui;
+    struct wl_event_source *timer;
+
+    bool applied; // whether transaction_apply has been called
+
+    struct wl_list views;        // transaction_view.link
+    struct wl_list dependencies; // transaction_dep.link
 };
 
 struct transaction_view {
+    struct transaction *parent;
+
     struct wl_list link; // transaction.views
     struct server_view *view;
+
+    struct transaction_dep {
+        struct wl_list link; // transaction.dependencies
+        struct wl_listener listener;
+    } resize_dep;
 
     uint32_t x, y, width, height, dest_width, dest_height;
     struct box crop;
@@ -124,7 +139,6 @@ void server_view_destroy(struct server_view *view);
 void transaction_apply(struct server_ui *ui, struct transaction *txn);
 struct transaction *transaction_create();
 struct transaction_view *transaction_get_view(struct transaction *txn, struct server_view *view);
-void transaction_destroy(struct transaction *txn);
 void transaction_view_set_above(struct transaction_view *view, struct wl_surface *surface);
 void transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, int32_t width,
                                int32_t height);

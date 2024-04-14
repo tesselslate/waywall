@@ -92,7 +92,6 @@ layout_active(struct wall *wall) {
     }
 
     transaction_apply(wall->server->ui, txn);
-    transaction_destroy(txn);
 }
 
 static void
@@ -195,7 +194,6 @@ layout_wall(struct wall *wall) {
     }
 
     transaction_apply(wall->server->ui, txn);
-    transaction_destroy(txn);
 }
 
 static void
@@ -402,7 +400,6 @@ play_instance(struct wall *wall, int id) {
     }
 
     transaction_apply(wall->server->ui, txn);
-    transaction_destroy(txn);
 }
 
 static void
@@ -790,7 +787,6 @@ wall_lua_set_res(struct wall *wall, int id, int32_t width, int32_t height) {
         transaction_view_set_size(view, width, height);
 
         transaction_apply(wall->server->ui, txn);
-        transaction_destroy(txn);
     }
 
     return 0;
