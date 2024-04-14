@@ -31,8 +31,6 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
     double y = trunc(relative_pointer->acc_y);
     relative_pointer->acc_y -= y;
 
-    // I'm not sure if any other compositors would have a reason to send non-whole number motion,
-    // but better safe than sorry.
     relative_pointer->acc_x_unaccel += wl_fixed_to_double(dx_unaccel);
     relative_pointer->acc_y_unaccel += wl_fixed_to_double(dy_unaccel);
 
@@ -40,7 +38,7 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
     relative_pointer->acc_x_unaccel -= x_unaccel;
 
     double y_unaccel = trunc(relative_pointer->acc_y_unaccel);
-    relative_pointer->acc_y_unaccel -= y;
+    relative_pointer->acc_y_unaccel -= y_unaccel;
 
     struct wl_client *client =
         wl_resource_get_client(relative_pointer->input_focus->surface->resource);
