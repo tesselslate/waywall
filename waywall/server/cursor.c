@@ -14,11 +14,10 @@ on_pointer_enter(struct wl_listener *listener, void *data) {
     uint32_t *serial = data;
     cursor->last_enter = *serial;
 
-    if (cursor->config->image) {
-        wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter,
-                              cursor->surface, cursor->config->image->hotspot_x,
-                              cursor->config->image->hotspot_y);
-    }
+    wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter,
+                          cursor->show ? cursor->surface : NULL,
+                          cursor->show ? cursor->config->image->hotspot_x : 0,
+                          cursor->show ? cursor->config->image->hotspot_y : 0);
 }
 
 struct server_cursor *
@@ -65,8 +64,7 @@ server_cursor_hide(struct server_cursor *cursor) {
     }
 
     cursor->show = false;
-    wl_surface_attach(cursor->surface, NULL, 0, 0);
-    wl_surface_commit(cursor->surface);
+    wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter, NULL, 0, 0);
 }
 
 void
@@ -76,8 +74,9 @@ server_cursor_show(struct server_cursor *cursor) {
     }
 
     cursor->show = true;
-    wl_surface_attach(cursor->surface, cursor->config->buffer, 0, 0);
-    wl_surface_commit(cursor->surface);
+    wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter,
+                          cursor->surface, cursor->config->image->hotspot_x,
+                          cursor->config->image->hotspot_y);
 }
 
 void
@@ -87,12 +86,13 @@ server_cursor_use_config(struct server_cursor *cursor, struct server_cursor_conf
     }
     cursor->config = config;
 
+    wl_surface_attach(cursor->surface, cursor->config->buffer, 0, 0);
+    wl_surface_commit(cursor->surface);
+
     if (cursor->show) {
         wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter,
                               cursor->surface, cursor->config->image->hotspot_x,
                               cursor->config->image->hotspot_y);
-        wl_surface_attach(cursor->surface, cursor->config->buffer, 0, 0);
-        wl_surface_commit(cursor->surface);
     }
 }
 
