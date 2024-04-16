@@ -120,7 +120,7 @@ make_color_buffer(struct remote_buffer_manager *manager, struct slot *slot) {
 
 struct remote_buffer_manager *
 remote_buffer_manager_create(struct server *server) {
-    // Check that RGBA8 is a supported SHM buffer format, because it's what will be used.
+    // We only use RGBA8.
     uint32_t *format;
     bool ok = false;
     wl_array_for_each(format, &server->backend->shm_formats) {
@@ -193,7 +193,6 @@ remote_buffer_manager_color(struct remote_buffer_manager *manager, const uint8_t
         assign_rgba(manager->data + pool->slots[idx].offset, rgba);
         return make_color_buffer(manager, &pool->slots[idx]);
     } else {
-        // Create a new pool and insert it into the list.
         struct color_pool *pool = zalloc(1, sizeof(*pool));
 
         pool->offset = manager->ptr;

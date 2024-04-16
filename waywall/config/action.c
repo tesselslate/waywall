@@ -32,7 +32,7 @@ config_action_try(struct config *cfg, struct wall *wall, struct config_action ac
         lua_pop(cfg->L, 2);
         return 0;
     default:
-        // Non-function values should have been filtered out by config_build_actions.
+        // Non-function values should have been filtered out when the config was loaded.
         ww_unreachable();
     }
 }

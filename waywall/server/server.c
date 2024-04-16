@@ -74,9 +74,9 @@ server_create(struct config *cfg) {
     struct server *server = zalloc(1, sizeof(*server));
 
     wl_signal_init(&server->events.input_focus);
-    wl_signal_init(&server->events.map_status);
-    wl_signal_init(&server->events.pointer_lock);   // used by pointer constraints
-    wl_signal_init(&server->events.pointer_unlock); // used by pointer constraints
+    wl_signal_init(&server->events.map_status);     // used by server_ui
+    wl_signal_init(&server->events.pointer_lock);   // used by server_pointer_constraints
+    wl_signal_init(&server->events.pointer_unlock); // used by server_pointer_constraints
 
     server->on_view_destroy.notify = on_view_destroy;
 
@@ -101,7 +101,7 @@ server_create(struct config *cfg) {
         goto fail_remote_buf;
     }
 
-    // These globals are required by others.
+    // These globals are required by other globals, so they must be made first.
     server->compositor = server_compositor_create(server);
     if (!server->compositor) {
         goto fail_globals;

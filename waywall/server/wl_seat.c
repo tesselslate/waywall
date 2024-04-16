@@ -446,7 +446,6 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     bool modifiers_updated = modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 
     if (seat->listener) {
-        // Only send a key event to the wall code if this keycode has an associated keysym.
         const xkb_keysym_t *syms;
 
         xkb_layout_index_t group =
