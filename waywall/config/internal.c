@@ -84,13 +84,13 @@ config_parse_hex(uint8_t rgba[static 4], const char *raw) {
 
 int
 config_pcall(struct config *cfg, int nargs, int nresults, int errfunc) {
-    if (cfg->use_hook) {
+    if (!cfg->experimental.jit) {
         lua_sethook(cfg->L, pcall_hook, LUA_MASKCOUNT, MAX_INSTRUCTIONS);
     }
 
     int ret = lua_pcall(cfg->L, nargs, nresults, errfunc);
 
-    if (cfg->use_hook) {
+    if (!cfg->experimental.jit) {
         lua_sethook(cfg->L, NULL, 0, 0);
     }
 

@@ -11,6 +11,9 @@ struct config {
     struct {
         char *counter_path;
     } general;
+    struct {
+        bool jit;
+    } experimental;
 
     struct {
         int weight_idle;
@@ -45,7 +48,6 @@ struct config {
     } theme;
 
     struct lua_State *L;
-    bool use_hook;
 };
 
 enum config_remap_type {

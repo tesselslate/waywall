@@ -495,6 +495,15 @@ process_config_cpu(struct config *cfg) {
 }
 
 static int
+process_config_experimental(struct config *cfg) {
+    if (get_bool(cfg, "jit", &cfg->experimental.jit, "experimental.jit", false) != 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 process_config_general(struct config *cfg) {
     if (get_string(cfg, "counter_path", &cfg->general.counter_path, "general.counter_path",
                    false) != 0) {
@@ -642,6 +651,10 @@ process_config(struct config *cfg) {
         return 1;
     }
 
+    if (get_table(cfg, "experimental", process_config_experimental, "experimental", false) != 0) {
+        return 1;
+    }
+
     if (get_table(cfg, "general", process_config_general, "general", false) != 0) {
         return 1;
     }
@@ -756,17 +769,9 @@ config_load(struct config *cfg) {
         return 1;
     }
 
-    bool jit_enabled = !!getenv("WAYWALL_USE_JIT");
-    bool hook_disabled = !!getenv("WAYWALL_DISABLE_HOOK");
-
-    if (!jit_enabled) {
-        if (!luaJIT_setmode(cfg->L, 0, LUAJIT_MODE_OFF)) {
-            ww_log(LOG_WARN, "failed to disable the JIT");
-        }
-
-        if (!hook_disabled) {
-            cfg->use_hook = true;
-        }
+    // The JIT can be re-enabled later if the user enables it in their config.
+    if (!luaJIT_setmode(cfg->L, 0, LUAJIT_MODE_OFF)) {
+        ww_log(LOG_WARN, "failed to disable the JIT");
     }
 
     luaL_newmetatable(cfg->L, METATABLE_WALL);
@@ -789,6 +794,14 @@ config_load(struct config *cfg) {
 
     if (load_config(cfg) != 0) {
         goto fail;
+    }
+
+    if (cfg->experimental.jit) {
+        if (!luaJIT_setmode(cfg->L, 0, LUAJIT_MODE_ON)) {
+            ww_log(LOG_WARN, "failed to re-enable the JIT");
+        } else {
+            ww_log(LOG_INFO, "JIT re-enabled");
+        }
     }
 
     return 0;
