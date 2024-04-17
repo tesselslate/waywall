@@ -30,6 +30,9 @@ struct server {
     struct server_xdg_decoration_manager *xdg_decoration;
     struct server_xdg_wm_base *xdg_shell;
 
+    struct wl_list clients; // server_client.link
+    struct wl_listener on_client_created;
+
     struct {
         struct wl_signal input_focus;    // data: struct server_view *
         struct wl_signal map_status;     // data: bool *

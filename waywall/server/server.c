@@ -19,6 +19,58 @@
 #include <wayland-client.h>
 #include <wayland-cursor.h>
 
+struct server_client {
+    struct wl_list link; // server.clients
+
+    struct wl_client *wl;
+    struct wl_listener on_destroy;
+};
+
+static void
+on_client_destroy(struct wl_listener *listener, void *data) {
+    static_assert(sizeof(pid_t) <= sizeof(int));
+
+    struct server_client *client = wl_container_of(listener, client, on_destroy);
+
+    pid_t pid;
+    wl_client_get_credentials(client->wl, &pid, NULL, NULL);
+    ww_log(LOG_INFO, "connection (%p) from process %d ended", client->wl, (int)pid);
+
+    wl_list_remove(&client->on_destroy.link);
+    wl_list_remove(&client->link);
+    free(client);
+}
+
+static void
+on_client_created(struct wl_listener *listener, void *data) {
+    static_assert(sizeof(pid_t) <= sizeof(int));
+
+    struct server *server = wl_container_of(listener, server, on_client_created);
+    struct wl_client *wl_client = data;
+
+    struct server_client *client = zalloc(1, sizeof(*client));
+
+    client->wl = wl_client;
+    wl_list_insert(&server->clients, &client->link);
+
+    client->on_destroy.notify = on_client_destroy;
+    wl_client_add_destroy_listener(wl_client, &client->on_destroy);
+
+    pid_t pid;
+    wl_client_get_credentials(wl_client, &pid, NULL, NULL);
+    ww_log(LOG_INFO, "new connection (%p) from process %d", wl_client, (int)pid);
+}
+
+static void
+on_view_destroy(struct wl_listener *listener, void *data) {
+    struct server *server = wl_container_of(listener, server, on_view_destroy);
+
+    server->input_focus = NULL;
+    wl_signal_emit_mutable(&server->events.input_focus, NULL);
+
+    wl_list_remove(&server->on_view_destroy.link);
+}
+
 static int
 backend_display_tick(int fd, uint32_t mask, void *data) {
     struct server *server = data;
@@ -59,16 +111,6 @@ backend_display_tick(int fd, uint32_t mask, void *data) {
     return dispatched > 0;
 }
 
-static void
-on_view_destroy(struct wl_listener *listener, void *data) {
-    struct server *server = wl_container_of(listener, server, on_view_destroy);
-
-    server->input_focus = NULL;
-    wl_signal_emit_mutable(&server->events.input_focus, NULL);
-
-    wl_list_remove(&server->on_view_destroy.link);
-}
-
 struct server *
 server_create(struct config *cfg) {
     struct server *server = zalloc(1, sizeof(*server));
@@ -89,6 +131,10 @@ server_create(struct config *cfg) {
     if (!server->display) {
         goto fail_display;
     }
+
+    wl_list_init(&server->clients);
+    server->on_client_created.notify = on_client_created;
+    wl_display_add_client_created_listener(server->display, &server->on_client_created);
 
     struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
     server->backend_source = wl_event_loop_add_fd(loop, wl_display_get_fd(server->backend->display),
@@ -166,6 +212,7 @@ fail_globals:
 fail_remote_buf:
     wl_event_source_remove(server->backend_source);
     wl_display_destroy(server->display);
+    wl_list_remove(&server->on_client_created.link);
 
 fail_display:
     server_backend_destroy(server->backend);
@@ -181,6 +228,8 @@ server_destroy(struct server *server) {
 
     wl_display_destroy_clients(server->display);
     wl_display_destroy(server->display);
+
+    ww_assert(wl_list_empty(&server->clients));
 
     server_ui_destroy(server->ui);
     remote_buffer_manager_destroy(server->remote_buf);
