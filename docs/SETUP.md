@@ -91,7 +91,7 @@ config.actions = {
 return config
 ```
 
-For more information in configuring waywall, visit `CONFIGURATION.md`.
+For more information in configuring waywall, visit [the configuration guide](CONFIGURATION.md).
 
 ## Preparing CPUs
 
@@ -132,7 +132,7 @@ Now, load the correct version.
 
 ```git checkout 3.4```
 
-Now, move the patch file (can be found in `docs/assets/glfw.patch`) to the `glfw` directory and apply it.
+Now, move the patch file (can be found [here](assets/glfw.patch)).
 
 ```git apply glfw.patch```
 
