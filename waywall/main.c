@@ -71,8 +71,8 @@ handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
 static int
 add_config_watch(struct waywall *ww, const char *name) {
     str path = str_new();
-    path = str_append(path, ww->config_path);
-    path = str_append(path, name);
+    str_append(&path, ww->config_path);
+    str_append(&path, name);
 
     int wd = inotify_subscribe(ww->inotify, path, IN_CLOSE_WRITE, handle_config_file, ww);
     if (wd == -1) {
@@ -143,8 +143,8 @@ config_subscribe(struct waywall *ww) {
 
     const char *env = getenv("XDG_CONFIG_HOME");
     if (env) {
-        ww->config_path = str_append(ww->config_path, env);
-        ww->config_path = str_append(ww->config_path, "/waywall/");
+        str_append(&ww->config_path, env);
+        str_append(&ww->config_path, "/waywall/");
     } else {
         env = getenv("HOME");
         if (!env) {
@@ -152,8 +152,8 @@ config_subscribe(struct waywall *ww) {
             return 1;
         }
 
-        ww->config_path = str_append(ww->config_path, env);
-        ww->config_path = str_append(ww->config_path, "/.config/waywall/");
+        str_append(&ww->config_path, env);
+        str_append(&ww->config_path, "/.config/waywall/");
     }
 
     ww->config_dir_wd =

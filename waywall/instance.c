@@ -318,8 +318,8 @@ process_mod_zip(const char *path, struct instance_mods *mods) {
 static int
 get_mods(const char *dirname, struct instance_mods *mods) {
     str dirpath = str_new();
-    dirpath = str_append(dirpath, dirname);
-    dirpath = str_append(dirpath, "/mods/");
+    str_append(&dirpath, dirname);
+    str_append(&dirpath, "/mods/");
 
     DIR *dir = opendir(dirpath);
     if (!dir) {
@@ -339,8 +339,8 @@ get_mods(const char *dirname, struct instance_mods *mods) {
         }
 
         str modpath = str_new();
-        modpath = str_append(modpath, dirpath);
-        modpath = str_append(modpath, dirent->d_name);
+        str_append(&modpath, dirpath);
+        str_append(&modpath, dirent->d_name);
 
         if (process_mod_zip(modpath, mods) != 0) {
             str_free(modpath);
@@ -365,8 +365,8 @@ fail_dir:
 static int
 get_options(const char *dirname, struct instance_mods mods, struct instance_options *opts) {
     str path = str_new();
-    path = str_append(path, dirname);
-    path = str_append(path, "/options.txt");
+    str_append(&path, dirname);
+    str_append(&path, "/options.txt");
 
     FILE *file = fopen(path, "r");
     if (!file) {
@@ -382,8 +382,8 @@ get_options(const char *dirname, struct instance_mods mods, struct instance_opti
 
     if (mods.standard_settings) {
         str_clear(path);
-        path = str_append(path, dirname);
-        path = str_append(path, "/config/standardoptions.txt");
+        str_append(&path, dirname);
+        str_append(&path, "/config/standardoptions.txt");
 
         // Follow the StandardSettings file chain, if there is one.
         file = fopen(path, "r");
@@ -476,8 +476,8 @@ open_state_file(const char *dir, struct instance_mods mods) {
     const char *file = mods.state_output ? "/wpstateout.txt" : "/logs/latest.log";
 
     str path = str_new();
-    path = str_append(path, dir);
-    path = str_append(path, file);
+    str_append(&path, dir);
+    str_append(&path, file);
 
     int fd = open(path, O_RDONLY | O_CLOEXEC);
     if (fd == -1) {
@@ -629,8 +629,8 @@ instance_get_state_path(struct instance *instance) {
     const char *file = instance->mods.state_output ? "/wpstateout.txt" : "/logs/latest.log";
 
     str path = str_new();
-    path = str_append(path, instance->dir);
-    path = str_append(path, file);
+    str_append(&path, instance->dir);
+    str_append(&path, file);
 
     return path;
 }

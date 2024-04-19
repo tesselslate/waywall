@@ -40,9 +40,9 @@ struct cpu_cgroup {
 static int
 open_group_procs(const char *base, const char *group) {
     str path = str_new();
-    path = str_append(path, base);
-    path = str_append(path, group);
-    path = str_append(path, "/cgroup.procs");
+    str_append(&path, base);
+    str_append(&path, group);
+    str_append(&path, "/cgroup.procs");
 
     int fd = open(path, O_WRONLY);
     if (fd == -1) {
@@ -58,9 +58,9 @@ open_group_procs(const char *base, const char *group) {
 static int
 set_group_weight(const char *base, const char *group, int weight) {
     str path = str_new();
-    path = str_append(path, base);
-    path = str_append(path, group);
-    path = str_append(path, "/cpu.weight");
+    str_append(&path, base);
+    str_append(&path, group);
+    str_append(&path, "/cpu.weight");
 
     int fd = open(path, O_WRONLY);
     if (fd == -1) {

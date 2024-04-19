@@ -155,8 +155,8 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
     }
 
     str logline = str_new();
-    logline = str_append(logline, "(XKB): ");
-    logline = str_append(logline, fmt);
+    str_append(&logline, "(XKB): ");
+    str_append(&logline, fmt);
 
     util_log_va(level, logline, args, false);
     str_free(logline);

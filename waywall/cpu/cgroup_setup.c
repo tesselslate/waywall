@@ -88,9 +88,9 @@ cgroup_setup_check(const char *base) {
     for (size_t i = 0; i < STATIC_ARRLEN(subgroups); i++) {
         for (size_t j = 0; j < STATIC_ARRLEN(files); j++) {
             str path = str_new();
-            path = str_append(path, base);
-            path = str_append(path, subgroups[i]);
-            path = str_append(path, files[j]);
+            str_append(&path, base);
+            str_append(&path, subgroups[i]);
+            str_append(&path, files[j]);
 
             struct stat fstat = {0};
             if (stat(path, &fstat) != 0) {
@@ -113,8 +113,8 @@ cgroup_setup_check(const char *base) {
     }
 
     str path = str_new();
-    path = str_append(path, base);
-    path = str_append(path, "cgroup.procs");
+    str_append(&path, base);
+    str_append(&path, "cgroup.procs");
 
     struct stat fstat = {0};
     if (stat(path, &fstat) != 0) {
@@ -158,8 +158,8 @@ cgroup_setup_dir(const char *base) {
     }
 
     str path = str_new();
-    path = str_append(path, base);
-    path = str_append(path, "cgroup.subtree_control");
+    str_append(&path, base);
+    str_append(&path, "cgroup.subtree_control");
     int fd = open(path, O_WRONLY, 0644);
     if (fd == -1) {
         if (errno == EPERM || errno == EACCES) {
@@ -185,8 +185,8 @@ cgroup_setup_dir(const char *base) {
     }
 
     str_clear(path);
-    path = str_append(path, base);
-    path = str_append(path, "cgroup.procs");
+    str_append(&path, base);
+    str_append(&path, "cgroup.procs");
     if (chown(path, uid, gid) != 0) {
         if (errno == EPERM || errno == EACCES) {
             ww_log(LOG_ERROR, PERMS_MESSAGE);
@@ -200,8 +200,8 @@ cgroup_setup_dir(const char *base) {
 
     for (size_t i = 0; i < STATIC_ARRLEN(subgroups); i++) {
         str_clear(path);
-        path = str_append(path, base);
-        path = str_append(path, subgroups[i]);
+        str_append(&path, base);
+        str_append(&path, subgroups[i]);
 
         if (mkdir(path, 0755) != 0 && errno != EEXIST) {
             if (errno == EPERM || errno == EACCES) {
@@ -216,8 +216,8 @@ cgroup_setup_dir(const char *base) {
 
         for (size_t j = 0; j < STATIC_ARRLEN(files); j++) {
             str subpath = str_new();
-            subpath = str_append(subpath, path);
-            subpath = str_append(subpath, files[j]);
+            str_append(&subpath, path);
+            str_append(&subpath, files[j]);
 
             if (chown(subpath, uid, gid) != 0) {
                 if (errno == EPERM || errno == EACCES) {

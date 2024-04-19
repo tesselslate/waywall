@@ -8,12 +8,12 @@ struct hdr {
 
 #define HDRSZ sizeof(struct hdr)
 
-#define strhdr(str) ((struct hdr *)((char *)str - HDRSZ))
+#define strhdr(str) ((struct hdr *)((char *)(str)-HDRSZ))
 #define hdrstr(hdr) ((hdr)->data)
 
-str
-str_append(str dst, const char *src) {
-    struct hdr *hdst = strhdr(dst);
+void
+str_append(str *dst, const char *src) {
+    struct hdr *hdst = strhdr(*dst);
     size_t srclen = strlen(src);
 
     size_t need_cap = srclen + hdst->len + 1;
@@ -26,7 +26,7 @@ str_append(str dst, const char *src) {
     memcpy(hdst->data + hdst->len, src, srclen);
     hdst->len += srclen;
     hdst->data[hdst->len] = '\0';
-    return hdrstr(hdst);
+    *dst = hdrstr(hdst);
 }
 
 void
