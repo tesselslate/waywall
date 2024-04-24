@@ -32,7 +32,7 @@ You can put these anywhere you wish to on your system, but we recommend putting 
 
 In order for waywall to run, it needs instructions on how you need it to work. You can do this by creating an `init.lua` script at `~/.config/waywall/init.lua`. This is a basic configuration you could use:
 
-```md
+```lua
 local waywall = require("waywall")
 local helpers = require("waywall.helpers")
 
@@ -60,7 +60,7 @@ local config = {
     theme = {
         background = "#303030ff",
         cursor_icon = "crosshair",
-        cursor_theme = "crosshair",
+        cursor_theme = "default",
     },
 }
 
@@ -118,7 +118,7 @@ There are a few things you need to change/check about each of your Minecraft ins
 
 ### GLFW
 
-The build of GLFW (a too Minecraft uses) that you usually use to play is outdated and doesn't work right with waywall. To get your instances up to a working version of GLFW with patches to make it work correctly, follow these steps:
+The build of GLFW (a library Minecraft uses) that you usually use to play is outdated and doesn't work right with waywall. To get your instances up to a working version of GLFW with patches to make it work correctly, follow these steps:
 
 Clone the GLFW repository.
 
