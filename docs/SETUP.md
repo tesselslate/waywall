@@ -59,8 +59,6 @@ local config = {
     },
     theme = {
         background = "#303030ff",
-        cursor_icon = "crosshair",
-        cursor_theme = "default",
     },
 }
 
