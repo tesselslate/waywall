@@ -11,9 +11,13 @@ protocol_xmls = [
   'stable/linux-dmabuf/linux-dmabuf-v1.xml',
   'stable/viewporter/viewporter.xml',
   'stable/xdg-shell/xdg-shell.xml',
+  'staging/cursor-shape/cursor-shape-v1.xml',
   'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
   'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
   'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
+
+  # required by cursor-shape, otherwise unused
+  'unstable/tablet/tablet-unstable-v2.xml',
 ]
 
 foreach xml : protocol_xmls

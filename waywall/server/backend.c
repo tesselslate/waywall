@@ -1,4 +1,5 @@
 #include "server/backend.h"
+#include "cursor-shape-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
@@ -10,6 +11,7 @@
 #include <wayland-client.h>
 
 #define USE_COMPOSITOR_VERSION 5
+#define USE_CURSOR_SHAPE_VERSION 1
 #define USE_DATA_DEVICE_MANAGER_VERSION 2
 #define USE_LINUX_DMABUF_VERSION 4
 #define USE_POINTER_CONSTRAINTS_VERSION 1
@@ -103,6 +105,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->compositor =
             wl_registry_bind(wl, name, &wl_compositor_interface, USE_COMPOSITOR_VERSION);
         ww_assert(backend->compositor);
+    } else if (strcmp(iface, wp_cursor_shape_manager_v1_interface.name) == 0) {
+        if (version < USE_CURSOR_SHAPE_VERSION) {
+            ww_log(LOG_WARN, "host compositor provides outdated wp_cursor_shape_manager (%d < %d)",
+                   version, USE_CURSOR_SHAPE_VERSION);
+            return;
+        }
+
+        backend->cursor_shape_manager = wl_registry_bind(
+            wl, name, &wp_cursor_shape_manager_v1_interface, USE_CURSOR_SHAPE_VERSION);
+        ww_assert(backend->cursor_shape_manager);
     } else if (strcmp(iface, wl_data_device_manager_interface.name) == 0) {
         if (version < USE_DATA_DEVICE_MANAGER_VERSION) {
             ww_log(LOG_ERROR, "host compostior provides outdated wl_data_device_manager (%d < %d)",
@@ -276,6 +288,10 @@ server_backend_create() {
         goto fail_registry;
     }
 
+    if (!backend->cursor_shape_manager) {
+        ww_log(LOG_WARN, "host compositor does not provide wp_cursor_shape_manager");
+    }
+
     return backend;
 
 fail_registry:
@@ -320,6 +336,10 @@ server_backend_destroy(struct server_backend *backend) {
     wl_subcompositor_destroy(backend->subcompositor);
     wp_viewporter_destroy(backend->viewporter);
     xdg_wm_base_destroy(backend->xdg_wm_base);
+
+    if (backend->cursor_shape_manager) {
+        wp_cursor_shape_manager_v1_destroy(backend->cursor_shape_manager);
+    }
 
     wl_registry_destroy(backend->registry);
     wl_display_disconnect(backend->display);

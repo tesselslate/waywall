@@ -20,6 +20,7 @@ struct server_backend {
     } seat;
     struct wl_array shm_formats; // data: uint32_t
 
+    // mandatory globals
     struct wl_compositor *compositor;
     struct wl_data_device_manager *data_device_manager;
     struct zwp_linux_dmabuf_v1 *linux_dmabuf;
@@ -29,6 +30,9 @@ struct server_backend {
     struct wl_subcompositor *subcompositor;
     struct wp_viewporter *viewporter;
     struct xdg_wm_base *xdg_wm_base;
+
+    // optional globals
+    struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
 
     struct {
         struct wl_signal seat_data_device; // data: NULL
