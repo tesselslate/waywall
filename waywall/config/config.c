@@ -45,9 +45,9 @@ static const struct config defaults = {
     .theme =
         {
             .background = {0, 0, 0, 255},
-            .cursor_theme = "default",
-            .cursor_icon = "left_ptr",
-            .cursor_size = 16,
+            .cursor_theme = "",
+            .cursor_icon = "",
+            .cursor_size = 0,
         },
 };
 
@@ -633,8 +633,8 @@ process_config_theme(struct config *cfg) {
     if (get_int(cfg, "cursor_size", &cfg->theme.cursor_size, "theme.cursor_size", false) != 0) {
         return 1;
     }
-    if (cfg->theme.cursor_size <= 0) {
-        ww_log(LOG_ERROR, "'theme.cursor_size' must be a positive, non-zero integer");
+    if (cfg->theme.cursor_size < 0) {
+        ww_log(LOG_ERROR, "'theme.cursor_size' must be a positive integer");
         return 1;
     }
 
