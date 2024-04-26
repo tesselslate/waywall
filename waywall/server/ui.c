@@ -9,6 +9,7 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "viewporter-client-protocol.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <wayland-client.h>
 
@@ -291,6 +292,15 @@ server_ui_create(struct server *server, struct config *cfg) {
     check_alloc(ui->xdg_toplevel);
     xdg_toplevel_add_listener(ui->xdg_toplevel, &xdg_toplevel_listener, ui);
 
+    if (server->backend->xdg_decoration_manager) {
+        ui->xdg_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
+            server->backend->xdg_decoration_manager, ui->xdg_toplevel);
+        check_alloc(ui->xdg_decoration);
+
+        zxdg_toplevel_decoration_v1_set_mode(ui->xdg_decoration,
+                                             ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+    }
+
     wl_list_init(&ui->views);
 
     wl_signal_init(&ui->events.resize);
@@ -319,6 +329,10 @@ fail_config:
 void
 server_ui_destroy(struct server_ui *ui) {
     server_ui_config_destroy(ui->config);
+
+    if (ui->xdg_decoration) {
+        zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
+    }
 
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
