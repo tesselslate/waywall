@@ -24,9 +24,9 @@ Now that you have a local copy of waywall on your machine, compile it with `make
 
 ```make```
 
-This command will create two binaries (programs) you'll need: `waywall` and `waywall-launch` (found in your newly created `build` directory at `build/waywall/waywall` and `build/tools/waywall-launch` respectively)
+This command will create the `waywall` binary, located at `build/waywall/waywall`.
 
-You can put these anywhere you wish to on your system, but we recommend putting them somewhere in your `PATH`, so you can call `waywall` and `waywall-launch` from anywhere on your system. Placing them in either `~/.local/bin` or `/usr/bin` will usually work.
+You can put this anywhere you wish to on your system, but we recommend putting it somewhere in your `PATH`, so you can call `waywall` from anywhere on your system. Placing it in either `~/.local/bin` or `/usr/bin` will usually work.
 
 ## Setting up config
 
@@ -163,7 +163,7 @@ To edit the launch command of an instance (this tutorial uses Prism Launcher but
 and insert this command into the `Wrapper command` box.
 
 ```sh
-sh -c "export LD_PRELOAD='/usr/lib/libjemalloc.so'; export MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:15000,muzzy_decay_ms:15000; waywall-launch $INST_JAVA $@"
+sh -c "export LD_PRELOAD='/usr/lib/libjemalloc.so'; export MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:15000,muzzy_decay_ms:15000; waywall exec $INST_JAVA $@"
 ```
 
 Now, when you launch this instance (it will only work while waywall is running), it will appear inside the waywall window!
