@@ -31,6 +31,8 @@ main(int argc, char **argv) {
 
     if (strcmp(argv[1], "cpu") == 0) {
         return cmd_cpu();
+    } else if (strcmp(argv[1], "exec") == 0) {
+        return cmd_exec(argc, argv);
     } else {
         ww_log(LOG_ERROR, "unknown subcommand '%s'", argv[1]);
         return 1;

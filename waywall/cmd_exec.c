@@ -1,3 +1,5 @@
+#include "cmd.h"
+#include "util/log.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -9,22 +11,22 @@ extern char **environ;
 
 static int
 print_help(int argc, char **argv) {
-    fprintf(stderr, "USAGE: %s COMMAND [ARGS...]\n", argc ? argv[0] : "waywall-launch");
+    fprintf(stderr, "USAGE: %s launch COMMAND [ARGS...]\n", argc ? argv[0] : "waywall");
     return 1;
 }
 
 int
-main(int argc, char **argv) {
-    if (argc < 2) {
+cmd_exec(int argc, char **argv) {
+    if (argc < 3) {
         return print_help(argc, argv);
     }
 
     int fd = open("/tmp/waywall-display", O_RDONLY);
     if (fd == -1) {
         if (errno == ENOENT) {
-            fprintf(stderr, "waywall is not running");
+            ww_log(LOG_ERROR, "waywall is not running");
         } else {
-            perror("failed to open waywall-display");
+            ww_log_errno(LOG_ERROR, "failed to open waywall-display");
         }
         return 1;
     }
@@ -32,7 +34,7 @@ main(int argc, char **argv) {
     char buf[4096];
     ssize_t n = read(fd, buf, sizeof(buf) - 1);
     if (n == -1) {
-        perror("failed to read waywall-display");
+        ww_log_errno(LOG_ERROR, "failed to read waywall-display");
         return 1;
     }
     buf[n] = '\0';
@@ -40,8 +42,8 @@ main(int argc, char **argv) {
 
     setenv("WAYLAND_DISPLAY", buf, 1);
 
-    execvp(argv[1], &argv[1]);
-    perror("execvp failed");
+    execvp(argv[2], &argv[2]);
+    ww_log_errno(LOG_ERROR, "execvp failed");
 
     return 1;
 }
