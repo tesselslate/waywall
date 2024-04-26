@@ -1,18 +1,17 @@
-#define _GNU_SOURCE
-#include <sys/mman.h>
-#undef _GNU_SOURCE
-
+#include "server/wl_seat.h"
 #include "config/config.h"
 #include "server/backend.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
-#include "server/wl_seat.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/serial.h"
 #include "util/str.h"
+#include "util/syscall.h"
 #include <linux/input-event-codes.h>
+#include <linux/memfd.h>
+#include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
 #include <wayland-client.h>

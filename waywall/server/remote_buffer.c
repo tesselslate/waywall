@@ -1,16 +1,15 @@
-#define _GNU_SOURCE
-#include <sys/mman.h>
-#undef _GNU_SOURCE
-
-#include "server/backend.h"
 #include "server/remote_buffer.h"
+#include "server/backend.h"
 #include "server/server.h"
 #include "util/alloc.h"
 #include "util/log.h"
+#include "util/syscall.h"
 #include <fcntl.h>
+#include <linux/memfd.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <wayland-client.h>
