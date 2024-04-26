@@ -33,6 +33,7 @@ struct server_backend {
 
     // optional globals
     struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
+    struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
 
     struct {
         struct wl_signal seat_data_device; // data: NULL

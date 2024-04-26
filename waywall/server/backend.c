@@ -6,6 +6,7 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "viewporter-client-protocol.h"
+#include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <string.h>
 #include <wayland-client.h>
@@ -20,6 +21,7 @@
 #define USE_SHM_VERSION 1
 #define USE_SUBCOMPOSITOR_VERSION 1
 #define USE_VIEWPORTER_VERSION 1
+#define USE_XDG_DECORATION_VERSION 1
 #define USE_XDG_WM_BASE_VERSION 1
 
 struct seat_name {
@@ -211,6 +213,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->viewporter =
             wl_registry_bind(wl, name, &wp_viewporter_interface, USE_VIEWPORTER_VERSION);
         ww_assert(backend->viewporter);
+    } else if (strcmp(iface, zxdg_decoration_manager_v1_interface.name) == 0) {
+        if (version < USE_XDG_DECORATION_VERSION) {
+            ww_log(LOG_WARN, "host compositor provides outdated zxdg_decoration_manager (%d < %d)",
+                   version, USE_XDG_DECORATION_VERSION);
+            return;
+        }
+
+        backend->xdg_decoration_manager = wl_registry_bind(
+            wl, name, &zxdg_decoration_manager_v1_interface, USE_XDG_DECORATION_VERSION);
+        ww_assert(backend->xdg_decoration_manager);
     } else if (strcmp(iface, xdg_wm_base_interface.name) == 0) {
         if (version < USE_XDG_WM_BASE_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated xdg_wm_base (%d < %d)", version,
@@ -291,6 +303,9 @@ server_backend_create() {
     if (!backend->cursor_shape_manager) {
         ww_log(LOG_WARN, "host compositor does not provide wp_cursor_shape_manager");
     }
+    if (!backend->xdg_decoration_manager) {
+        ww_log(LOG_WARN, "host compositor does not provide zxdg_decoration_manager");
+    }
 
     return backend;
 
@@ -339,6 +354,9 @@ server_backend_destroy(struct server_backend *backend) {
 
     if (backend->cursor_shape_manager) {
         wp_cursor_shape_manager_v1_destroy(backend->cursor_shape_manager);
+    }
+    if (backend->xdg_decoration_manager) {
+        zxdg_decoration_manager_v1_destroy(backend->xdg_decoration_manager);
     }
 
     wl_registry_destroy(backend->registry);
