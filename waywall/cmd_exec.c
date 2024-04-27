@@ -1,5 +1,6 @@
 #include "cmd.h"
 #include "util/log.h"
+#include "util/prelude.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -9,17 +10,9 @@
 
 extern char **environ;
 
-static int
-print_help(int argc, char **argv) {
-    fprintf(stderr, "USAGE: %s launch COMMAND [ARGS...]\n", argc ? argv[0] : "waywall");
-    return 1;
-}
-
 int
 cmd_exec(int argc, char **argv) {
-    if (argc < 3) {
-        return print_help(argc, argv);
-    }
+    ww_assert(argv[0]);
 
     int fd = open("/tmp/waywall-display", O_RDONLY);
     if (fd == -1) {
@@ -42,7 +35,7 @@ cmd_exec(int argc, char **argv) {
 
     setenv("WAYLAND_DISPLAY", buf, 1);
 
-    execvp(argv[2], &argv[2]);
+    execvp(argv[0], argv);
     ww_log_errno(LOG_ERROR, "execvp failed");
 
     return 1;

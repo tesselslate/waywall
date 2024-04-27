@@ -73,7 +73,12 @@ main(int argc, char **argv) {
     if (strcmp(action, "cpu") == 0) {
         return cmd_cpu();
     } else if (strcmp(action, "exec") == 0) {
-        return cmd_exec(argc, argv);
+        if (argc < 3) {
+            print_help(argv[0]);
+            return 1;
+        }
+
+        return cmd_exec(argc - 2, argv + 2);
     } else if (strcmp(action, "run") == 0) {
         // This space intentionally left blank.
     } else {
