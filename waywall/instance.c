@@ -579,7 +579,9 @@ instance_create(struct server_view *view, struct inotify *inotify) {
     if (get_mods(dir, &mods) != 0) {
         return NULL;
     }
-    // TODO: support instances without state output
+
+    // TODO: Is supporting log output (i.e. no state output) really necessary? The state-output mod
+    // is available for virtually every version nowadays.
     if (!mods.state_output) {
         ww_log(LOG_ERROR, "instance '%s' has no state output", dir);
         return NULL;
@@ -675,7 +677,7 @@ instance_state_update(struct instance *instance) {
     if (instance->mods.state_output) {
         parse_state_output(instance);
     } else {
-        // TODO
+        ww_unreachable();
     }
 
     int current = instance->state.screen;
