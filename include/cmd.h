@@ -3,6 +3,6 @@
 
 int cmd_cpu();
 int cmd_exec(int argc, char **argv);
-int cmd_waywall();
+int cmd_run(const char *profile);
 
 #endif

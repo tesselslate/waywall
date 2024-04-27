@@ -28,7 +28,7 @@ lint: build
 	selene $(LUA)
 
 run: all
-	./build/waywall/waywall
+	./build/waywall/waywall run
 
 # non-PHONY
 

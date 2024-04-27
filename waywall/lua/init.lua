@@ -64,7 +64,7 @@ end
 package.path = package.path .. ";" .. path .. "?.lua"
 
 -- Run the user's configuration file.
-local user_config = require("init")
+local user_config = require(priv.profile() or "init")
 
 -- If the user's configuration does not return a table, then `require` will
 -- return a boolean to say whether or not the call was successful.

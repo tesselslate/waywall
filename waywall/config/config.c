@@ -760,7 +760,7 @@ config_destroy(struct config *cfg) {
 }
 
 int
-config_load(struct config *cfg) {
+config_load(struct config *cfg, const char *profile) {
     ww_assert(!cfg->L);
 
     cfg->L = luaL_newstate();
@@ -788,7 +788,7 @@ config_load(struct config *cfg) {
         lua_call(cfg->L, 1, 0);
     }
 
-    if (config_api_init(cfg) != 0) {
+    if (config_api_init(cfg, profile) != 0) {
         goto fail;
     }
 

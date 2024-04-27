@@ -12,6 +12,7 @@ extern const struct config_registry_keys {
     char actions;
     char events;
     char layout;
+    char profile;
     char wall;
 } config_registry_keys;
 

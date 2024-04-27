@@ -25,6 +25,7 @@ struct waywall {
         int *data;
         ssize_t len, cap;
     } config_wd;
+    const char *profile;
 };
 
 static void
@@ -48,7 +49,7 @@ handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
     }
 
     struct config *cfg = config_create();
-    if (config_load(cfg) != 0) {
+    if (config_load(cfg, ww->profile) != 0) {
         ww_log(LOG_ERROR, "failed to load new config");
         config_destroy(cfg);
         return;
@@ -238,7 +239,7 @@ check_cgroups() {
 }
 
 int
-cmd_waywall() {
+cmd_run(const char *profile) {
     if (check_cgroups() != 0) {
         return 1;
     }
@@ -264,10 +265,11 @@ cmd_waywall() {
 
     struct waywall ww = {0};
 
+    ww.profile = profile;
     ww.cfg = config_create();
     ww_assert(ww.cfg);
 
-    if (config_load(ww.cfg) != 0) {
+    if (config_load(ww.cfg, profile) != 0) {
         goto fail_config_populate;
     }
 

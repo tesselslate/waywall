@@ -4,7 +4,7 @@
 struct config;
 struct wall;
 
-int config_api_init(struct config *cfg);
+int config_api_init(struct config *cfg, const char *profile);
 void config_api_set_wall(struct config *cfg, struct wall *wall);
 
 #endif

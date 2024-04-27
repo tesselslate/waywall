@@ -237,6 +237,21 @@ l_play(lua_State *L) {
 }
 
 static int
+l_profile(lua_State *L) {
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.profile);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+
+    if (lua_isnil(L, -1)) {
+        lua_pop(L, 1);
+        lua_pushnil(L);
+    } else {
+        ww_assert(lua_isstring(L, -1));
+    }
+
+    return 1;
+}
+
+static int
 l_reset(lua_State *L) {
     struct wall *wall = get_wall(L);
 
@@ -472,6 +487,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"listen", l_listen},
     {"num_instances", l_num_instances},
     {"play", l_play},
+    {"profile", l_profile},
     {"reset", l_reset},
     {"set_keymap", l_set_keymap},
     {"set_layout", l_set_layout},
@@ -487,10 +503,16 @@ static const struct luaL_Reg lua_lib[] = {
 };
 
 int
-config_api_init(struct config *cfg) {
+config_api_init(struct config *cfg, const char *profile) {
     lua_getglobal(cfg->L, "_G");
     luaL_register(cfg->L, "priv_waywall", lua_lib);
     lua_pop(cfg->L, 2);
+
+    if (profile) {
+        lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.profile);
+        lua_pushstring(cfg->L, profile);
+        lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+    }
 
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
     lua_newtable(cfg->L);

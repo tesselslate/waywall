@@ -48,6 +48,10 @@ M.num_instances = priv.num_instances
 -- the given instance is already active.
 M.play = priv.play
 
+--- Get the name of the current profile.
+-- @return The current profile, or nil if the default profile is active.
+M.profile = priv.profile
+
 --- Reset the given instance(s).
 -- The caller can provide either a number (single instance ID), or an array
 -- containing one or more instance IDs.

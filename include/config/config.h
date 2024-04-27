@@ -63,6 +63,6 @@ struct config_remap {
 
 struct config *config_create();
 void config_destroy(struct config *cfg);
-int config_load(struct config *cfg);
+int config_load(struct config *cfg, const char *profile);
 
 #endif
