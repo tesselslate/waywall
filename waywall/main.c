@@ -62,11 +62,28 @@ log_sysinfo() {
 
 int
 main(int argc, char **argv) {
-    const char *action = NULL;
-    const char *profile = NULL;
+    util_log_init();
+
+    if (argc < 2) {
+        print_help(argv[0]);
+        return 1;
+    }
+
+    const char *action = argv[1];
+    if (strcmp(action, "cpu") == 0) {
+        return cmd_cpu();
+    } else if (strcmp(action, "exec") == 0) {
+        return cmd_exec(argc, argv);
+    } else if (strcmp(action, "run") == 0) {
+        // This space intentionally left blank.
+    } else {
+        print_help(argv[0]);
+        return 1;
+    }
 
     bool expect_profile = false;
-    for (int i = 1; i < argc; i++) {
+    const char *profile = NULL;
+    for (int i = 2; i < argc; i++) {
         const char *arg = argv[i];
 
         if (expect_profile) {
@@ -82,34 +99,17 @@ main(int argc, char **argv) {
                     expect_profile = true;
                 }
             } else {
-                if (action) {
-                    print_help(argv[0]);
-                    return 1;
-                }
-                action = arg;
+                print_help(argv[0]);
+                return 1;
             }
         }
     }
-
     if (expect_profile) {
         fprintf(stderr, "expected PROFILE after --profile\n");
         return 1;
     }
 
-    if (!action) {
-        print_help(argv[0]);
-        return 1;
-    }
-
-    util_log_init();
-
-    if (strcmp(action, "cpu") == 0) {
-        return cmd_cpu();
-    } else if (strcmp(action, "exec") == 0) {
-        return cmd_exec(argc, argv);
-    } else {
-        set_realtime();
-        log_sysinfo();
-        return cmd_run(profile);
-    }
+    set_realtime();
+    log_sysinfo();
+    return cmd_run(profile);
 }
