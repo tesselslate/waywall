@@ -650,7 +650,9 @@ instance_reset(struct instance *instance) {
         return false;
     }
 
-    // TODO: atum click fix is only necessary on older atum versions?
+    // Older versions of Atum (prior to 1.2.2?) require that the user click the instance window at
+    // least once before the global reset hotkey will work.
+    server_view_send_click(instance->view);
 
     uint8_t reset_key = instance->state.screen == SCREEN_PREVIEWING
                             ? instance->opts.keys.leave_preview
