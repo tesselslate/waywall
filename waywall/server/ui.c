@@ -464,9 +464,9 @@ server_view_destroy(struct server_view *view) {
 
 void
 transaction_apply(struct server_ui *ui, struct transaction *txn) {
-    // If there is an inflight transaction, cancel it and take over.
+    // If there is an inflight transaction, disregard any pending resizes from it and take over.
     if (ui->inflight_txn) {
-        destroy_txn(ui->inflight_txn);
+        finalize_txn(ui->inflight_txn);
     }
     ui->inflight_txn = txn;
 
