@@ -110,6 +110,10 @@ M.benchmark = function(settings)
     end
 
     benchmark.start = function()
+        if waywall.active_instance() then
+            return false
+        end
+
         if state.run then
             error("Benchmark already running")
         end
@@ -136,6 +140,7 @@ M.benchmark = function(settings)
                 state.run.remaining = state.run.remaining - 1
             end
         end
+        return true
     end
 
     benchmark.stop = function()
@@ -144,6 +149,7 @@ M.benchmark = function(settings)
         end
 
         finish()
+        return true
     end
 
     return benchmark
@@ -277,7 +283,7 @@ M.wall = function(settings)
     wall.focus_reset = function()
         local hovered = waywall.hovered()
         if not hovered then
-            return
+            return false
         end
 
         local num_instances = waywall.num_instances()
@@ -288,11 +294,12 @@ M.wall = function(settings)
         end
 
         waywall.play(hovered)
+        return true
     end
     wall.play = function()
         local hovered = waywall.hovered()
         if not hovered then
-            return
+            return false
         end
 
         waywall.play(hovered)
@@ -300,20 +307,22 @@ M.wall = function(settings)
             state.locked[hovered] = nil
             waywall.set_priority(hovered, false)
         end
+        return true
     end
     wall.reset = function()
         local hovered = waywall.hovered()
         if not hovered then
-            return
+            return false
         end
 
         if check_reset(hovered) then
             waywall.reset(hovered)
         end
+        return true
     end
     wall.reset_all = function()
         if waywall.active_instance() then
-            return
+            return false
         end
 
         local num_instances = waywall.num_instances()
@@ -325,11 +334,12 @@ M.wall = function(settings)
         end
 
         waywall.reset(to_reset)
+        return true
     end
     wall.reset_ingame = function()
         local active = waywall.active_instance()
         if not active then
-            return
+            return false
         end
 
         if state.bypass then
@@ -342,7 +352,7 @@ M.wall = function(settings)
 
                     waywall.reset(active)
                     waywall.set_resolution(active, state.stretch_width, state.stretch_height)
-                    return
+                    return true
                 end
             end
         end
@@ -350,11 +360,12 @@ M.wall = function(settings)
         waywall.goto_wall()
         waywall.reset(active)
         waywall.set_resolution(active, state.stretch_width, state.stretch_height)
+        return true
     end
     wall.toggle_lock = function()
         local hovered = waywall.hovered()
         if not hovered then
-            return
+            return false
         end
 
         if state.locked[hovered] then
@@ -362,6 +373,7 @@ M.wall = function(settings)
         else
             wall.lock(hovered)
         end
+        return true
     end
 
     -- Assign the wall event listeners. Error if there was already a set of registered listeners.
