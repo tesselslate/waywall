@@ -21,13 +21,15 @@ config_action_try(struct config *cfg, struct wall *wall, struct config_action ac
     case LUA_TFUNCTION:
         config_api_set_wall(cfg, wall);
 
-        if (config_pcall(cfg, 0, 0, 0) != 0) {
+        if (config_pcall(cfg, 0, 1, 0) != 0) {
             ww_log(LOG_ERROR, "failed to perform action: '%s'", lua_tostring(cfg->L, -1));
             return -1;
         }
 
-        lua_pop(cfg->L, 1);
-        return 1;
+        bool consumed = (!lua_isboolean(cfg->L, -1) || lua_toboolean(cfg->L, -1));
+
+        lua_pop(cfg->L, 2);
+        return consumed ? 1 : 0;
     case LUA_TNIL:
         lua_pop(cfg->L, 2);
         return 0;
