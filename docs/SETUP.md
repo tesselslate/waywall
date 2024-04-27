@@ -176,7 +176,7 @@ Open a terminal and run these commands
 
 ```sh
 sudo waywall cpu
-waywall
+waywall run
 ```
 
 Then, launch all of the instances you prepared. You should be good to go!
