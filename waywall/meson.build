@@ -35,6 +35,7 @@ executable('waywall',
   'inotify.c',
   'instance.c',
   'main.c',
+  'reload.c',
   'wall.c',
 
   protocol_headers,
