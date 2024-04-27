@@ -352,6 +352,7 @@ M.wall = function(settings)
 
                     waywall.reset(active)
                     waywall.set_resolution(active, state.stretch_width, state.stretch_height)
+                    update()
                     return true
                 end
             end
