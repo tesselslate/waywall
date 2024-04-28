@@ -19,6 +19,10 @@ local function generate_wall(width, height)
     local num_instances = waywall.num_instances()
     local win_width, win_height = waywall.window_size()
 
+    if win_width < width or win_height < height then
+        return {}
+    end
+
     -- The window is closed. Don't generate a layout.
     if win_width == 0 or win_height == 0 then
         return nil
