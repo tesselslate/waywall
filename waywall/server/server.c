@@ -6,6 +6,7 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_data_device_manager.h"
+#include "server/wl_output.h"
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
@@ -203,7 +204,16 @@ server_create(struct config *cfg) {
         goto fail_ui;
     }
 
+    server->output = server_output_create(server, server->ui);
+    if (!server->output) {
+        ww_log(LOG_ERROR, "failed to initialize server_output");
+        goto fail_output;
+    }
+
     return server;
+
+fail_output:
+    server_ui_destroy(server->ui);
 
 fail_ui:
     server_cursor_destroy(server->cursor);

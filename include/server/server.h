@@ -23,6 +23,7 @@ struct server {
     struct server_compositor *compositor;
     struct server_data_device_manager *data_device_manager;
     struct server_linux_dmabuf *linux_dmabuf;
+    struct server_output *output;
     struct server_pointer_constraints *pointer_constraints;
     struct server_relative_pointer *relative_pointer;
     struct server_seat *seat;
