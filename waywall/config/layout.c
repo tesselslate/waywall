@@ -7,6 +7,8 @@
 #include "wall.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
+#include <stdlib.h>
+#include <string.h>
 
 static int
 get_int32(lua_State *L, const char *key, int32_t *dst) {

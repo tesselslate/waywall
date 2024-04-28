@@ -1,11 +1,6 @@
 #ifndef WAYWALL_UTIL_STR_H
 #define WAYWALL_UTIL_STR_H
 
-#include "util/alloc.h"
-#include <stdbool.h>
-#include <stddef.h>
-#include <string.h>
-
 typedef char *str;
 
 void str_append(str *dst, const char *src);

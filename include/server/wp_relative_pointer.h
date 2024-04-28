@@ -1,9 +1,9 @@
 #ifndef WAYWALL_SERVER_WP_RELATIVE_POINTER_H
 #define WAYWALL_SERVER_WP_RELATIVE_POINTER_H
 
+#include "config/config.h"
 #include <wayland-server-core.h>
-
-struct config;
+#include <wayland-util.h>
 
 struct server_relative_pointer {
     struct wl_global *global;

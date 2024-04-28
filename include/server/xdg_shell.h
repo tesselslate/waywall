@@ -2,9 +2,10 @@
 #define WAYWALL_SERVER_XDG_SHELL_H
 
 #include "util/serial.h"
+#include <stdbool.h>
+#include <stdint.h>
 #include <wayland-server-core.h>
-
-struct server;
+#include <wayland-util.h>
 
 struct server_xdg_wm_base {
     struct wl_global *global;

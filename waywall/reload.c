@@ -1,10 +1,13 @@
 #include "reload.h"
 #include "config/config.h"
 #include "inotify.h"
+#include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include <dirent.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/inotify.h>
 
 static void

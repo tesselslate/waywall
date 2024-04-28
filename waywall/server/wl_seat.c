@@ -6,16 +6,22 @@
 #include "server/wl_compositor.h"
 #include "util/alloc.h"
 #include "util/log.h"
+#include "util/prelude.h"
 #include "util/serial.h"
 #include "util/str.h"
 #include "util/syscall.h"
+#include <inttypes.h>
 #include <linux/input-event-codes.h>
 #include <linux/memfd.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
-#include <wayland-client.h>
-#include <wayland-server.h>
+#include <wayland-client-protocol.h>
+#include <wayland-server-protocol.h>
+#include <xkbcommon/xkbcommon-names.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define SRV_SEAT_VERSION 6

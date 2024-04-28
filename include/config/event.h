@@ -1,11 +1,8 @@
 #ifndef WAYWALL_CONFIG_EVENT_H
 #define WAYWALL_CONFIG_EVENT_H
 
-#include <stddef.h>
-#include <stdint.h>
-
-struct config;
-struct wall;
+#include "config/config.h"
+#include "wall.h"
 
 void config_signal_death(struct config *cfg, struct wall *wall, int id);
 void config_signal_preview_percent(struct config *cfg, struct wall *wall, int id, int percent);

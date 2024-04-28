@@ -9,10 +9,14 @@
 #include "util/prelude.h"
 #include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
+#include <luajit-2.1/lua.h>
 #include <luajit-2.1/luajit.h>
 #include <luajit-2.1/lualib.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
+#include <sys/types.h>
+#include <xkbcommon/xkbcommon-keysyms.h>
 #include <xkbcommon/xkbcommon.h>
 
 static const struct config defaults = {

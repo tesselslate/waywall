@@ -1,5 +1,8 @@
 #include "util/str.h"
+#include "util/alloc.h"
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 
 struct hdr {
     size_t len, cap;

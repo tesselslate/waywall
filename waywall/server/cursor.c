@@ -6,8 +6,12 @@
 #include "server/wl_seat.h"
 #include "util/alloc.h"
 #include "util/log.h"
-#include <wayland-client.h>
+#include "util/prelude.h"
+#include <stdlib.h>
+#include <string.h>
+#include <wayland-client-protocol.h>
 #include <wayland-cursor.h>
+#include <wayland-util.h>
 
 #define DEFAULT_ICON "left_ptr"
 #define DEFAULT_SIZE 16

@@ -1,9 +1,9 @@
 #ifndef WAYWALL_SERVER_XDG_DECORATION_H
 #define WAYWALL_SERVER_XDG_DECORATION_H
 
+#include "server/server.h"
 #include <wayland-server-core.h>
-
-struct server;
+#include <wayland-util.h>
 
 struct server_xdg_decoration_manager {
     struct wl_global *global;

@@ -1,12 +1,11 @@
 #ifndef WAYWALL_SERVER_CURSOR_H
 #define WAYWALL_SERVER_CURSOR_H
 
+#include "config/config.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include <stdbool.h>
+#include <stdint.h>
 #include <wayland-server-core.h>
-
-struct config;
-struct server;
 
 struct server_cursor {
     struct server *server;

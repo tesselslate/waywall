@@ -2,10 +2,11 @@
 #include "string.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include <bits/types/struct_sched_param.h>
 #include <sched.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <sys/resource.h>
 #include <sys/utsname.h>
 #include <unistd.h>

@@ -17,9 +17,13 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/str.h"
 #include <limits.h>
 #include <linux/input-event-codes.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/inotify.h>
+#include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
 
 static_assert(BTN_JOYSTICK - BTN_MOUSE == STATIC_ARRLEN((struct wall){0}.input.buttons));

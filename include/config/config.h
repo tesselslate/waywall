@@ -1,11 +1,10 @@
 #ifndef WAYWALL_CONFIG_CONFIG_H
 #define WAYWALL_CONFIG_CONFIG_H
 
+#include <luajit-2.1/lua.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-struct wall;
 
 struct config {
     struct {
@@ -47,7 +46,7 @@ struct config {
         int cursor_size;
     } theme;
 
-    struct lua_State *L;
+    lua_State *L;
 };
 
 enum config_remap_type {

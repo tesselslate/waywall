@@ -7,6 +7,10 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "util/alloc.h"
+#include "util/prelude.h"
+#include <math.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 #define SRV_RELATIVE_POINTER_VERSION 1
 

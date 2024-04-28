@@ -1,9 +1,8 @@
 #ifndef WAYWALL_CONFIG_ACTION_H
 #define WAYWALL_CONFIG_ACTION_H
 
+#include "config/config.h"
 #include <stdint.h>
-
-struct config;
 
 struct config_action {
     enum config_action_type {

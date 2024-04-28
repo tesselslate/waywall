@@ -2,10 +2,10 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "util/str.h"
+#include <errno.h>
 #include <fcntl.h>
-#include <inttypes.h>
 #include <pwd.h>
-#include <stdio.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
 

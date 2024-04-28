@@ -1,6 +1,7 @@
 #include "inotify.h"
 #include "util/prelude.h"
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/inotify.h>

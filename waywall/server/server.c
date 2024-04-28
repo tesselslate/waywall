@@ -15,9 +15,13 @@
 #include "server/xdg_shell.h"
 #include "util/alloc.h"
 #include "util/log.h"
+#include "util/prelude.h"
+#include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
-#include <wayland-client.h>
-#include <wayland-cursor.h>
+#include <sys/types.h>
+#include <wayland-client-core.h>
+#include <wayland-client-protocol.h>
 
 struct server_client {
     struct wl_list link; // server.clients

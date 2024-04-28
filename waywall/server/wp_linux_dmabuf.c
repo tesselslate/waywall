@@ -7,8 +7,12 @@
 #include "server/wl_compositor.h"
 #include "util/alloc.h"
 #include "util/prelude.h"
+#include <inttypes.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <wayland-client-core.h>
+#include <wayland-client-protocol.h>
+#include <wayland-util.h>
 
 /*
  * TODO: Investigate the usage of wl_event_queue.

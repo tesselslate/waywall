@@ -1,7 +1,6 @@
 #ifndef WAYWALL_COUNTER_H
 #define WAYWALL_COUNTER_H
 
-#include <stdbool.h>
 #include <stdint.h>
 
 struct counter {

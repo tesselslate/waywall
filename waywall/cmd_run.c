@@ -5,13 +5,14 @@
 #include "reload.h"
 #include "server/server.h"
 #include "util/log.h"
-#include "util/str.h"
+#include "util/prelude.h"
 #include "wall.h"
-#include <dirent.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <sys/inotify.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <wayland-server-core.h>
 
 struct waywall {
     struct config *cfg;

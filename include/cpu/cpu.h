@@ -1,10 +1,9 @@
 #ifndef WAYWALL_CPU_CPU_H
 #define WAYWALL_CPU_CPU_H
 
+#include "config/config.h"
+#include "instance.h"
 #include <stdbool.h>
-
-struct config;
-struct instance;
 
 struct cpu_manager {
     void (*destroy)(struct cpu_manager *cpu);

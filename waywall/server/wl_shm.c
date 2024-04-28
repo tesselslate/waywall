@@ -3,10 +3,13 @@
 #include "server/buffer.h"
 #include "server/server.h"
 #include "util/alloc.h"
+#include "util/prelude.h"
+#include <inttypes.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <wayland-client.h>
-#include <wayland-server.h>
+#include <wayland-client-protocol.h>
+#include <wayland-server-protocol.h>
 
 #define SRV_SHM_VERSION 1
 

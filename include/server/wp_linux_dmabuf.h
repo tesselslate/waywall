@@ -1,9 +1,9 @@
 #ifndef WAYWALL_SERVER_WP_LINUX_DMABUF_H
 #define WAYWALL_SERVER_WP_LINUX_DMABUF_H
 
+#include "server/server.h"
+#include <stdbool.h>
 #include <wayland-server-core.h>
-
-struct server;
 
 struct server_linux_dmabuf {
     struct wl_global *global;

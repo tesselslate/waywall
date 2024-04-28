@@ -1,10 +1,9 @@
 #ifndef WAYWALL_RELOAD_H
 #define WAYWALL_RELOAD_H
 
+#include "config/config.h"
 #include "util/str.h"
 #include <sys/types.h>
-
-struct config;
 
 typedef void (*reload_func_t)(struct config *cfg, void *data);
 

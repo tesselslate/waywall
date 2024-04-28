@@ -11,7 +11,9 @@
 #include "util/prelude.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <wayland-server-core.h>
+#include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
 
 static void

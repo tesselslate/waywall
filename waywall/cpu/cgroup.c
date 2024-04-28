@@ -9,7 +9,10 @@
 #include "util/str.h"
 #include "wall.h"
 #include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 enum group {

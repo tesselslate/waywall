@@ -1,9 +1,10 @@
 #ifndef WAYWALL_SERVER_WL_SHM_H
 #define WAYWALL_SERVER_WL_SHM_H
 
+#include "server/server.h"
+#include <stdint.h>
 #include <wayland-server-core.h>
-
-struct server;
+#include <wayland-util.h>
 
 struct server_shm {
     struct wl_global *global;

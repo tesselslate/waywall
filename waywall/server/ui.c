@@ -11,7 +11,9 @@
 #include "viewporter-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
-#include <wayland-client.h>
+#include <stdlib.h>
+#include <wayland-client-core.h>
+#include <wayland-client-protocol.h>
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480

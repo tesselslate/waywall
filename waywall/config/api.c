@@ -14,7 +14,12 @@
 #include "wall.h"
 #include "wrap.h"
 #include <luajit-2.1/lauxlib.h>
-#include <luajit-2.1/lualib.h>
+#include <luajit-2.1/lua.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
 #include <time.h>
 #include <xkbcommon/xkbcommon.h>
 

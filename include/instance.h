@@ -1,14 +1,12 @@
 #ifndef WAYWALL_INSTANCE_H
 #define WAYWALL_INSTANCE_H
 
+#include "inotify.h"
 #include "util/str.h"
 #include <stdbool.h>
 #include <stdint.h>
-#include <sys/time.h>
 #include <sys/types.h>
-
-struct inotify;
-struct server_view;
+#include <time.h>
 
 struct instance {
     char *dir;

@@ -1,12 +1,10 @@
 #ifndef WAYWALL_SERVER_REMOTE_BUFFER_H
 #define WAYWALL_SERVER_REMOTE_BUFFER_H
 
+#include "server/server.h"
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/types.h>
-#include <wayland-server-core.h>
-
-struct server;
+#include <wayland-util.h>
 
 struct remote_buffer_manager {
     struct wl_shm_pool *pool;

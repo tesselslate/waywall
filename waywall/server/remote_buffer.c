@@ -3,17 +3,17 @@
 #include "server/server.h"
 #include "util/alloc.h"
 #include "util/log.h"
+#include "util/prelude.h"
 #include "util/syscall.h"
-#include <fcntl.h>
 #include <linux/memfd.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <wayland-client.h>
-#include <wayland-server-core.h>
+#include <wayland-client-protocol.h>
 
 #define COLOR_POOL_SIZE 64
 #define POOL_INITIAL_SIZE 16384

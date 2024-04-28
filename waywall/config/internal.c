@@ -1,24 +1,26 @@
 #include "config/internal.h"
+#include "config/action.h"
 #include "config/config.h"
 #include <luajit-2.1/lauxlib.h>
+#include <luajit-2.1/lua.h>
 #include <stdbool.h>
-#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <sys/types.h>
 
 const struct config_registry_keys config_registry_keys = {0};
 
 #define MAX_INSTRUCTIONS 50000000
 
 static void
-pcall_hook(struct lua_State *L, struct lua_Debug *dbg) {
+pcall_hook(lua_State *L, struct lua_Debug *dbg) {
     luaL_error(L, "instruction count exceeded");
 }
 
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
 void
-config_dump_stack(struct lua_State *L) {
+config_dump_stack(lua_State *L) {
     int n = lua_gettop(L);
     fprintf(stderr, "--- stack (%d)\n", n);
 

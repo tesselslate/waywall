@@ -1,9 +1,10 @@
 #ifndef WAYWALL_SERVER_WP_POINTER_CONSTRAINTS_H
 #define WAYWALL_SERVER_WP_POINTER_CONSTRAINTS_H
 
+#include "config/config.h"
+#include <stdbool.h>
 #include <wayland-server-core.h>
-
-struct config;
+#include <wayland-util.h>
 
 struct server_pointer_constraints {
     struct wl_global *global;

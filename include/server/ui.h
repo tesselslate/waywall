@@ -1,12 +1,13 @@
 #ifndef WAYWALL_SERVER_UI_H
 #define WAYWALL_SERVER_UI_H
 
+#include "config/config.h"
 #include "util/box.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include <wayland-server-core.h>
-
-struct config;
+#include <wayland-util.h>
 
 struct server_ui {
     struct server *server;

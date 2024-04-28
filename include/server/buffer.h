@@ -1,9 +1,9 @@
 #ifndef WAYWALL_SERVER_BUFFER_H
 #define WAYWALL_SERVER_BUFFER_H
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
-#include <wayland-client.h>
-#include <wayland-server.h>
 
 struct server_buffer {
     struct wl_resource *resource;

@@ -2,8 +2,11 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdalign.h>
+#include <stdlib.h>
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <wayland-server-core.h>

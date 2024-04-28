@@ -1,6 +1,8 @@
 #ifndef WAYWALL_WALL_H
 #define WAYWALL_WALL_H
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <sys/types.h>
 #include <wayland-server-core.h>
 

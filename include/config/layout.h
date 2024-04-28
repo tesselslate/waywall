@@ -1,11 +1,10 @@
 #ifndef WAYWALL_CONFIG_LAYOUT_H
 #define WAYWALL_CONFIG_LAYOUT_H
 
+#include "config/config.h"
+#include "wall.h"
 #include <stddef.h>
 #include <stdint.h>
-
-struct config;
-struct wall;
 
 struct config_layout {
     struct config_layout_element *elements;

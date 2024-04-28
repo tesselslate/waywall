@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <wayland-server-core.h>
+#include <wayland-util.h>
 
 struct server_backend {
     struct wl_display *display;

@@ -7,10 +7,11 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <wayland-client.h>
-#include <wayland-server.h>
+#include <wayland-client-protocol.h>
+#include <wayland-server-protocol.h>
 
 #define SRV_DATA_DEVICE_MANAGER_VERSION 1
 

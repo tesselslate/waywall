@@ -2,7 +2,10 @@
 #include "util/alloc.h"
 #include "util/prelude.h"
 #include <stdlib.h>
-#include <wayland-client.h>
+#include <string.h>
+#include <wayland-client-protocol.h>
+#include <wayland-server-core.h>
+#include <wayland-server-protocol.h>
 
 static void
 invalid_buffer_destroy(void *data) {

@@ -6,9 +6,9 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
-#include "server/wl_seat.h"
 #include "util/alloc.h"
 #include "util/prelude.h"
+#include <stdint.h>
 #include <stdlib.h>
 
 #define SRV_POINTER_CONSTRAINTS_VERSION 1

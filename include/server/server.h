@@ -1,10 +1,10 @@
 #ifndef WAYWALL_SERVER_SERVER_H
 #define WAYWALL_SERVER_SERVER_H
 
-#include <wayland-client-core.h>
+#include "config/config.h"
+#include <stdbool.h>
 #include <wayland-server-core.h>
-
-struct config;
+#include <wayland-util.h>
 
 struct server {
     struct wl_display *display;

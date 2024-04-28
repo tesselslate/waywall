@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 #include <sys/types.h>
-
-struct wl_event_loop;
+#include <wayland-server-core.h>
 
 typedef void (*inotify_func_t)(int wd, uint32_t mask, const char *name, void *data);
 

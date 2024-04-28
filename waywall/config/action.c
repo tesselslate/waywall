@@ -1,10 +1,10 @@
 #include "config/action.h"
-#include "config/api.h"
 #include "config/config.h"
 #include "config/internal.h"
 #include "util/log.h"
 #include "util/prelude.h"
-#include <luajit-2.1/lauxlib.h>
+#include <luajit-2.1/lua.h>
+#include <stdbool.h>
 
 int
 config_action_try(struct config *cfg, struct config_action action) {

@@ -3,7 +3,10 @@
 #include "server/wl_compositor.h"
 #include "server/xdg_shell.h"
 #include "util/alloc.h"
+#include "util/prelude.h"
 #include "xdg-decoration-unstable-v1-server-protocol.h"
+#include <stdint.h>
+#include <stdlib.h>
 
 #define SRV_XDG_DECORATION_MANAGER_VERSION 1
 

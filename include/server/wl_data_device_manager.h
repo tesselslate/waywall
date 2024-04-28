@@ -1,7 +1,10 @@
 #ifndef WAYWALL_SERVER_WL_DATA_DEVICE_MANAGER_H
 #define WAYWALL_SERVER_WL_DATA_DEVICE_MANAGER_H
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <wayland-server-core.h>
+#include <wayland-util.h>
 
 struct server_data_device_manager {
     struct wl_global *global;

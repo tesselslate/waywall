@@ -8,8 +8,11 @@
 #include "viewporter-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
-#include <wayland-client.h>
+#include <wayland-client-core.h>
+#include <wayland-client-protocol.h>
 
 #define USE_COMPOSITOR_VERSION 5
 #define USE_CURSOR_SHAPE_VERSION 1

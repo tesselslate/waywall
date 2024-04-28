@@ -2,9 +2,12 @@
 #define WAYWALL_SERVER_WL_SEAT_H
 
 #include "config/config.h"
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <wayland-server-core.h>
-
-struct xkb_rule_names;
+#include <wayland-util.h>
+#include <xkbcommon/xkbcommon.h>
 
 enum kb_modifier {
     KB_MOD_SHIFT = (1 << 0),

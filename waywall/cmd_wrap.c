@@ -4,11 +4,17 @@
 #include "reload.h"
 #include "server/server.h"
 #include "util/log.h"
+#include "util/prelude.h"
 #include "util/syscall.h"
 #include "wrap.h"
+#include <errno.h>
 #include <signal.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <wayland-server-core.h>
 
 struct waywall {
     struct config *cfg;
