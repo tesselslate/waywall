@@ -262,7 +262,7 @@ server_backend_create() {
 
     backend->display = wl_display_connect(NULL);
     if (!backend->display) {
-        ww_log(LOG_ERROR, "wl_display_connect failed");
+        ww_log_errno(LOG_ERROR, "wl_display_connect failed");
         goto fail_display;
     }
 
