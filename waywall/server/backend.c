@@ -73,7 +73,7 @@ on_shm_format(void *data, struct wl_shm *wl, uint32_t format) {
     struct server_backend *backend = data;
 
     uint32_t *next = wl_array_add(&backend->shm_formats, sizeof(*next));
-    ww_assert(next);
+    check_alloc(next);
     *next = format;
 
     wl_signal_emit_mutable(&backend->events.shm_format, next);
@@ -106,7 +106,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->compositor =
             wl_registry_bind(wl, name, &wl_compositor_interface, USE_COMPOSITOR_VERSION);
-        ww_assert(backend->compositor);
+        check_alloc(backend->compositor);
     } else if (strcmp(iface, wp_cursor_shape_manager_v1_interface.name) == 0) {
         if (version < USE_CURSOR_SHAPE_VERSION) {
             ww_log(LOG_WARN, "host compositor provides outdated wp_cursor_shape_manager (%d < %d)",
@@ -116,7 +116,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->cursor_shape_manager = wl_registry_bind(
             wl, name, &wp_cursor_shape_manager_v1_interface, USE_CURSOR_SHAPE_VERSION);
-        ww_assert(backend->cursor_shape_manager);
+        check_alloc(backend->cursor_shape_manager);
     } else if (strcmp(iface, wl_data_device_manager_interface.name) == 0) {
         if (version < USE_DATA_DEVICE_MANAGER_VERSION) {
             ww_log(LOG_ERROR, "host compostior provides outdated wl_data_device_manager (%d < %d)",
@@ -126,7 +126,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->data_device_manager = wl_registry_bind(wl, name, &wl_data_device_manager_interface,
                                                         USE_DATA_DEVICE_MANAGER_VERSION);
-        ww_assert(backend->data_device_manager);
+        check_alloc(backend->data_device_manager);
     } else if (strcmp(iface, zwp_linux_dmabuf_v1_interface.name) == 0) {
         if (version < USE_LINUX_DMABUF_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated zwp_linux_dmabuf (%d < %d)",
@@ -136,7 +136,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->linux_dmabuf =
             wl_registry_bind(wl, name, &zwp_linux_dmabuf_v1_interface, USE_LINUX_DMABUF_VERSION);
-        ww_assert(backend->linux_dmabuf);
+        check_alloc(backend->linux_dmabuf);
     } else if (strcmp(iface, zwp_pointer_constraints_v1_interface.name) == 0) {
         if (version < USE_POINTER_CONSTRAINTS_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated zwp_pointer_constraints (%d < %d)",
@@ -146,7 +146,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->pointer_constraints = wl_registry_bind(
             wl, name, &zwp_pointer_constraints_v1_interface, USE_POINTER_CONSTRAINTS_VERSION);
-        ww_assert(backend->pointer_constraints);
+        check_alloc(backend->pointer_constraints);
     } else if (strcmp(iface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
         if (version < USE_RELATIVE_POINTER_MANAGER_VERSION) {
             ww_log(LOG_ERROR,
@@ -158,7 +158,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->relative_pointer_manager =
             wl_registry_bind(wl, name, &zwp_relative_pointer_manager_v1_interface,
                              USE_RELATIVE_POINTER_MANAGER_VERSION);
-        ww_assert(backend->relative_pointer_manager);
+        check_alloc(backend->relative_pointer_manager);
     } else if (strcmp(iface, wl_seat_interface.name) == 0) {
         if (version < USE_SEAT_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_seat (%d < %d)", version,
@@ -172,7 +172,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         if (wl_list_empty(&backend->seat.names)) {
             backend->seat.remote = wl_registry_bind(wl, name, &wl_seat_interface, USE_SEAT_VERSION);
-            ww_assert(backend->seat.remote);
+            check_alloc(backend->seat.remote);
 
             wl_seat_add_listener(backend->seat.remote, &seat_listener, backend);
             wl_display_roundtrip(backend->display);
@@ -190,7 +190,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         }
 
         backend->shm = wl_registry_bind(wl, name, &wl_shm_interface, USE_SHM_VERSION);
-        ww_assert(backend->shm);
+        check_alloc(backend->shm);
 
         wl_shm_add_listener(backend->shm, &shm_listener, backend);
         wl_display_roundtrip(backend->display);
@@ -212,7 +212,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->viewporter =
             wl_registry_bind(wl, name, &wp_viewporter_interface, USE_VIEWPORTER_VERSION);
-        ww_assert(backend->viewporter);
+        check_alloc(backend->viewporter);
     } else if (strcmp(iface, zxdg_decoration_manager_v1_interface.name) == 0) {
         if (version < USE_XDG_DECORATION_VERSION) {
             ww_log(LOG_WARN, "host compositor provides outdated zxdg_decoration_manager (%d < %d)",
@@ -222,7 +222,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->xdg_decoration_manager = wl_registry_bind(
             wl, name, &zxdg_decoration_manager_v1_interface, USE_XDG_DECORATION_VERSION);
-        ww_assert(backend->xdg_decoration_manager);
+        check_alloc(backend->xdg_decoration_manager);
     } else if (strcmp(iface, xdg_wm_base_interface.name) == 0) {
         if (version < USE_XDG_WM_BASE_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated xdg_wm_base (%d < %d)", version,
@@ -232,7 +232,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->xdg_wm_base =
             wl_registry_bind(wl, name, &xdg_wm_base_interface, USE_XDG_WM_BASE_VERSION);
-        ww_assert(backend->xdg_wm_base);
+        check_alloc(backend->xdg_wm_base);
 
         xdg_wm_base_add_listener(backend->xdg_wm_base, &xdg_wm_base_listener, backend);
     }
@@ -267,7 +267,7 @@ server_backend_create() {
     }
 
     backend->registry = wl_display_get_registry(backend->display);
-    ww_assert(backend->registry);
+    check_alloc(backend->registry);
     wl_registry_add_listener(backend->registry, &registry_listener, backend);
     wl_display_roundtrip(backend->display);
 

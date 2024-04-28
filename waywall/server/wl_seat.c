@@ -217,7 +217,7 @@ send_keyboard_enter(struct server_seat *seat) {
     struct wl_array keys;
     wl_array_init(&keys);
     uint32_t *data = wl_array_add(&keys, sizeof(uint32_t) * seat->keyboard.pressed.len);
-    ww_assert(data);
+    check_alloc(data);
     for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
         data[i] = seat->keyboard.pressed.data[i];
     }

@@ -139,7 +139,7 @@ server_create(struct config *cfg) {
     struct wl_event_loop *loop = wl_display_get_event_loop(server->display);
     server->backend_source = wl_event_loop_add_fd(loop, wl_display_get_fd(server->backend->display),
                                                   WL_EVENT_READABLE, backend_display_tick, server);
-    ww_assert(server->backend_source);
+    check_alloc(server->backend_source);
     wl_event_source_check(server->backend_source);
 
     server->remote_buf = remote_buffer_manager_create(server);
@@ -315,7 +315,7 @@ server_get_wl_data_device(struct server *server) {
 
     server->backend->seat.data_device = wl_data_device_manager_get_data_device(
         server->backend->data_device_manager, server->backend->seat.remote);
-    ww_assert(server->backend->seat.data_device);
+    check_alloc(server->backend->seat.data_device);
     return server->backend->seat.data_device;
 }
 
@@ -334,7 +334,7 @@ server_get_wl_keyboard(struct server *server) {
     }
 
     server->backend->seat.keyboard = wl_seat_get_keyboard(server->backend->seat.remote);
-    ww_assert(server->backend->seat.keyboard);
+    check_alloc(server->backend->seat.keyboard);
     return server->backend->seat.keyboard;
 }
 
@@ -353,7 +353,7 @@ server_get_wl_pointer(struct server *server) {
     }
 
     server->backend->seat.pointer = wl_seat_get_pointer(server->backend->seat.remote);
-    ww_assert(server->backend->seat.pointer);
+    check_alloc(server->backend->seat.pointer);
     return server->backend->seat.pointer;
 }
 
