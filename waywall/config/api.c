@@ -8,6 +8,7 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"
+#include "server/wp_relative_pointer.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -676,7 +677,7 @@ l_set_sensitivity_wall(lua_State *L, struct wall *wall) {
     double sens = luaL_checknumber(L, 1);
     luaL_argcheck(L, sens > 0, 1, "sensitivity must be a positive, non-zero number");
 
-    wall->cfg->input.sens = sens;
+    server_relative_pointer_set_sens(wall->server->relative_pointer, sens);
     return 0;
 }
 
@@ -685,7 +686,7 @@ l_set_sensitivity_wrap(lua_State *L, struct wrap *wrap) {
     double sens = luaL_checknumber(L, 1);
     luaL_argcheck(L, sens > 0, 1, "sensitivity must be a positive, non-zero number");
 
-    wrap->cfg->input.sens = 0;
+    server_relative_pointer_set_sens(wrap->server->relative_pointer, sens);
     return 0;
 }
 
