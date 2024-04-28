@@ -5,5 +5,5 @@
 noreturn void
 util_panic(const char *file, int line, const char *msg) {
     fprintf(stderr, "[%s:%d] %s\n", file, line, msg);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
