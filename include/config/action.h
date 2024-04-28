@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 struct config;
-struct wall;
 
 struct config_action {
     enum config_action_type {
@@ -17,6 +16,6 @@ struct config_action {
     uint32_t modifiers;
 };
 
-int config_action_try(struct config *config, struct wall *wall, struct config_action action);
+int config_action_try(struct config *config, struct config_action action);
 
 #endif

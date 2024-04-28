@@ -12,15 +12,14 @@
 
 static void
 print_help(const char *argv0) {
-    fprintf(stderr, "\nUSAGE: %s COMMAND [OPTION...]\n", argv0 ? argv0 : "waywall");
-
     static const char *lines[] = {
-        "\nCommands:",
-        "        cpu     Setup cgroups for waywall. Requires root privileges",
-        "        exec    Run program in active waywall instance",
-        "        run     Start waywall",
+        "\nUsage:",
+        "\twaywall cpu                    Setup cgroups for waywall. Requires root privileges",
+        "\twaywall exec -- CMD            Run the specified command in an active waywall instance",
+        "\twaywall run [OPTS...]          Start a new instance of waywall",
+        "\twaywall wrap [OPTS...] -- CMD  Run the specified command in a new waywall instance",
         "\nOptions:",
-        "        --profile PROFILE       Run waywall with the given profile",
+        "\t--profile PROFILE              Run waywall with the given configuration profile",
         "",
     };
 
@@ -70,24 +69,10 @@ main(int argc, char **argv) {
     }
 
     const char *action = argv[1];
-    if (strcmp(action, "cpu") == 0) {
-        return cmd_cpu();
-    } else if (strcmp(action, "exec") == 0) {
-        if (argc < 3) {
-            print_help(argv[0]);
-            return 1;
-        }
-
-        return cmd_exec(argc - 2, argv + 2);
-    } else if (strcmp(action, "run") == 0) {
-        // This space intentionally left blank.
-    } else {
-        print_help(argv[0]);
-        return 1;
-    }
+    const char *profile = NULL;
+    char **subcommand = NULL;
 
     bool expect_profile = false;
-    const char *profile = NULL;
     for (int i = 2; i < argc; i++) {
         const char *arg = argv[i];
 
@@ -102,6 +87,9 @@ main(int argc, char **argv) {
                         return 1;
                     }
                     expect_profile = true;
+                } else if (strcmp(arg, "--") == 0) {
+                    subcommand = argv + i + 1;
+                    break;
                 }
             } else {
                 print_help(argv[0]);
@@ -114,7 +102,30 @@ main(int argc, char **argv) {
         return 1;
     }
 
-    set_realtime();
-    log_sysinfo();
-    return cmd_run(profile);
+    if (strcmp(action, "cpu") == 0) {
+        return cmd_cpu();
+    } else if (strcmp(action, "exec") == 0) {
+        if (!subcommand || !*subcommand) {
+            print_help(argv[0]);
+            return 1;
+        }
+
+        return cmd_exec(subcommand);
+    } else if (strcmp(action, "run") == 0) {
+        set_realtime();
+        log_sysinfo();
+        return cmd_run(profile);
+    } else if (strcmp(action, "wrap") == 0) {
+        if (!subcommand || !*subcommand) {
+            print_help(argv[0]);
+            return 1;
+        }
+
+        set_realtime();
+        log_sysinfo();
+        return cmd_wrap(profile, subcommand);
+    } else {
+        print_help(argv[0]);
+        return 1;
+    }
 }

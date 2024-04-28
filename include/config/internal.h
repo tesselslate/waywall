@@ -5,6 +5,7 @@
 
 #define BIND_BUFLEN 17
 #define METATABLE_WALL "waywall.wall"
+#define METATABLE_WRAP "waywall.wrap"
 
 struct lua_State;
 
@@ -14,6 +15,7 @@ extern const struct config_registry_keys {
     char layout;
     char profile;
     char wall;
+    char wrap;
 } config_registry_keys;
 
 void config_dump_stack(struct lua_State *L);

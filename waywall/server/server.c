@@ -389,7 +389,6 @@ server_set_input_focus(struct server *server, struct server_view *view) {
 
 void
 server_shutdown(struct server *server) {
-    // TODO: make graceful (request window close, timeout)
     wl_display_terminate(server->display);
 }
 

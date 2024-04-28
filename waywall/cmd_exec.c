@@ -11,7 +11,7 @@
 extern char **environ;
 
 int
-cmd_exec(int argc, char **argv) {
+cmd_exec(char **argv) {
     ww_assert(argv[0]);
 
     int fd = open("/tmp/waywall-display", O_RDONLY);

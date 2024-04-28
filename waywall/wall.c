@@ -1,5 +1,6 @@
 #include "wall.h"
 #include "config/action.h"
+#include "config/api.h"
 #include "config/config.h"
 #include "config/event.h"
 #include "config/layout.h"
@@ -248,7 +249,7 @@ fixup_layout(struct wall *wall, int id) {
 
 static bool
 process_action(struct wall *wall, struct config_action action) {
-    bool consumed = (config_action_try(wall->cfg, wall, action) != 0);
+    bool consumed = (config_action_try(wall->cfg, action) != 0);
 
     if (consumed) {
         struct config_layout *layout = config_layout_get(wall->cfg, wall);
@@ -572,6 +573,8 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wall->server = server;
     wall->inotify = inotify;
 
+    config_api_set_wall(wall->cfg, wall);
+
     if (strcmp(cfg->general.counter_path, "") != 0) {
         wall->counter = counter_create(cfg->general.counter_path);
         if (!wall->counter) {
@@ -689,6 +692,8 @@ wall_set_config(struct wall *wall, struct config *cfg) {
         }
         wall->counter = counter;
     }
+
+    config_api_set_wall(cfg, wall);
 
     wall->cfg = cfg;
     return 0;

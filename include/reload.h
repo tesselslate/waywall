@@ -23,7 +23,8 @@ struct reload {
     } config_wd;
 };
 
-struct reload *reload_create(struct inotify *inotify, const char *profile, reload_func_t callback, void *data);
+struct reload *reload_create(struct inotify *inotify, const char *profile, reload_func_t callback,
+                             void *data);
 void reload_destroy(struct reload *rl);
 
 #endif

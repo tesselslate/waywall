@@ -775,7 +775,8 @@ config_load(struct config *cfg, const char *profile) {
     }
 
     luaL_newmetatable(cfg->L, METATABLE_WALL);
-    lua_pop(cfg->L, 1);
+    luaL_newmetatable(cfg->L, METATABLE_WRAP);
+    lua_pop(cfg->L, 2);
 
     static const struct luaL_Reg base_lib[] = {
         {"", luaopen_base},         {"package", luaopen_package}, {"table", luaopen_table},

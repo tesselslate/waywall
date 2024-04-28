@@ -12,10 +12,14 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "wall.h"
+#include "wrap.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lualib.h>
 #include <time.h>
 #include <xkbcommon/xkbcommon.h>
+
+#define STARTUP_ERRMSG(function) function " cannot be called during startup"
+#define WRAP_ERRMSG(function) function " cannot be called in wrap mode"
 
 static inline uint32_t
 timespec_ms(struct timespec *ts) {
@@ -25,11 +29,11 @@ timespec_ms(struct timespec *ts) {
 static struct wall *
 get_wall(lua_State *L) {
     lua_pushlightuserdata(L, (void *)&config_registry_keys.wall);
-    lua_gettable(L, LUA_REGISTRYINDEX);
+    lua_rawget(L, LUA_REGISTRYINDEX);
 
     if (!luaL_testudata(L, -1, METATABLE_WALL)) {
-        luaL_error(L, "this function cannot be called at startup");
-        ww_unreachable();
+        lua_pop(L, 1);
+        return NULL;
     }
 
     struct wall **wall = lua_touserdata(L, -1);
@@ -37,18 +41,43 @@ get_wall(lua_State *L) {
     return *wall;
 }
 
+static struct wrap *
+get_wrap(lua_State *L) {
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.wrap);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+
+    if (!luaL_testudata(L, -1, METATABLE_WRAP)) {
+        lua_pop(L, 1);
+        return NULL;
+    }
+
+    struct wrap **wrap = lua_touserdata(L, -1);
+    lua_pop(L, 1);
+    return *wrap;
+}
+
 static int
 l_active_instance(lua_State *L) {
     struct wall *wall = get_wall(L);
-    int id = wall->active_instance;
+    if (wall) {
+        int id = wall->active_instance;
 
-    if (id >= 0) {
-        lua_pushinteger(L, id + 1);
-    } else {
-        lua_pushnil(L);
+        if (id >= 0) {
+            lua_pushinteger(L, id + 1);
+        } else {
+            lua_pushnil(L);
+        }
+
+        return 1;
     }
 
-    return 1;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        lua_pushinteger(L, 1);
+        return 1;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("active_instance"));
 }
 
 static int
@@ -65,35 +94,50 @@ l_current_time(lua_State *L) {
 static int
 l_goto_wall(lua_State *L) {
     struct wall *wall = get_wall(L);
+    if (wall) {
+        bool ok = wall_lua_return(wall) == 0;
+        if (!ok) {
+            return luaL_error(L, "wall already active");
+        }
 
-    bool ok = wall_lua_return(wall) == 0;
-    if (!ok) {
-        return luaL_error(L, "wall already active");
+        return 0;
     }
 
-    return 0;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        ww_log(LOG_WARN, WRAP_ERRMSG("goto_wall"));
+        return 0;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("goto_wall"));
 }
 
 static int
 l_hovered(lua_State *L) {
     struct wall *wall = get_wall(L);
-    int id = wall_lua_get_hovered(wall);
+    if (wall) {
+        int id = wall_lua_get_hovered(wall);
 
-    if (id >= 0) {
-        lua_pushinteger(L, id + 1);
-    } else {
-        lua_pushnil(L);
+        if (id >= 0) {
+            lua_pushinteger(L, id + 1);
+        } else {
+            lua_pushnil(L);
+        }
+
+        return 1;
     }
 
-    return 1;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        lua_pushnil(L);
+        return 1;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("hovered"));
 }
 
 static int
 l_instance(lua_State *L) {
-    struct wall *wall = get_wall(L);
-    int id = luaL_checkint(L, 1);
-    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
-
     static const char *screen_names[] = {
         [SCREEN_TITLE] = "title",           [SCREEN_WAITING] = "waiting",
         [SCREEN_GENERATING] = "generating", [SCREEN_PREVIEWING] = "previewing",
@@ -106,30 +150,45 @@ l_instance(lua_State *L) {
         [INWORLD_MENU] = "menu",
     };
 
-    struct instance_state state = wall->instances[id - 1]->state;
+    struct instance_state *state = NULL;
+
+    struct wall *wall = get_wall(L);
+    if (wall) {
+        int id = luaL_checkint(L, 1);
+        luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+        state = &wall->instances[id - 1]->state;
+    }
+
+    if (get_wrap(L)) {
+        // TODO: Allow this function in wrap mode
+        return luaL_error(L, WRAP_ERRMSG("instance"));
+    }
+
+    // TODO: Early-startup check once it is possible to call this in wrap mode
+    ww_assert(state);
 
     lua_newtable(L);
 
     lua_pushstring(L, "screen");
-    lua_pushstring(L, screen_names[state.screen]);
+    lua_pushstring(L, screen_names[state->screen]);
     lua_rawset(L, -3);
 
-    if (state.screen == SCREEN_GENERATING || state.screen == SCREEN_PREVIEWING) {
+    if (state->screen == SCREEN_GENERATING || state->screen == SCREEN_PREVIEWING) {
         lua_pushstring(L, "percent");
-        lua_pushinteger(L, state.data.percent);
+        lua_pushinteger(L, state->data.percent);
         lua_rawset(L, -3);
-    } else if (state.screen == SCREEN_INWORLD) {
+    } else if (state->screen == SCREEN_INWORLD) {
         lua_pushstring(L, "inworld");
-        lua_pushstring(L, inworld_names[state.data.inworld]);
+        lua_pushstring(L, inworld_names[state->data.inworld]);
         lua_rawset(L, -3);
     }
 
     lua_pushstring(L, "last_load");
-    lua_pushinteger(L, timespec_ms(&state.last_load));
+    lua_pushinteger(L, timespec_ms(&state->last_load));
     lua_rawset(L, -3);
 
     lua_pushstring(L, "last_preview");
-    lua_pushinteger(L, timespec_ms(&state.last_preview));
+    lua_pushinteger(L, timespec_ms(&state->last_preview));
     lua_rawset(L, -3);
 
     return 1;
@@ -178,14 +237,8 @@ l_listen(lua_State *L) {
     lua_pushvalue(L, -3);
     lua_rawset(L, LUA_REGISTRYINDEX);
 
-    // Call the `install` event handler if the wall global has been set (i.e. this call to `listen`
-    // is not a result of the configuration being loaded.)
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.wall);
-    lua_gettable(L, LUA_REGISTRYINDEX);
-    bool has_wall = !lua_isnil(L, -1);
-    lua_pop(L, 1);
-
-    if (has_wall) {
+    // Call the `install` event handler if this call to `listen` was not at config load time.
+    if (get_wall(L) || get_wrap(L)) {
         ssize_t stack_start = lua_gettop(L);
 
         lua_pushstring(L, "install");
@@ -217,23 +270,42 @@ l_listen(lua_State *L) {
 static int
 l_num_instances(lua_State *L) {
     struct wall *wall = get_wall(L);
+    if (wall) {
+        lua_pushinteger(L, wall->num_instances);
+        return 1;
+    }
 
-    lua_pushinteger(L, wall->num_instances);
-    return 1;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        lua_pushinteger(L, 1);
+        return 1;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("num_instances"));
 }
 
 static int
 l_play(lua_State *L) {
     struct wall *wall = get_wall(L);
-    int id = luaL_checkint(L, 1);
-    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+    if (wall) {
+        int id = luaL_checkint(L, 1);
+        luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
 
-    bool ok = wall_lua_play(wall, id - 1) == 0;
-    if (!ok) {
-        return luaL_error(L, "instance %d already active", id);
+        bool ok = wall_lua_play(wall, id - 1) == 0;
+        if (!ok) {
+            return luaL_error(L, "instance %d already active", id);
+        }
+
+        return 0;
     }
 
-    return 0;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        ww_log(LOG_WARN, WRAP_ERRMSG("play"));
+        return 0;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("play"));
 }
 
 static int
@@ -253,7 +325,14 @@ l_profile(lua_State *L) {
 
 static int
 l_reset(lua_State *L) {
+    if (get_wrap(L)) {
+        return luaL_error(L, WRAP_ERRMSG("reset"));
+    }
+
     struct wall *wall = get_wall(L);
+    if (!wall) {
+        return luaL_error(L, STARTUP_ERRMSG("reset"));
+    }
 
     int argc = lua_gettop(L);
     if (argc > 2) {
@@ -323,6 +402,10 @@ l_reset(lua_State *L) {
 static int
 l_set_keymap(lua_State *L) {
     struct wall *wall = get_wall(L);
+    struct wrap *wrap = get_wrap(L);
+    if (!wall && !wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("set_keymap"));
+    }
 
     int argc = lua_gettop(L);
     if (argc != 1) {
@@ -371,7 +454,8 @@ l_set_keymap(lua_State *L) {
         lua_pop(L, 1);
     }
 
-    server_seat_lua_set_keymap(wall->server->seat, &rule_names);
+    ww_assert(wall || wrap);
+    server_seat_lua_set_keymap(wall ? wall->server->seat : wrap->server->seat, &rule_names);
 
     for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
         if (strings[i]) {
@@ -384,6 +468,11 @@ l_set_keymap(lua_State *L) {
 
 static int
 l_set_layout(lua_State *L) {
+    if (get_wrap(L)) {
+        ww_log(LOG_WARN, WRAP_ERRMSG("set_layout"));
+        return 0;
+    }
+
     int argc = lua_gettop(L);
 
     if (argc != 1) {
@@ -400,7 +489,16 @@ l_set_layout(lua_State *L) {
 
 static int
 l_set_priority(lua_State *L) {
+    if (get_wrap(L)) {
+        ww_log(LOG_WARN, WRAP_ERRMSG("set_priority"));
+        return 0;
+    }
+
     struct wall *wall = get_wall(L);
+    if (!wall) {
+        return luaL_error(L, STARTUP_ERRMSG("set_priority"));
+    }
+
     int id = luaL_checkint(L, 1);
     luaL_checktype(L, 2, LUA_TBOOLEAN);
     bool priority = lua_toboolean(L, 2);
@@ -416,46 +514,80 @@ l_set_priority(lua_State *L) {
 
 static int
 l_set_resolution(lua_State *L) {
-    struct wall *wall = get_wall(L);
     int id = luaL_checkint(L, 1);
     int32_t width = luaL_checkint(L, 2);
     int32_t height = luaL_checkint(L, 3);
-    luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
     luaL_argcheck(L, width >= 0, 1, "width must be non-negative");
     luaL_argcheck(L, height >= 0, 1, "height must be non-negative");
 
-    bool ok = wall_lua_set_res(wall, id - 1, width, height) == 0;
-    if (!ok) {
-        return luaL_error(L, "cannot set resolution");
+    struct wall *wall = get_wall(L);
+    if (wall) {
+        luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
+        bool ok = wall_lua_set_res(wall, id - 1, width, height) == 0;
+        if (!ok) {
+            return luaL_error(L, "cannot set resolution");
+        }
+        return 0;
     }
 
-    return 0;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        luaL_argcheck(L, id == 1, 1, "invalid instance");
+        bool ok = wrap_lua_set_res(wrap, width, height) == 0;
+        if (!ok) {
+            return luaL_error(L, "cannot set resolution");
+        }
+        return 0;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("set_resolution"));
 }
 
 static int
 l_set_sensitivity(lua_State *L) {
-    struct wall *wall = get_wall(L);
-
     double sens = luaL_checknumber(L, 1);
     luaL_argcheck(L, sens > 0, 1, "sensitivity must be a positive, non-zero number");
 
-    wall->cfg->input.sens = sens;
-    return 0;
+    struct wall *wall = get_wall(L);
+    if (wall) {
+        wall->cfg->input.sens = sens;
+    }
+
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        wrap->cfg->input.sens = sens;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("set_sensitivity"));
 }
 
 static int
 l_window_size(lua_State *L) {
     struct wall *wall = get_wall(L);
-
-    if (!wall->server->ui->mapped) {
-        lua_pushinteger(L, 0);
-        lua_pushinteger(L, 0);
-    } else {
-        lua_pushinteger(L, wall->width);
-        lua_pushinteger(L, wall->height);
+    if (wall) {
+        if (!wall->server->ui->mapped) {
+            lua_pushinteger(L, 0);
+            lua_pushinteger(L, 0);
+        } else {
+            lua_pushinteger(L, wall->width);
+            lua_pushinteger(L, wall->height);
+        }
+        return 2;
     }
 
-    return 2;
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        if (!wrap->server->ui->mapped) {
+            lua_pushinteger(L, 0);
+            lua_pushinteger(L, 0);
+        } else {
+            lua_pushinteger(L, wrap->width);
+            lua_pushinteger(L, wrap->height);
+        }
+        return 2;
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("window_size"));
 }
 
 static int
@@ -556,6 +688,23 @@ config_api_set_wall(struct config *cfg, struct wall *wall) {
     *udata = wall;
 
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.wall);
+    lua_pushvalue(cfg->L, -2);
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == stack_start);
+}
+
+void
+config_api_set_wrap(struct config *cfg, struct wrap *wrap) {
+    ssize_t stack_start = lua_gettop(cfg->L);
+
+    struct wrap **udata = lua_newuserdata(cfg->L, sizeof(*udata));
+    luaL_getmetatable(cfg->L, METATABLE_WRAP);
+    lua_setmetatable(cfg->L, -2);
+    *udata = wrap;
+
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.wrap);
     lua_pushvalue(cfg->L, -2);
     lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
