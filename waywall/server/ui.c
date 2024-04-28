@@ -61,7 +61,7 @@ on_xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
     }
     server_ui_hide(ui);
 
-    // TODO: more useful close logic
+    wl_signal_emit_mutable(&ui->events.close, NULL);
 }
 
 static void
@@ -303,6 +303,7 @@ server_ui_create(struct server *server, struct config *cfg) {
 
     wl_list_init(&ui->views);
 
+    wl_signal_init(&ui->events.close);
     wl_signal_init(&ui->events.resize);
     wl_signal_init(&ui->events.view_create);
     wl_signal_init(&ui->events.view_destroy);

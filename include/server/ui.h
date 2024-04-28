@@ -30,6 +30,7 @@ struct server_ui {
     struct transaction *inflight_txn;
 
     struct {
+        struct wl_signal close;        // data: NULL
         struct wl_signal resize;       // data: NULL
         struct wl_signal view_create;  // data: struct server_view *
         struct wl_signal view_destroy; // data: struct server_view *
