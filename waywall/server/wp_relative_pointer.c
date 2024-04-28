@@ -197,3 +197,8 @@ server_relative_pointer_create(struct server *server, struct config *cfg) {
     relative_pointer->config.sens = cfg->input.sens;
     return relative_pointer;
 }
+
+void
+server_relative_pointer_set_sens(struct server_relative_pointer *relative_pointer, double sens) {
+    relative_pointer->config.sens = sens;
+}
