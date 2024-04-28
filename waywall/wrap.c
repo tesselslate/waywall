@@ -127,6 +127,9 @@ on_view_create(struct wl_listener *listener, void *data) {
     wrap->view = view;
 
     server_set_input_focus(wrap->server, wrap->view);
+    server_ui_show(wrap->server->ui);
+
+    ww_assert(wrap->width > 0 && wrap->height > 0);
     layout(wrap);
 }
 

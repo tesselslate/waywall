@@ -202,7 +202,6 @@ server_create(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to initialize server_ui");
         goto fail_ui;
     }
-    server_ui_show(server->ui);
 
     return server;
 

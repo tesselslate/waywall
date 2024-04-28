@@ -4,6 +4,7 @@
 #include "inotify.h"
 #include "reload.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "wall.h"
@@ -134,6 +135,8 @@ cmd_run(const char *profile) {
         ww_log_errno(LOG_ERROR, "failed to write waywall-display");
         goto fail_socket_write;
     }
+
+    server_ui_show(ww.server->ui);
     wl_display_run(ww.server->display);
 
     reload_destroy(ww.reload);
