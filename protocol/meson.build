@@ -12,6 +12,7 @@ protocol_xmls = [
   'stable/viewporter/viewporter.xml',
   'stable/xdg-shell/xdg-shell.xml',
   'staging/cursor-shape/cursor-shape-v1.xml',
+  'staging/xwayland-shell/xwayland-shell-v1.xml',
   'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
   'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
   'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
