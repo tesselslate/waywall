@@ -53,6 +53,9 @@ executable('waywall',
     wayland_cursor,
     wayland_server,
     xkbcommon,
+
+    xcb,
+    xwayland,
   ],
 
   include_directories: includes,

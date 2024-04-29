@@ -29,6 +29,9 @@ wayland_scanner = dependency('wayland-scanner')
 wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 
+xcb = dependency('xcb')
+xwayland = dependency('xwayland')
+
 subdir('protocol')
 subdir('test')
 subdir('waywall')
