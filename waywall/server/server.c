@@ -17,6 +17,7 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "xwayland/xwayland.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -188,6 +189,10 @@ server_create(struct config *cfg) {
     }
     server->xdg_shell = server_xdg_wm_base_create(server);
     if (!server->xdg_shell) {
+        goto fail_globals;
+    }
+    server->xwayland = server_xwayland_create(server);
+    if (!server->xwayland) {
         goto fail_globals;
     }
 
