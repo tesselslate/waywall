@@ -377,6 +377,8 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     surface->current.buffer_scale = 1;
 
     wl_signal_init(&surface->events.commit);
+
+    wl_signal_emit_mutable(&compositor->events.new_surface, surface);
 }
 
 static const struct wl_compositor_interface compositor_impl = {
@@ -402,8 +404,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_compositor *compositor =
         wl_container_of(listener, compositor, on_display_destroy);
 
-    wl_region_destroy(compositor->empty_region);
+    wl_signal_emit_mutable(&compositor->events.destroy, compositor);
 
+    wl_region_destroy(compositor->empty_region);
     wl_global_destroy(compositor->global);
 
     wl_list_remove(&compositor->on_display_destroy.link);
@@ -424,6 +427,9 @@ server_compositor_create(struct server *server) {
 
     compositor->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &compositor->on_display_destroy);
+
+    wl_signal_init(&compositor->events.destroy);
+    wl_signal_init(&compositor->events.new_surface);
 
     return compositor;
 }

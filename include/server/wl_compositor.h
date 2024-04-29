@@ -13,6 +13,11 @@ struct server_compositor {
     struct wl_region *empty_region;
 
     struct wl_listener on_display_destroy;
+
+    struct {
+        struct wl_signal destroy;
+        struct wl_signal new_surface;
+    } events;
 };
 
 struct server_region {
