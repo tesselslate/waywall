@@ -105,6 +105,8 @@ static void
 surface_resource_destroy(struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
+    wl_signal_emit(&surface->events.destroy, surface);
+
     if (surface->role && surface->role_resource) {
         surface->role->destroy(surface->role_resource);
     }
@@ -377,6 +379,7 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     surface->current.buffer_scale = 1;
 
     wl_signal_init(&surface->events.commit);
+    wl_signal_init(&surface->events.destroy);
 
     wl_signal_emit_mutable(&compositor->events.new_surface, surface);
 }

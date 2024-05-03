@@ -57,7 +57,8 @@ struct server_surface {
     struct wl_resource *role_resource;
 
     struct {
-        struct wl_signal commit; // data: struct server_surface *
+        struct wl_signal commit;  // data: struct server_surface *
+        struct wl_signal destroy; // data: struct server_surface *
     } events;
 };
 
