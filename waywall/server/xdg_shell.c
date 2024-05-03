@@ -27,8 +27,9 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
 }
 
 static pid_t
-xdg_toplevel_view_get_pid(struct wl_resource *role_resource) {
-    struct wl_client *client = wl_resource_get_client(role_resource);
+xdg_toplevel_view_get_pid(void *data) {
+    struct server_xdg_toplevel *xdg_toplevel = data;
+    struct wl_client *client = wl_resource_get_client(xdg_toplevel->resource);
 
     pid_t pid;
     wl_client_get_credentials(client, &pid, NULL, NULL);
@@ -36,8 +37,8 @@ xdg_toplevel_view_get_pid(struct wl_resource *role_resource) {
 }
 
 static char *
-xdg_toplevel_view_get_title(struct wl_resource *role_resource) {
-    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(role_resource);
+xdg_toplevel_view_get_title(void *data) {
+    struct server_xdg_toplevel *xdg_toplevel = data;
 
     if (xdg_toplevel->title) {
         return strdup(xdg_toplevel->title);
@@ -47,8 +48,8 @@ xdg_toplevel_view_get_title(struct wl_resource *role_resource) {
 }
 
 static void
-xdg_toplevel_view_set_size(struct wl_resource *role_resource, uint32_t width, uint32_t height) {
-    struct server_xdg_toplevel *xdg_toplevel = server_xdg_toplevel_from_resource(role_resource);
+xdg_toplevel_view_set_size(void *data, uint32_t width, uint32_t height) {
+    struct server_xdg_toplevel *xdg_toplevel = data;
 
     xdg_toplevel->width = width;
     xdg_toplevel->height = height;
@@ -117,7 +118,7 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
 
         xdg_toplevel->view =
             server_view_create(xdg_surface->xdg_wm_base->server->ui, xdg_surface->parent,
-                               &xdg_toplevel_view_impl, xdg_toplevel->resource);
+                               &xdg_toplevel_view_impl, xdg_toplevel);
     }
 }
 

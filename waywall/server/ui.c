@@ -414,17 +414,17 @@ server_ui_config_destroy(struct server_ui_config *config) {
 
 pid_t
 server_view_get_pid(struct server_view *view) {
-    return view->impl->get_pid(view->impl_resource);
+    return view->impl->get_pid(view->impl_data);
 }
 
 char *
 server_view_get_title(struct server_view *view) {
-    return view->impl->get_title(view->impl_resource);
+    return view->impl->get_title(view->impl_data);
 }
 
 struct server_view *
 server_view_create(struct server_ui *ui, struct server_surface *surface,
-                   const struct server_view_impl *impl, struct wl_resource *impl_resource) {
+                   const struct server_view_impl *impl, void *impl_data) {
     struct server_view *view = zalloc(1, sizeof(*view));
 
     view->ui = ui;
@@ -436,7 +436,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     view->state.crop = (struct box){-1, -1, -1, -1};
 
     view->impl = impl;
-    view->impl_resource = impl_resource;
+    view->impl_data = impl_data;
 
     view->on_surface_commit.notify = on_view_surface_commit;
     wl_signal_add(&view->surface->events.commit, &view->on_surface_commit);
@@ -500,7 +500,7 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
                 wl_list_insert(&txn->dependencies, &tv->resize_dep.link);
             }
 
-            tv->view->impl->set_size(tv->view->impl_resource, tv->width, tv->height);
+            tv->view->impl->set_size(tv->view->impl_data, tv->width, tv->height);
         }
         if (tv->apply & TXN_VIEW_VISIBLE) {
             txn_apply_visible(tv, ui);

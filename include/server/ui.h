@@ -57,7 +57,7 @@ struct server_view {
     } state;
 
     const struct server_view_impl *impl;
-    struct wl_resource *impl_resource;
+    void *impl_data;
 
     struct wl_listener on_surface_commit;
 
@@ -70,9 +70,9 @@ struct server_view {
 struct server_view_impl {
     const char *name;
 
-    pid_t (*get_pid)(struct wl_resource *impl_resource);
-    char *(*get_title)(struct wl_resource *impl_resource);
-    void (*set_size)(struct wl_resource *impl_resource, uint32_t width, uint32_t height);
+    pid_t (*get_pid)(void *impl_data);
+    char *(*get_title)(void *impl_data);
+    void (*set_size)(void *impl_data, uint32_t width, uint32_t height);
 };
 
 struct transaction {
@@ -147,8 +147,7 @@ pid_t server_view_get_pid(struct server_view *view);
 char *server_view_get_title(struct server_view *view);
 
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,
-                                       const struct server_view_impl *impl,
-                                       struct wl_resource *impl_resource);
+                                       const struct server_view_impl *impl, void *impl_data);
 void server_view_destroy(struct server_view *view);
 
 void transaction_apply(struct server_ui *ui, struct transaction *txn);
