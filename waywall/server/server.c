@@ -14,10 +14,13 @@
 #include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
+#include "server/xserver.h"
 #include "server/xwayland.h"
+#include "server/xwayland_shell.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "xwayland-shell-v1-server-protocol.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -117,6 +120,17 @@ backend_display_tick(int fd, uint32_t mask, void *data) {
     return dispatched > 0;
 }
 
+static bool
+global_filter(const struct wl_client *client, const struct wl_global *global, void *data) {
+    struct server *server = data;
+
+    if (wl_global_get_interface(global) == &xwayland_shell_v1_interface) {
+        return client == server->xwayland->xserver->client;
+    } else {
+        return true;
+    }
+}
+
 struct server *
 server_create(struct config *cfg) {
     struct server *server = zalloc(1, sizeof(*server));
@@ -191,6 +205,11 @@ server_create(struct config *cfg) {
     if (!server->xdg_shell) {
         goto fail_globals;
     }
+    server->xwayland_shell = server_xwayland_shell_create(server);
+    if (!server->xwayland_shell) {
+        goto fail_globals;
+    }
+
     server->xwayland = server_xwayland_create(server);
     if (!server->xwayland) {
         goto fail_globals;
@@ -214,6 +233,8 @@ server_create(struct config *cfg) {
         ww_log(LOG_ERROR, "failed to initialize server_output");
         goto fail_output;
     }
+
+    wl_display_set_global_filter(server->display, global_filter, server);
 
     return server;
 

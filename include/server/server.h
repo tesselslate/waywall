@@ -30,6 +30,8 @@ struct server {
     struct server_shm *shm;
     struct server_xdg_decoration_manager *xdg_decoration;
     struct server_xdg_wm_base *xdg_shell;
+    struct server_xwayland_shell *xwayland_shell;
+
     struct server_xwayland *xwayland;
 
     struct wl_list clients; // server_client.link
