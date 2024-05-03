@@ -1,5 +1,5 @@
-#ifndef WAYWALL_XWAYLAND_XWAYLAND_H
-#define WAYWALL_XWAYLAND_XWAYLAND_H
+#ifndef WAYWALL_SERVER_XWAYLAND_H
+#define WAYWALL_SERVER_XWAYLAND_H
 
 #include <stdint.h>
 #include <wayland-server-core.h>

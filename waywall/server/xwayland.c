@@ -1,9 +1,9 @@
-#include "xwayland/xwayland.h"
+#include "server/xwayland.h"
 #include "server/server.h"
+#include "server/xserver.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
-#include "xwayland/xserver.h"
 
 /*
  * This code is partially my own making, but was largely only possible to write after combing

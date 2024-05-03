@@ -14,10 +14,10 @@
 #include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
+#include "server/xwayland.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
-#include "xwayland/xwayland.h"
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

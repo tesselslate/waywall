@@ -1,7 +1,7 @@
-#ifndef WAYWALL_XWAYLAND_XSERVER_H
-#define WAYWALL_XWAYLAND_XSERVER_H
+#ifndef WAYWALL_SERVER_XSERVER_H
+#define WAYWALL_SERVER_XSERVER_H
 
-#include "xwayland/xwayland.h"
+#include "server/xwayland.h"
 #include <sys/types.h>
 #include <wayland-server-core.h>
 

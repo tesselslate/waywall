@@ -1,10 +1,10 @@
-#include "xwayland/xserver.h"
+#include "server/xserver.h"
 #include "server/server.h"
+#include "server/xwayland.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "util/syscall.h"
-#include "xwayland/xwayland.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
