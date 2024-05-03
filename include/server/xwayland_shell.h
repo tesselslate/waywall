@@ -11,6 +11,8 @@ struct server_xwayland_shell {
     struct wl_global *global;
     struct wl_resource *resource;
 
+    bool bound;
+
     struct wl_listener on_display_destroy;
 
     struct {

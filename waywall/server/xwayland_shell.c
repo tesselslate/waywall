@@ -75,7 +75,9 @@ xwayland_shell_resource_destroy(struct wl_resource *resource) {
     struct server_xwayland_shell *xwayland_shell = wl_resource_get_user_data(resource);
 
     ww_assert(xwayland_shell->resource == resource);
+
     xwayland_shell->resource = NULL;
+    xwayland_shell->bound = false;
 }
 
 static void
@@ -137,6 +139,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
                                    xwayland_shell_resource_destroy);
 
     xwayland_shell->resource = resource;
+    xwayland_shell->bound = true;
 }
 
 static void
