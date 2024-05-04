@@ -32,6 +32,11 @@ struct server_backend {
     struct wp_viewporter *viewporter;
     struct xdg_wm_base *xdg_wm_base;
 
+    struct {
+        uint32_t name;
+        bool found;
+    } drm;
+
     // optional globals
     struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
     struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
