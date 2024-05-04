@@ -449,6 +449,14 @@ server_surface_from_resource(struct wl_resource *resource) {
     return wl_resource_get_user_data(resource);
 }
 
+struct server_surface *
+server_surface_try_from_resource(struct wl_resource *resource) {
+    if (wl_resource_instance_of(resource, &wl_surface_interface, &surface_impl)) {
+        return wl_resource_get_user_data(resource);
+    }
+    return NULL;
+}
+
 int
 server_surface_set_role(struct server_surface *surface, const struct server_surface_role *role,
                         struct wl_resource *role_resource) {

@@ -72,6 +72,7 @@ struct server_surface_role {
 struct server_compositor *server_compositor_create(struct server *server);
 struct server_region *server_region_from_resource(struct wl_resource *resource);
 struct server_surface *server_surface_from_resource(struct wl_resource *resource);
+struct server_surface *server_surface_try_from_resource(struct wl_resource *resource);
 int server_surface_set_role(struct server_surface *surface, const struct server_surface_role *role,
                             struct wl_resource *role_resource);
 
