@@ -6,6 +6,7 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_data_device_manager.h"
+#include "server/wl_drm.h"
 #include "server/wl_output.h"
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
@@ -179,6 +180,10 @@ server_create(struct config *cfg) {
 
     server->data_device_manager = server_data_device_manager_create(server);
     if (!server->data_device_manager) {
+        goto fail_globals;
+    }
+    server->drm = server_drm_create(server);
+    if (!server->drm) {
         goto fail_globals;
     }
     server->linux_dmabuf = server_linux_dmabuf_create(server);
