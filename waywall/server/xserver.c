@@ -97,6 +97,10 @@ static int
 handle_pidfd(int32_t fd, uint32_t mask, void *data) {
     struct xserver *srv = data;
 
+    if (waitpid(srv->pid, NULL, 0) != srv->pid) {
+        ww_log_errno(LOG_ERROR, "failed to waitpid on Xwayland");
+    }
+
     wl_event_source_remove(srv->src_pidfd);
     srv->src_pidfd = NULL;
 
