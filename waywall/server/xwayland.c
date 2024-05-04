@@ -1,6 +1,7 @@
 #include "server/xwayland.h"
 #include "server/server.h"
 #include "server/xserver.h"
+#include "server/xwm.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -66,6 +67,11 @@ static void
 on_ready(struct wl_listener *listener, void *data) {
     struct server_xwayland *xwl = wl_container_of(listener, xwl, on_ready);
 
+    xwl->xwm = xwm_create(xwl, xwl->shell, xwl->xserver->fd_xwm[0]);
+    if (!xwl->xwm) {
+        return;
+    }
+
 #warning TODO seat
 #warning TODO cursor
 
@@ -77,6 +83,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_xwayland *xwl = wl_container_of(listener, xwl, on_display_destroy);
 
     xserver_destroy(xwl->xserver);
+    if (xwl->xwm) {
+        xwm_destroy(xwl->xwm);
+    }
 
     wl_list_remove(&xwl->on_display_destroy.link);
 
@@ -84,10 +93,11 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 }
 
 struct server_xwayland *
-server_xwayland_create(struct server *server) {
+server_xwayland_create(struct server *server, struct server_xwayland_shell *shell) {
     struct server_xwayland *xwl = zalloc(1, sizeof(*xwl));
 
     xwl->server = server;
+    xwl->shell = shell;
 
     xwl->xserver = xserver_create(xwl);
     if (!xwl->xserver) {

@@ -184,6 +184,12 @@ xserver_exec(struct xserver *srv, int notify_fd) {
         }
     }
 
+    // Determine the Xwayland binary to use.
+    char *xwl_path = "Xwayland";
+    if (getenv("WAYWALL_XWAYLAND_BINARY")) {
+        xwl_path = getenv("WAYWALL_XWAYLAND_BINARY");
+    }
+
     // Build the command to pass to execvp.
     char *argv[64];
     size_t i = 0;
@@ -192,7 +198,7 @@ xserver_exec(struct xserver *srv, int notify_fd) {
     snprintf(wmfd, STATIC_ARRLEN(wmfd), "%d", srv->fd_xwm[1]);
     snprintf(displayfd, STATIC_ARRLEN(displayfd), "%d", notify_fd);
 
-    argv[i++] = "Xwayland";
+    argv[i++] = xwl_path;
     argv[i++] = "-rootless"; // run in rootless mode
     argv[i++] = "-core";     // make core dumps
     argv[i++] = "-noreset";  // do not reset when the last client disconnects

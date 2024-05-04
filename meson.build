@@ -30,6 +30,9 @@ wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 
 xcb = dependency('xcb')
+xcb_composite = dependency('xcb-composite')
+xcb_errors = dependency('xcb-errors')
+xcb_res = dependency('xcb-res')
 xwayland = dependency('xwayland')
 
 subdir('protocol')

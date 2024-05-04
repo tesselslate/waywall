@@ -215,7 +215,7 @@ server_create(struct config *cfg) {
         goto fail_globals;
     }
 
-    server->xwayland = server_xwayland_create(server);
+    server->xwayland = server_xwayland_create(server, server->xwayland_shell);
     if (!server->xwayland) {
         goto fail_globals;
     }

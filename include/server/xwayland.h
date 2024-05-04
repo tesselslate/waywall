@@ -8,8 +8,10 @@ struct server;
 
 struct server_xwayland {
     struct server *server;
+    struct server_xwayland_shell *shell;
 
     struct xserver *xserver;
+    struct xwm *xwm;
 
     struct wl_listener on_display_destroy;
     struct wl_listener on_ready;
@@ -19,6 +21,7 @@ struct server_xwayland {
     } events;
 };
 
-struct server_xwayland *server_xwayland_create(struct server *server);
+struct server_xwayland *server_xwayland_create(struct server *server,
+                                               struct server_xwayland_shell *shell);
 
 #endif
