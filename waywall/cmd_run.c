@@ -73,7 +73,7 @@ cmd_run(const char *profile) {
         return 1;
     }
 
-    int display_file_fd = open("/tmp/waywall-display", O_WRONLY | O_CREAT, 0644);
+    int display_file_fd = open("/tmp/waywall-display", O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
     if (display_file_fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open /tmp/waywall-display");
         return 1;
