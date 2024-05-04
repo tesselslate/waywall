@@ -17,7 +17,7 @@ set_file(struct counter *counter, const char *path) {
     char *path_dup = strdup(path);
     check_alloc(path_dup);
 
-    int fd = open(path, O_CREAT | O_RDWR, 0644);
+    int fd = open(path, O_RDWR | O_CREAT | O_CLOEXEC, 0644);
     if (fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
         goto fail_open;
