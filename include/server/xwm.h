@@ -1,6 +1,10 @@
 #ifndef WAYWALL_SERVER_XWM_H
 #define WAYWALL_SERVER_XWM_H
 
+#ifndef WAYWALL_XWAYLAND
+#error xwm.h should only be included with Xwayland support enabled
+#endif
+
 #include "server/xwayland.h"
 #include <wayland-server-core.h>
 #include <xcb/xcb.h>

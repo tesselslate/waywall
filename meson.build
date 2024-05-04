@@ -19,21 +19,41 @@ includes = include_directories('include')
 
 cc = meson.get_compiler('c')
 
-libm = cc.find_library('m')
 libzip = dependency('libzip')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
-wayland_protocols = dependency('wayland-protocols')
-wayland_scanner = dependency('wayland-scanner')
 wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 
-xcb = dependency('xcb')
-xcb_composite = dependency('xcb-composite')
-xcb_errors = dependency('xcb-errors')
-xcb_res = dependency('xcb-res')
-xwayland = dependency('xwayland')
+waywall_deps = [
+  cc.find_library('m'),
+
+  libzip,
+  luajit,
+  wayland_client,
+  wayland_cursor,
+  wayland_server,
+  xkbcommon,
+]
+
+wayland_protocols = dependency('wayland-protocols')
+wayland_scanner = dependency('wayland-scanner')
+
+if get_option('xwayland').enabled()
+  waywall_deps += dependency('xcb')
+  waywall_deps += dependency('xcb-composite')
+  waywall_deps += dependency('xcb-errors')
+  waywall_deps += dependency('xcb-res')
+  waywall_deps += dependency('xwayland')
+
+  add_project_arguments(
+    [
+      '-DWAYWALL_XWAYLAND',
+    ],
+    language: 'c',
+  )
+endif
 
 subdir('protocol')
 subdir('test')

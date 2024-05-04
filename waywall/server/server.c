@@ -15,9 +15,6 @@
 #include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
 #include "server/xdg_shell.h"
-#include "server/xserver.h"
-#include "server/xwayland.h"
-#include "server/xwayland_shell.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -28,6 +25,14 @@
 #include <sys/types.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
+
+#ifdef WAYWALL_XWAYLAND
+
+#include "server/xserver.h"
+#include "server/xwayland.h"
+#include "server/xwayland_shell.h"
+
+#endif
 
 struct server_client {
     struct wl_list link; // server.clients
@@ -123,6 +128,8 @@ backend_display_tick(int fd, uint32_t mask, void *data) {
 
 static bool
 global_filter(const struct wl_client *client, const struct wl_global *global, void *data) {
+#ifdef WAYWALL_XWAYLAND
+
     struct server *server = data;
 
     if (wl_global_get_interface(global) == &xwayland_shell_v1_interface) {
@@ -130,6 +137,12 @@ global_filter(const struct wl_client *client, const struct wl_global *global, vo
     } else {
         return true;
     }
+
+#else
+
+    return true;
+
+#endif
 }
 
 struct server *
@@ -210,6 +223,9 @@ server_create(struct config *cfg) {
     if (!server->xdg_shell) {
         goto fail_globals;
     }
+
+#ifdef WAYWALL_XWAYLAND
+
     server->xwayland_shell = server_xwayland_shell_create(server);
     if (!server->xwayland_shell) {
         goto fail_globals;
@@ -219,6 +235,8 @@ server_create(struct config *cfg) {
     if (!server->xwayland) {
         goto fail_globals;
     }
+
+#endif
 
     server->cursor = server_cursor_create(server, cfg);
     if (!server->cursor) {

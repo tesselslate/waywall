@@ -1,6 +1,6 @@
 subdir('lua')
 
-executable('waywall',
+waywall_src = [
   'config/action.c',
   'config/api.c',
   'config/config.c',
@@ -26,10 +26,6 @@ executable('waywall',
   'server/wp_relative_pointer.c',
   'server/xdg_decoration.c',
   'server/xdg_shell.c',
-  'server/xserver.c',
-  'server/xwayland.c',
-  'server/xwayland_shell.c',
-  'server/xwm.c',
   'util/log.c',
   'util/prelude.c',
   'util/str.c',
@@ -45,26 +41,21 @@ executable('waywall',
   'reload.c',
   'wall.c',
   'wrap.c',
+]
 
+if get_option('xwayland').enabled()
+  waywall_src += 'server/xserver.c'
+  waywall_src += 'server/xwayland.c'
+  waywall_src += 'server/xwayland_shell.c'
+  waywall_src += 'server/xwm.c'
+endif
+
+executable('waywall',
+  waywall_src,
   protocol_headers,
   protocol_sources,
   lua_headers,
 
-  dependencies: [
-    libm,
-    libzip,
-    luajit,
-    wayland_client,
-    wayland_cursor,
-    wayland_server,
-    xkbcommon,
-
-    xcb,
-    xcb_composite,
-    xcb_errors,
-    xcb_res,
-    xwayland,
-  ],
-
+  dependencies: waywall_deps,
   include_directories: includes,
 )

@@ -1,6 +1,10 @@
 #ifndef WAYWALL_SERVER_XSERVER_H
 #define WAYWALL_SERVER_XSERVER_H
 
+#ifndef WAYWALL_XWAYLAND
+#error xserver.h should only be included with Xwayland support enabled
+#endif
+
 #include "server/xwayland.h"
 #include <sys/types.h>
 #include <wayland-server-core.h>
