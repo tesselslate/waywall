@@ -76,10 +76,6 @@
 
 static int xserver_start(struct xserver *srv);
 
-static const char X11_LOCK_FMT[] = "/tmp/.X%d-lock";
-static const char X11_SOCKET_DIR[] = "/tmp/.X11-unix/";
-static const char X11_SOCKET_FMT[] = "/tmp/.X11-unix/X%d";
-
 static void
 on_client_destroy(struct wl_listener *listener, void *data) {
     struct xserver *srv = wl_container_of(listener, srv, on_client_destroy);
@@ -114,13 +110,21 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
 
     // To be honest, I have no idea what any of this does. I took it from wlroots.
     if (mask & WL_EVENT_READABLE) {
-        char buf[64];
+        char buf[64] = {0};
         ssize_t n = read(fd, buf, STATIC_ARRLEN(buf));
         if (n == -1 && errno != EINTR) {
             ww_log_errno(LOG_ERROR, "failed to read from xwayland displayfd");
             mask = 0;
         } else if (n <= 0 || buf[n - 1] != '\n') {
             return 1;
+        } else {
+            errno = 0;
+            srv->display = strtol(buf, NULL, 10);
+            if (errno != 0) {
+                ww_log_errno(LOG_ERROR, "failed to read display from displayfd");
+            } else {
+                ww_log(LOG_INFO, "using X11 display :%d", srv->display);
+            }
         }
     }
 
@@ -163,176 +167,6 @@ set_cloexec(int fd, bool cloexec) {
     return 0;
 }
 
-static int
-ensure_socket_dir() {
-    // If the directory does not exist, we can create it ourselves.
-    if (mkdir(X11_SOCKET_DIR, 0777) == 0) {
-        ww_log(LOG_WARN, "created X11 socket dir - unwritable by other users");
-        return 0;
-    } else if (errno != EEXIST) {
-        ww_log_errno(LOG_ERROR, "failed to create X11 socket dir '%s'", X11_SOCKET_DIR);
-        return 1;
-    }
-
-    // Ensure that the socket directory is a directory.
-    struct stat stat;
-    if (lstat(X11_SOCKET_DIR, &stat) != 0) {
-        ww_log_errno(LOG_ERROR, "failed to stat X11 socket dir '%s'", X11_SOCKET_DIR);
-        return 1;
-    }
-    if (!S_ISDIR(stat.st_mode)) {
-        ww_log(LOG_ERROR, "X11 socket dir '%s' is not a directory", X11_SOCKET_DIR);
-        return 1;
-    }
-
-    // TODO: wlroots does some additional permissions checks but I don't think other users messing
-    // with our X11 sockets is a huge concern
-
-    return 0;
-}
-
-static int
-open_socket(struct sockaddr_un *addr, size_t len) {
-    socklen_t size = offsetof(struct sockaddr_un, sun_path) + len + 1;
-    char err_prefix = addr->sun_path[0] ? addr->sun_path[0] : '@';
-
-    int fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to create socket %c%s", err_prefix, addr->sun_path + 1);
-        return -1;
-    }
-
-    if (addr->sun_path[0]) {
-        unlink(addr->sun_path);
-    }
-
-    if (bind(fd, (struct sockaddr *)addr, size) != 0) {
-        ww_log_errno(LOG_ERROR, "failed to bind socket %c%s", err_prefix, addr->sun_path + 1);
-        goto fail;
-    }
-
-    if (listen(fd, 1) != 0) {
-        ww_log_errno(LOG_ERROR, "failed to listen on socket %c%s", err_prefix, addr->sun_path + 1);
-        goto fail;
-    }
-
-    return fd;
-
-fail:
-    close(fd);
-    if (addr->sun_path[0]) {
-        unlink(addr->sun_path);
-    }
-    return -1;
-}
-
-static int
-open_x11_display(int display, int fd_x11[static 2], int lock_fd) {
-    if (ensure_socket_dir() != 0) {
-        return 1;
-    }
-
-    // Open a socket pair.
-    struct sockaddr_un addr = {0};
-    addr.sun_family = AF_LOCAL;
-
-    addr.sun_path[0] = 0;
-    ssize_t len =
-        snprintf(addr.sun_path + 1, STATIC_ARRLEN(addr.sun_path) - 1, X11_SOCKET_FMT, display);
-    fd_x11[0] = open_socket(&addr, len);
-    if (fd_x11[0] == -1) {
-        return 1;
-    }
-
-    len = snprintf(addr.sun_path, STATIC_ARRLEN(addr.sun_path), X11_SOCKET_FMT, display);
-    fd_x11[1] = open_socket(&addr, len);
-    if (fd_x11[1] == -1) {
-        close(fd_x11[0]);
-        fd_x11[0] = -1;
-        return 1;
-    }
-
-    // Write the compositor PID to the X11 lockfile.
-    char pid[12] = {0};
-    snprintf(pid, sizeof(pid), "%10d", getpid());
-    if (write(lock_fd, pid, STATIC_STRLEN(pid)) != STATIC_STRLEN(pid)) {
-        close(fd_x11[0]);
-        close(fd_x11[1]);
-        fd_x11[0] = fd_x11[1] = -1;
-
-        return 1;
-    }
-
-    return 0;
-}
-
-static int
-acquire_x11_display(int fd_x11[static 2]) {
-    for (int display = 0; display <= 32; display++) {
-        char lock_name[64] = {0};
-        ssize_t n = snprintf(lock_name, STATIC_ARRLEN(lock_name), X11_LOCK_FMT, display);
-        ww_assert(n <= (ssize_t)STATIC_STRLEN(lock_name));
-
-        // If the lock file does not exist (O_EXCL), we can take it for ourselves.
-        int lock_fd = open(lock_name, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0444);
-        if (lock_fd >= 0) {
-            if (open_x11_display(display, fd_x11, lock_fd) != 0) {
-                unlink(lock_name);
-                close(lock_fd);
-                continue;
-            }
-
-            close(lock_fd);
-            return display;
-        }
-
-        // If the lock file does exist, see if it is actually in use anymore. Read the process ID
-        // from the lock file and then use `kill()` to check if it is still alive.
-        lock_fd = open(lock_name, O_RDONLY | O_CLOEXEC);
-        if (lock_fd == -1) {
-            continue;
-        }
-
-        char pidbuf[12] = {0};
-        if (read(lock_fd, pidbuf, STATIC_STRLEN(pidbuf)) != STATIC_STRLEN(pidbuf)) {
-            close(lock_fd);
-            continue;
-        }
-        close(lock_fd);
-
-        char *endptr = NULL;
-        long pid = strtol(pidbuf, &endptr, 10);
-        if (pid < 0 || pid > INT32_MAX || endptr != pidbuf + STATIC_STRLEN(pidbuf) - 1) {
-            continue;
-        }
-
-        errno = 0;
-        if (kill(pid, 0) != 0 && errno == ESRCH) {
-            if (unlink(lock_name) != 0) {
-                continue;
-            }
-
-            // The process which owned this lock no longer exists. Try to acquire the lock again.
-            --display;
-            continue;
-        }
-    }
-
-    ww_log(LOG_ERROR, "no X11 displays available");
-    return -1;
-}
-
-static void
-unlink_x11_display(int display) {
-    char buf[64];
-
-    snprintf(buf, STATIC_ARRLEN(buf), X11_SOCKET_FMT, display);
-    unlink(buf);
-
-    snprintf(buf, STATIC_ARRLEN(buf), X11_LOCK_FMT, display);
-    unlink(buf);
-}
-
 static void
 xserver_exec(struct xserver *srv, int notify_fd) {
     // This function should only ever be run in the context of the child process created from
@@ -340,8 +174,6 @@ xserver_exec(struct xserver *srv, int notify_fd) {
 
     // Unset CLOEXEC on the file descriptors which will be owned by the X server.
     const int fds[] = {
-        srv->fd_x11[0],
-        srv->fd_x11[1],
         srv->fd_xwm[1],
         srv->fd_wl[1],
     };
@@ -356,22 +188,14 @@ xserver_exec(struct xserver *srv, int notify_fd) {
     char *argv[64];
     size_t i = 0;
 
-    char xfd0[16], xfd1[16], wmfd[16], displayfd[16];
-    snprintf(xfd0, STATIC_ARRLEN(xfd0), "%d", srv->fd_x11[0]);
-    snprintf(xfd1, STATIC_ARRLEN(xfd1), "%d", srv->fd_x11[1]);
+    char wmfd[16], displayfd[16];
     snprintf(wmfd, STATIC_ARRLEN(wmfd), "%d", srv->fd_xwm[1]);
     snprintf(displayfd, STATIC_ARRLEN(displayfd), "%d", notify_fd);
 
     argv[i++] = "Xwayland";
-    argv[i++] = srv->display_name; // pre-acquired X11 display
-    argv[i++] = "-rootless";       // run in rootless mode
-    argv[i++] = "-core";           // make core dumps
-    argv[i++] = "-noreset";        // do not reset when the last client disconnects
-
-    argv[i++] = "-listenfd";
-    argv[i++] = xfd0;
-    argv[i++] = "-listenfd";
-    argv[i++] = xfd1;
+    argv[i++] = "-rootless"; // run in rootless mode
+    argv[i++] = "-core";     // make core dumps
+    argv[i++] = "-noreset";  // do not reset when the last client disconnects
 
     argv[i++] = "-displayfd";
     argv[i++] = displayfd;
@@ -386,7 +210,7 @@ xserver_exec(struct xserver *srv, int notify_fd) {
     snprintf(wayland_socket, STATIC_ARRLEN(wayland_socket), "%d", srv->fd_wl[1]);
     setenv("WAYLAND_SOCKET", wayland_socket, true);
 
-    ww_log(LOG_INFO, "running Xwayland on display '%s'", srv->display_name);
+    ww_log(LOG_INFO, "running Xwayland");
     ww_assert(close(STDIN_FILENO) == 0);
 
     execvp(argv[0], argv);
@@ -435,13 +259,10 @@ xserver_start(struct xserver *srv) {
 
     // The Xwayland process owns the other half of the displayfd pipe.
     // Close any file descriptors which the Xwayland process is supposed to own.
-    close(srv->fd_x11[0]);
-    close(srv->fd_x11[1]);
     close(srv->fd_wl[1]);
     close(srv->fd_xwm[1]);
     close(notify_fd[1]);
 
-    srv->fd_x11[0] = srv->fd_x11[1] = -1;
     srv->fd_wl[1] = -1;
     srv->fd_xwm[1] = -1;
 
@@ -466,19 +287,10 @@ xserver_create(struct server_xwayland *xwl) {
     struct xserver *srv = zalloc(1, sizeof(*srv));
     srv->wl_display = xwl->server->display;
 
-    srv->fd_x11[0] = srv->fd_x11[1] = -1;
     srv->fd_xwm[0] = srv->fd_xwm[1] = -1;
     srv->fd_wl[0] = srv->fd_wl[1] = -1;
 
     srv->pidfd = -1;
-
-    // Acquire an X11 display.
-    srv->display = acquire_x11_display(srv->fd_x11);
-    if (srv->display == -1) {
-        goto fail;
-    }
-    ww_assert(snprintf(srv->display_name, STATIC_ARRLEN(srv->display_name), ":%d", srv->display) <=
-              (ssize_t)STATIC_STRLEN(srv->display_name));
 
     // Create socket pairs for the Wayland connection and XWM connection.
     if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, srv->fd_wl) != 0) {
@@ -525,8 +337,6 @@ xserver_destroy(struct xserver *srv) {
     safe_close(srv->fd_xwm[1]);
     safe_close(srv->fd_wl[0]);
     safe_close(srv->fd_wl[1]);
-    safe_close(srv->fd_x11[0]);
-    safe_close(srv->fd_x11[1]);
 
     if (srv->pidfd >= 0) {
         if (pidfd_send_signal(srv->pidfd, SIGKILL, NULL, 0) != 0) {
@@ -534,8 +344,6 @@ xserver_destroy(struct xserver *srv) {
         }
         close(srv->pidfd);
     }
-
-    unlink_x11_display(srv->display);
 
     free(srv);
 }
