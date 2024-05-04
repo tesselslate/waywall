@@ -47,7 +47,7 @@ open_group_procs(const char *base, const char *group) {
     str_append(&path, group);
     str_append(&path, "/cgroup.procs");
 
-    int fd = open(path, O_WRONLY);
+    int fd = open(path, O_WRONLY | O_CLOEXEC);
     if (fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
         str_free(path);
@@ -65,7 +65,7 @@ set_group_weight(const char *base, const char *group, int weight) {
     str_append(&path, group);
     str_append(&path, "/cpu.weight");
 
-    int fd = open(path, O_WRONLY);
+    int fd = open(path, O_WRONLY | O_CLOEXEC);
     if (fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open '%s'", path);
         str_free(path);
