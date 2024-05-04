@@ -48,6 +48,27 @@ unlock_pointer(struct server_pointer_constraints *pointer_constraints) {
 }
 
 static void
+confined_pointer_resource_destroy(struct wl_resource *resource) {
+    // Unused.
+}
+
+static void
+confined_pointer_destroy(struct wl_client *client, struct wl_resource *resource) {
+    wl_resource_destroy(resource);
+}
+
+static void
+confined_pointer_set_region(struct wl_client *client, struct wl_resource *resource,
+                            struct wl_resource *region_resource) {
+    // Unused. We don't care about what region Xwayland wants to confine the pointer to.
+}
+
+static const struct zwp_confined_pointer_v1_interface confined_pointer_impl = {
+    .destroy = confined_pointer_destroy,
+    .set_region = confined_pointer_set_region,
+};
+
+static void
 locked_pointer_resource_destroy(struct wl_resource *resource) {
     struct server_pointer_constraints *pointer_constraints = wl_resource_get_user_data(resource);
 
@@ -100,9 +121,15 @@ pointer_constraints_confine_pointer(struct wl_client *client, struct wl_resource
                                     uint32_t id, struct wl_resource *surface_resource,
                                     struct wl_resource *pointer_resource,
                                     struct wl_resource *region_resource, uint32_t lifetime) {
-    // Unused.
-    wl_client_post_implementation_error(client,
-                                        "zwp_pointer_constraints.confine_pointer is not supported");
+    // Unfortunately, Xwayland may attempt to confine the pointer. We don't want to respect it, but
+    // we do need to at least create the confined pointer resource.
+    struct server_pointer_constraints *pointer_constraints = wl_resource_get_user_data(resource);
+
+    struct wl_resource *confined_pointer_resource = wl_resource_create(
+        client, &zwp_confined_pointer_v1_interface, wl_resource_get_version(resource), id);
+    check_alloc(confined_pointer_resource);
+    wl_resource_set_implementation(confined_pointer_resource, &confined_pointer_impl,
+                                   pointer_constraints, confined_pointer_resource_destroy);
 }
 
 static void
