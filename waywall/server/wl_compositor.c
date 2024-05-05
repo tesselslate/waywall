@@ -157,22 +157,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
 
     wl_signal_emit(&surface->events.commit, surface);
 
-    // Check that the buffer size matches the buffer scale.
-    {
-        struct server_buffer *buffer = state->buffer ? state->buffer : surface->current.buffer;
-        if (buffer) {
-            int32_t scale = state->scale > 0 ? state->scale : surface->current.buffer_scale;
-            uint32_t width, height;
-            server_buffer_get_size(buffer, &width, &height);
-            if (width % scale != 0 || height % scale != 0) {
-                wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SIZE,
-                                       "buffer size of (%" PRIu32 ", %" PRIu32
-                                       ") is not multiple of buffer scale %" PRIi32,
-                                       width, height, scale);
-                return;
-            }
-        }
-    }
+    // TODO: fix buffer scale check
 
     if (state->apply & SURFACE_STATE_ATTACH) {
         ww_assert(state->buffer);
