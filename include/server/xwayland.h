@@ -5,6 +5,8 @@
 #error xwayland.h should only be included with Xwayland support enabled
 #endif
 
+#include "server/ui.h"
+#include "server/wl_seat.h"
 #include <stdint.h>
 #include <wayland-server-core.h>
 
@@ -27,5 +29,9 @@ struct server_xwayland {
 
 struct server_xwayland *server_xwayland_create(struct server *server,
                                                struct server_xwayland_shell *shell);
+
+void xwl_send_click(struct server_xwayland *xwl, struct server_view *view);
+void xwl_send_keys(struct server_xwayland *xwl, struct server_view *view, size_t num_keys,
+                   const struct syn_key keys[static num_keys]);
 
 #endif

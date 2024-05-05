@@ -7,6 +7,7 @@
 #include "server/xwayland_shell.h"
 #include "util/alloc.h"
 #include "util/log.h"
+#include "util/prelude.h"
 #include <stdbool.h>
 #include <string.h>
 #include <sys/types.h>
@@ -974,4 +975,12 @@ xwm_destroy(struct xwm *xwm) {
     }
 
     free(xwm);
+}
+
+xcb_window_t
+xwm_window_from_view(struct server_view *view) {
+    ww_assert(strcmp(view->impl->name, "xwayland") == 0);
+
+    struct xsurface *xsurface = view->impl_data;
+    return xsurface->window;
 }

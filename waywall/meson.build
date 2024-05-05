@@ -12,6 +12,7 @@ waywall_src = [
   'server/backend.c',
   'server/buffer.c',
   'server/cursor.c',
+  'server/fake_input.c',
   'server/remote_buffer.c',
   'server/server.c',
   'server/ui.c',

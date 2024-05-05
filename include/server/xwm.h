@@ -50,4 +50,6 @@ struct xwm *xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell
                        int xwm_fd);
 void xwm_destroy(struct xwm *xwm);
 
+xcb_window_t xwm_window_from_view(struct server_view *view);
+
 #endif

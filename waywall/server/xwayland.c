@@ -2,9 +2,12 @@
 #include "server/server.h"
 #include "server/xserver.h"
 #include "server/xwm.h"
+#include "string.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include <time.h>
+#include <xcb/xproto.h>
 
 /*
  * This code is partially my own making, but was largely only possible to write after combing
@@ -63,6 +66,49 @@
  *  SOFTWARE.
  */
 
+static uint32_t
+key_timestamp() {
+    // HACK: Xwayland uses CLOCK_MONOTONIC, which uses a common epoch between applications on Linux.
+    // Ideally, this will remain the case forever, because I don't want to replicate the awful time
+    // approximation logic from resetti.
+
+    // HACK: GLFW expects each keypress to have an ascending timestamp. We must make sure each
+    // timestamp returned by this function is greater than the last.
+
+    // TODO: If there ever exists any case where we issue two consecutive keypresses for the same
+    // key, we must increment the timestamp by 20ms. This will need to track additional state at
+    // that point.
+
+    static uint32_t last_timestamp = 0;
+
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    uint64_t ms = now.tv_sec * 1000 + now.tv_nsec / 1000000;
+
+    if (ms <= last_timestamp) {
+        ms = ++last_timestamp;
+    }
+    last_timestamp = ms;
+
+    return (uint32_t)ms;
+}
+
+static void
+send_key_event(struct server_xwayland *xwl, xcb_window_t window, xcb_keycode_t keycode,
+               bool press) {
+    xcb_key_press_event_t event = {0};
+    event.response_type = press ? XCB_KEY_PRESS : XCB_KEY_RELEASE;
+    event.detail = keycode + 8; // Convert from libinput to XKB
+    event.time = key_timestamp();
+    event.root = window;
+    event.event = window;
+    event.child = window;
+    event.same_screen = true;
+
+    xcb_send_event(xwl->xwm->conn, true, window,
+                   XCB_EVENT_MASK_KEY_PRESS | XCB_EVENT_MASK_KEY_RELEASE, (char *)&event);
+}
+
 static void
 on_ready(struct wl_listener *listener, void *data) {
     struct server_xwayland *xwl = wl_container_of(listener, xwl, on_ready);
@@ -114,4 +160,52 @@ server_xwayland_create(struct server *server, struct server_xwayland_shell *shel
     wl_display_add_destroy_listener(server->display, &xwl->on_display_destroy);
 
     return xwl;
+}
+
+void
+xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
+    // HACK: Sending an EnterNotify event causes GLFW to update the mouse pointer coordinates, so
+    // we don't accidentally click any menu buttons.
+
+    static const uint32_t window_mask = XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
+    static const uint32_t button_mask = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
+
+    xcb_window_t window = xwm_window_from_view(view);
+
+    // Send EnterNotify and LeaveNotify.
+    xcb_enter_notify_event_t notify_event = {0};
+    notify_event.response_type = XCB_ENTER_NOTIFY;
+    notify_event.root = window;
+    notify_event.event = window;
+    notify_event.child = window;
+    xcb_send_event(xwl->xwm->conn, true, window, window_mask, (char *)&notify_event);
+
+    notify_event.response_type = XCB_LEAVE_NOTIFY;
+    xcb_send_event(xwl->xwm->conn, true, window, window_mask, (char *)&notify_event);
+
+    // Send a button press and release.
+    xcb_button_press_event_t button_event = {0};
+    button_event.response_type = XCB_BUTTON_PRESS;
+    button_event.detail = XCB_BUTTON_INDEX_1;
+    button_event.root = window;
+    button_event.event = window;
+    button_event.child = window;
+    xcb_send_event(xwl->xwm->conn, true, window, button_mask, (char *)&button_event);
+
+    button_event.response_type = XCB_BUTTON_RELEASE;
+    xcb_send_event(xwl->xwm->conn, true, window, button_mask, (char *)&button_event);
+
+    xcb_flush(xwl->xwm->conn);
+}
+
+void
+xwl_send_keys(struct server_xwayland *xwl, struct server_view *view, size_t num_keys,
+              const struct syn_key keys[static num_keys]) {
+    xcb_window_t window = xwm_window_from_view(view);
+
+    for (size_t i = 0; i < num_keys; i++) {
+        send_key_event(xwl, window, keys[i].keycode, keys[i].press);
+    }
+
+    xcb_flush(xwl->xwm->conn);
 }
