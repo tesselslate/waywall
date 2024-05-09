@@ -1,18 +1,18 @@
-luajit_program = find_program('luajit')
+luajit_cmd = find_program('luajit')
 
-lua_files = [
+waywall_lua_files = [
   'api.lua',
   'helpers.lua',
   'init.lua',
 ]
 
-lua_headers = []
+waywall_lua = []
 
-foreach lua : lua_files
-  lua_headers += custom_target(
+foreach lua : waywall_lua_files
+  waywall_lua += custom_target(
     lua,
     input: lua,
     output: '@BASENAME@.h',
-    command: [luajit_program, '-b', '-g', '@INPUT@', '@OUTPUT@'],
+    command: [luajit_cmd, '-b', '-g', '@INPUT@', '@OUTPUT@'],
   )
 endforeach

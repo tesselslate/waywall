@@ -1,6 +1,6 @@
 subdir('lua')
 
-waywall_src = [
+waywall_src = files(
   'config/action.c',
   'config/api.c',
   'config/config.c',
@@ -42,20 +42,22 @@ waywall_src = [
   'reload.c',
   'wall.c',
   'wrap.c',
-]
+)
 
 if get_option('xwayland').enabled()
-  waywall_src += 'server/xserver.c'
-  waywall_src += 'server/xwayland.c'
-  waywall_src += 'server/xwayland_shell.c'
-  waywall_src += 'server/xwm.c'
+  waywall_src += files(
+    'server/xserver.c',
+    'server/xwayland.c',
+    'server/xwayland_shell.c',
+    'server/xwm.c',
+  )
 endif
 
 executable('waywall',
   waywall_src,
+  waywall_lua,
   protocol_headers,
   protocol_sources,
-  lua_headers,
 
   dependencies: waywall_deps,
   include_directories: includes,
