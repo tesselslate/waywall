@@ -90,5 +90,4 @@ if get_option('xwayland').enabled()
 endif
 
 subdir('protocol')
-subdir('test')
 subdir('waywall')
