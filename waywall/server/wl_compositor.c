@@ -52,7 +52,6 @@ region_resource_destroy(struct wl_resource *resource) {
     struct server_region *region = wl_resource_get_user_data(resource);
 
     wl_region_destroy(region->remote);
-    wl_array_release(&region->ops);
     free(region);
 }
 
@@ -62,15 +61,6 @@ region_add(struct wl_client *client, struct wl_resource *resource, int32_t x, in
     struct server_region *region = wl_resource_get_user_data(resource);
 
     wl_region_add(region->remote, x, y, width, height);
-
-    struct server_region_op *op = wl_array_add(&region->ops, sizeof(*op));
-    check_alloc(op);
-
-    op->add = true;
-    op->x = x;
-    op->y = y;
-    op->width = width;
-    op->height = height;
 }
 
 static void
@@ -84,15 +74,6 @@ region_subtract(struct wl_client *client, struct wl_resource *resource, int32_t 
     struct server_region *region = wl_resource_get_user_data(resource);
 
     wl_region_subtract(region->remote, x, y, width, height);
-
-    struct server_region_op *op = wl_array_add(&region->ops, sizeof(*op));
-    check_alloc(op);
-
-    op->add = false;
-    op->x = x;
-    op->y = y;
-    op->width = width;
-    op->height = height;
 }
 
 static const struct wl_region_interface region_impl = {
@@ -181,30 +162,12 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         wl_surface_set_buffer_scale(surface->remote, state->scale);
         surface->current.buffer_scale = state->scale;
     }
-    if (state->apply & SURFACE_STATE_OPAQUE) {
-        struct wl_region *region = wl_compositor_create_region(surface->parent->remote);
-        check_alloc(region);
-
-        struct server_region_op *op;
-        wl_array_for_each(op, &state->opaque) {
-            if (op->add) {
-                wl_region_add(region, op->x, op->y, op->width, op->height);
-            } else {
-                wl_region_subtract(region, op->x, op->y, op->width, op->height);
-            }
-        }
-
-        wl_surface_set_opaque_region(surface->remote, region);
-        wl_region_destroy(region);
-    }
 
     wl_array_release(&state->damage);
     wl_array_release(&state->buffer_damage);
-    wl_array_release(&state->opaque);
     surface->pending = (struct server_surface_state){0};
     wl_array_init(&surface->pending.damage);
     wl_array_init(&surface->pending.buffer_damage);
-    wl_array_init(&state->opaque);
 
     wl_surface_commit(surface->remote);
 }
@@ -298,11 +261,8 @@ surface_set_input_region(struct wl_client *client, struct wl_resource *resource,
 static void
 surface_set_opaque_region(struct wl_client *client, struct wl_resource *resource,
                           struct wl_resource *region_resource) {
-    struct server_surface *surface = wl_resource_get_user_data(resource);
-    struct server_region *region = wl_resource_get_user_data(region_resource);
-
-    wl_array_copy(&surface->pending.opaque, &region->ops);
-    surface->pending.apply |= SURFACE_STATE_OPAQUE;
+    // Unused. `set_opaque_region` is just an optimization hint that clients can give to the
+    // compositor, but it requires additional bookkeeping code from waywall.
 }
 
 static const struct wl_surface_interface surface_impl = {
@@ -337,8 +297,6 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
 
     region->remote = wl_compositor_create_region(compositor->remote);
     check_alloc(region->remote);
-
-    wl_array_init(&region->ops);
 }
 
 static void

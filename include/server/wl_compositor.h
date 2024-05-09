@@ -24,7 +24,6 @@ struct server_region {
     struct wl_resource *resource;
 
     struct wl_region *remote;
-    struct wl_array ops; // data: struct server_region_op
 };
 
 struct server_surface {
@@ -42,14 +41,12 @@ struct server_surface {
         struct server_buffer *buffer;
         struct wl_array damage, buffer_damage; // data: struct server_surface_damage
         int32_t scale;
-        struct wl_array opaque; // data: struct server_region_op
 
         enum {
             SURFACE_STATE_ATTACH = (1 << 0),
             SURFACE_STATE_DAMAGE = (1 << 1),
             SURFACE_STATE_DAMAGE_BUFFER = (1 << 2),
             SURFACE_STATE_SCALE = (1 << 3),
-            SURFACE_STATE_OPAQUE = (1 << 4),
         } apply;
     } pending;
 
