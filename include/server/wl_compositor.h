@@ -32,20 +32,16 @@ struct server_surface {
     struct server_compositor *parent;
     struct wl_surface *remote;
 
-    struct {
-        struct server_buffer *buffer;
-    } current;
-
     struct server_surface_state {
         struct server_buffer *buffer;
         struct wl_array damage, buffer_damage; // data: struct server_surface_damage
 
         enum {
-            SURFACE_STATE_ATTACH = (1 << 0),
+            SURFACE_STATE_BUFFER = (1 << 0),
             SURFACE_STATE_DAMAGE = (1 << 1),
             SURFACE_STATE_DAMAGE_BUFFER = (1 << 2),
-        } apply;
-    } pending;
+        } present;
+    } current, pending;
 
     const struct server_surface_role *role;
     struct wl_resource *role_resource;
@@ -67,6 +63,8 @@ struct server_compositor *server_compositor_create(struct server *server);
 struct server_region *server_region_from_resource(struct wl_resource *resource);
 struct server_surface *server_surface_from_resource(struct wl_resource *resource);
 struct server_surface *server_surface_try_from_resource(struct wl_resource *resource);
+
+struct server_buffer *server_surface_next_buffer(struct server_surface *surface);
 int server_surface_set_role(struct server_surface *surface, const struct server_surface_role *role,
                             struct wl_resource *role_resource);
 

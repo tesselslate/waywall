@@ -13,11 +13,6 @@
 
 #define SRV_COMPOSITOR_VERSION 5
 
-struct server_region_op {
-    bool add;
-    int32_t x, y, width, height;
-};
-
 struct server_surface_damage {
     int32_t x, y, width, height;
 };
@@ -47,6 +42,16 @@ on_surface_frame_done(void *data, struct wl_callback *wl, uint32_t callback_data
 static const struct wl_callback_listener surface_frame_listener = {
     .done = on_surface_frame_done,
 };
+
+static void
+surface_state_reset(struct server_surface_state *state) {
+    wl_array_release(&state->damage);
+    wl_array_release(&state->buffer_damage);
+    *state = (struct server_surface_state){0};
+
+    wl_array_init(&state->damage);
+    wl_array_init(&state->buffer_damage);
+}
 
 static void
 region_resource_destroy(struct wl_resource *resource) {
@@ -103,11 +108,20 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
     struct server_surface *surface = wl_resource_get_user_data(resource);
     struct server_buffer *buffer = server_buffer_from_resource(buffer_resource);
 
+    // If a NULL buffer (no buffer) is being attached, skip the checks.
+    if (!buffer) {
+        surface->pending.buffer = NULL;
+        surface->pending.present |= SURFACE_STATE_BUFFER;
+        return;
+    }
+
+    // Invalid buffers (typically from linux_dmabuf) are not acceptable.
     if (server_buffer_is_invalid(buffer)) {
         wl_client_post_implementation_error(client, "cannot attach invalid buffer");
         return;
     }
 
+    // We don't want offset surfaces in general, but we need to check which type of error to send.
     if (x != 0 || y != 0) {
         int version = wl_resource_get_version(resource);
         if (version >= WL_SURFACE_OFFSET_SINCE_VERSION) {
@@ -115,9 +129,6 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
                                    "non-zero offset provided to wl_surface.attach");
             return;
         } else {
-            // Hopefully no relevant clients make use of this function. GLFW and Xserver don't seem
-            // to, but Mesa makes some calls to `wl_surface_attach` that do not explicitly pass in
-            // 0.
             wl_client_post_implementation_error(client,
                                                 "non-zero offset provided to wl_surface.attach");
             return;
@@ -125,45 +136,38 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
     }
 
     surface->pending.buffer = buffer;
-    surface->pending.apply |= SURFACE_STATE_ATTACH;
+    surface->pending.present |= SURFACE_STATE_BUFFER;
 }
 
 static void
 surface_commit(struct wl_client *client, struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
-    struct server_surface_state *state = &surface->pending;
     if (surface->role && surface->role_resource) {
         surface->role->commit(surface->role_resource);
     }
 
     wl_signal_emit(&surface->events.commit, surface);
 
-    if (state->apply & SURFACE_STATE_ATTACH) {
-        ww_assert(state->buffer);
-
-        wl_surface_attach(surface->remote, state->buffer->remote, 0, 0);
-        surface->current.buffer = state->buffer;
+    if (surface->pending.present & SURFACE_STATE_BUFFER) {
+        wl_surface_attach(surface->remote,
+                          surface->pending.buffer ? surface->pending.buffer->remote : NULL, 0, 0);
+        surface->current.buffer = surface->pending.buffer;
     }
-    if (state->apply & SURFACE_STATE_DAMAGE) {
+    if (surface->pending.present & SURFACE_STATE_DAMAGE) {
         struct server_surface_damage *dmg;
-        wl_array_for_each(dmg, &state->damage) {
+        wl_array_for_each(dmg, &surface->pending.damage) {
             wl_surface_damage(surface->remote, dmg->x, dmg->y, dmg->width, dmg->height);
         }
     }
-    if (state->apply & SURFACE_STATE_DAMAGE_BUFFER) {
+    if (surface->pending.present & SURFACE_STATE_DAMAGE_BUFFER) {
         struct server_surface_damage *dmg;
-        wl_array_for_each(dmg, &state->buffer_damage) {
+        wl_array_for_each(dmg, &surface->pending.buffer_damage) {
             wl_surface_damage_buffer(surface->remote, dmg->x, dmg->y, dmg->width, dmg->height);
         }
     }
 
-    wl_array_release(&state->damage);
-    wl_array_release(&state->buffer_damage);
-    surface->pending = (struct server_surface_state){0};
-    wl_array_init(&surface->pending.damage);
-    wl_array_init(&surface->pending.buffer_damage);
-
+    surface_state_reset(&surface->pending);
     wl_surface_commit(surface->remote);
 }
 
@@ -179,7 +183,7 @@ surface_damage(struct wl_client *client, struct wl_resource *resource, int32_t x
     dmg->y = y;
     dmg->width = width;
     dmg->height = height;
-    surface->pending.apply |= SURFACE_STATE_DAMAGE;
+    surface->pending.present |= SURFACE_STATE_DAMAGE;
 }
 
 static void
@@ -194,7 +198,7 @@ surface_damage_buffer(struct wl_client *client, struct wl_resource *resource, in
     dmg->y = y;
     dmg->width = width;
     dmg->height = height;
-    surface->pending.apply |= SURFACE_STATE_DAMAGE_BUFFER;
+    surface->pending.present |= SURFACE_STATE_DAMAGE_BUFFER;
 }
 
 static void
@@ -396,6 +400,12 @@ server_surface_try_from_resource(struct wl_resource *resource) {
         return wl_resource_get_user_data(resource);
     }
     return NULL;
+}
+
+struct server_buffer *
+server_surface_next_buffer(struct server_surface *surface) {
+    return (surface->pending.present & SURFACE_STATE_BUFFER) ? surface->pending.buffer
+                                                             : surface->current.buffer;
 }
 
 int

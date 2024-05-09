@@ -360,19 +360,14 @@ xsurface_update_view(struct xsurface *xsurface, bool commit) {
         return;
     }
 
-    struct server_surface *surface = xsurface->parent;
-
     // If the associated Wayland surface does not have a buffer, it must not be given a server_view.
     bool has_buffer;
     if (commit) {
         // Determine whether or not the associated Wayland surface will have a buffer attached after
         // this commit completes.
-        has_buffer = !!surface->current.buffer || !!surface->pending.buffer;
-        if (!surface->pending.buffer && (surface->pending.apply & SURFACE_STATE_ATTACH)) {
-            has_buffer = false;
-        }
+        has_buffer = !!server_surface_next_buffer(xsurface->parent);
     } else {
-        has_buffer = !!surface->current.buffer;
+        has_buffer = !!xsurface->parent->current.buffer;
     }
 
     // If the surface is not mapped in the X11 session, it should not be mapped by the compositor

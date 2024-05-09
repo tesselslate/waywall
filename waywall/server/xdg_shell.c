@@ -101,10 +101,7 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
     }
 
     bool had_buffer = surface->current.buffer;
-    bool has_buffer = had_buffer || surface->pending.buffer;
-    if (!surface->pending.buffer && (surface->pending.apply & SURFACE_STATE_ATTACH)) {
-        has_buffer = false;
-    }
+    bool has_buffer = !!server_surface_next_buffer(surface);
 
     if (had_buffer && !has_buffer) {
         // Unmap the toplevel.

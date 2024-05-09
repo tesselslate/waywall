@@ -129,7 +129,7 @@ static void
 on_view_surface_commit(struct wl_listener *listener, void *data) {
     struct server_view *view = wl_container_of(listener, view, on_surface_commit);
 
-    if (!(view->surface->pending.apply & SURFACE_STATE_ATTACH)) {
+    if (!(view->surface->pending.present & SURFACE_STATE_BUFFER)) {
         return;
     }
 
@@ -206,11 +206,11 @@ can_apply_crop(struct server_view *view, struct box crop) {
         return true;
     }
 
+    struct server_buffer *buffer = server_surface_next_buffer(view->surface);
+    ww_assert(buffer);
+
     uint32_t width, height;
-    server_buffer_get_size((view->surface->pending.apply & SURFACE_STATE_ATTACH)
-                               ? view->surface->pending.buffer
-                               : view->surface->current.buffer,
-                           &width, &height);
+    server_buffer_get_size(buffer, &width, &height);
 
     return (crop.x + crop.width <= (int32_t)width) && (crop.y + crop.height <= (int32_t)height);
 }
