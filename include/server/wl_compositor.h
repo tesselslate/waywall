@@ -34,19 +34,16 @@ struct server_surface {
 
     struct {
         struct server_buffer *buffer;
-        int32_t buffer_scale;
     } current;
 
     struct server_surface_state {
         struct server_buffer *buffer;
         struct wl_array damage, buffer_damage; // data: struct server_surface_damage
-        int32_t scale;
 
         enum {
             SURFACE_STATE_ATTACH = (1 << 0),
             SURFACE_STATE_DAMAGE = (1 << 1),
             SURFACE_STATE_DAMAGE_BUFFER = (1 << 2),
-            SURFACE_STATE_SCALE = (1 << 3),
         } apply;
     } pending;
 

@@ -3,6 +3,7 @@
 #include "server/buffer.h"
 #include "server/server.h"
 #include "util/alloc.h"
+#include "util/log.h"
 #include "util/prelude.h"
 #include <inttypes.h>
 #include <stdbool.h>
@@ -138,8 +139,6 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
 
     wl_signal_emit(&surface->events.commit, surface);
 
-    // TODO: fix buffer scale check
-
     if (state->apply & SURFACE_STATE_ATTACH) {
         ww_assert(state->buffer);
 
@@ -157,10 +156,6 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         wl_array_for_each(dmg, &state->buffer_damage) {
             wl_surface_damage_buffer(surface->remote, dmg->x, dmg->y, dmg->width, dmg->height);
         }
-    }
-    if (state->apply & SURFACE_STATE_SCALE) {
-        wl_surface_set_buffer_scale(surface->remote, state->scale);
-        surface->current.buffer_scale = state->scale;
     }
 
     wl_array_release(&state->damage);
@@ -238,8 +233,12 @@ surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
-    surface->pending.scale = scale;
-    surface->pending.apply |= SURFACE_STATE_SCALE;
+    // TODO: Properly support buffer scaling (including fractional scaling, probably, maybe?)
+    // As of right now, it's not actually supported, so there's no point pretending it is.
+
+    if (scale != 1) {
+        ww_log(LOG_WARN, "non-default buffer scale (%" PRIi32 " for surface %p)", scale, surface);
+    }
 }
 
 static void
@@ -319,7 +318,6 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     wl_surface_set_input_region(surface->remote, compositor->empty_region);
 
     surface->parent = compositor;
-    surface->current.buffer_scale = 1;
 
     wl_signal_init(&surface->events.commit);
     wl_signal_init(&surface->events.destroy);
