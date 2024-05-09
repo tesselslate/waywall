@@ -160,11 +160,13 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
     }
 
     str logline = str_new();
-    str_append(&logline, "(XKB): ");
+    str_append(&logline, "[xkb] ");
     str_append(&logline, fmt);
 
     util_log_va(level, logline, args, false);
     str_free(logline);
+
+    va_end(args);
 }
 
 static bool
