@@ -19,6 +19,7 @@ enum ww_log_level {
 void util_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
 void util_log_va(enum ww_log_level, const char *fmt, va_list args, bool newline);
 
+int util_log_create_file(const char *name, bool cloexec);
 void util_log_init();
 void util_log_set_file(int fd);
 

@@ -1,14 +1,18 @@
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/str.h"
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 
 #define PREFIX_INFO "[%7lu.%06lu] [INFO] "
 #define PREFIX_WARN "[%7lu.%06lu] [WARN] "
 #define PREFIX_ERR "[%7lu.%06lu]  [ERR] "
+#define LOG_DIRECTORY "/tmp/waywall/"
 
 static const char *color_info = "";
 static const char *color_warn = "";
@@ -72,6 +76,28 @@ util_log_va(enum ww_log_level level, const char *fmt, va_list args, bool newline
         dprintf(log_fd, "\n");
     }
     fprintf(stderr, "%s%s", color_reset, newline ? "\n" : "");
+}
+
+int
+util_log_create_file(const char *name, bool cloexec) {
+    if (mkdir(LOG_DIRECTORY, 0755) != 0 && errno != EEXIST) {
+        ww_log_errno(LOG_ERROR, "failed to create log directory at '%s'", LOG_DIRECTORY);
+        return -1;
+    }
+
+    str path = str_new();
+    str_append(&path, LOG_DIRECTORY);
+    str_append(&path, name);
+
+    int flags = O_CREAT | O_WRONLY;
+    if (cloexec) {
+        flags |= O_CLOEXEC;
+    }
+
+    int fd = open(path, flags, 0644);
+    str_free(path);
+
+    return fd;
 }
 
 void
