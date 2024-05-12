@@ -2,9 +2,11 @@
 #include "config/action.h"
 #include "config/api.h"
 #include "config/config.h"
+#include "server/buffer.h"
 #include "server/cursor.h"
 #include "server/server.h"
 #include "server/ui.h"
+#include "server/wl_compositor.h"
 #include "server/wl_seat.h"
 #include "util/alloc.h"
 #include "util/log.h"
@@ -125,6 +127,18 @@ on_view_create(struct wl_listener *listener, void *data) {
     }
 
     wrap->view = view;
+
+    // HACK: This is not ideal. We know that the xdg_toplevel view is created as a result of the
+    // xdg_surface role commit event, so the pending buffer will not have been put into the current
+    // state yet. I would like to have a better API for this (perhaps change when the event fires?),
+    // but this works for now.
+    ww_assert(wrap->view->surface->pending.buffer);
+
+    uint32_t width, height;
+    server_buffer_get_size(wrap->view->surface->pending.buffer, &width, &height);
+
+    wrap->server->ui->width = width;
+    wrap->server->ui->height = height;
 
     server_set_input_focus(wrap->server, wrap->view);
     server_ui_show(wrap->server->ui);
