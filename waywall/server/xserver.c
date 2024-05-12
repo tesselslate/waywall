@@ -134,7 +134,7 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
 
     if (!(mask & WL_EVENT_READABLE)) {
         ww_assert(mask & WL_EVENT_HANGUP);
-        ww_log(LOG_ERROR, "xwayland startup failed");
+        ww_log(LOG_ERROR, "display pipe closed (xwayland startup failed)");
         goto fail;
     }
 
@@ -145,6 +145,9 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
     return 0;
 
 fail:
+    wl_event_source_remove(srv->src_pipe);
+    srv->src_pipe = NULL;
+
     close(fd);
     return 0;
 }
