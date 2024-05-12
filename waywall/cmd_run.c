@@ -11,6 +11,7 @@
 #include "wall.h"
 #include <fcntl.h>
 #include <signal.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -73,6 +74,16 @@ cmd_run(const char *profile) {
     if (check_cgroups() != 0) {
         return 1;
     }
+
+    char logname[32] = {0};
+    ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wall-%jd", (intmax_t)getpid());
+    ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
+
+    int log_fd = util_log_create_file(logname, true);
+    if (log_fd == -1) {
+        return 1;
+    }
+    util_log_set_file(log_fd);
 
     sysinfo_dump_log();
 
@@ -153,7 +164,8 @@ cmd_run(const char *profile) {
     fcntl(display_file_fd, F_SETLK, &lock);
     close(display_file_fd);
 
-    ww_log(LOG_INFO, "Done");
+    close(log_fd);
+
     return 0;
 
 fail_socket_write:
@@ -178,6 +190,7 @@ fail_config_populate:
 
 fail_lock:
     close(display_file_fd);
+    close(log_fd);
 
     return 1;
 }

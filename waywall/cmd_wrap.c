@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -66,6 +67,16 @@ handle_signal(int signal, void *data) {
 
 int
 cmd_wrap(const char *profile, char **argv) {
+    char logname[32] = {0};
+    ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wrap-%jd", (intmax_t)getpid());
+    ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
+
+    int log_fd = util_log_create_file(logname, true);
+    if (log_fd == -1) {
+        return 1;
+    }
+    util_log_set_file(log_fd);
+
     sysinfo_dump_log();
 
     struct waywall ww = {0};
@@ -146,6 +157,7 @@ cmd_wrap(const char *profile, char **argv) {
     wl_event_source_remove(src_sigint);
     server_destroy(ww.server);
     config_destroy(ww.cfg);
+    close(log_fd);
 
     return 0;
 
@@ -167,5 +179,6 @@ fail_inotify:
 fail_server:
 fail_config_populate:
     config_destroy(ww.cfg);
+    close(log_fd);
     return 1;
 }
