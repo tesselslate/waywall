@@ -175,7 +175,7 @@ set_cloexec(int fd, bool cloexec) {
 }
 
 static void
-xserver_exec(struct xserver *srv, int notify_fd) {
+xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     // This function should only ever be run in the context of the child process created from
     // `xserver_start`.
 
@@ -219,15 +219,31 @@ xserver_exec(struct xserver *srv, int notify_fd) {
     argv[i++] = NULL;
     ww_assert(i < STATIC_ARRLEN(argv));
 
+    // Set WAYLAND_SOCKET so that the X server will connect correctly.
     char wayland_socket[16];
     snprintf(wayland_socket, STATIC_ARRLEN(wayland_socket), "%d", srv->fd_wl[1]);
     setenv("WAYLAND_SOCKET", wayland_socket, true);
 
-    ww_log(LOG_INFO, "running Xwayland");
+    // Set stdout and stderr to go to the Xwayland log file. Keep a CLOEXEC backup of stderr in case
+    // we need to print an error.
+    int stderr_backup = dup(STDERR_FILENO);
+    set_cloexec(stderr_backup, true);
+
+    if (dup2(log_fd, STDOUT_FILENO) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to dup log_fd to stdout");
+    }
+    if (dup2(log_fd, STDERR_FILENO) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to dup log_fd to stderr");
+    }
+
     ww_assert(close(STDIN_FILENO) == 0);
 
     execvp(argv[0], argv);
+
+    // Restore stderr to print the error message.
+    dup2(stderr_backup, STDERR_FILENO);
     ww_log_errno(LOG_ERROR, "failed to exec Xwayland");
+    close(log_fd);
 }
 
 static int
@@ -249,7 +265,7 @@ xserver_start(struct xserver *srv) {
         return 1;
     }
     if (set_cloexec(notify_fd[0], true) != 0) {
-        goto fail;
+        goto fail_cloexec;
     }
 
     // Create the readiness notification.
@@ -257,18 +273,30 @@ xserver_start(struct xserver *srv) {
     srv->src_pipe =
         wl_event_loop_add_fd(loop, notify_fd[0], WL_EVENT_READABLE, handle_xserver_ready, srv);
 
+    // Create the log file for Xwayland.
+    char logname[32] = {0};
+    ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "xwayland-%jd", (intmax_t)getpid());
+    ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
+
+    int log_fd = util_log_create_file(logname, false);
+    if (log_fd == -1) {
+        goto fail_log;
+    }
+
     // Spawn the child process.
     srv->pid = fork();
     if (srv->pid == 0) {
         // Child process
-        xserver_exec(srv, notify_fd[1]);
-        ww_log(LOG_ERROR, "failed to start xwayland");
+        xserver_exec(srv, notify_fd[1], log_fd);
         exit(EXIT_FAILURE);
     } else if (srv->pid == -1) {
         // Parent process (error)
         ww_log_errno(LOG_ERROR, "failed to fork xwayland");
-        goto fail;
+        goto fail_fork;
     }
+
+    // We don't need the log file descriptor anymore. The Xwayland process will own it.
+    close(log_fd);
 
     // The Xwayland process owns the other half of the displayfd pipe.
     // Close any file descriptors which the Xwayland process is supposed to own.
@@ -289,7 +317,14 @@ xserver_start(struct xserver *srv) {
 
     return 0;
 
-fail:
+fail_fork:
+    close(log_fd);
+
+fail_log:
+    wl_event_source_remove(srv->src_pipe);
+    srv->src_pipe = NULL;
+
+fail_cloexec:
     close(notify_fd[0]);
     close(notify_fd[1]);
     return 1;
