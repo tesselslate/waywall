@@ -7,6 +7,7 @@
 #include "server/ui.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/sysinfo.h"
 #include "wall.h"
 #include <fcntl.h>
 #include <signal.h>
@@ -72,6 +73,8 @@ cmd_run(const char *profile) {
     if (check_cgroups() != 0) {
         return 1;
     }
+
+    sysinfo_dump_log();
 
     int display_file_fd = open("/tmp/waywall-display", O_WRONLY | O_CREAT | O_CLOEXEC, 0644);
     if (display_file_fd == -1) {

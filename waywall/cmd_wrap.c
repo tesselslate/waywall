@@ -6,6 +6,7 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "util/syscall.h"
+#include "util/sysinfo.h"
 #include "wrap.h"
 #include <errno.h>
 #include <signal.h>
@@ -65,6 +66,8 @@ handle_signal(int signal, void *data) {
 
 int
 cmd_wrap(const char *profile, char **argv) {
+    sysinfo_dump_log();
+
     struct waywall ww = {0};
 
     ww.cfg = config_create();

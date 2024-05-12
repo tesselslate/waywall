@@ -7,8 +7,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <sys/resource.h>
-#include <sys/utsname.h>
 #include <unistd.h>
 
 static void
@@ -42,22 +40,6 @@ set_realtime() {
         ww_log_errno(LOG_ERROR, "failed to set scheduler priority");
         return;
     }
-}
-
-static void
-log_sysinfo() {
-    struct utsname name;
-    ww_assert(uname(&name) == 0);
-
-    ww_log(LOG_INFO, "system:  %s", name.sysname);
-    ww_log(LOG_INFO, "release: %s", name.release);
-    ww_log(LOG_INFO, "version: %s", name.version);
-    ww_log(LOG_INFO, "machine: %s", name.machine);
-
-    struct rlimit nofile;
-    ww_assert(getrlimit(RLIMIT_NOFILE, &nofile) == 0);
-
-    ww_log(LOG_INFO, "nofile:  %ju / %ju", (uintmax_t)nofile.rlim_cur, (uintmax_t)nofile.rlim_max);
 }
 
 int
@@ -114,7 +96,6 @@ main(int argc, char **argv) {
         return cmd_exec(subcommand);
     } else if (strcmp(action, "run") == 0) {
         set_realtime();
-        log_sysinfo();
         return cmd_run(profile);
     } else if (strcmp(action, "wrap") == 0) {
         if (!subcommand || !*subcommand) {
@@ -123,7 +104,6 @@ main(int argc, char **argv) {
         }
 
         set_realtime();
-        log_sysinfo();
         return cmd_wrap(profile, subcommand);
     } else {
         print_help(argv[0]);
