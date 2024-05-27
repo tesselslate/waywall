@@ -782,16 +782,7 @@ config_load(struct config *cfg, const char *profile) {
     luaL_newmetatable(cfg->L, METATABLE_WRAP);
     lua_pop(cfg->L, 2);
 
-    static const struct luaL_Reg base_lib[] = {
-        {"", luaopen_base},         {"package", luaopen_package}, {"table", luaopen_table},
-        {"string", luaopen_string}, {"math", luaopen_math},
-    };
-
-    for (size_t i = 0; i < STATIC_ARRLEN(base_lib); i++) {
-        lua_pushcfunction(cfg->L, base_lib[i].func);
-        lua_pushstring(cfg->L, base_lib[i].name);
-        lua_call(cfg->L, 1, 0);
-    }
+    luaL_openlibs(cfg->L);
 
     if (config_api_init(cfg, profile) != 0) {
         goto fail;
