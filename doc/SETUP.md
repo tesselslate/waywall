@@ -163,7 +163,7 @@ To edit the launch command of an instance (this tutorial uses Prism Launcher but
 and insert this command into the `Wrapper command` box.
 
 ```sh
-sh -c "export LD_PRELOAD='/usr/lib/libjemalloc.so'; export MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:15000,muzzy_decay_ms:15000; waywall exec $INST_JAVA $@"
+sh -c "export LD_PRELOAD='/usr/lib/libjemalloc.so'; export MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:15000,muzzy_decay_ms:15000; waywall exec -- $INST_JAVA $@"
 ```
 
 Now, when you launch this instance (it will only work while waywall is running), it will appear inside the waywall window!
