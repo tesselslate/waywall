@@ -26,6 +26,13 @@ send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
     wl_array_release(&states);
 }
 
+static void
+xdg_toplevel_view_close(void *data) {
+    struct server_xdg_toplevel *xdg_toplevel = data;
+
+    xdg_toplevel_send_close(xdg_toplevel->resource);
+}
+
 static pid_t
 xdg_toplevel_view_get_pid(void *data) {
     struct server_xdg_toplevel *xdg_toplevel = data;
@@ -60,6 +67,7 @@ xdg_toplevel_view_set_size(void *data, uint32_t width, uint32_t height) {
 static const struct server_view_impl xdg_toplevel_view_impl = {
     .name = "xdg_toplevel",
 
+    .close = xdg_toplevel_view_close,
     .get_pid = xdg_toplevel_view_get_pid,
     .get_title = xdg_toplevel_view_get_title,
     .set_size = xdg_toplevel_view_set_size,
