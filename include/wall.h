@@ -39,6 +39,7 @@ struct wall {
         double mx, my;
     } input;
 
+    struct wl_listener on_close;
     struct wl_listener on_pointer_lock;
     struct wl_listener on_pointer_unlock;
     struct wl_listener on_resize;

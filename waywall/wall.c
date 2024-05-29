@@ -409,6 +409,15 @@ play_instance(struct wall *wall, int id) {
 }
 
 static void
+on_close(struct wl_listener *listener, void *data) {
+    struct wall *wall = wl_container_of(listener, wall, on_close);
+
+    // TODO: Allow waywall to keep running in the background
+    server_ui_hide(wall->server->ui);
+    server_shutdown(wall->server);
+}
+
+static void
 on_pointer_lock(struct wl_listener *listener, void *data) {
     struct wall *wall = wl_container_of(listener, wall, on_pointer_lock);
     server_cursor_hide(wall->server->cursor);
@@ -598,6 +607,9 @@ wall_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wall->layout_rectangles.cap = 8;
 
     wall->active_instance = -1;
+
+    wall->on_close.notify = on_close;
+    wl_signal_add(&server->ui->events.close, &wall->on_close);
 
     wall->on_pointer_lock.notify = on_pointer_lock;
     wl_signal_add(&server->events.pointer_lock, &wall->on_pointer_lock);

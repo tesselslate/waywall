@@ -75,8 +75,9 @@ static void
 on_close(struct wl_listener *listener, void *data) {
     struct wrap *wrap = wl_container_of(listener, wrap, on_close);
 
-    ww_log(LOG_INFO, "window closed, shutting down");
-    server_shutdown(wrap->server);
+    // When the view is destroyed, the server event loop will be stopped and waywall will exit.
+    // See `on_view_destroy`.
+    server_view_close(wrap->view);
 }
 
 static void

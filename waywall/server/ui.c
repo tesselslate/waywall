@@ -61,7 +61,6 @@ on_xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
         ww_log(LOG_WARN, "received spurious xdg_toplevel.close from remote compositor");
         return;
     }
-    server_ui_hide(ui);
 
     wl_signal_emit_mutable(&ui->events.close, NULL);
 }
