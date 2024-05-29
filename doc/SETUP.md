@@ -109,7 +109,7 @@ There are a few things you need to change/check about each of your Minecraft ins
 
 ### Mods
 
-(This is not an exaustive list of mods recommended for speedrunning, just what you need to waywall to work properly)
+(This is not an exhaustive list of mods recommended for speedrunning, just what you need to waywall to work properly)
 
 - Atum 1.2.2 or higher
 - State Output 1.1.6 or higher
