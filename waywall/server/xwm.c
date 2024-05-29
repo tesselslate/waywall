@@ -172,10 +172,28 @@ static void on_xwayland_surface_destroy(struct wl_listener *listener, void *data
 static void on_xwayland_surface_set_serial(struct wl_listener *listener, void *data);
 
 static const char *atom_names[] = {
-    [NET_SUPPORTED] = "_NET_SUPPORTED", [NET_SUPPORTING_WM_CHECK] = "_NET_SUPPORTING_WM_CHECK",
-    [NET_WM_NAME] = "_NET_WM_NAME",     [UTF8_STRING] = "UTF8_STRING",
-    [WL_SURFACE_ID] = "WL_SURFACE_ID",  [WL_SURFACE_SERIAL] = "WL_SURFACE_SERIAL",
+    [NET_SUPPORTED] = "_NET_SUPPORTED",      [NET_SUPPORTING_WM_CHECK] = "_NET_SUPPORTING_WM_CHECK",
+    [NET_WM_NAME] = "_NET_WM_NAME",          [UTF8_STRING] = "UTF8_STRING",
+    [WL_SURFACE_ID] = "WL_SURFACE_ID",       [WL_SURFACE_SERIAL] = "WL_SURFACE_SERIAL",
+    [WM_DELETE_WINDOW] = "WM_DELETE_WINDOW",
 };
+
+static void
+xwayland_view_close(void *data) {
+    struct xsurface *xsurface = data;
+
+    // GLFW suppoorts WM_DELETE_WINDOW, so this is good enough.
+    xcb_client_message_event_t event = {0};
+    event.response_type = XCB_CLIENT_MESSAGE;
+    event.format = 32;
+    event.data.data32[0] = xsurface->xwm->atoms[WM_DELETE_WINDOW];
+    event.data.data32[1] = XCB_CURRENT_TIME;
+    event.window = xsurface->window;
+
+    xcb_send_event(xsurface->xwm->conn, true, xsurface->window, XCB_EVENT_MASK_NO_EVENT,
+                   (char *)&event);
+    xcb_flush(xsurface->xwm->conn);
+}
 
 static pid_t
 xwayland_view_get_pid(void *data) {
@@ -209,6 +227,7 @@ xwayland_view_set_size(void *data, uint32_t width, uint32_t height) {
 static const struct server_view_impl xwayland_view_impl = {
     .name = "xwayland",
 
+    .close = xwayland_view_close,
     .get_pid = xwayland_view_get_pid,
     .get_title = xwayland_view_get_title,
     .set_size = xwayland_view_set_size,

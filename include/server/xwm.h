@@ -17,6 +17,7 @@ enum xwm_atom {
     UTF8_STRING,
     WL_SURFACE_ID,
     WL_SURFACE_SERIAL,
+    WM_DELETE_WINDOW,
 
     ATOM_COUNT,
 };
