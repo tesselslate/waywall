@@ -70,6 +70,7 @@ struct server_view {
 struct server_view_impl {
     const char *name;
 
+    void (*close)(void *impl_data);
     pid_t (*get_pid)(void *impl_data);
     char *(*get_title)(void *impl_data);
     void (*set_size)(void *impl_data, uint32_t width, uint32_t height);
@@ -143,6 +144,7 @@ void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config)
 struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);
 void server_ui_config_destroy(struct server_ui_config *config);
 
+void server_view_close(struct server_view *view);
 pid_t server_view_get_pid(struct server_view *view);
 char *server_view_get_title(struct server_view *view);
 

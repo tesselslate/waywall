@@ -412,6 +412,11 @@ server_ui_config_destroy(struct server_ui_config *config) {
     free(config);
 }
 
+void
+server_view_close(struct server_view *view) {
+    return view->impl->close(view->impl_data);
+}
+
 pid_t
 server_view_get_pid(struct server_view *view) {
     return view->impl->get_pid(view->impl_data);
