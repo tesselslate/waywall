@@ -7,6 +7,7 @@
 #include <sys/resource.h>
 #include <sys/utsname.h>
 #include <unistd.h>
+#include <wayland-version.h>
 
 #define PATH_SYSCTL "/proc/sys/"
 
@@ -78,6 +79,11 @@ log_uname() {
     ww_log(LOG_INFO, "machine: %s", name.machine);
 }
 
+static void
+log_wl_version() {
+    ww_log(LOG_INFO, "libwayland version: %s", WAYLAND_VERSION);
+}
+
 void
 sysinfo_dump_log() {
     ww_log(LOG_INFO, "---- SYSTEM INFO");
@@ -85,6 +91,7 @@ sysinfo_dump_log() {
     log_uname();
     log_max_files();
     log_inotify_limits();
+    log_wl_version();
 
     ww_log(LOG_INFO, "---- END SYSTEM INFO");
 }
