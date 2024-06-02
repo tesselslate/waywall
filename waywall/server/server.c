@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
+#include <wayland-server-core.h>
 
 #ifdef WAYWALL_XWAYLAND
 
@@ -33,6 +34,8 @@
 #include "server/xwayland_shell.h"
 
 #endif
+
+#define MAX_BUFFER_SIZE 65536
 
 struct server_client {
     struct wl_list link; // server.clients
@@ -145,6 +148,19 @@ global_filter(const struct wl_client *client, const struct wl_global *global, vo
 #endif
 }
 
+static void
+set_default_buffer_size(struct wl_display *display) {
+#if WAYLAND_VERSION_MINOR >= 23
+
+    wl_display_set_default_max_buffer_size(display, MAX_BUFFER_SIZE);
+
+#else
+
+    // The buffer size API was added in libwayland 1.23.
+
+#endif
+}
+
 struct server *
 server_create(struct config *cfg) {
     struct server *server = zalloc(1, sizeof(*server));
@@ -165,6 +181,8 @@ server_create(struct config *cfg) {
     if (!server->display) {
         goto fail_display;
     }
+
+    set_default_buffer_size(server->display);
 
     wl_list_init(&server->clients);
     server->on_client_created.notify = on_client_created;
