@@ -51,7 +51,7 @@ layout(struct wrap *wrap) {
             transaction_view_set_crop(view, -1, -1, -1, -1);
         } else {
             // Negative X or Y coordinates mean that the provided resolution is greater than the
-            // size of the waywrap window. In this case, we need to crop the view.
+            // size of the waywall window. In this case, we need to crop the view.
             int32_t w = (x >= 0) ? wrap->active_res.w : wrap->width;
             int32_t h = (y >= 0) ? wrap->active_res.h : wrap->height;
 
