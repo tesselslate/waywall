@@ -182,13 +182,21 @@ config_layout_destroy(struct config_layout *layout) {
 
 struct config_layout *
 config_layout_get(struct config *cfg, struct wall *wall) {
+    ww_assert(lua_gettop(cfg->L) == 0);
+
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.layout);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
 
     if (lua_isnil(cfg->L, -1)) {
+        lua_pop(cfg->L, 1);
+        ww_assert(lua_gettop(cfg->L) == 0);
+
         return NULL;
     }
 
     ww_assert(lua_istable(cfg->L, -1));
-    return unmarshal_layout(cfg, wall);
+    struct config_layout *layout = unmarshal_layout(cfg, wall);
+
+    lua_settop(cfg->L, 0);
+    return layout;
 }

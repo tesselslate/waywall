@@ -770,6 +770,8 @@ static const struct luaL_Reg lua_lib[] = {
 
 int
 config_api_init(struct config *cfg, const char *profile) {
+    ww_assert(lua_gettop(cfg->L) == 0);
+
     lua_getglobal(cfg->L, "_G");
     luaL_register(cfg->L, "priv_waywall", lua_lib);
     lua_pop(cfg->L, 2);
@@ -803,18 +805,20 @@ config_api_init(struct config *cfg, const char *profile) {
         goto fail_pcall_helpers;
     }
 
+    ww_assert(lua_gettop(cfg->L) == 0);
     return 0;
 
 fail_pcall_helpers:
 fail_loadbuffer_helpers:
 fail_pcall:
 fail_loadbuffer:
+    lua_settop(cfg->L, 0);
     return 1;
 }
 
 void
 config_api_set_wall(struct config *cfg, struct wall *wall) {
-    ssize_t stack_start = lua_gettop(cfg->L);
+    ww_assert(lua_gettop(cfg->L) == 0);
 
     struct wall **udata = lua_newuserdata(cfg->L, sizeof(*udata));
     luaL_getmetatable(cfg->L, METATABLE_WALL);
@@ -826,12 +830,12 @@ config_api_set_wall(struct config *cfg, struct wall *wall) {
     lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
     lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == stack_start);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }
 
 void
 config_api_set_wrap(struct config *cfg, struct wrap *wrap) {
-    ssize_t stack_start = lua_gettop(cfg->L);
+    ww_assert(lua_gettop(cfg->L) == 0);
 
     struct wrap **udata = lua_newuserdata(cfg->L, sizeof(*udata));
     luaL_getmetatable(cfg->L, METATABLE_WRAP);
@@ -843,5 +847,5 @@ config_api_set_wrap(struct config *cfg, struct wrap *wrap) {
     lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
     lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == stack_start);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }

@@ -7,9 +7,7 @@
 #include <luajit-2.1/lua.h>
 
 static void
-event_prologue(struct config *cfg, struct wall *wall, const char *event) {
-    config_api_set_wall(cfg, wall);
-
+push_event_callback(struct config *cfg, struct wall *wall, const char *event) {
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
     lua_pushstring(cfg->L, event);
@@ -18,7 +16,9 @@ event_prologue(struct config *cfg, struct wall *wall, const char *event) {
 
 void
 config_signal_death(struct config *cfg, struct wall *wall, int id) {
-    event_prologue(cfg, wall, "death");
+    ww_assert(lua_gettop(cfg->L) == 0);
+
+    push_event_callback(cfg, wall, "death");
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
@@ -26,19 +26,25 @@ config_signal_death(struct config *cfg, struct wall *wall, int id) {
         if (config_pcall(cfg, 1, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'death' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
-            lua_settop(cfg->L, 0);
+            lua_pop(cfg->L, 1);
         }
         break;
     case LUA_TNIL:
-        return;
+        lua_pop(cfg->L, 1);
+        break;
     default:
         ww_unreachable();
     }
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }
 
 void
 config_signal_preview_percent(struct config *cfg, struct wall *wall, int id, int percent) {
-    event_prologue(cfg, wall, "prewview_percent");
+    ww_assert(lua_gettop(cfg->L) == 0);
+
+    push_event_callback(cfg, wall, "prewview_percent");
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
@@ -47,19 +53,25 @@ config_signal_preview_percent(struct config *cfg, struct wall *wall, int id, int
         if (config_pcall(cfg, 2, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'preview_percent' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
-            lua_settop(cfg->L, 0);
+            lua_pop(cfg->L, 1);
         }
         break;
     case LUA_TNIL:
-        return;
+        lua_pop(cfg->L, 1);
+        break;
     default:
         ww_unreachable();
     }
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }
 
 void
 config_signal_preview_start(struct config *cfg, struct wall *wall, int id) {
-    event_prologue(cfg, wall, "preview_start");
+    ww_assert(lua_gettop(cfg->L) == 0);
+
+    push_event_callback(cfg, wall, "preview_start");
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
@@ -67,19 +79,25 @@ config_signal_preview_start(struct config *cfg, struct wall *wall, int id) {
         if (config_pcall(cfg, 1, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'preview_start' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
-            lua_settop(cfg->L, 0);
+            lua_pop(cfg->L, 1);
         }
         break;
     case LUA_TNIL:
-        return;
+        lua_pop(cfg->L, 1);
+        break;
     default:
         ww_unreachable();
     }
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }
 
 void
 config_signal_resize(struct config *cfg, struct wall *wall, int width, int height) {
-    event_prologue(cfg, wall, "resize");
+    ww_assert(lua_gettop(cfg->L) == 0);
+
+    push_event_callback(cfg, wall, "resize");
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
@@ -88,19 +106,25 @@ config_signal_resize(struct config *cfg, struct wall *wall, int width, int heigh
         if (config_pcall(cfg, 2, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'resize' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
-            lua_settop(cfg->L, 0);
+            lua_pop(cfg->L, 1);
         }
         break;
     case LUA_TNIL:
-        return;
+        lua_pop(cfg->L, 1);
+        break;
     default:
         ww_unreachable();
     }
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }
 
 void
 config_signal_spawn(struct config *cfg, struct wall *wall, int id) {
-    event_prologue(cfg, wall, "spawn");
+    ww_assert(lua_gettop(cfg->L) == 0);
+
+    push_event_callback(cfg, wall, "spawn");
 
     switch (lua_type(cfg->L, -1)) {
     case LUA_TFUNCTION:
@@ -108,12 +132,16 @@ config_signal_spawn(struct config *cfg, struct wall *wall, int id) {
         if (config_pcall(cfg, 1, 0, 0) != 0) {
             ww_log(LOG_ERROR, "failed to call 'spawn' event listener: '%s'",
                    lua_tostring(cfg->L, -1));
-            lua_settop(cfg->L, 0);
+            lua_pop(cfg->L, 1);
         }
         break;
     case LUA_TNIL:
-        return;
+        lua_pop(cfg->L, 1);
+        break;
     default:
         ww_unreachable();
     }
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
 }

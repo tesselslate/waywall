@@ -704,10 +704,9 @@ load_config(struct config *cfg) {
 
 fail_load:
 fail_table:
-    lua_settop(cfg->L, 0);
-
 fail_pcall:
 fail_loadbuffer:
+    lua_settop(cfg->L, 0);
     return 1;
 }
 
@@ -800,6 +799,7 @@ config_load(struct config *cfg, const char *profile) {
         }
     }
 
+    ww_assert(lua_gettop(cfg->L) == 0);
     return 0;
 
 fail:
