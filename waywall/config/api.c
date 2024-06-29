@@ -275,11 +275,6 @@ l_instance(lua_State *L) {
 
 static int
 l_listen(lua_State *L) {
-    int argc = lua_gettop(L);
-
-    if (argc != 1) {
-        return luaL_error(L, "expected one table argument");
-    }
     luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
 
     // Copy the functions from the provided table.
@@ -424,19 +419,17 @@ l_profile(lua_State *L) {
 
 static inline int
 l_reset_wall(lua_State *L, struct wall *wall) {
-    int argc = lua_gettop(L);
-    if (argc > 2) {
-        return luaL_error(L, "too many arguments: %d > 2", argc);
-    } else if (argc == 0) {
-        return luaL_error(L, "at least one argument is required");
-    }
-
-    bool count = true;
-    if (argc == 2) {
-        if (lua_type(L, 2) != LUA_TBOOLEAN) {
-            return luaL_argerror(L, 2, "expected boolean");
-        }
-        count = lua_toboolean(L, 2);
+    bool count_resets = true;
+    switch (lua_gettop(L)) {
+    case 1:
+        count_resets = true;
+        break;
+    case 2:
+        luaL_checktype(L, 2, LUA_TBOOLEAN);
+        count_resets = lua_toboolean(L, 2);
+        break;
+    default:
+        return luaL_error(L, "expected 1 or 2 arguments, got %d", lua_gettop(L));
     }
 
     switch (lua_type(L, 1)) {
@@ -444,7 +437,7 @@ l_reset_wall(lua_State *L, struct wall *wall) {
         int id = luaL_checkinteger(L, 1);
         luaL_argcheck(L, id >= 1 && id <= wall->num_instances, 1, "invalid instance");
 
-        if (wall_lua_reset_one(wall, count, id - 1) == 0) {
+        if (wall_lua_reset_one(wall, count_resets, id - 1) == 0) {
             lua_pushinteger(L, 1);
         } else {
             lua_pushinteger(L, 0);
@@ -480,7 +473,7 @@ l_reset_wall(lua_State *L, struct wall *wall) {
             lua_pop(L, 1);
         }
 
-        lua_pushinteger(L, wall_lua_reset_many(wall, count, n, ids));
+        lua_pushinteger(L, wall_lua_reset_many(wall, count_resets, n, ids));
         free(ids);
         return 1;
     }
@@ -511,10 +504,6 @@ l_reset(lua_State *L) {
 
 static inline int
 l_set_keymap_wall(lua_State *L, struct wall *wall) {
-    int argc = lua_gettop(L);
-    if (argc != 1) {
-        return luaL_error(L, "expected one table argument");
-    }
     luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
 
     const struct xkb_rule_names rule_names = get_rule_names(L);
@@ -525,10 +514,6 @@ l_set_keymap_wall(lua_State *L, struct wall *wall) {
 
 static inline int
 l_set_keymap_wrap(lua_State *L, struct wrap *wrap) {
-    int argc = lua_gettop(L);
-    if (argc != 1) {
-        return luaL_error(L, "expected one table argument");
-    }
     luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
 
     const struct xkb_rule_names rule_names = get_rule_names(L);
@@ -554,11 +539,6 @@ l_set_keymap(lua_State *L) {
 
 static inline int
 l_set_layout_wall(lua_State *L, struct wall *wall) {
-    int argc = lua_gettop(L);
-
-    if (argc != 1) {
-        return luaL_error(L, "expected one table argument");
-    }
     luaL_argcheck(L, lua_istable(L, 1), 1, "expected table");
 
     lua_pushlightuserdata(L, (void *)&config_registry_keys.layout);
