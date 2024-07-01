@@ -393,31 +393,39 @@ add_remap(struct config *cfg, struct config_remap remap) {
 
 static int
 process_config_actions(struct config *cfg) {
-    ssize_t stack_start = lua_gettop(cfg->L);
+    static const int IDX_ACTIONS = 2;
+    static const int IDX_DUP_TABLE = 3;
+    static const int IDX_ACTION_KEY = 4;
+    static const int IDX_ACTION_VAL = 5;
+
+    // LUA STACK:
+    // - config.actions
+    // - config
+    ww_assert(lua_gettop(cfg->L) == IDX_ACTIONS);
 
     lua_newtable(cfg->L);
 
     lua_pushnil(cfg->L);
-    while (lua_next(cfg->L, -3)) {
-        // stack:
-        // - value (should be function)
-        // - key (should be string)
-        // - registry actions table
+    while (lua_next(cfg->L, IDX_ACTIONS)) {
+        // LUA STACK:
+        // - config.actions[key] (expected to be a function)
+        // - key (expected to be a string)
+        // - duplicate actions table (to be put in registry)
         // - config.actions
         // - config
 
-        if (!lua_isstring(cfg->L, -2)) {
+        if (!lua_isstring(cfg->L, IDX_ACTION_KEY)) {
             ww_log(LOG_ERROR, "non-string key '%s' found in actions table",
-                   lua_tostring(cfg->L, -2));
+                   lua_tostring(cfg->L, IDX_ACTION_KEY));
             return 1;
         }
-        if (!lua_isfunction(cfg->L, -1)) {
+        if (!lua_isfunction(cfg->L, IDX_ACTION_VAL)) {
             ww_log(LOG_ERROR, "non-function value for key '%s' found in actions table",
-                   lua_tostring(cfg->L, -2));
+                   lua_tostring(cfg->L, IDX_ACTION_KEY));
             return 1;
         }
 
-        const char *bind = lua_tostring(cfg->L, -2);
+        const char *bind = lua_tostring(cfg->L, IDX_ACTION_KEY);
         struct config_action action = {0};
         if (parse_bind(bind, &action) != 0) {
             return 1;
@@ -426,25 +434,29 @@ process_config_actions(struct config *cfg) {
         char buf[BIND_BUFLEN];
         config_encode_bind(buf, action);
 
+        // The key (encoded bind) and value (action function) need to be pushed to the top of the
+        // stack to be put in the duplicate table.
         lua_pushlstring(cfg->L, buf, STATIC_ARRLEN(buf));
-        lua_pushvalue(cfg->L, -2);
-        lua_rawset(cfg->L, -5);
+        lua_pushvalue(cfg->L, IDX_ACTION_VAL);
+        lua_rawset(cfg->L, IDX_DUP_TABLE);
 
-        // Pop the value from the top of the stack.
+        // Pop the value from the top of the stack. The previous key will be left at the top of the
+        // stack for the next call to `lua_next`.
         lua_pop(cfg->L, 1);
+        ww_assert(lua_gettop(cfg->L) == IDX_ACTION_KEY);
     }
 
-    // stack:
-    // - registry actions table
+    // LUA STACK:
+    // - duplicate actions table (to be put in registry)
     // - config.actions
     // - config
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.actions);
-    lua_pushvalue(cfg->L, -2);
+    lua_pushvalue(cfg->L, IDX_DUP_TABLE);
     lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
-    // Pop the registry actions table which was created at the start of this function.
+    // Pop the duplicate actions table which was created at the start of this function.
     lua_pop(cfg->L, 1);
-    ww_assert(lua_gettop(cfg->L) == stack_start);
+    ww_assert(lua_gettop(cfg->L) == IDX_ACTIONS);
 
     return 0;
 }
@@ -519,30 +531,38 @@ process_config_general(struct config *cfg) {
 
 static int
 process_config_input_remaps(struct config *cfg) {
-    ssize_t stack_start = lua_gettop(cfg->L);
+    static const int IDX_REMAPS = 3;
+    static const int IDX_REMAP_KEY = 4;
+    static const int IDX_REMAP_VAL = 5;
+
+    // LUA STACK:
+    // - config.input.remaps
+    // - config.input
+    // - config
+    ww_assert(lua_gettop(cfg->L) == IDX_REMAPS);
 
     lua_pushnil(cfg->L);
-    while (lua_next(cfg->L, -2)) {
-        // stack:
-        // - value (should be string)
-        // - key (should be string)
+    while (lua_next(cfg->L, IDX_REMAPS)) {
+        // LUA STACK:
+        // - config.input.remaps[key] (expected to be a string)
+        // - key (expected to be a string)
         // - config.input.remaps
         // - config.input
         // - config
 
-        if (!lua_isstring(cfg->L, -2)) {
+        if (!lua_isstring(cfg->L, IDX_REMAP_KEY)) {
             ww_log(LOG_ERROR, "non-string key '%s' found in remaps table",
-                   lua_tostring(cfg->L, -2));
+                   lua_tostring(cfg->L, IDX_REMAP_KEY));
             return 1;
         }
-        if (!lua_isstring(cfg->L, -1)) {
+        if (!lua_isstring(cfg->L, IDX_REMAP_VAL)) {
             ww_log(LOG_ERROR, "non-string value for key '%s' found in remaps table",
-                   lua_tostring(cfg->L, -2));
+                   lua_tostring(cfg->L, IDX_REMAP_KEY));
             return 1;
         }
 
-        const char *src_input = lua_tostring(cfg->L, -2);
-        const char *dst_input = lua_tostring(cfg->L, -1);
+        const char *src_input = lua_tostring(cfg->L, IDX_REMAP_KEY);
+        const char *dst_input = lua_tostring(cfg->L, IDX_REMAP_VAL);
 
         struct config_remap remap = {0};
         if (parse_remap(src_input, dst_input, &remap) != 0) {
@@ -550,17 +570,28 @@ process_config_input_remaps(struct config *cfg) {
         }
         add_remap(cfg, remap);
 
-        // Pop the value from the top of the stack.
+        // Pop the value from the top of the stack. The previous key will be left at the top of the
+        // stack for the next call to `lua_next`.
         lua_pop(cfg->L, 1);
+        ww_assert(lua_gettop(cfg->L) == IDX_REMAP_KEY);
     }
 
-    ww_assert(lua_gettop(cfg->L) == stack_start);
+    // LUA STACK:
+    // - config.input.remaps
+    // - config.input
+    // - config
+    ww_assert(lua_gettop(cfg->L) == 3);
 
     return 0;
 }
 
 static int
 process_config_input(struct config *cfg) {
+    // LUA STACK:
+    // - config.input
+    // - config
+    ww_assert(lua_gettop(cfg->L) == 2);
+
     if (get_table(cfg, "remaps", process_config_input_remaps, "input.remaps", false) != 0) {
         return 1;
     }
@@ -611,6 +642,11 @@ process_config_input(struct config *cfg) {
 
 static int
 process_config_theme(struct config *cfg) {
+    // LUA STACK:
+    // - config.theme
+    // - config
+    ww_assert(lua_gettop(cfg->L) == 2);
+
     char *raw_background = NULL;
     if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
         return 1;
@@ -647,6 +683,10 @@ process_config_theme(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
+    // LUA STACK:
+    // - config
+    ww_assert(lua_gettop(cfg->L) == 1);
+
     if (get_table(cfg, "actions", process_config_actions, "actions", true) != 0) {
         return 1;
     }

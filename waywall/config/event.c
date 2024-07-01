@@ -8,10 +8,15 @@
 
 static void
 push_event_callback(struct config *cfg, struct wall *wall, const char *event) {
+    static const int IDX_EVENTS = 1;
+
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
     lua_rawget(cfg->L, LUA_REGISTRYINDEX);
     lua_pushstring(cfg->L, event);
-    lua_rawget(cfg->L, -2);
+    lua_rawget(cfg->L, IDX_EVENTS);
+
+    // This function intentionally leaves the event callback function (or nil) at the top of the
+    // stack.
 }
 
 void
