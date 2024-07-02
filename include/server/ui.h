@@ -70,7 +70,6 @@ struct server_view {
 
     struct {
         struct wl_signal destroy; // data: NULL
-        struct wl_signal resize;  // data: uint32_t[2]
     } events;
 };
 

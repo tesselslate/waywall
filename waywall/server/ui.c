@@ -34,16 +34,15 @@ on_txn_timeout(void *data) {
 }
 
 static void
-on_txn_view_resize(struct wl_listener *listener, void *data) {
+on_txn_view_commit(struct wl_listener *listener, void *data) {
     struct server_txn_dep *dep = wl_container_of(listener, dep, listener);
     struct server_txn_view *tv = wl_container_of(dep, tv, resize_dep);
     struct server_txn *txn = tv->parent;
 
-    uint32_t *size = data;
-    uint32_t width = size[0];
-    uint32_t height = size[1];
+    uint32_t size[2];
+    server_buffer_get_size(server_surface_next_buffer(tv->view->surface), &size[0], &size[1]);
 
-    if (width == tv->width && height == tv->height) {
+    if (size[0] == tv->width && size[1] == tv->height) {
         wl_list_remove(&dep->listener.link);
         wl_list_remove(&dep->link);
 
@@ -132,21 +131,13 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         return;
     }
 
-    if (can_apply_crop(view, view->state.crop)) {
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(view->state.crop.x),
-                               wl_fixed_from_int(view->state.crop.y),
-                               wl_fixed_from_int(view->state.crop.width),
-                               wl_fixed_from_int(view->state.crop.height));
-    } else {
-        // Just get rid of the source box entirely if the surface gets sized down so we don't
-        // crash.
+    if (!can_apply_crop(view, view->state.crop)) {
+        // Just get rid of the source box entirely if the surface size decreases unexpectedly so we
+        // don't crash.
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                                wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+        ww_log(LOG_WARN, "surface size decreased unexpectedly");
     }
-
-    uint32_t size[2] = {0};
-    server_buffer_get_size(view->surface->pending.buffer, &size[0], &size[1]);
-    wl_signal_emit_mutable(&view->events.resize, size);
 }
 
 static void
@@ -468,7 +459,6 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     wl_list_insert(&ui->views, &view->link);
 
     wl_signal_init(&view->events.destroy);
-    wl_signal_init(&view->events.resize);
 
     wl_signal_emit_mutable(&ui->events.view_create, view);
 
@@ -519,8 +509,8 @@ server_ui_apply(struct server_ui *ui, struct server_txn *txn) {
             tv->view->state.y = tv->y;
         }
         if (tv->apply & TXN_VIEW_SIZE) {
-            tv->resize_dep.listener.notify = on_txn_view_resize;
-            wl_signal_add(&tv->view->events.resize, &tv->resize_dep.listener);
+            tv->resize_dep.listener.notify = on_txn_view_commit;
+            wl_signal_add(&tv->view->surface->events.commit, &tv->resize_dep.listener);
 
             wl_list_insert(&txn->dependencies, &tv->resize_dep.link);
 
