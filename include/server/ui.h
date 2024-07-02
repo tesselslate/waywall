@@ -28,7 +28,7 @@ struct server_ui {
 
     struct wl_list views; // server_view.link
 
-    struct transaction *inflight_txn;
+    struct server_txn *inflight_txn;
 
     struct {
         struct wl_signal close;        // data: NULL
@@ -76,24 +76,24 @@ struct server_view_impl {
     void (*set_size)(void *impl_data, uint32_t width, uint32_t height);
 };
 
-struct transaction {
+struct server_txn {
     struct server_ui *ui;
     struct wl_event_source *timer;
 
-    bool applied; // whether transaction_apply has been called
+    bool applied; // whether server_txn_apply has been called
 
-    struct wl_list views;        // transaction_view.link
-    struct wl_list dependencies; // transaction_dep.link
+    struct wl_list views;        // server_txn_view.link
+    struct wl_list dependencies; // server_txn_dep.link
 };
 
-struct transaction_view {
-    struct transaction *parent;
+struct server_txn_view {
+    struct server_txn *parent;
 
-    struct wl_list link; // transaction.views
+    struct wl_list link; // server_txn.views
     struct server_view *view;
 
-    struct transaction_dep {
-        struct wl_list link; // transaction.dependencies
+    struct server_txn_dep {
+        struct wl_list link; // server_txn.dependencies
         struct wl_listener listener;
     } resize_dep;
 
@@ -102,7 +102,7 @@ struct transaction_view {
     struct wl_surface *above;
     bool visible;
 
-    enum transaction_view_state {
+    enum server_txn_view_state {
         TXN_VIEW_ABOVE = (1 << 0),
         TXN_VIEW_CROP = (1 << 1),
         TXN_VIEW_DEST_SIZE = (1 << 2),
@@ -113,7 +113,7 @@ struct transaction_view {
 
     // The behavior only applies for asynchronous operations (i.e. surface resizing) which may not
     // complete in a timely fashion.
-    enum transaction_behavior {
+    enum server_txn_behavior {
         // All asynchronous operations should complete before the timeout, but the transaction can
         // still be finalized if they do not. This is the default behavior.
         TXN_BEHAVIOR_DEFER = 0,
@@ -137,6 +137,7 @@ struct ui_rectangle {
 
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
+void server_ui_apply(struct server_ui *ui, struct server_txn *txn);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_show(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
@@ -152,18 +153,16 @@ struct server_view *server_view_create(struct server_ui *ui, struct server_surfa
                                        const struct server_view_impl *impl, void *impl_data);
 void server_view_destroy(struct server_view *view);
 
-void transaction_apply(struct server_ui *ui, struct transaction *txn);
-struct transaction *transaction_create();
-struct transaction_view *transaction_get_view(struct transaction *txn, struct server_view *view);
-void transaction_view_set_above(struct transaction_view *view, struct wl_surface *surface);
-void transaction_view_set_behavior(struct transaction_view *view,
-                                   enum transaction_behavior behavior);
-void transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, int32_t width,
-                               int32_t height);
-void transaction_view_set_dest_size(struct transaction_view *view, uint32_t width, uint32_t height);
-void transaction_view_set_position(struct transaction_view *view, uint32_t x, uint32_t y);
-void transaction_view_set_size(struct transaction_view *view, uint32_t width, uint32_t height);
-void transaction_view_set_visible(struct transaction_view *view, bool visible);
+struct server_txn *server_txn_create();
+struct server_txn_view *server_txn_get_view(struct server_txn *txn, struct server_view *view);
+void server_txn_view_set_above(struct server_txn_view *view, struct wl_surface *surface);
+void server_txn_view_set_behavior(struct server_txn_view *view, enum server_txn_behavior behavior);
+void server_txn_view_set_crop(struct server_txn_view *view, int32_t x, int32_t y, int32_t width,
+                              int32_t height);
+void server_txn_view_set_dest_size(struct server_txn_view *view, uint32_t width, uint32_t height);
+void server_txn_view_set_pos(struct server_txn_view *view, uint32_t x, uint32_t y);
+void server_txn_view_set_size(struct server_txn_view *view, uint32_t width, uint32_t height);
+void server_txn_view_set_visible(struct server_txn_view *view, bool visible);
 
 struct ui_rectangle *ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y,
                                          uint32_t width, uint32_t height,

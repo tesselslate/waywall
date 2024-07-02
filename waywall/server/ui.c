@@ -20,12 +20,12 @@
 #define TXN_TIMEOUT_MS 100
 
 static bool can_apply_crop(struct server_view *view, struct box crop);
-static void destroy_txn(struct transaction *txn);
-static void finalize_txn(struct transaction *txn);
+static void destroy_txn(struct server_txn *txn);
+static void finalize_txn(struct server_txn *txn);
 
 static int
-on_transaction_timeout(void *data) {
-    struct transaction *txn = data;
+on_txn_timeout(void *data) {
+    struct server_txn *txn = data;
 
     ww_log(LOG_WARN, "transaction timed out");
     finalize_txn(txn);
@@ -35,9 +35,9 @@ on_transaction_timeout(void *data) {
 
 static void
 on_txn_view_resize(struct wl_listener *listener, void *data) {
-    struct transaction_dep *dep = wl_container_of(listener, dep, listener);
-    struct transaction_view *tv = wl_container_of(dep, tv, resize_dep);
-    struct transaction *txn = tv->parent;
+    struct server_txn_dep *dep = wl_container_of(listener, dep, listener);
+    struct server_txn_view *tv = wl_container_of(dep, tv, resize_dep);
+    struct server_txn *txn = tv->parent;
 
     uint32_t *size = data;
     uint32_t width = size[0];
@@ -150,7 +150,7 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
 }
 
 static void
-txn_apply_crop(struct transaction_view *tv, struct server_ui *ui) {
+txn_apply_crop(struct server_txn_view *tv, struct server_ui *ui) {
     struct box crop = tv->crop;
 
     ww_assert(((crop.x == -1) == (crop.y == -1)) == ((crop.width == -1) == (crop.height == -1)));
@@ -163,18 +163,18 @@ txn_apply_crop(struct transaction_view *tv, struct server_ui *ui) {
 }
 
 static void
-txn_apply_dest_size(struct transaction_view *tv, struct server_ui *ui) {
+txn_apply_dest_size(struct server_txn_view *tv, struct server_ui *ui) {
     wp_viewport_set_destination(tv->view->viewport, tv->dest_width, tv->dest_height);
 }
 
 static void
-txn_apply_pos(struct transaction_view *tv, struct server_ui *ui) {
+txn_apply_pos(struct server_txn_view *tv, struct server_ui *ui) {
     ww_assert(tv->view->subsurface);
     wl_subsurface_set_position(tv->view->subsurface, tv->x, tv->y);
 }
 
 static void
-txn_apply_visible(struct transaction_view *tv, struct server_ui *ui) {
+txn_apply_visible(struct server_txn_view *tv, struct server_ui *ui) {
     if (tv->visible == !!tv->view->subsurface) {
         return;
     }
@@ -192,7 +192,7 @@ txn_apply_visible(struct transaction_view *tv, struct server_ui *ui) {
 }
 
 static void
-txn_apply_z(struct transaction_view *tv, struct server_ui *ui) {
+txn_apply_z(struct server_txn_view *tv, struct server_ui *ui) {
     ww_assert(tv->view->subsurface);
     wl_subsurface_place_above(tv->view->subsurface, tv->above);
 }
@@ -215,9 +215,9 @@ can_apply_crop(struct server_view *view, struct box crop) {
 }
 
 static void
-destroy_txn(struct transaction *txn) {
+destroy_txn(struct server_txn *txn) {
     // There may be remaining dependencies if the transaction did not complete.
-    struct transaction_dep *dep, *tmp_dep;
+    struct server_txn_dep *dep, *tmp_dep;
     wl_list_for_each_safe (dep, tmp_dep, &txn->dependencies, link) {
         wl_list_remove(&dep->listener.link);
         wl_list_remove(&dep->link);
@@ -230,7 +230,7 @@ destroy_txn(struct transaction *txn) {
         }
     }
 
-    struct transaction_view *tv, *tmp_view;
+    struct server_txn_view *tv, *tmp_view;
     wl_list_for_each_safe (tv, tmp_view, &txn->views, link) {
         if (tv->view->subsurface) {
             wl_subsurface_set_desync(tv->view->subsurface);
@@ -247,8 +247,8 @@ destroy_txn(struct transaction *txn) {
 }
 
 static void
-finalize_txn(struct transaction *txn) {
-    struct transaction_view *tv;
+finalize_txn(struct server_txn *txn) {
+    struct server_txn_view *tv;
     wl_list_for_each (tv, &txn->views, link) {
         if (tv->apply & TXN_VIEW_ABOVE) {
             txn_apply_z(tv, txn->ui);
@@ -470,7 +470,7 @@ server_view_destroy(struct server_view *view) {
 }
 
 void
-transaction_apply(struct server_ui *ui, struct transaction *txn) {
+server_ui_apply(struct server_ui *ui, struct server_txn *txn) {
     // If there is an inflight transaction, disregard any pending resizes from it and take over.
     if (ui->inflight_txn) {
         finalize_txn(ui->inflight_txn);
@@ -482,12 +482,12 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
 
     txn->ui = ui;
     txn->timer = wl_event_loop_add_timer(wl_display_get_event_loop(ui->server->display),
-                                         on_transaction_timeout, txn);
+                                         on_txn_timeout, txn);
     check_alloc(txn->timer);
 
     wl_event_source_timer_update(txn->timer, TXN_TIMEOUT_MS);
 
-    struct transaction_view *tv;
+    struct server_txn_view *tv;
     wl_list_for_each (tv, &txn->views, link) {
         if (tv->apply & TXN_VIEW_CROP) {
             tv->view->state.crop = tv->crop;
@@ -516,9 +516,9 @@ transaction_apply(struct server_ui *ui, struct transaction *txn) {
     }
 }
 
-struct transaction *
-transaction_create() {
-    struct transaction *txn = zalloc(1, sizeof(*txn));
+struct server_txn *
+server_txn_create() {
+    struct server_txn *txn = zalloc(1, sizeof(*txn));
 
     wl_list_init(&txn->views);
     wl_list_init(&txn->dependencies);
@@ -526,9 +526,9 @@ transaction_create() {
     return txn;
 }
 
-struct transaction_view *
-transaction_get_view(struct transaction *txn, struct server_view *view) {
-    struct transaction_view *txn_view = zalloc(1, sizeof(*txn_view));
+struct server_txn_view *
+server_txn_get_view(struct server_txn *txn, struct server_view *view) {
+    struct server_txn_view *txn_view = zalloc(1, sizeof(*txn_view));
 
     txn_view->parent = txn;
     txn_view->view = view;
@@ -542,19 +542,19 @@ transaction_get_view(struct transaction *txn, struct server_view *view) {
 }
 
 void
-transaction_view_set_above(struct transaction_view *view, struct wl_surface *surface) {
+server_txn_view_set_above(struct server_txn_view *view, struct wl_surface *surface) {
     view->above = surface;
     view->apply |= TXN_VIEW_ABOVE;
 }
 
 void
-transaction_view_set_behavior(struct transaction_view *view, enum transaction_behavior behavior) {
+server_txn_view_set_behavior(struct server_txn_view *view, enum server_txn_behavior behavior) {
     view->behavior = behavior;
 }
 
 void
-transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, int32_t width,
-                          int32_t height) {
+server_txn_view_set_crop(struct server_txn_view *view, int32_t x, int32_t y, int32_t width,
+                         int32_t height) {
     view->crop.x = x;
     view->crop.y = y;
     view->crop.width = width;
@@ -563,28 +563,28 @@ transaction_view_set_crop(struct transaction_view *view, int32_t x, int32_t y, i
 }
 
 void
-transaction_view_set_dest_size(struct transaction_view *view, uint32_t width, uint32_t height) {
+server_txn_view_set_dest_size(struct server_txn_view *view, uint32_t width, uint32_t height) {
     view->dest_width = width;
     view->dest_height = height;
     view->apply |= TXN_VIEW_DEST_SIZE;
 }
 
 void
-transaction_view_set_position(struct transaction_view *view, uint32_t x, uint32_t y) {
+server_txn_view_set_pos(struct server_txn_view *view, uint32_t x, uint32_t y) {
     view->x = x;
     view->y = y;
     view->apply |= TXN_VIEW_POS;
 }
 
 void
-transaction_view_set_size(struct transaction_view *view, uint32_t width, uint32_t height) {
+server_txn_view_set_size(struct server_txn_view *view, uint32_t width, uint32_t height) {
     view->width = width;
     view->height = height;
     view->apply |= TXN_VIEW_SIZE;
 }
 
 void
-transaction_view_set_visible(struct transaction_view *view, bool visible) {
+server_txn_view_set_visible(struct server_txn_view *view, bool visible) {
     view->visible = visible;
     view->apply |= TXN_VIEW_VISIBLE;
 }

@@ -54,30 +54,30 @@ static void
 layout_active(struct wall *wall) {
     ww_assert(!ON_WALL(wall));
 
-    struct transaction *txn = transaction_create();
+    struct server_txn *txn = server_txn_create();
     ww_assert(txn);
 
-    struct transaction_view *view =
-        transaction_get_view(txn, wall->instances[wall->active_instance]->view);
+    struct server_txn_view *view =
+        server_txn_get_view(txn, wall->instances[wall->active_instance]->view);
     ww_assert(view);
 
     if (wall->active_res.w == 0) {
         ww_assert(wall->active_res.h == 0);
 
-        transaction_view_set_behavior(view, TXN_BEHAVIOR_ASYNC);
-        transaction_view_set_position(view, 0, 0);
-        transaction_view_set_dest_size(view, wall->width, wall->height);
-        transaction_view_set_size(view, wall->width, wall->height);
-        transaction_view_set_crop(view, -1, -1, -1, -1);
+        server_txn_view_set_behavior(view, TXN_BEHAVIOR_ASYNC);
+        server_txn_view_set_pos(view, 0, 0);
+        server_txn_view_set_dest_size(view, wall->width, wall->height);
+        server_txn_view_set_size(view, wall->width, wall->height);
+        server_txn_view_set_crop(view, -1, -1, -1, -1);
     } else {
         int32_t x = (wall->width / 2) - (wall->active_res.w / 2);
         int32_t y = (wall->height / 2) - (wall->active_res.h / 2);
 
         if (x >= 0 && y >= 0) {
-            transaction_view_set_position(view, x, y);
-            transaction_view_set_dest_size(view, wall->active_res.w, wall->active_res.h);
-            transaction_view_set_size(view, wall->active_res.w, wall->active_res.h);
-            transaction_view_set_crop(view, -1, -1, -1, -1);
+            server_txn_view_set_pos(view, x, y);
+            server_txn_view_set_dest_size(view, wall->active_res.w, wall->active_res.h);
+            server_txn_view_set_size(view, wall->active_res.w, wall->active_res.h);
+            server_txn_view_set_crop(view, -1, -1, -1, -1);
         } else {
             // Negative X or Y coordinates mean that the provided resolution is greater than the
             // size of the waywall window. In this case, we need to crop the view.
@@ -90,14 +90,14 @@ layout_active(struct wall *wall) {
             x = x >= 0 ? x : 0;
             y = y >= 0 ? y : 0;
 
-            transaction_view_set_position(view, x, y);
-            transaction_view_set_dest_size(view, w, h);
-            transaction_view_set_size(view, wall->active_res.w, wall->active_res.h);
-            transaction_view_set_crop(view, crop_x, crop_y, w, h);
+            server_txn_view_set_pos(view, x, y);
+            server_txn_view_set_dest_size(view, w, h);
+            server_txn_view_set_size(view, wall->active_res.w, wall->active_res.h);
+            server_txn_view_set_crop(view, crop_x, crop_y, w, h);
         }
     }
 
-    transaction_apply(wall->server->ui, txn);
+    server_ui_apply(wall->server->ui, txn);
 }
 
 static void
@@ -136,7 +136,7 @@ layout_wall(struct wall *wall) {
         return;
     }
 
-    struct transaction *txn = transaction_create();
+    struct server_txn *txn = server_txn_create();
     ww_assert(txn);
 
     destroy_rectangles(wall);
@@ -161,14 +161,14 @@ layout_wall(struct wall *wall) {
                 continue;
             }
 
-            struct transaction_view *view =
-                transaction_get_view(txn, wall->instances[element->data.instance]->view);
+            struct server_txn_view *view =
+                server_txn_get_view(txn, wall->instances[element->data.instance]->view);
             ww_assert(view);
 
-            transaction_view_set_dest_size(view, element->w, element->h);
-            transaction_view_set_position(view, element->x, element->y);
-            transaction_view_set_visible(view, true);
-            transaction_view_set_above(view, previous);
+            server_txn_view_set_dest_size(view, element->w, element->h);
+            server_txn_view_set_pos(view, element->x, element->y);
+            server_txn_view_set_visible(view, true);
+            server_txn_view_set_above(view, previous);
             shown[element->data.instance] = true;
 
             previous = view->view->surface->remote;
@@ -192,14 +192,14 @@ layout_wall(struct wall *wall) {
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (!shown[i]) {
-            struct transaction_view *view = transaction_get_view(txn, wall->instances[i]->view);
+            struct server_txn_view *view = server_txn_get_view(txn, wall->instances[i]->view);
             ww_assert(view);
 
-            transaction_view_set_visible(view, false);
+            server_txn_view_set_visible(view, false);
         }
     }
 
-    transaction_apply(wall->server->ui, txn);
+    server_ui_apply(wall->server->ui, txn);
 }
 
 static void
@@ -384,28 +384,28 @@ play_instance(struct wall *wall, int id) {
     instance_unpause(wall->instances[id]);
     server_set_input_focus(wall->server, wall->instances[id]->view);
 
-    struct transaction *txn = transaction_create();
+    struct server_txn *txn = server_txn_create();
     ww_assert(txn);
 
-    struct transaction_view *view = transaction_get_view(txn, wall->instances[id]->view);
+    struct server_txn_view *view = server_txn_get_view(txn, wall->instances[id]->view);
     ww_assert(view);
 
-    transaction_view_set_position(view, 0, 0);
-    transaction_view_set_dest_size(view, wall->width, wall->height);
-    transaction_view_set_size(view, wall->width, wall->height);
-    transaction_view_set_crop(view, -1, -1, -1, -1);
-    transaction_view_set_visible(view, true);
+    server_txn_view_set_pos(view, 0, 0);
+    server_txn_view_set_dest_size(view, wall->width, wall->height);
+    server_txn_view_set_size(view, wall->width, wall->height);
+    server_txn_view_set_crop(view, -1, -1, -1, -1);
+    server_txn_view_set_visible(view, true);
 
     for (int i = 0; i < wall->num_instances; i++) {
         if (i != id) {
-            view = transaction_get_view(txn, wall->instances[i]->view);
+            view = server_txn_get_view(txn, wall->instances[i]->view);
             ww_assert(view);
 
-            transaction_view_set_visible(view, false);
+            server_txn_view_set_visible(view, false);
         }
     }
 
-    transaction_apply(wall->server->ui, txn);
+    server_ui_apply(wall->server->ui, txn);
 }
 
 static void
@@ -800,15 +800,15 @@ wall_lua_set_res(struct wall *wall, int id, int32_t width, int32_t height) {
         wall->active_res.h = height;
         layout_active(wall);
     } else {
-        struct transaction *txn = transaction_create();
+        struct server_txn *txn = server_txn_create();
         ww_assert(txn);
 
-        struct transaction_view *view = transaction_get_view(txn, wall->instances[id]->view);
+        struct server_txn_view *view = server_txn_get_view(txn, wall->instances[id]->view);
         ww_assert(view);
 
-        transaction_view_set_size(view, width, height);
+        server_txn_view_set_size(view, width, height);
 
-        transaction_apply(wall->server->ui, txn);
+        server_ui_apply(wall->server->ui, txn);
     }
 
     return 0;

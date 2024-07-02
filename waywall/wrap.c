@@ -24,31 +24,31 @@ layout(struct wrap *wrap) {
         return;
     }
 
-    struct transaction *txn = transaction_create();
+    struct server_txn *txn = server_txn_create();
     ww_assert(txn);
 
-    struct transaction_view *view = transaction_get_view(txn, wrap->view);
+    struct server_txn_view *view = server_txn_get_view(txn, wrap->view);
     ww_assert(view);
 
-    transaction_view_set_visible(view, true);
+    server_txn_view_set_visible(view, true);
 
     if (wrap->active_res.w == 0) {
         ww_assert(wrap->active_res.h == 0);
 
-        transaction_view_set_behavior(view, TXN_BEHAVIOR_ASYNC);
-        transaction_view_set_position(view, 0, 0);
-        transaction_view_set_dest_size(view, wrap->width, wrap->height);
-        transaction_view_set_size(view, wrap->width, wrap->height);
-        transaction_view_set_crop(view, -1, -1, -1, -1);
+        server_txn_view_set_behavior(view, TXN_BEHAVIOR_ASYNC);
+        server_txn_view_set_pos(view, 0, 0);
+        server_txn_view_set_dest_size(view, wrap->width, wrap->height);
+        server_txn_view_set_size(view, wrap->width, wrap->height);
+        server_txn_view_set_crop(view, -1, -1, -1, -1);
     } else {
         int32_t x = (wrap->width / 2) - (wrap->active_res.w / 2);
         int32_t y = (wrap->height / 2) - (wrap->active_res.h / 2);
 
         if (x >= 0 && y >= 0) {
-            transaction_view_set_position(view, x, y);
-            transaction_view_set_dest_size(view, wrap->active_res.w, wrap->active_res.h);
-            transaction_view_set_size(view, wrap->active_res.w, wrap->active_res.h);
-            transaction_view_set_crop(view, -1, -1, -1, -1);
+            server_txn_view_set_pos(view, x, y);
+            server_txn_view_set_dest_size(view, wrap->active_res.w, wrap->active_res.h);
+            server_txn_view_set_size(view, wrap->active_res.w, wrap->active_res.h);
+            server_txn_view_set_crop(view, -1, -1, -1, -1);
         } else {
             // Negative X or Y coordinates mean that the provided resolution is greater than the
             // size of the waywall window. In this case, we need to crop the view.
@@ -61,14 +61,14 @@ layout(struct wrap *wrap) {
             x = x >= 0 ? x : 0;
             y = y >= 0 ? y : 0;
 
-            transaction_view_set_position(view, x, y);
-            transaction_view_set_dest_size(view, w, h);
-            transaction_view_set_size(view, wrap->active_res.w, wrap->active_res.h);
-            transaction_view_set_crop(view, crop_x, crop_y, w, h);
+            server_txn_view_set_pos(view, x, y);
+            server_txn_view_set_dest_size(view, w, h);
+            server_txn_view_set_size(view, wrap->active_res.w, wrap->active_res.h);
+            server_txn_view_set_crop(view, crop_x, crop_y, w, h);
         }
     }
 
-    transaction_apply(wrap->server->ui, txn);
+    server_ui_apply(wrap->server->ui, txn);
 }
 
 static void
