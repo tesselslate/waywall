@@ -255,10 +255,8 @@ surface_set_buffer_transform(struct wl_client *client, struct wl_resource *resou
 static void
 surface_set_input_region(struct wl_client *client, struct wl_resource *resource,
                          struct wl_resource *region_resource) {
-    // Unused. The base Wayland protocol unfortunately leaves a lot of details regarding subsurfaces
-    // unspecified, resulting in a lot of variation in behavior between compositors. In particular,
-    // some compositors seem to pass certain input events through to the root surface, so we do not
-    // want to ever receive input events on another surface.
+    // Unused. We want to ensure that all client surfaces have an empty input region so that all
+    // input events in the waywall toplevel are passed to the root surface.
 }
 
 static void
