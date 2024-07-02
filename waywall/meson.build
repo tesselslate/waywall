@@ -32,6 +32,7 @@ waywall_src = files(
   'util/str.c',
   'util/syscall.c',
   'util/sysinfo.c',
+  'util/zip.c',
   'cmd_cpu.c',
   'cmd_exec.c',
   'cmd_run.c',
