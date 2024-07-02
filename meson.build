@@ -55,7 +55,6 @@ wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner')
 
 # Runtime dependencies
-libzip = dependency('libzip')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
@@ -65,7 +64,6 @@ xkbcommon = dependency('xkbcommon')
 waywall_deps = [
   cc.find_library('m'),
 
-  libzip,
   luajit,
   wayland_client,
   wayland_cursor,
