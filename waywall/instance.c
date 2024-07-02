@@ -7,6 +7,7 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "util/str.h"
+#include "util/zip.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -19,7 +20,6 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
-#include <zip.h>
 
 #define K(x)                                                                                       \
     { #x, KEY_##x }
@@ -264,48 +264,35 @@ check_subdirs(const char *dirname) {
 
 static int
 process_mod_zip(const char *path, struct instance_mods *mods) {
-    int err;
-    zip_t *zip = zip_open(path, ZIP_RDONLY, &err);
+    struct zip *zip = zip_open(path);
     if (!zip) {
-        zip_error_t error;
-        zip_error_init_with_code(&error, err);
-        ww_log(LOG_ERROR, "failed to read mod zip '%s': %s", path, zip_error_strerror(&error));
-        zip_error_fini(&error);
         return 1;
     }
 
-    for (int64_t i = 0; i < zip_get_num_entries(zip, 0); i++) {
-        zip_stat_t stat;
-        if (zip_stat_index(zip, i, 0, &stat) != 0) {
-            zip_error_t *error = zip_get_error(zip);
-            ww_log(LOG_ERROR, "failed to stat entry %" PRIi64 " of '%s': %s", i, path,
-                   zip_error_strerror(error));
-            zip_close(zip);
-            return 1;
-        }
-
-        if (strcmp(stat.name, "me/voidxwalker/autoreset/") == 0) {
+    const char *filename;
+    while ((filename = zip_next(zip))) {
+        if (strcmp(filename, "me/voidxwalker/autoreset/") == 0) {
             // Atum
             mods->atum = true;
             break;
-        } else if (strcmp(stat.name, "com/kingcontaria/standardsettings/") == 0) {
+        } else if (strcmp(filename, "com/kingcontaria/standardsettings/") == 0) {
             // StandardSettings
             mods->standard_settings = true;
             break;
-        } else if (strcmp(stat.name, "me/voidxwalker/worldpreview") == 0) {
+        } else if (strcmp(filename, "me/voidxwalker/worldpreview/") == 0) {
             // WorldPreview
             mods->world_preview = true;
             continue;
-        } else if (strcmp(stat.name, "me/voidxwalker/worldpreview/StateOutputHelper.class") == 0) {
+        } else if (strcmp(filename, "me/voidxwalker/worldpreview/StateOutputHelper.class") == 0) {
             // WorldPreview with state output (3.x - 4.x)
             mods->state_output = true;
             mods->world_preview = true;
             break;
-        } else if (strcmp(stat.name, "xyz/tildejustin/stateoutput/") == 0) {
+        } else if (strcmp(filename, "xyz/tildejustin/stateoutput/") == 0) {
             // Legacy state-output
             mods->state_output = true;
             break;
-        } else if (strcmp(stat.name, "dev/tildejustin/stateoutput/") == 0) {
+        } else if (strcmp(filename, "dev/tildejustin/stateoutput/") == 0) {
             // state-output
             mods->state_output = true;
             break;
