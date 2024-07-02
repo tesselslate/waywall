@@ -693,7 +693,7 @@ on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_s
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
-    if (surface != seat->server->ui->surface) {
+    if (surface != seat->server->ui->root.surface) {
         ww_log(LOG_WARN, "received wl_pointer.enter for unknown surface");
         return;
     }

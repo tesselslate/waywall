@@ -23,7 +23,7 @@ lock_pointer(struct server_pointer_constraints *pointer_constraints) {
     }
 
     pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
-        pointer_constraints->remote, pointer_constraints->server->ui->surface,
+        pointer_constraints->remote, pointer_constraints->server->ui->root.surface,
         server_get_wl_pointer(pointer_constraints->server), NULL,
         ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
     check_alloc(pointer_constraints->locked_pointer);
@@ -40,7 +40,7 @@ unlock_pointer(struct server_pointer_constraints *pointer_constraints) {
 
     if (pointer_constraints->config.confine) {
         pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui->surface,
+            pointer_constraints->remote, pointer_constraints->server->ui->root.surface,
             server_get_wl_pointer(pointer_constraints->server), NULL,
             ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         check_alloc(pointer_constraints->confined_pointer);
@@ -249,14 +249,14 @@ on_pointer(struct wl_listener *listener, void *data) {
     if (pointer_constraints->locked_pointer) {
         zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
         pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui->surface, pointer, NULL,
-            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
+            NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         check_alloc(pointer_constraints->locked_pointer);
     } else if (pointer_constraints->confined_pointer) {
         zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
         pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui->surface, pointer, NULL,
-            ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
+            NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         check_alloc(pointer_constraints->confined_pointer);
     }
 }
@@ -326,7 +326,7 @@ server_pointer_constraints_set_confine(struct server_pointer_constraints *pointe
         pointer_constraints->confined_pointer = NULL;
     } else if (confine && (!confined && !locked)) {
         pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-            pointer_constraints->remote, pointer_constraints->server->ui->surface,
+            pointer_constraints->remote, pointer_constraints->server->ui->root.surface,
             server_get_wl_pointer(pointer_constraints->server), NULL,
             ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         check_alloc(pointer_constraints->confined_pointer);

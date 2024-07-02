@@ -142,7 +142,7 @@ layout_wall(struct wall *wall) {
     destroy_rectangles(wall);
 
     // Used for Z ordering.
-    struct wl_surface *previous = wall->server->ui->surface;
+    struct wl_surface *previous = wall->server->ui->tree.surface;
 
     bool shown[MAX_INSTANCES] = {0};
     for (size_t i = 0; i < wall->layout->num_elements; i++) {

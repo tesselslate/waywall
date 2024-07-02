@@ -16,8 +16,15 @@ struct server_ui {
 
     struct wl_region *empty_region;
 
-    struct wl_surface *surface;
-    struct wp_viewport *viewport;
+    struct {
+        struct wl_surface *surface;
+        struct wp_viewport *viewport;
+    } root;
+    struct {
+        struct wl_buffer *buffer;
+        struct wl_surface *surface;
+        struct wl_subsurface *subsurface;
+    } tree;
 
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;

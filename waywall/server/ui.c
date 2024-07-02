@@ -109,7 +109,7 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
     struct server_ui *ui = data;
 
     xdg_surface_set_window_geometry(xdg_surface, 0, 0, ui->width, ui->height);
-    wp_viewport_set_destination(ui->viewport, ui->width, ui->height);
+    wp_viewport_set_destination(ui->root.viewport, ui->width, ui->height);
 
     xdg_surface_ack_configure(xdg_surface, serial);
 
@@ -117,7 +117,7 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
         wl_signal_emit(&ui->events.resize, NULL);
         ui->resize = false;
     }
-    wl_surface_commit(ui->surface);
+    wl_surface_commit(ui->root.surface);
 }
 
 static const struct xdg_surface_listener xdg_surface_listener = {
@@ -180,11 +180,13 @@ txn_apply_visible(struct server_txn_view *tv, struct server_ui *ui) {
     }
 
     if (tv->visible) {
-        tv->view->subsurface = wl_subcompositor_get_subsurface(
-            ui->server->backend->subcompositor, tv->view->surface->remote, tv->view->ui->surface);
+        tv->view->subsurface =
+            wl_subcompositor_get_subsurface(ui->server->backend->subcompositor,
+                                            tv->view->surface->remote, tv->view->ui->tree.surface);
         check_alloc(tv->view->subsurface);
 
         wl_subsurface_set_position(tv->view->subsurface, tv->view->state.x, tv->view->state.y);
+        wl_subsurface_set_desync(tv->view->subsurface);
     } else {
         wl_subsurface_destroy(tv->view->subsurface);
         tv->view->subsurface = NULL;
@@ -232,9 +234,6 @@ destroy_txn(struct server_txn *txn) {
 
     struct server_txn_view *tv, *tmp_view;
     wl_list_for_each_safe (tv, tmp_view, &txn->views, link) {
-        if (tv->view->subsurface) {
-            wl_subsurface_set_desync(tv->view->subsurface);
-        }
         wl_list_remove(&tv->link);
         free(tv);
     }
@@ -243,6 +242,7 @@ destroy_txn(struct server_txn *txn) {
         wl_event_source_remove(txn->timer);
     }
 
+    wl_subsurface_set_desync(txn->ui->tree.subsurface);
     free(txn);
 }
 
@@ -266,7 +266,7 @@ finalize_txn(struct server_txn *txn) {
         wl_surface_commit(tv->view->surface->remote);
     }
 
-    wl_surface_commit(txn->ui->surface);
+    wl_surface_commit(txn->ui->tree.surface);
     destroy_txn(txn);
 }
 
@@ -279,13 +279,27 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->empty_region = wl_compositor_create_region(server->backend->compositor);
     check_alloc(ui->empty_region);
 
-    ui->surface = wl_compositor_create_surface(server->backend->compositor);
-    check_alloc(ui->surface);
+    ui->root.surface = wl_compositor_create_surface(server->backend->compositor);
+    check_alloc(ui->root.surface);
 
-    ui->viewport = wp_viewporter_get_viewport(server->backend->viewporter, ui->surface);
-    check_alloc(ui->viewport);
+    ui->root.viewport = wp_viewporter_get_viewport(server->backend->viewporter, ui->root.surface);
+    check_alloc(ui->root.viewport);
 
-    ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->surface);
+    ui->tree.buffer =
+        remote_buffer_manager_color(server->remote_buf, (const uint8_t[4]){0, 0, 0, 0});
+    ww_assert(ui->tree.buffer);
+
+    ui->tree.surface = wl_compositor_create_surface(server->backend->compositor);
+    check_alloc(ui->tree.surface);
+    wl_surface_attach(ui->tree.surface, ui->tree.buffer, 0, 0);
+    wl_surface_set_input_region(ui->tree.surface, ui->empty_region);
+    wl_surface_commit(ui->tree.surface);
+
+    ui->tree.subsurface = wl_subcompositor_get_subsurface(server->backend->subcompositor,
+                                                          ui->tree.surface, ui->root.surface);
+    check_alloc(ui->tree.surface);
+
+    ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->root.surface);
     check_alloc(ui->xdg_surface);
     xdg_surface_add_listener(ui->xdg_surface, &xdg_surface_listener, ui);
 
@@ -321,8 +335,11 @@ server_ui_create(struct server *server, struct config *cfg) {
 fail_config:
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
-    wp_viewport_destroy(ui->viewport);
-    wl_surface_destroy(ui->surface);
+    wl_subsurface_destroy(ui->tree.subsurface);
+    wl_surface_destroy(ui->tree.surface);
+    remote_buffer_deref(ui->tree.buffer);
+    wp_viewport_destroy(ui->root.viewport);
+    wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
     free(ui);
     return NULL;
@@ -338,8 +355,11 @@ server_ui_destroy(struct server_ui *ui) {
 
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
-    wp_viewport_destroy(ui->viewport);
-    wl_surface_destroy(ui->surface);
+    wl_subsurface_destroy(ui->tree.subsurface);
+    wl_surface_destroy(ui->tree.surface);
+    remote_buffer_deref(ui->tree.buffer);
+    wp_viewport_destroy(ui->root.viewport);
+    wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
 
     free(ui);
@@ -349,8 +369,8 @@ void
 server_ui_hide(struct server_ui *ui) {
     ww_assert(ui->mapped);
 
-    wl_surface_attach(ui->surface, NULL, 0, 0);
-    wl_surface_commit(ui->surface);
+    wl_surface_attach(ui->root.surface, NULL, 0, 0);
+    wl_surface_commit(ui->root.surface);
 
     ui->mapped = false;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
@@ -362,12 +382,12 @@ server_ui_show(struct server_ui *ui) {
 
     struct wl_display *display = ui->server->backend->display;
 
-    wl_surface_attach(ui->surface, NULL, 0, 0);
-    wl_surface_commit(ui->surface);
+    wl_surface_attach(ui->root.surface, NULL, 0, 0);
+    wl_surface_commit(ui->root.surface);
     wl_display_roundtrip(display);
 
-    wl_surface_attach(ui->surface, ui->config->background, 0, 0);
-    wl_surface_commit(ui->surface);
+    wl_surface_attach(ui->root.surface, ui->config->background, 0, 0);
+    wl_surface_commit(ui->root.surface);
     wl_display_roundtrip(display);
 
     xdg_toplevel_set_title(ui->xdg_toplevel, "waywall");
@@ -385,9 +405,9 @@ server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
     ui->config = config;
 
     if (ui->mapped) {
-        wl_surface_attach(ui->surface, config->background, 0, 0);
-        wl_surface_damage_buffer(ui->surface, 0, 0, INT32_MAX, INT32_MAX);
-        wl_surface_commit(ui->surface);
+        wl_surface_attach(ui->root.surface, config->background, 0, 0);
+        wl_surface_damage_buffer(ui->root.surface, 0, 0, INT32_MAX, INT32_MAX);
+        wl_surface_commit(ui->root.surface);
     }
 }
 
@@ -477,6 +497,8 @@ server_ui_apply(struct server_ui *ui, struct server_txn *txn) {
     }
     ui->inflight_txn = txn;
 
+    wl_subsurface_set_sync(ui->tree.subsurface);
+
     ww_assert(!txn->applied);
     txn->applied = true;
 
@@ -532,9 +554,6 @@ server_txn_get_view(struct server_txn *txn, struct server_view *view) {
 
     txn_view->parent = txn;
     txn_view->view = view;
-    if (view->subsurface) {
-        wl_subsurface_set_sync(view->subsurface);
-    }
 
     wl_list_insert(&txn->views, &txn_view->link);
 
@@ -636,13 +655,14 @@ ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible) {
     }
 
     if (visible) {
-        rect->subsurface = wl_subcompositor_get_subsurface(
-            rect->parent->server->backend->subcompositor, rect->surface, rect->parent->surface);
+        rect->subsurface =
+            wl_subcompositor_get_subsurface(rect->parent->server->backend->subcompositor,
+                                            rect->surface, rect->parent->tree.surface);
         check_alloc(rect->subsurface);
 
         wl_subsurface_set_position(rect->subsurface, rect->x, rect->y);
         wl_surface_commit(rect->surface);
-        wl_surface_commit(rect->parent->surface);
+        wl_surface_commit(rect->parent->tree.surface);
     } else {
         wl_subsurface_destroy(rect->subsurface);
         wl_surface_commit(rect->surface);

@@ -440,7 +440,7 @@ server_get_wl_pointer(struct server *server) {
 void
 server_set_pointer_pos(struct server *server, double x, double y) {
     server_pointer_constraints_set_hint(server->pointer_constraints, x, y);
-    wl_surface_commit(server->ui->surface);
+    wl_surface_commit(server->ui->root.surface);
 }
 
 void
