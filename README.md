@@ -16,7 +16,6 @@ The following dependencies are required only at build time:
 
 The following dependencies are required for both building and running:
 
- - `libzip`
  - `luajit`
  - `wayland-client`
  - `wayland-cursor`
