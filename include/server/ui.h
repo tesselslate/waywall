@@ -117,18 +117,6 @@ struct server_txn_view {
         TXN_VIEW_SIZE = (1 << 4),
         TXN_VIEW_VISIBLE = (1 << 5),
     } apply;
-
-    // The behavior only applies for asynchronous operations (i.e. surface resizing) which may not
-    // complete in a timely fashion.
-    enum server_txn_behavior {
-        // All asynchronous operations should complete before the timeout, but the transaction can
-        // still be finalized if they do not. This is the default behavior.
-        TXN_BEHAVIOR_DEFER = 0,
-
-        // Do not wait for any asynchronous operations to complete before finalizing the
-        // transaction.
-        TXN_BEHAVIOR_ASYNC,
-    } behavior;
 };
 
 struct ui_rectangle {
@@ -163,7 +151,6 @@ void server_view_destroy(struct server_view *view);
 struct server_txn *server_txn_create();
 struct server_txn_view *server_txn_get_view(struct server_txn *txn, struct server_view *view);
 void server_txn_view_set_above(struct server_txn_view *view, struct wl_surface *surface);
-void server_txn_view_set_behavior(struct server_txn_view *view, enum server_txn_behavior behavior);
 void server_txn_view_set_crop(struct server_txn_view *view, int32_t x, int32_t y, int32_t width,
                               int32_t height);
 void server_txn_view_set_dest_size(struct server_txn_view *view, uint32_t width, uint32_t height);

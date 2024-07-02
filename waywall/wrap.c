@@ -35,7 +35,6 @@ layout(struct wrap *wrap) {
     if (wrap->active_res.w == 0) {
         ww_assert(wrap->active_res.h == 0);
 
-        server_txn_view_set_behavior(view, TXN_BEHAVIOR_ASYNC);
         server_txn_view_set_pos(view, 0, 0);
         server_txn_view_set_dest_size(view, wrap->width, wrap->height);
         server_txn_view_set_size(view, wrap->width, wrap->height);

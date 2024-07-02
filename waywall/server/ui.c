@@ -519,12 +519,10 @@ server_ui_apply(struct server_ui *ui, struct server_txn *txn) {
             tv->view->state.y = tv->y;
         }
         if (tv->apply & TXN_VIEW_SIZE) {
-            if (tv->behavior != TXN_BEHAVIOR_ASYNC) {
-                tv->resize_dep.listener.notify = on_txn_view_resize;
-                wl_signal_add(&tv->view->events.resize, &tv->resize_dep.listener);
+            tv->resize_dep.listener.notify = on_txn_view_resize;
+            wl_signal_add(&tv->view->events.resize, &tv->resize_dep.listener);
 
-                wl_list_insert(&txn->dependencies, &tv->resize_dep.link);
-            }
+            wl_list_insert(&txn->dependencies, &tv->resize_dep.link);
 
             tv->view->impl->set_size(tv->view->impl_data, tv->width, tv->height);
         }
@@ -564,11 +562,6 @@ void
 server_txn_view_set_above(struct server_txn_view *view, struct wl_surface *surface) {
     view->above = surface;
     view->apply |= TXN_VIEW_ABOVE;
-}
-
-void
-server_txn_view_set_behavior(struct server_txn_view *view, enum server_txn_behavior behavior) {
-    view->behavior = behavior;
 }
 
 void

@@ -64,7 +64,6 @@ layout_active(struct wall *wall) {
     if (wall->active_res.w == 0) {
         ww_assert(wall->active_res.h == 0);
 
-        server_txn_view_set_behavior(view, TXN_BEHAVIOR_ASYNC);
         server_txn_view_set_pos(view, 0, 0);
         server_txn_view_set_dest_size(view, wall->width, wall->height);
         server_txn_view_set_size(view, wall->width, wall->height);
