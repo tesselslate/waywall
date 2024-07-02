@@ -98,6 +98,9 @@ struct server_txn_view {
     struct wl_list link; // server_txn.views
     struct server_view *view;
 
+    // See on_txn_view_commit for more details.
+    bool needs_commit;
+
     struct server_txn_dep {
         struct wl_list link; // server_txn.dependencies
         struct wl_listener listener;

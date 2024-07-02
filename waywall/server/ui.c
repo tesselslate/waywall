@@ -47,6 +47,12 @@ on_txn_view_commit(struct wl_listener *listener, void *data) {
         wl_list_remove(&dep->link);
 
         if (wl_list_empty(&txn->dependencies)) {
+            // If this surface had the last transaction dependency, we cannot call wl_surface.commit
+            // in `finalize_txn` because the new buffer will not have been committed yet. The
+            // `server_surface.commit` event is emitted before we call `wl_surface.commit` on the
+            // remote surface, so the new buffer is still part of the pending state.
+            tv->needs_commit = false;
+
             finalize_txn(txn);
         }
     }
@@ -131,12 +137,16 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         return;
     }
 
-    if (!can_apply_crop(view, view->state.crop)) {
-        // Just get rid of the source box entirely if the surface size decreases unexpectedly so we
-        // don't crash.
+    if (can_apply_crop(view, view->state.crop)) {
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(view->state.crop.x),
+                               wl_fixed_from_int(view->state.crop.y),
+                               wl_fixed_from_int(view->state.crop.width),
+                               wl_fixed_from_int(view->state.crop.height));
+    } else {
+        // Just get rid of the source box entirely if the surface gets sized down so we don't
+        // crash.
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                                wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-        ww_log(LOG_WARN, "surface size decreased unexpectedly");
     }
 }
 
@@ -254,7 +264,9 @@ finalize_txn(struct server_txn *txn) {
             txn_apply_pos(tv, txn->ui);
         }
 
-        wl_surface_commit(tv->view->surface->remote);
+        if (tv->needs_commit) {
+            wl_surface_commit(tv->view->surface->remote);
+        }
     }
 
     wl_surface_commit(txn->ui->tree.surface);
@@ -542,6 +554,7 @@ server_txn_get_view(struct server_txn *txn, struct server_view *view) {
 
     txn_view->parent = txn;
     txn_view->view = view;
+    txn_view->needs_commit = true;
 
     wl_list_insert(&txn->views, &txn_view->link);
 
