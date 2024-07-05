@@ -463,8 +463,6 @@ static inline int
 l_reset_wall(lua_State *L, struct wall *wall) {
     static const int ARG_TARGET = 1;
     static const int ARG_COUNT_RESETS = 2;
-    static const int IDX_ARG_TARGET_KEY = 3;
-    static const int IDX_ARG_TARGET_VAL = 4;
 
     bool count_resets = true;
     switch (lua_gettop(L)) {
@@ -478,6 +476,9 @@ l_reset_wall(lua_State *L, struct wall *wall) {
     default:
         return luaL_error(L, "expected 1 or 2 arguments, got %d", lua_gettop(L));
     }
+
+    int idx_arg_target_key = lua_gettop(L) + 1;
+    int idx_arg_target_val = lua_gettop(L) + 2;
 
     switch (lua_type(L, ARG_TARGET)) {
     case LUA_TNUMBER: {
@@ -504,13 +505,13 @@ l_reset_wall(lua_State *L, struct wall *wall) {
         lua_pushnil(L);
         for (size_t i = 0; i < n; i++) {
             ww_assert(lua_next(L, ARG_TARGET) != 0);
-            ww_assert(lua_gettop(L) == IDX_ARG_TARGET_VAL);
+            ww_assert(lua_gettop(L) == idx_arg_target_val);
 
-            if (!lua_isnumber(L, IDX_ARG_TARGET_VAL)) {
+            if (!lua_isnumber(L, idx_arg_target_val)) {
                 free(ids);
                 return luaL_error(L, "expected instance ID (number), got %s", luaL_typename(L, -1));
             }
-            int id = lua_tointeger(L, IDX_ARG_TARGET_VAL);
+            int id = lua_tointeger(L, idx_arg_target_val);
             if (id < 1 || id > wall->num_instances) {
                 free(ids);
                 return luaL_error(L, "invalid instance: %d", id);
@@ -519,7 +520,7 @@ l_reset_wall(lua_State *L, struct wall *wall) {
             ids[i] = id - 1;
 
             lua_pop(L, 1);
-            ww_assert(lua_gettop(L) == IDX_ARG_TARGET_KEY);
+            ww_assert(lua_gettop(L) == idx_arg_target_key);
         }
 
         lua_pushinteger(L, wall_lua_reset_many(wall, count_resets, n, ids));
