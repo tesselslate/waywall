@@ -192,9 +192,9 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     }
 
     // Determine the Xwayland binary to use.
-    char *xwl_path = "Xwayland";
-    if (getenv("WAYWALL_XWAYLAND_BINARY")) {
-        xwl_path = getenv("WAYWALL_XWAYLAND_BINARY");
+    char *xwl_path = getenv("WAYWALL_XWAYLAND_BINARY");
+    if (!xwl_path) {
+        xwl_path = "Xwayland";
     }
 
     // Build the command to pass to execvp.
