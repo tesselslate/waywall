@@ -11,7 +11,7 @@ struct hdr {
 
 #define HDRSZ sizeof(struct hdr)
 
-#define strhdr(str) ((struct hdr *)((char *)(str)-HDRSZ))
+#define strhdr(str) ((struct hdr *)((char *)(str) - HDRSZ))
 #define hdrstr(hdr) ((hdr)->data)
 
 void

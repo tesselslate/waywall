@@ -55,8 +55,7 @@ static const struct config defaults = {
         },
 };
 
-#define K(x)                                                                                       \
-    { #x, KEY_##x }
+#define K(x) {#x, KEY_##x}
 
 static const struct {
     const char *name;

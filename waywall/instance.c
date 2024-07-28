@@ -21,8 +21,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#define K(x)                                                                                       \
-    { #x, KEY_##x }
+#define K(x) {#x, KEY_##x}
 
 // TODO: This does not cover all possible keycodes.
 static struct {
