@@ -310,6 +310,7 @@ M.wall = function(settings)
         if state.locked[hovered] then
             state.locked[hovered] = nil
             waywall.set_priority(hovered, false)
+            update()
         end
         return true
     end
