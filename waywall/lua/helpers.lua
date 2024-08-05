@@ -159,6 +159,31 @@ M.benchmark = function(settings)
     return benchmark
 end
 
+--- Provides an easy way to switch between different resolutions.
+-- The returned function will do nothing if there is no active instance.
+-- If there is an active instance with no resolution (or a resolution different
+-- to the one provided to `toggle_res`), the function will set it to the given
+-- resolution. Otherwise, the instance will be set back to no resolution.
+-- @param width The width to set the active instance to.
+-- @param height The height to set the active instance to.
+-- @return toggle_res A function which can be used to switch resolutions.
+M.toggle_res = function(width, height)
+    return function()
+        if not waywall.active_instance() then
+            return false
+        end
+
+        local act_width, act_height = waywall.get_active_res()
+        if act_width == width and act_height == height then
+            waywall.set_resolution(waywall.active_instance(), 0, 0)
+        else
+            waywall.set_resolution(waywall.active_instance(), width, height)
+        end
+
+        return true
+    end
+end
+
 --- Provides a basic static wall implementation.
 -- @param settings The wall settings to use.
 -- @return wall An object which can be used to query and modify the wall state.
