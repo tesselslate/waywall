@@ -157,6 +157,39 @@ l_current_time(lua_State *L) {
     return 1;
 }
 
+static int
+l_get_active_res_wall(lua_State *L, struct wall *wall) {
+    if (wall->active_instance == -1) {
+        return luaL_error(L, "cannot get resolution without active instance");
+    }
+
+    lua_pushinteger(L, wall->active_res.w);
+    lua_pushinteger(L, wall->active_res.h);
+    return 2;
+}
+
+static int
+l_get_active_res_wrap(lua_State *L, struct wrap *wrap) {
+    lua_pushinteger(L, wrap->active_res.w);
+    lua_pushinteger(L, wrap->active_res.h);
+    return 2;
+}
+
+static int
+l_get_active_res(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    if (wall) {
+        return l_get_active_res_wall(L, wall);
+    }
+
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        return l_get_active_res_wrap(L, wrap);
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("get_active_res"));
+}
+
 static inline int
 l_goto_wall_wall(lua_State *L, struct wall *wall) {
     bool ok = wall_lua_return(wall) == 0;
@@ -820,6 +853,7 @@ static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_instance", l_active_instance},
     {"current_time", l_current_time},
+    {"get_active_res", l_get_active_res},
     {"goto_wall", l_goto_wall},
     {"hovered", l_hovered},
     {"instance", l_instance},

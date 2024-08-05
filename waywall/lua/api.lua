@@ -17,6 +17,12 @@ M.active_instance = priv.active_instance
 -- state information, such as last_load and last_preview.
 M.current_time = priv.current_time
 
+--- Get the resolution of the active instance, if any.
+-- Throws an error if there is no active instance.
+-- @return width The width of the active instance, or 0 if none has been set.
+-- @return height The height of the active instance, or 0 if none has been set.
+M.get_active_res = priv.get_active_res
+
 --- Switch to the wall view.
 -- This function will throw an error if the user is already on the wall.
 M.goto_wall = priv.goto_wall
