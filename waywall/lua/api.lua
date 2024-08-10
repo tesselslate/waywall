@@ -66,7 +66,6 @@ M.profile = priv.profile
 --- Reset the given instance(s).
 -- The caller can provide either a number (single instance ID), or an array
 -- containing one or more instance IDs.
--- This function will throw an error in the event of an allocation failure.
 -- @param instances The ID of the instance(s) to reset.
 -- @param count Optional. If `false` is provided, the reset will not be counted.
 -- @return The number of instances which were actually reset.
