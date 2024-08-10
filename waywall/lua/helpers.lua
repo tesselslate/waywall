@@ -18,7 +18,7 @@ local M = {}
 -- @return toggle_res A function which can be used to switch resolutions.
 M.toggle_res = function(width, height)
     return function()
-        local act_width, act_height = waywall.get_active_res()
+        local act_width, act_height = waywall.active_res()
         if act_width == width and act_height == height then
             waywall.set_resolution(0, 0)
         else

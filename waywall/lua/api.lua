@@ -38,13 +38,13 @@ local events = {}
 
 local M = {}
 
---- Get the current time, in milliseconds, with an arbitrary epoch.
-M.current_time = priv.current_time
-
 --- Get the current resolution of Minecraft.
 -- @return width The width of the Minecraft window, or 0 if none has been set.
 -- @return height The height of the Minecraft window, or 0 if none has been set.
-M.get_active_res = priv.get_active_res
+M.active_res = priv.active_res
+
+--- Get the current time, in milliseconds, with an arbitrary epoch.
+M.current_time = priv.current_time
 
 --- Register a listener for a specific event.
 -- @param event The name of the event to listen for.

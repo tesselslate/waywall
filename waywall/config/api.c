@@ -111,10 +111,10 @@ l_current_time(lua_State *L) {
 }
 
 static int
-l_get_active_res(lua_State *L) {
+l_active_res(lua_State *L) {
     struct wrap *wrap = get_wrap(L);
     if (!wrap) {
-        return luaL_error(L, STARTUP_ERRMSG("get_active_res"));
+        return luaL_error(L, STARTUP_ERRMSG("active_res"));
     }
 
     lua_pushinteger(L, wrap->active_res.w);
@@ -284,7 +284,7 @@ l_register(lua_State *L) {
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"current_time", l_current_time},
-    {"get_active_res", l_get_active_res},
+    {"active_res", l_active_res},
     {"press_key", l_press_key},
     {"profile", l_profile},
     {"set_keymap", l_set_keymap},
