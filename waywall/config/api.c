@@ -217,6 +217,52 @@ l_set_sensitivity(lua_State *L) {
 }
 
 static int
+l_state(lua_State *L) {
+    struct wrap *wrap = get_wrap(L);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("state"));
+    }
+    if (!wrap->instance) {
+        return luaL_error(L, "no state output");
+    }
+
+    static const char *screen_names[] = {
+        [SCREEN_TITLE] = "title",           [SCREEN_WAITING] = "waiting",
+        [SCREEN_GENERATING] = "generating", [SCREEN_PREVIEWING] = "previewing",
+        [SCREEN_INWORLD] = "inworld",       [SCREEN_WALL] = "wall",
+    };
+
+    static const char *inworld_names[] = {
+        [INWORLD_UNPAUSED] = "unpaused",
+        [INWORLD_PAUSED] = "paused",
+        [INWORLD_MENU] = "menu",
+    };
+
+    struct instance_state *state = &wrap->instance->state;
+
+    static const int IDX_STATE = 1;
+
+    lua_newtable(L);
+
+    lua_pushstring(L, "screen");
+    lua_pushstring(L, screen_names[state->screen]);
+    lua_rawset(L, IDX_STATE);
+
+    if (state->screen == SCREEN_GENERATING || state->screen == SCREEN_PREVIEWING) {
+        lua_pushstring(L, "percent");
+        lua_pushinteger(L, state->data.percent);
+        lua_rawset(L, IDX_STATE);
+    } else if (state->screen == SCREEN_INWORLD) {
+        lua_pushstring(L, "inworld");
+        lua_pushstring(L, inworld_names[state->data.inworld]);
+        lua_rawset(L, IDX_STATE);
+    }
+
+    ww_assert(lua_gettop(L) == IDX_STATE);
+    return 1;
+}
+
+static int
 l_window_size(lua_State *L) {
     struct wrap *wrap = get_wrap(L);
     if (!wrap) {
@@ -290,6 +336,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"set_keymap", l_set_keymap},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
+    {"state", l_state},
     {"window_size", l_window_size},
 
     // private (see init.lua)

@@ -84,6 +84,12 @@ M.set_sensitivity = priv.set_sensitivity
 -- @param height The height to set the Minecraft window to.
 M.set_resolution = priv.set_resolution
 
+--- Gets the state of the Minecraft instance.
+-- StateOutput must be present and enabled on the instance for an accurate
+-- result.
+-- @return state A table containing information about the instance state.
+M.state = priv.state
+
 --- Gets the size of the waywall window.
 -- This function will return (0, 0) if the window is not open.
 -- @return width The width of the window, in pixels
