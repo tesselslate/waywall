@@ -1,4 +1,4 @@
-.PHONY: all check clean configure_debug configure_release format lint run
+.PHONY: all check clean configure_debug configure_release format lint
 
 LUA=waywall/lua/api.lua \
 	waywall/lua/helpers.lua \
@@ -26,9 +26,6 @@ format: build
 lint: build
 	ninja -C build scan-build
 	selene $(LUA)
-
-run: all
-	./build/waywall/waywall run
 
 # non-PHONY
 
