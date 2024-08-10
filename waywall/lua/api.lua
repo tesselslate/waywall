@@ -6,6 +6,36 @@
 
 local priv = _G.priv_waywall
 
+local function event_handler(name)
+    local listeners = {}
+
+    priv.register(name, function()
+        for listener, _ in pairs(listeners) do
+            local ok, result = pcall(listener)
+            if not ok then
+                priv.log_error("failed to call event listener (" .. name .. "): " .. result)
+            end
+        end
+    end)
+
+    return function(listener)
+        if type(listener) ~= "function" then
+            error("listener must be a function")
+        end
+
+        if listeners[listener] then
+            return
+        end
+
+        listeners[listener] = true
+        return function()
+            listeners[listener] = nil
+        end
+    end
+end
+
+local events = {}
+
 local M = {}
 
 --- Get the current time, in milliseconds, with an arbitrary epoch.
@@ -15,6 +45,18 @@ M.current_time = priv.current_time
 -- @return width The width of the Minecraft window, or 0 if none has been set.
 -- @return height The height of the Minecraft window, or 0 if none has been set.
 M.get_active_res = priv.get_active_res
+
+--- Register a listener for a specific event.
+-- @param event The name of the event to listen for.
+-- @param listener The function to call when the event occurs.
+-- @return unregister A function which can be used to remove the listener.
+M.listen = function(event, listener)
+    if not events[event] then
+        error("unknown event: " .. event)
+    end
+
+    return events[event](listener)
+end
 
 --- Press and immediately release the given key in the Minecraft window.
 -- @param key The name of the key to press.

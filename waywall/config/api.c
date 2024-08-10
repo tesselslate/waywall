@@ -254,6 +254,33 @@ l_log(lua_State *L) {
     return 0;
 }
 
+static int
+l_log_error(lua_State *L) {
+    ww_log(LOG_ERROR, "lua: %s", lua_tostring(L, 1));
+    return 0;
+}
+
+static int
+l_register(lua_State *L) {
+    static const int ARG_SIGNAL = 1;
+    static const int ARG_HANDLER = 2;
+
+    const char *signal = luaL_checkstring(L, ARG_SIGNAL);
+    luaL_argcheck(L, lua_type(L, ARG_HANDLER) == LUA_TFUNCTION, ARG_HANDLER,
+                  "handler must be a function");
+
+    static const int IDX_TABLE = 3;
+
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.events);
+    lua_rawget(L, LUA_REGISTRYINDEX);
+
+    lua_pushstring(L, signal);
+    lua_pushvalue(L, ARG_HANDLER);
+    lua_rawset(L, IDX_TABLE);
+
+    return 0;
+}
+
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"current_time", l_current_time},
@@ -268,6 +295,8 @@ static const struct luaL_Reg lua_lib[] = {
     // private (see init.lua)
     {"getenv", l_getenv},
     {"log", l_log},
+    {"log_error", l_log_error},
+    {"register", l_register},
     {NULL, NULL},
 };
 
@@ -331,6 +360,26 @@ config_api_set_wrap(struct config *cfg, struct wrap *wrap) {
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.wrap);
     lua_pushvalue(cfg->L, -2);
     lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+
+    lua_pop(cfg->L, 1);
+    ww_assert(lua_gettop(cfg->L) == 0);
+}
+
+void
+config_api_signal(struct config *cfg, const char *signal) {
+    static const int IDX_TABLE = 1;
+
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
+    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
+
+    lua_pushstring(cfg->L, signal);
+    lua_rawget(cfg->L, IDX_TABLE);
+
+    ww_assert(lua_type(cfg->L, -1) == LUA_TFUNCTION);
+    if (config_pcall(cfg, 0, 0, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to call event listeners: %s", lua_tostring(cfg->L, -1));
+        lua_pop(cfg->L, 1);
+    }
 
     lua_pop(cfg->L, 1);
     ww_assert(lua_gettop(cfg->L) == 0);
