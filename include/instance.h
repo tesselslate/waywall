@@ -19,6 +19,7 @@ struct instance {
             SCREEN_GENERATING,
             SCREEN_PREVIEWING,
             SCREEN_INWORLD,
+            SCREEN_WALL,
         } screen;
         union {
             int percent;

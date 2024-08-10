@@ -262,8 +262,18 @@ instance_state_update(struct instance *instance) {
     case 't': // title
         next.screen = SCREEN_TITLE;
         break;
-    case 'w': // waiting
-        next.screen = SCREEN_WAITING;
+    case 'w': // waiting | wall
+        switch (buf[2]) {
+        case 'i':
+            next.screen = SCREEN_WAITING;
+            break;
+        case 'l':
+            next.screen = SCREEN_WALL;
+            break;
+        default:
+            ww_log(LOG_ERROR, "cannot parse wpstateout.txt: '%s'", buf);
+            return;
+        }
         break;
     case 'g': // generating,PERCENT
         next.screen = SCREEN_GENERATING;
