@@ -8,19 +8,9 @@
 
 struct config {
     struct {
-        char *counter_path;
-    } general;
-    struct {
         bool jit;
     } experimental;
 
-    struct {
-        int weight_idle;
-        int weight_low;
-        int weight_high;
-        int weight_active;
-        int preview_threshold;
-    } cpu;
     struct {
         struct {
             char *layout;
