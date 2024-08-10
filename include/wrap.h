@@ -8,9 +8,11 @@
 struct wrap {
     struct config *cfg;
     struct server *server;
+    struct inotify *inotify;
 
     int32_t width, height;
     struct server_view *view;
+    struct instance *instance;
 
     struct {
         int32_t w, h;
@@ -29,7 +31,7 @@ struct wrap {
     struct wl_listener on_view_destroy;
 };
 
-struct wrap *wrap_create(struct server *server, struct config *cfg);
+struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct config *cfg);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 

@@ -34,7 +34,9 @@ local function event_handler(name)
     end
 end
 
-local events = {}
+local events = {
+    ["state"] = event_handler("state"),
+}
 
 local M = {}
 

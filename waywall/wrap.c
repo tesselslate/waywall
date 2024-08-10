@@ -2,6 +2,8 @@
 #include "config/action.h"
 #include "config/api.h"
 #include "config/config.h"
+#include "inotify.h"
+#include "instance.h"
 #include "server/buffer.h"
 #include "server/cursor.h"
 #include "server/fake_input.h"
@@ -15,9 +17,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <sys/inotify.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
+
+static void
+process_state_update(int wd, uint32_t mask, const char *name, void *data) {
+    struct wrap *wrap = data;
+
+    instance_state_update(wrap->instance);
+    config_api_signal(wrap->cfg, "state");
+}
 
 static void
 layout(struct wrap *wrap) {
@@ -128,11 +139,25 @@ on_view_create(struct wl_listener *listener, void *data) {
     }
 
     wrap->view = view;
+    wrap->instance = instance_create(view, wrap->inotify);
+    if (wrap->instance) {
+        str path = instance_get_state_path(wrap->instance);
+
+        wrap->instance->state_wd =
+            inotify_subscribe(wrap->inotify, path, IN_MODIFY, process_state_update, wrap);
+        if (wrap->instance->state_wd == -1) {
+            ww_log(LOG_ERROR, "failed to watch instance state");
+            instance_destroy(wrap->instance);
+            wrap->instance = NULL;
+        }
+
+        str_free(path);
+    }
 
     // HACK: This is not ideal. We know that the xdg_toplevel view is created as a result of the
-    // xdg_surface role commit event, so the pending buffer will not have been put into the current
-    // state yet. I would like to have a better API for this (perhaps change when the event fires?),
-    // but this works for now.
+    // xdg_surface role commit event, so the pending buffer will not have been put into the
+    // current state yet. I would like to have a better API for this (perhaps change when the
+    // event fires?), but this works for now.
     ww_assert(wrap->view->surface->pending.buffer);
 
     uint32_t width, height;
@@ -155,6 +180,12 @@ on_view_destroy(struct wl_listener *listener, void *data) {
 
     if (wrap->view != view) {
         return;
+    }
+
+    if (wrap->instance) {
+        inotify_unsubscribe(wrap->inotify, wrap->instance->state_wd);
+        instance_destroy(wrap->instance);
+        wrap->instance = NULL;
     }
 
     wrap->view = NULL;
@@ -203,11 +234,12 @@ static const struct server_seat_listener seat_listener = {
 };
 
 struct wrap *
-wrap_create(struct server *server, struct config *cfg) {
+wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
 
     wrap->cfg = cfg;
     wrap->server = server;
+    wrap->inotify = inotify;
 
     config_api_set_wrap(wrap->cfg, wrap);
 

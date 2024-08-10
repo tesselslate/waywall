@@ -104,7 +104,7 @@ cmd_wrap(const char *profile, char **argv) {
         goto fail_inotify;
     }
 
-    ww.wrap = wrap_create(ww.server, ww.cfg);
+    ww.wrap = wrap_create(ww.server, ww.inotify, ww.cfg);
     if (!ww.wrap) {
         goto fail_wrap;
     }
