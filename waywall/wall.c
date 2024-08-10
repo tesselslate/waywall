@@ -10,6 +10,7 @@
 #include "inotify.h"
 #include "instance.h"
 #include "server/cursor.h"
+#include "server/fake_input.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -737,6 +738,21 @@ wall_lua_play(struct wall *wall, int id) {
     }
 
     play_instance(wall, id);
+    return 0;
+}
+
+int
+wall_lua_press_key(struct wall *wall, uint32_t keycode) {
+    if (wall->active_instance == -1) {
+        return 1;
+    }
+
+    const struct syn_key keys[] = {
+        {keycode, true},
+        {keycode, false},
+    };
+    server_view_send_keys(wall->instances[wall->active_instance]->view, STATIC_ARRLEN(keys), keys);
+
     return 0;
 }
 

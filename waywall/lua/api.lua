@@ -54,6 +54,11 @@ M.num_instances = priv.num_instances
 -- the given instance is already active.
 M.play = priv.play
 
+--- Press and immediately release the given key on the active instance.
+-- This function will throw an error if there is no active instance.
+-- @param key The name of the key to press.
+M.press_key = priv.press_key
+
 --- Get the name of the current profile.
 -- @return The current profile, or nil if the default profile is active.
 M.profile = priv.profile

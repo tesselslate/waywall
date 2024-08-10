@@ -53,6 +53,7 @@ int wall_set_config(struct wall *wall, struct config *cfg);
 
 int wall_lua_get_hovered(struct wall *wall);
 int wall_lua_play(struct wall *wall, int id);
+int wall_lua_press_key(struct wall *wall, uint32_t keycode);
 int wall_lua_reset_one(struct wall *wall, bool count_reset, int id);
 int wall_lua_reset_many(struct wall *wall, bool count_reset, size_t num_ids,
                         int ids[static num_ids]);

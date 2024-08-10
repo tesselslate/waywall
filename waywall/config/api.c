@@ -14,18 +14,35 @@
 #include "util/prelude.h"
 #include "wall.h"
 #include "wrap.h"
+#include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/types.h>
 #include <time.h>
 #include <xkbcommon/xkbcommon.h>
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 #define WRAP_ERRMSG(function) function " cannot be called in wrap mode"
+
+#define K(x) {#x, KEY_##x}
+
+// TODO: This does not cover all possible keycodes.
+static struct {
+    const char *name;
+    uint8_t code;
+} key_mapping[] = {
+    K(0),  K(1),  K(2),  K(3),  K(4),  K(5),  K(6),  K(7),  K(8),  K(9),   K(A),   K(B),
+    K(C),  K(D),  K(E),  K(F),  K(G),  K(H),  K(I),  K(J),  K(K),  K(L),   K(M),   K(N),
+    K(O),  K(P),  K(Q),  K(R),  K(S),  K(T),  K(U),  K(V),  K(W),  K(X),   K(Y),   K(Z),
+    K(F1), K(F2), K(F3), K(F4), K(F5), K(F6), K(F7), K(F8), K(F9), K(F10), K(F11), K(F12),
+};
+
+#undef K
 
 static struct xkb_rule_names
 get_rule_names(lua_State *L) {
@@ -478,6 +495,63 @@ l_play(lua_State *L) {
 }
 
 static int
+l_press_key_wall(lua_State *L, struct wall *wall) {
+    const char *key = luaL_checkstring(L, 1);
+
+    uint32_t keycode = UINT32_MAX;
+    for (size_t i = 0; i < STATIC_ARRLEN(key_mapping); i++) {
+        if (strcasecmp(key_mapping[i].name, key) == 0) {
+            keycode = key_mapping[i].code;
+            break;
+        }
+    }
+    if (keycode == UINT32_MAX) {
+        return luaL_error(L, "unknown key %s", key);
+    }
+
+    if (wall->active_instance == -1) {
+        return luaL_error(L, "cannot press key without active instance");
+    }
+
+    ww_assert(wall_lua_press_key(wall, keycode) == 0);
+    return 0;
+}
+
+static int
+l_press_key_wrap(lua_State *L, struct wrap *wrap) {
+    const char *key = luaL_checkstring(L, 1);
+
+    uint32_t keycode = UINT32_MAX;
+    for (size_t i = 0; i < STATIC_ARRLEN(key_mapping); i++) {
+        if (strcasecmp(key_mapping[i].name, key) == 0) {
+            keycode = key_mapping[i].code;
+            break;
+        }
+    }
+    if (keycode == UINT32_MAX) {
+        return luaL_error(L, "unknown key %s", key);
+    }
+
+    wrap_lua_press_key(wrap, keycode);
+    return 0;
+}
+
+static int
+l_press_key(lua_State *L) {
+    struct wall *wall = get_wall(L);
+    if (wall) {
+        return l_press_key_wall(L, wall);
+    }
+
+    struct wrap *wrap = get_wrap(L);
+    if (wrap) {
+        return l_press_key_wrap(L, wrap);
+    }
+
+    return luaL_error(L, STARTUP_ERRMSG("press_key"));
+}
+
+static int
 l_profile(lua_State *L) {
     lua_pushlightuserdata(L, (void *)&config_registry_keys.profile);
     lua_rawget(L, LUA_REGISTRYINDEX);
@@ -860,6 +934,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"listen", l_listen},
     {"num_instances", l_num_instances},
     {"play", l_play},
+    {"press_key", l_press_key},
     {"profile", l_profile},
     {"reset", l_reset},
     {"set_keymap", l_set_keymap},

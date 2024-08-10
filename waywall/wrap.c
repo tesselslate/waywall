@@ -4,6 +4,7 @@
 #include "config/config.h"
 #include "server/buffer.h"
 #include "server/cursor.h"
+#include "server/fake_input.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -260,6 +261,20 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
 
     wrap->cfg = cfg;
     return 0;
+}
+
+void
+wrap_lua_press_key(struct wrap *wrap, uint32_t keycode) {
+    if (!wrap->view) {
+        return;
+    }
+
+    const struct syn_key keys[] = {
+        {keycode, true},
+        {keycode, false},
+    };
+
+    server_view_send_keys(wrap->view, STATIC_ARRLEN(keys), keys);
 }
 
 int
