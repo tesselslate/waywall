@@ -61,8 +61,8 @@ static void
 get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     ww_assert(seat->input_focus);
 
-    *x = seat->pointer.x - (double)seat->input_focus->state.x;
-    *y = seat->pointer.y - (double)seat->input_focus->state.y;
+    *x = seat->pointer.x - (double)seat->input_focus->current.x;
+    *y = seat->pointer.y - (double)seat->input_focus->current.y;
 }
 
 static int

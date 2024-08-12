@@ -17,45 +17,55 @@
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
-#define TXN_TIMEOUT_MS 100
 
-static bool can_apply_crop(struct server_view *view, struct box crop);
-static void destroy_txn(struct server_txn *txn);
-static void finalize_txn(struct server_txn *txn);
+static void
+layout_centered(struct server_view *view) {
+    ww_assert(view->subsurface);
 
-static int
-on_txn_timeout(void *data) {
-    struct server_txn *txn = data;
+    uint32_t width, height;
+    server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
 
-    ww_log(LOG_WARN, "transaction timed out");
-    finalize_txn(txn);
+    // Center the view in the window.
+    int32_t x = (view->ui->width / 2) - (width / 2);
+    int32_t y = (view->ui->height / 2) - (height / 2);
 
-    return 0;
+    if (x >= 0 && y >= 0) {
+        // If the centered view is entirely inside the window, it can be shown as normal.
+        wl_subsurface_set_position(view->subsurface, x, y);
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
+                               wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+        wp_viewport_set_destination(view->viewport, -1, -1);
+    } else {
+        // If the centered view is partially outside the window, it must be cropped.
+        uint32_t crop_width = (x >= 0) ? width : (uint32_t)view->ui->width;
+        uint32_t crop_height = (y >= 0) ? height : (uint32_t)view->ui->height;
+
+        uint32_t crop_x = (width / 2) - (crop_width / 2);
+        uint32_t crop_y = (height / 2) - (crop_height / 2);
+
+        x = x >= 0 ? x : 0;
+        y = y >= 0 ? y : 0;
+
+        wl_subsurface_set_position(view->subsurface, x, y);
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x), wl_fixed_from_int(crop_y),
+                               wl_fixed_from_int(crop_width), wl_fixed_from_int(crop_height));
+        wp_viewport_set_destination(view->viewport, crop_width, crop_height);
+    }
 }
 
 static void
-on_txn_view_commit(struct wl_listener *listener, void *data) {
-    struct server_txn_dep *dep = wl_container_of(listener, dep, listener);
-    struct server_txn_view *tv = wl_container_of(dep, tv, resize_dep);
-    struct server_txn *txn = tv->parent;
+layout_floating(struct server_view *view) {
+    ww_assert(view->subsurface);
 
-    uint32_t size[2];
-    server_buffer_get_size(server_surface_next_buffer(tv->view->surface), &size[0], &size[1]);
+    wl_subsurface_set_position(view->subsurface, view->current.x, view->current.y);
+    wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
+                           wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+    wp_viewport_set_destination(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+}
 
-    if (size[0] == tv->width && size[1] == tv->height) {
-        wl_list_remove(&dep->listener.link);
-        wl_list_remove(&dep->link);
-
-        if (wl_list_empty(&txn->dependencies)) {
-            // If this surface had the last transaction dependency, we cannot call wl_surface.commit
-            // in `finalize_txn` because the new buffer will not have been committed yet. The
-            // `server_surface.commit` event is emitted before we call `wl_surface.commit` on the
-            // remote surface, so the new buffer is still part of the pending state.
-            tv->needs_commit = false;
-
-            finalize_txn(txn);
-        }
-    }
+static void
+view_state_reset(struct server_view_state *state) {
+    *state = (struct server_view_state){0};
 }
 
 static void
@@ -137,140 +147,14 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         return;
     }
 
-    if (can_apply_crop(view, view->state.crop)) {
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(view->state.crop.x),
-                               wl_fixed_from_int(view->state.crop.y),
-                               wl_fixed_from_int(view->state.crop.width),
-                               wl_fixed_from_int(view->state.crop.height));
-    } else {
-        // Just get rid of the source box entirely if the surface gets sized down so we don't
-        // crash.
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
-                               wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-    }
-}
-
-static void
-txn_apply_crop(struct server_txn_view *tv, struct server_ui *ui) {
-    struct box crop = tv->crop;
-
-    ww_assert(((crop.x == -1) == (crop.y == -1)) == ((crop.width == -1) == (crop.height == -1)));
-
-    if (can_apply_crop(tv->view, crop)) {
-        wp_viewport_set_source(tv->view->viewport, wl_fixed_from_int(crop.x),
-                               wl_fixed_from_int(crop.y), wl_fixed_from_int(crop.width),
-                               wl_fixed_from_int(crop.height));
-    }
-}
-
-static void
-txn_apply_dest_size(struct server_txn_view *tv, struct server_ui *ui) {
-    wp_viewport_set_destination(tv->view->viewport, tv->dest_width, tv->dest_height);
-}
-
-static void
-txn_apply_pos(struct server_txn_view *tv, struct server_ui *ui) {
-    ww_assert(tv->view->subsurface);
-    wl_subsurface_set_position(tv->view->subsurface, tv->x, tv->y);
-}
-
-static void
-txn_apply_visible(struct server_txn_view *tv, struct server_ui *ui) {
-    if (tv->visible == !!tv->view->subsurface) {
+    if (!view->subsurface) {
         return;
     }
 
-    if (tv->visible) {
-        tv->view->subsurface =
-            wl_subcompositor_get_subsurface(ui->server->backend->subcompositor,
-                                            tv->view->surface->remote, tv->view->ui->tree.surface);
-        check_alloc(tv->view->subsurface);
-
-        wl_subsurface_set_position(tv->view->subsurface, tv->view->state.x, tv->view->state.y);
-        wl_subsurface_set_desync(tv->view->subsurface);
-    } else {
-        wl_subsurface_destroy(tv->view->subsurface);
-        tv->view->subsurface = NULL;
+    if (view->current.centered) {
+        layout_centered(view);
+        wl_surface_commit(view->ui->tree.surface);
     }
-}
-
-static void
-txn_apply_z(struct server_txn_view *tv, struct server_ui *ui) {
-    ww_assert(tv->view->subsurface);
-    wl_subsurface_place_above(tv->view->subsurface, tv->above);
-}
-
-static bool
-can_apply_crop(struct server_view *view, struct box crop) {
-    ww_assert(((crop.x == -1) == (crop.y == -1)) == ((crop.width == -1) == (crop.height == -1)));
-
-    if (crop.x == -1) {
-        return true;
-    }
-
-    struct server_buffer *buffer = server_surface_next_buffer(view->surface);
-    ww_assert(buffer);
-
-    uint32_t width, height;
-    server_buffer_get_size(buffer, &width, &height);
-
-    return (crop.x + crop.width <= (int32_t)width) && (crop.y + crop.height <= (int32_t)height);
-}
-
-static void
-destroy_txn(struct server_txn *txn) {
-    // There may be remaining dependencies if the transaction did not complete.
-    struct server_txn_dep *dep, *tmp_dep;
-    wl_list_for_each_safe (dep, tmp_dep, &txn->dependencies, link) {
-        wl_list_remove(&dep->listener.link);
-        wl_list_remove(&dep->link);
-    }
-
-    // If the transaction did not complete, we also need to unset the inflight transaction.
-    if (txn->ui) {
-        if (txn->ui->inflight_txn == txn) {
-            txn->ui->inflight_txn = NULL;
-        }
-    }
-
-    struct server_txn_view *tv, *tmp_view;
-    wl_list_for_each_safe (tv, tmp_view, &txn->views, link) {
-        wl_list_remove(&tv->link);
-        free(tv);
-    }
-
-    if (txn->timer) {
-        wl_event_source_remove(txn->timer);
-    }
-
-    wl_subsurface_set_desync(txn->ui->tree.subsurface);
-    free(txn);
-}
-
-static void
-finalize_txn(struct server_txn *txn) {
-    struct server_txn_view *tv;
-    wl_list_for_each (tv, &txn->views, link) {
-        if (tv->apply & TXN_VIEW_ABOVE) {
-            txn_apply_z(tv, txn->ui);
-        }
-        if (tv->apply & TXN_VIEW_CROP) {
-            txn_apply_crop(tv, txn->ui);
-        }
-        if (tv->apply & TXN_VIEW_DEST_SIZE) {
-            txn_apply_dest_size(tv, txn->ui);
-        }
-        if (tv->apply & TXN_VIEW_POS) {
-            txn_apply_pos(tv, txn->ui);
-        }
-
-        if (tv->needs_commit) {
-            wl_surface_commit(tv->view->surface->remote);
-        }
-    }
-
-    wl_surface_commit(txn->ui->tree.surface);
-    destroy_txn(txn);
 }
 
 struct server_ui *
@@ -301,6 +185,8 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->tree.subsurface = wl_subcompositor_get_subsurface(server->backend->subcompositor,
                                                           ui->tree.surface, ui->root.surface);
     check_alloc(ui->tree.surface);
+
+    wl_subsurface_set_desync(ui->tree.subsurface);
 
     ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->root.surface);
     check_alloc(ui->xdg_surface);
@@ -449,6 +335,95 @@ server_view_get_title(struct server_view *view) {
     return view->impl->get_title(view->impl_data);
 }
 
+void
+server_view_commit(struct server_view *view) {
+    bool size_changed = false;
+    bool visibility_changed = false;
+
+    if (view->pending.present & VIEW_STATE_CENTERED) {
+        view->current.centered = view->pending.centered;
+    }
+    if (view->pending.present & VIEW_STATE_POS) {
+        view->current.x = view->pending.x;
+        view->current.y = view->pending.y;
+    }
+    if (view->pending.present & VIEW_STATE_SIZE) {
+        size_changed = view->current.width != view->pending.width ||
+                       view->current.height != view->pending.height;
+
+        view->current.width = view->pending.width;
+        view->current.height = view->pending.height;
+    }
+    if (view->pending.present & VIEW_STATE_VISIBLE) {
+        visibility_changed = view->current.visible != view->pending.visible;
+
+        view->current.visible = view->pending.visible;
+    }
+
+    if (size_changed) {
+        view->impl->set_size(view->impl_data, view->current.width, view->current.height);
+    }
+
+    if (visibility_changed && view->current.visible) {
+        ww_assert(!view->subsurface);
+
+        view->subsurface =
+            wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor,
+                                            view->surface->remote, view->ui->tree.surface);
+        check_alloc(view->subsurface);
+
+        if (view->current.centered) {
+            layout_centered(view);
+        } else {
+            layout_floating(view);
+        }
+
+        wl_subsurface_set_desync(view->subsurface);
+    } else if (visibility_changed && !view->current.visible) {
+        ww_assert(view->subsurface);
+
+        wl_subsurface_destroy(view->subsurface);
+        view->subsurface = NULL;
+    }
+
+    wl_surface_commit(view->ui->tree.surface);
+
+    view_state_reset(&view->pending);
+}
+
+void
+server_view_refresh(struct server_view *view) {
+    if (view->subsurface && view->current.centered) {
+        layout_centered(view);
+    }
+}
+
+void
+server_view_set_centered(struct server_view *view, bool centered) {
+    view->pending.centered = true;
+    view->pending.present |= VIEW_STATE_CENTERED;
+}
+
+void
+server_view_set_pos(struct server_view *view, uint32_t x, uint32_t y) {
+    view->pending.x = x;
+    view->pending.y = y;
+    view->pending.present |= VIEW_STATE_POS;
+}
+
+void
+server_view_set_size(struct server_view *view, uint32_t width, uint32_t height) {
+    view->pending.width = width;
+    view->pending.height = height;
+    view->pending.present |= VIEW_STATE_SIZE;
+}
+
+void
+server_view_set_visible(struct server_view *view, bool visible) {
+    view->pending.visible = visible;
+    view->pending.present |= VIEW_STATE_VISIBLE;
+}
+
 struct server_view *
 server_view_create(struct server_ui *ui, struct server_surface *surface,
                    const struct server_view_impl *impl, void *impl_data) {
@@ -459,8 +434,6 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
     view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
     check_alloc(view->viewport);
-
-    view->state.crop = (struct box){-1, -1, -1, -1};
 
     view->impl = impl;
     view->impl_data = impl_data;
@@ -489,119 +462,6 @@ server_view_destroy(struct server_view *view) {
     wl_list_remove(&view->on_surface_commit.link);
     wl_list_remove(&view->link);
     free(view);
-}
-
-void
-server_ui_apply(struct server_ui *ui, struct server_txn *txn) {
-    // If there is an inflight transaction, disregard any pending resizes from it and take over.
-    if (ui->inflight_txn) {
-        finalize_txn(ui->inflight_txn);
-    }
-    ui->inflight_txn = txn;
-
-    wl_subsurface_set_sync(ui->tree.subsurface);
-
-    ww_assert(!txn->applied);
-    txn->applied = true;
-
-    txn->ui = ui;
-    txn->timer = wl_event_loop_add_timer(wl_display_get_event_loop(ui->server->display),
-                                         on_txn_timeout, txn);
-    check_alloc(txn->timer);
-
-    wl_event_source_timer_update(txn->timer, TXN_TIMEOUT_MS);
-
-    struct server_txn_view *tv;
-    wl_list_for_each (tv, &txn->views, link) {
-        if (tv->apply & TXN_VIEW_CROP) {
-            tv->view->state.crop = tv->crop;
-        }
-        if (tv->apply & TXN_VIEW_POS) {
-            tv->view->state.x = tv->x;
-            tv->view->state.y = tv->y;
-        }
-        if (tv->apply & TXN_VIEW_SIZE) {
-            tv->resize_dep.listener.notify = on_txn_view_commit;
-            wl_signal_add(&tv->view->surface->events.commit, &tv->resize_dep.listener);
-
-            wl_list_insert(&txn->dependencies, &tv->resize_dep.link);
-
-            tv->view->impl->set_size(tv->view->impl_data, tv->width, tv->height);
-        }
-        if (tv->apply & TXN_VIEW_VISIBLE) {
-            txn_apply_visible(tv, ui);
-        }
-    }
-
-    if (wl_list_empty(&txn->dependencies)) {
-        finalize_txn(txn);
-    }
-}
-
-struct server_txn *
-server_txn_create() {
-    struct server_txn *txn = zalloc(1, sizeof(*txn));
-
-    wl_list_init(&txn->views);
-    wl_list_init(&txn->dependencies);
-
-    return txn;
-}
-
-struct server_txn_view *
-server_txn_get_view(struct server_txn *txn, struct server_view *view) {
-    struct server_txn_view *txn_view = zalloc(1, sizeof(*txn_view));
-
-    txn_view->parent = txn;
-    txn_view->view = view;
-    txn_view->needs_commit = true;
-
-    wl_list_insert(&txn->views, &txn_view->link);
-
-    return txn_view;
-}
-
-void
-server_txn_view_set_above(struct server_txn_view *view, struct wl_surface *surface) {
-    view->above = surface;
-    view->apply |= TXN_VIEW_ABOVE;
-}
-
-void
-server_txn_view_set_crop(struct server_txn_view *view, int32_t x, int32_t y, int32_t width,
-                         int32_t height) {
-    view->crop.x = x;
-    view->crop.y = y;
-    view->crop.width = width;
-    view->crop.height = height;
-    view->apply |= TXN_VIEW_CROP;
-}
-
-void
-server_txn_view_set_dest_size(struct server_txn_view *view, uint32_t width, uint32_t height) {
-    view->dest_width = width;
-    view->dest_height = height;
-    view->apply |= TXN_VIEW_DEST_SIZE;
-}
-
-void
-server_txn_view_set_pos(struct server_txn_view *view, uint32_t x, uint32_t y) {
-    view->x = x;
-    view->y = y;
-    view->apply |= TXN_VIEW_POS;
-}
-
-void
-server_txn_view_set_size(struct server_txn_view *view, uint32_t width, uint32_t height) {
-    view->width = width;
-    view->height = height;
-    view->apply |= TXN_VIEW_SIZE;
-}
-
-void
-server_txn_view_set_visible(struct server_txn_view *view, bool visible) {
-    view->visible = visible;
-    view->apply |= TXN_VIEW_VISIBLE;
 }
 
 struct ui_rectangle *

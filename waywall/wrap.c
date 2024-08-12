@@ -31,58 +31,6 @@ process_state_update(int wd, uint32_t mask, const char *name, void *data) {
 }
 
 static void
-layout(struct wrap *wrap) {
-    if (!wrap->view) {
-        return;
-    }
-
-    struct server_txn *txn = server_txn_create();
-    ww_assert(txn);
-
-    struct server_txn_view *view = server_txn_get_view(txn, wrap->view);
-    ww_assert(view);
-
-    server_txn_view_set_visible(view, true);
-
-    if (wrap->active_res.w == 0) {
-        ww_assert(wrap->active_res.h == 0);
-
-        server_txn_view_set_pos(view, 0, 0);
-        server_txn_view_set_dest_size(view, wrap->width, wrap->height);
-        server_txn_view_set_size(view, wrap->width, wrap->height);
-        server_txn_view_set_crop(view, -1, -1, -1, -1);
-    } else {
-        int32_t x = (wrap->width / 2) - (wrap->active_res.w / 2);
-        int32_t y = (wrap->height / 2) - (wrap->active_res.h / 2);
-
-        if (x >= 0 && y >= 0) {
-            server_txn_view_set_pos(view, x, y);
-            server_txn_view_set_dest_size(view, wrap->active_res.w, wrap->active_res.h);
-            server_txn_view_set_size(view, wrap->active_res.w, wrap->active_res.h);
-            server_txn_view_set_crop(view, -1, -1, -1, -1);
-        } else {
-            // Negative X or Y coordinates mean that the provided resolution is greater than the
-            // size of the waywall window. In this case, we need to crop the view.
-            int32_t w = (x >= 0) ? wrap->active_res.w : wrap->width;
-            int32_t h = (y >= 0) ? wrap->active_res.h : wrap->height;
-
-            int32_t crop_x = (wrap->active_res.w / 2) - (w / 2);
-            int32_t crop_y = (wrap->active_res.h / 2) - (h / 2);
-
-            x = x >= 0 ? x : 0;
-            y = y >= 0 ? y : 0;
-
-            server_txn_view_set_pos(view, x, y);
-            server_txn_view_set_dest_size(view, w, h);
-            server_txn_view_set_size(view, wrap->active_res.w, wrap->active_res.h);
-            server_txn_view_set_crop(view, crop_x, crop_y, w, h);
-        }
-    }
-
-    server_ui_apply(wrap->server->ui, txn);
-}
-
-static void
 on_close(struct wl_listener *listener, void *data) {
     struct wrap *wrap = wl_container_of(listener, wrap, on_close);
 
@@ -121,7 +69,14 @@ on_resize(struct wl_listener *listener, void *data) {
     wrap->width = new_width;
     wrap->height = new_height;
 
-    layout(wrap);
+    if (wrap->view) {
+        if (wrap->active_res.w == 0) {
+            server_view_set_size(wrap->view, wrap->width, wrap->height);
+            server_view_commit(wrap->view);
+        } else {
+            server_view_refresh(wrap->view);
+        }
+    }
 
     if (wrap->input.pointer_locked) {
         server_set_pointer_pos(wrap->server, wrap->width / 2.0, wrap->height / 2.0);
@@ -170,7 +125,11 @@ on_view_create(struct wl_listener *listener, void *data) {
     server_ui_show(wrap->server->ui);
 
     ww_assert(wrap->width > 0 && wrap->height > 0);
-    layout(wrap);
+    ww_assert(wrap->view);
+
+    server_view_set_centered(wrap->view, true);
+    server_view_set_visible(wrap->view, true);
+    server_view_commit(wrap->view);
 }
 
 static void
@@ -319,9 +278,20 @@ wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height) {
         return 1;
     }
 
+    if (!wrap->view) {
+        return 1;
+    }
+
+    if (wrap->active_res.w == width && wrap->active_res.h == height) {
+        return 0;
+    }
+
     wrap->active_res.w = width;
     wrap->active_res.h = height;
-    layout(wrap);
+
+    server_view_set_size(wrap->view, wrap->active_res.w > 0 ? wrap->active_res.w : wrap->width,
+                         wrap->active_res.h > 0 ? wrap->active_res.h : wrap->height);
+    server_view_commit(wrap->view);
 
     return 0;
 }
