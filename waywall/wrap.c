@@ -268,6 +268,10 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
 
 void
 wrap_destroy(struct wrap *wrap) {
+    if (wrap->instance) {
+        instance_destroy(wrap->instance);
+    }
+
     wl_list_remove(&wrap->on_close.link);
     wl_list_remove(&wrap->on_pointer_lock.link);
     wl_list_remove(&wrap->on_pointer_unlock.link);
