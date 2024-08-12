@@ -51,6 +51,8 @@ layout_centered(struct server_view *view) {
                                wl_fixed_from_int(crop_width), wl_fixed_from_int(crop_height));
         wp_viewport_set_destination(view->viewport, crop_width, crop_height);
     }
+
+    wl_surface_commit(view->ui->tree.surface);
 }
 
 static void
@@ -60,7 +62,9 @@ layout_floating(struct server_view *view) {
     wl_subsurface_set_position(view->subsurface, view->current.x, view->current.y);
     wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                            wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-    wp_viewport_set_destination(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+    wp_viewport_set_destination(view->viewport, -1, -1);
+
+    wl_surface_commit(view->ui->tree.surface);
 }
 
 static void
@@ -153,7 +157,6 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
 
     if (view->current.centered) {
         layout_centered(view);
-        wl_surface_commit(view->ui->tree.surface);
     }
 }
 
@@ -372,12 +375,6 @@ server_view_commit(struct server_view *view) {
                                             view->surface->remote, view->ui->tree.surface);
         check_alloc(view->subsurface);
 
-        if (view->current.centered) {
-            layout_centered(view);
-        } else {
-            layout_floating(view);
-        }
-
         wl_subsurface_set_desync(view->subsurface);
     } else if (visibility_changed && !view->current.visible) {
         ww_assert(view->subsurface);
@@ -386,7 +383,13 @@ server_view_commit(struct server_view *view) {
         view->subsurface = NULL;
     }
 
-    wl_surface_commit(view->ui->tree.surface);
+    if (view->subsurface) {
+        if (view->current.centered) {
+            layout_centered(view);
+        } else {
+            layout_floating(view);
+        }
+    }
 
     view_state_reset(&view->pending);
 }
@@ -400,7 +403,7 @@ server_view_refresh(struct server_view *view) {
 
 void
 server_view_set_centered(struct server_view *view, bool centered) {
-    view->pending.centered = true;
+    view->pending.centered = centered;
     view->pending.present |= VIEW_STATE_CENTERED;
 }
 
