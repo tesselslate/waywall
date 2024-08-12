@@ -1059,6 +1059,7 @@ xwm_set_clipboard(struct xwm *xwm, const char *content) {
         free(xwm->paste_content);
     }
     xwm->paste_content = strdup(content);
+    check_alloc(xwm->paste_content);
 
     xcb_set_selection_owner(xwm->conn, xwm->ewmh_window, xwm->atoms[CLIPBOARD], XCB_CURRENT_TIME);
 }

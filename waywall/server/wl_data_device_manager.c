@@ -9,6 +9,7 @@
 #include "util/prelude.h"
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
@@ -40,9 +41,50 @@ static struct server_data_offer *create_remote_offer(struct server_data_device *
 static void data_offer_resource_destroy(struct wl_resource *resource);
 static void destroy_previous_selection(struct server_data_device_manager *data_device_manager);
 static void remote_offer_destroy(struct remote_offer *offer);
+static void selection_content_destroy(struct server_selection_content *selection_content);
 static void send_selection_offer(struct server_data_offer *offer);
 static void set_selection(struct server_data_device_manager *data_device_manager,
                           enum server_selection_type type, void *data);
+
+static int
+handle_selection_pipe(int32_t fd, uint32_t mask, void *data) {
+    static const int CHUNK_SIZE = 4096;
+
+    struct server_data_device_manager *data_device_manager = data;
+    ww_assert(fd == data_device_manager->selection_content.fd);
+
+    char **str = &data_device_manager->selection_content.data;
+    ssize_t new_len = data_device_manager->selection_content.len + CHUNK_SIZE;
+    *str = realloc(*str, new_len + 1);
+    check_alloc(*str);
+
+    ssize_t n = read(fd, *str + data_device_manager->selection_content.len, CHUNK_SIZE);
+    bool eof = (n == 0);
+    if (n == -1) {
+        ww_log_errno(LOG_ERROR, "failed to read from selection pipe");
+        selection_content_destroy(&data_device_manager->selection_content);
+        return 0;
+    }
+
+    (*str)[data_device_manager->selection_content.len + n] = '\0';
+    data_device_manager->selection_content.len = new_len;
+
+    if (eof) {
+
+#ifdef WAYWALL_XWAYLAND
+
+        xwl_set_clipboard(data_device_manager->server->xwayland, *str);
+
+#endif
+
+        ww_log(LOG_INFO, "received selection content of length %lu", strlen(*str));
+
+        wl_event_source_remove(data_device_manager->selection_content.src_pipe);
+        data_device_manager->selection_content.src_pipe = NULL;
+    }
+
+    return 0;
+}
 
 static void
 on_data_offer_offer(void *data, struct wl_data_offer *offer, const char *type_str) {
@@ -317,6 +359,26 @@ remote_offer_destroy(struct remote_offer *offer) {
 }
 
 static void
+selection_content_destroy(struct server_selection_content *selection_content) {
+    if (selection_content->src_pipe) {
+        wl_event_source_remove(selection_content->src_pipe);
+        selection_content->src_pipe = NULL;
+    }
+
+    if (selection_content->data) {
+        free(selection_content->data);
+        selection_content->data = NULL;
+    }
+
+    if (selection_content->fd >= 0) {
+        close(selection_content->fd);
+        selection_content->fd = -1;
+    }
+
+    selection_content->len = 0;
+}
+
+static void
 send_selection_offer(struct server_data_offer *offer) {
     struct server_data_device *data_device = offer->parent;
 
@@ -343,6 +405,88 @@ send_selection_offer(struct server_data_offer *offer) {
 }
 
 static void
+get_utf8_selection(struct server_data_device_manager *data_device_manager) {
+    static const char *UTF8_MIME = "text/plain;charset=utf-8";
+
+    selection_content_destroy(&data_device_manager->selection_content);
+
+    if (data_device_manager->selection.type == SELECTION_NONE) {
+        data_device_manager->selection_content.data = strdup("");
+        check_alloc(data_device_manager->selection_content.data);
+        return;
+    }
+
+    switch (data_device_manager->selection.type) {
+    case SELECTION_LOCAL: {
+        struct server_data_source *data_source = data_device_manager->selection.data.local;
+
+        bool utf8_selection = false;
+        struct mime_type *mime;
+        wl_list_for_each (mime, &data_source->mime_types, link) {
+            if (strcasecmp(UTF8_MIME, mime->data) == 0) {
+                utf8_selection = true;
+                break;
+            }
+        }
+
+        if (!utf8_selection) {
+            ww_log(LOG_WARN, "no UTF-8 text/plain MIME type in local selection");
+            return;
+        }
+
+        int pipe_fd[2] = {0};
+        if (pipe(pipe_fd) != 0) {
+            ww_log_errno(LOG_ERROR, "failed to create pipe for selection content");
+            return;
+        }
+
+        data_device_manager->selection_content.fd = pipe_fd[0];
+        wl_data_source_send_send(data_source->resource, UTF8_MIME, pipe_fd[1]);
+        close(pipe_fd[1]);
+
+        break;
+    }
+    case SELECTION_REMOTE: {
+        struct remote_offer *offer = data_device_manager->selection.data.remote;
+
+        bool utf8_selection = false;
+        struct mime_type *mime;
+        wl_list_for_each (mime, &offer->mime_types, link) {
+            if (strcasecmp(UTF8_MIME, mime->data) == 0) {
+                utf8_selection = true;
+                break;
+            }
+        }
+
+        if (!utf8_selection) {
+            ww_log(LOG_WARN, "no UTF-8 text/plain MIME type in remote selection");
+            return;
+        }
+
+        int pipe_fd[2] = {0};
+        if (pipe(pipe_fd) != 0) {
+            ww_log_errno(LOG_ERROR, "failed to create pipe for selection content");
+            return;
+        }
+
+        data_device_manager->selection_content.fd = pipe_fd[0];
+        wl_data_offer_receive(offer->wl, UTF8_MIME, pipe_fd[1]);
+        close(pipe_fd[1]);
+
+        break;
+    }
+    default:
+        ww_unreachable();
+    }
+
+    data_device_manager->selection_content.src_pipe =
+        wl_event_loop_add_fd(wl_display_get_event_loop(data_device_manager->server->display),
+                             data_device_manager->selection_content.fd, WL_EVENT_READABLE,
+                             handle_selection_pipe, data_device_manager);
+    check_alloc(data_device_manager->selection_content.src_pipe);
+}
+
+static void
 set_selection(struct server_data_device_manager *data_device_manager,
               enum server_selection_type type, void *data) {
     data_device_manager->selection.type = type;
@@ -362,6 +506,9 @@ set_selection(struct server_data_device_manager *data_device_manager,
         data_device_manager->selection.data.remote = data;
         break;
     }
+
+    // The content of the selection must be copied to the X11 clipboard.
+    get_utf8_selection(data_device_manager);
 }
 
 static void
@@ -657,6 +804,8 @@ static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_data_device_manager *data_device_manager =
         wl_container_of(listener, data_device_manager, on_display_destroy);
+
+    selection_content_destroy(&data_device_manager->selection_content);
 
     if (data_device_manager->selection.type == SELECTION_REMOTE) {
         remote_offer_destroy(data_device_manager->selection.data.remote);

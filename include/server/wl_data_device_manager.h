@@ -34,6 +34,14 @@ struct server_data_device_manager {
         uint64_t serial;
     } selection;
 
+    struct server_selection_content {
+        struct wl_event_source *src_pipe;
+
+        int32_t fd;
+        char *data;
+        ssize_t len;
+    } selection_content;
+
     struct wl_list devices; // server_data_device.link
 
     struct wl_listener on_input_focus;
