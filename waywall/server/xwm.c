@@ -172,9 +172,14 @@ static void on_xwayland_surface_destroy(struct wl_listener *listener, void *data
 static void on_xwayland_surface_set_serial(struct wl_listener *listener, void *data);
 
 static const char *atom_names[] = {
-    [NET_SUPPORTED] = "_NET_SUPPORTED",      [NET_SUPPORTING_WM_CHECK] = "_NET_SUPPORTING_WM_CHECK",
-    [NET_WM_NAME] = "_NET_WM_NAME",          [UTF8_STRING] = "UTF8_STRING",
-    [WL_SURFACE_ID] = "WL_SURFACE_ID",       [WL_SURFACE_SERIAL] = "WL_SURFACE_SERIAL",
+    [CLIPBOARD] = "CLIPBOARD",
+    [NET_SUPPORTED] = "_NET_SUPPORTED",
+    [NET_SUPPORTING_WM_CHECK] = "_NET_SUPPORTING_WM_CHECK",
+    [NET_WM_NAME] = "_NET_WM_NAME",
+    [TARGETS] = "TARGETS",
+    [UTF8_STRING] = "UTF8_STRING",
+    [WL_SURFACE_ID] = "WL_SURFACE_ID",
+    [WL_SURFACE_SERIAL] = "WL_SURFACE_SERIAL",
     [WM_DELETE_WINDOW] = "WM_DELETE_WINDOW",
 };
 
@@ -679,6 +684,56 @@ done:
 }
 
 static void
+handle_xcb_selection_request(struct xwm *xwm, xcb_selection_request_event_t *event) {
+    if (!xwm->paste_content) {
+        ww_log(LOG_WARN, "X11 client requested clipboard content while none was set");
+        return;
+    }
+
+    // We only care about the clipboard and not any other data transfer (e.g. primary selection.)
+    if (event->selection != xwm->atoms[CLIPBOARD]) {
+        return;
+    }
+
+    xcb_generic_error_t *err;
+    xcb_get_selection_owner_cookie_t owner_cookie =
+        xcb_get_selection_owner(xwm->conn, xwm->atoms[CLIPBOARD]);
+    xcb_get_selection_owner_reply_t *owner_reply =
+        xcb_get_selection_owner_reply(xwm->conn, owner_cookie, &err);
+    if (err) {
+        // TODO: Handle error
+        return;
+    }
+
+    // If we do not own the selection anymore, do not send a response.
+    if (owner_reply->owner != xwm->ewmh_window) {
+        free(owner_reply);
+        return;
+    }
+    free(owner_reply);
+
+    if (event->target == xwm->atoms[TARGETS] && event->property != XCB_ATOM_NONE) {
+        xcb_change_property(xwm->conn, XCB_PROP_MODE_REPLACE, event->requestor, event->property,
+                            XCB_ATOM_ATOM, 32, 1, (uint32_t[1]){xwm->atoms[UTF8_STRING]});
+    } else if (event->target == xwm->atoms[UTF8_STRING] && event->property != XCB_ATOM_NONE) {
+        xcb_change_property(xwm->conn, XCB_PROP_MODE_REPLACE, event->requestor, event->property,
+                            XCB_ATOM_ATOM, 8, strlen(xwm->paste_content), xwm->paste_content);
+    }
+
+    xcb_selection_notify_event_t evt = {0};
+    evt.response_type = XCB_SELECTION_NOTIFY;
+    evt.sequence = event->sequence;
+    evt.requestor = event->requestor;
+    evt.selection = event->selection;
+    evt.target = event->target;
+    evt.property = event->property;
+    evt.time = event->time;
+
+    xcb_send_event(xwm->conn, 0, event->requestor, XCB_EVENT_MASK_NO_EVENT, (const char *)&evt);
+    xcb_flush(xwm->conn);
+}
+
+static void
 handle_xcb_unmap_notify(struct xwm *xwm, xcb_unmap_notify_event_t *event) {
     struct xsurface *xsurface = xsurface_lookup(xwm, event->window);
 
@@ -779,6 +834,9 @@ handle_x11_conn(int32_t fd, uint32_t mask, void *data) {
             break;
         case XCB_PROPERTY_NOTIFY:
             handle_xcb_property_notify(xwm, (xcb_property_notify_event_t *)event);
+            break;
+        case XCB_SELECTION_REQUEST:
+            handle_xcb_selection_request(xwm, (xcb_selection_request_event_t *)event);
             break;
         case XCB_UNMAP_NOTIFY:
             handle_xcb_unmap_notify(xwm, (xcb_unmap_notify_event_t *)event);
@@ -941,8 +999,6 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
     // Xwayland will refuse to associate X11 windows with Wayland surfaces.
     xcb_composite_redirect_subwindows(xwm->conn, xwm->screen->root, XCB_COMPOSITE_REDIRECT_MANUAL);
 
-    // TODO: selection init
-
     xcb_flush(xwm->conn);
 
     xwm->on_new_wl_surface.notify = on_new_wl_surface;
@@ -950,6 +1006,8 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
 
     xwm->on_new_xwayland_surface.notify = on_new_xwayland_surface;
     wl_signal_add(&xwm->shell->events.new_surface, &xwm->on_new_xwayland_surface);
+
+    wl_signal_init(&xwm->events.clipboard);
 
     return xwm;
 
@@ -988,7 +1046,21 @@ xwm_destroy(struct xwm *xwm) {
         upsurface_destroy(upsurface);
     }
 
+    if (xwm->paste_content) {
+        free(xwm->paste_content);
+    }
+
     free(xwm);
+}
+
+void
+xwm_set_clipboard(struct xwm *xwm, const char *content) {
+    if (xwm->paste_content) {
+        free(xwm->paste_content);
+    }
+    xwm->paste_content = strdup(content);
+
+    xcb_set_selection_owner(xwm->conn, xwm->ewmh_window, xwm->atoms[CLIPBOARD], XCB_CURRENT_TIME);
 }
 
 xcb_window_t

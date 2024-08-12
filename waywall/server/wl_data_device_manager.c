@@ -13,6 +13,12 @@
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
 
+#ifdef WAYWALL_XWAYLAND
+
+#include "server/xwayland.h"
+
+#endif
+
 #define SRV_DATA_DEVICE_MANAGER_VERSION 1
 
 struct mime_type {

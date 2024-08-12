@@ -33,5 +33,6 @@ struct server_xwayland *server_xwayland_create(struct server *server,
 void xwl_send_click(struct server_xwayland *xwl, struct server_view *view);
 void xwl_send_keys(struct server_xwayland *xwl, struct server_view *view, size_t num_keys,
                    const struct syn_key keys[static num_keys]);
+void xwl_set_clipboard(struct server_xwayland *xwl, const char *content);
 
 #endif

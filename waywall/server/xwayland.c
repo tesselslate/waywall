@@ -118,9 +118,6 @@ on_ready(struct wl_listener *listener, void *data) {
         return;
     }
 
-#warning TODO seat
-#warning TODO cursor
-
     wl_signal_emit_mutable(&xwl->events.ready, NULL);
 }
 
@@ -208,4 +205,9 @@ xwl_send_keys(struct server_xwayland *xwl, struct server_view *view, size_t num_
     }
 
     xcb_flush(xwl->xwm->conn);
+}
+
+void
+xwl_set_clipboard(struct server_xwayland *xwl, const char *content) {
+    xwm_set_clipboard(xwl->xwm, content);
 }
