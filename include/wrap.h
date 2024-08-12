@@ -21,6 +21,9 @@ struct wrap {
     struct {
         struct wl_list views; // floating_view.link
         bool visible;
+
+        struct floating_view *grab;
+        double grab_x, grab_y;
     } floating;
 
     struct {

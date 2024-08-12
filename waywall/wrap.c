@@ -14,6 +14,7 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include <linux/input-event-codes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -26,7 +27,7 @@ struct floating_view {
     struct wl_list link;
 
     struct server_view *view;
-    uint32_t x, y;
+    int32_t x, y;
 };
 
 static void
@@ -43,16 +44,24 @@ floating_set_visible(struct wrap *wrap, bool visible) {
         server_view_commit(fview->view);
     }
 
-    if (!wrap->view) {
-        return;
-    }
+    if (!visible) {
+        // Stop any active grab if floating windows are being hidden.
+        if (wrap->floating.grab) {
+            wrap->floating.grab = NULL;
+        }
 
-    if (!server_view_has_focus(wrap->view)) {
-        server_set_input_focus(wrap->server, wrap->view);
+        if (!wrap->view) {
+            return;
+        }
+
+        // Give the Minecraft instance input focus if it does not already have it.
+        if (!server_view_has_focus(wrap->view)) {
+            server_set_input_focus(wrap->server, wrap->view);
+        }
     }
 }
 
-static struct server_view *
+static struct floating_view *
 floating_view_at(struct wrap *wrap, double x, double y) {
     struct floating_view *fview;
     wl_list_for_each (fview, &wrap->floating.views, link) {
@@ -67,7 +76,7 @@ floating_view_at(struct wrap *wrap, double x, double y) {
         };
 
         if (x >= area.x && y >= area.y && x <= area.x + area.width && y <= area.y + area.height) {
-            return fview->view;
+            return fview;
         }
     }
 
@@ -95,6 +104,18 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
     wl_list_for_each_safe (fview, tmp, &wrap->floating.views, link) {
         if (fview->view != view) {
             continue;
+        }
+
+        // If the destroyed view was being interactively moved, then stop the interactive move.
+        if (fview == wrap->floating.grab) {
+            wrap->floating.grab = NULL;
+        }
+
+        // If the destroyed view was focused, then give focus back to the Minecraft instance.
+        if (server_view_has_focus(fview->view)) {
+            if (wrap->view) {
+                server_set_input_focus(wrap->server, wrap->view);
+            }
         }
 
         wl_list_remove(&fview->link);
@@ -240,23 +261,47 @@ static bool
 on_button(void *data, uint32_t button, bool pressed) {
     struct wrap *wrap = data;
 
+    // Process the active grab, if any.
+    if (wrap->floating.grab) {
+        if (button == BTN_LEFT && !pressed) {
+            wrap->floating.grab = NULL;
+        }
+
+        return true;
+    }
+
     // If Minecraft has locked the pointer, just send it the button event. Do not check if it should
     // be sent to a floating window.
     if (wrap->input.pointer_locked) {
         return false;
     }
 
+    // Whether or not a window grab can be initiated by this event.
+    // The user must have started pressing the left mouse button while holding shift.
+    bool should_grab = (pressed && button == BTN_LEFT && (wrap->input.modifiers & KB_MOD_SHIFT));
+
     // Check to see if the input focus should be changed to a new window. If the user did not click
     // on any floating window, then input focus should be given back to the Minecraft instance.
-    struct server_view *view = floating_view_at(wrap, wrap->input.x, wrap->input.y);
-    if (!view) {
+    struct floating_view *fview = floating_view_at(wrap, wrap->input.x, wrap->input.y);
+    if (!fview) {
         ww_assert(wrap->view);
         server_set_input_focus(wrap->server, wrap->view);
         return false;
     }
 
-    server_set_input_focus(wrap->server, view);
-    return false;
+    // If a window grab should start, then start it. Otherwise, focus the window that the user
+    // clicked.
+    if (should_grab) {
+        wrap->floating.grab = fview;
+        wrap->floating.grab_x = wrap->input.x - fview->x;
+        wrap->floating.grab_y = wrap->input.y - fview->y;
+
+        server_set_input_focus(wrap->server, fview->view);
+        return true;
+    } else {
+        server_set_input_focus(wrap->server, fview->view);
+        return false;
+    }
 }
 
 static bool
@@ -289,7 +334,18 @@ on_motion(void *data, double x, double y) {
     wrap->input.x = x;
     wrap->input.y = y;
 
-    // TODO: Allow the user to drag floating windows.
+    if (!wrap->floating.grab) {
+        return;
+    }
+
+    int32_t view_x = x - wrap->floating.grab_x;
+    int32_t view_y = y - wrap->floating.grab_y;
+
+    wrap->floating.grab->x = view_x;
+    wrap->floating.grab->y = view_y;
+
+    server_view_set_pos(wrap->floating.grab->view, view_x, view_y);
+    server_view_commit(wrap->floating.grab->view);
 }
 
 static const struct server_seat_listener seat_listener = {
