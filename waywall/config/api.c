@@ -217,6 +217,23 @@ l_set_sensitivity(lua_State *L) {
 }
 
 static int
+l_show_floating(lua_State *L) {
+    static const int ARG_SHOW = 1;
+
+    struct wrap *wrap = get_wrap(L);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("show_floating"));
+    }
+
+    luaL_argcheck(L, lua_type(L, ARG_SHOW) == LUA_TBOOLEAN, ARG_SHOW,
+                  "visibility must be a boolean");
+    bool show = lua_toboolean(L, ARG_SHOW);
+
+    wrap_lua_show_floating(wrap, show);
+    return 0;
+}
+
+static int
 l_state(lua_State *L) {
     struct wrap *wrap = get_wrap(L);
     if (!wrap) {
@@ -336,6 +353,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"set_keymap", l_set_keymap},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
+    {"show_floating", l_show_floating},
     {"state", l_state},
     {"window_size", l_window_size},
 

@@ -309,9 +309,6 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
 
     wl_list_init(&wrap->floating.views);
 
-    // TODO: Remove this. There should be a Lua API function to toggle floating windows.
-    floating_set_visible(wrap, true);
-
     config_api_set_wrap(wrap->cfg, wrap);
 
     wrap->on_close.notify = on_close;
@@ -412,4 +409,9 @@ wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height) {
     server_view_commit(wrap->view);
 
     return 0;
+}
+
+void
+wrap_lua_show_floating(struct wrap *wrap, bool show) {
+    floating_set_visible(wrap, show);
 }

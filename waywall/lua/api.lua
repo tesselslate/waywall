@@ -84,6 +84,10 @@ M.set_sensitivity = priv.set_sensitivity
 -- @param height The height to set the Minecraft window to.
 M.set_resolution = priv.set_resolution
 
+--- Shows or hides floating windows.
+-- @param show Whether or not to show floating windows.
+M.show_floating = priv.show_floating
+
 --- Gets the state of the Minecraft instance.
 -- StateOutput must be present and enabled on the instance for an accurate
 -- result.
