@@ -11,16 +11,22 @@ struct wrap {
     struct inotify *inotify;
 
     int32_t width, height;
+
     struct server_view *view;
     struct instance *instance;
-
     struct {
         int32_t w, h;
     } active_res;
 
     struct {
+        struct wl_list views; // floating_view.link
+        bool visible;
+    } floating;
+
+    struct {
         uint32_t modifiers;
         bool pointer_locked;
+        double x, y;
     } input;
 
     struct wl_listener on_close;

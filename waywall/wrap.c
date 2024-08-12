@@ -22,6 +22,89 @@
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
 
+struct floating_view {
+    struct wl_list link;
+
+    struct server_view *view;
+    uint32_t x, y;
+};
+
+static void
+floating_set_visible(struct wrap *wrap, bool visible) {
+    if (wrap->floating.visible == visible) {
+        return;
+    }
+
+    wrap->floating.visible = visible;
+
+    struct floating_view *fview;
+    wl_list_for_each (fview, &wrap->floating.views, link) {
+        server_view_set_visible(fview->view, visible);
+        server_view_commit(fview->view);
+    }
+
+    if (!wrap->view) {
+        return;
+    }
+
+    if (!server_view_has_focus(wrap->view)) {
+        server_set_input_focus(wrap->server, wrap->view);
+    }
+}
+
+static struct server_view *
+floating_view_at(struct wrap *wrap, double x, double y) {
+    struct floating_view *fview;
+    wl_list_for_each (fview, &wrap->floating.views, link) {
+        uint32_t width, height;
+        server_buffer_get_size(server_surface_next_buffer(fview->view->surface), &width, &height);
+
+        struct box area = {
+            .x = fview->x,
+            .y = fview->y,
+            .width = width,
+            .height = height,
+        };
+
+        if (x >= area.x && y >= area.y && x <= area.x + area.width && y <= area.y + area.height) {
+            return fview->view;
+        }
+    }
+
+    return NULL;
+}
+
+static void
+floating_view_create(struct wrap *wrap, struct server_view *view) {
+    struct floating_view *fview = zalloc(1, sizeof(*fview));
+    fview->view = view;
+    wl_list_insert(&wrap->floating.views, &fview->link);
+
+    if (wrap->floating.visible) {
+        server_view_set_visible(view, true);
+    }
+
+    server_view_set_centered(view, false);
+    server_view_set_pos(view, 0, 0);
+    server_view_commit(view);
+}
+
+static void
+floating_view_destroy(struct wrap *wrap, struct server_view *view) {
+    struct floating_view *fview, *tmp;
+    wl_list_for_each_safe (fview, tmp, &wrap->floating.views, link) {
+        if (fview->view != view) {
+            continue;
+        }
+
+        wl_list_remove(&fview->link);
+        free(fview);
+        return;
+    }
+
+    ww_panic("could not find floating view");
+}
+
 static void
 process_state_update(int wd, uint32_t mask, const char *name, void *data) {
     struct wrap *wrap = data;
@@ -89,7 +172,7 @@ on_view_create(struct wl_listener *listener, void *data) {
     struct server_view *view = data;
 
     if (wrap->view) {
-        ww_log(LOG_WARN, "extra toplevel created");
+        floating_view_create(wrap, view);
         return;
     }
 
@@ -138,6 +221,7 @@ on_view_destroy(struct wl_listener *listener, void *data) {
     struct server_view *view = data;
 
     if (wrap->view != view) {
+        floating_view_destroy(wrap, view);
         return;
     }
 
@@ -154,6 +238,24 @@ on_view_destroy(struct wl_listener *listener, void *data) {
 
 static bool
 on_button(void *data, uint32_t button, bool pressed) {
+    struct wrap *wrap = data;
+
+    // If Minecraft has locked the pointer, just send it the button event. Do not check if it should
+    // be sent to a floating window.
+    if (wrap->input.pointer_locked) {
+        return false;
+    }
+
+    // Check to see if the input focus should be changed to a new window. If the user did not click
+    // on any floating window, then input focus should be given back to the Minecraft instance.
+    struct server_view *view = floating_view_at(wrap, wrap->input.x, wrap->input.y);
+    if (!view) {
+        ww_assert(wrap->view);
+        server_set_input_focus(wrap->server, wrap->view);
+        return false;
+    }
+
+    server_set_input_focus(wrap->server, view);
     return false;
 }
 
@@ -182,7 +284,12 @@ on_modifiers(void *data, uint32_t mods) {
 
 static void
 on_motion(void *data, double x, double y) {
-    // Unused.
+    struct wrap *wrap = data;
+
+    wrap->input.x = x;
+    wrap->input.y = y;
+
+    // TODO: Allow the user to drag floating windows.
 }
 
 static const struct server_seat_listener seat_listener = {
@@ -199,6 +306,11 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wrap->cfg = cfg;
     wrap->server = server;
     wrap->inotify = inotify;
+
+    wl_list_init(&wrap->floating.views);
+
+    // TODO: Remove this. There should be a Lua API function to toggle floating windows.
+    floating_set_visible(wrap, true);
 
     config_api_set_wrap(wrap->cfg, wrap);
 
@@ -229,6 +341,12 @@ void
 wrap_destroy(struct wrap *wrap) {
     if (wrap->instance) {
         instance_destroy(wrap->instance);
+    }
+
+    struct floating_view *fview, *tmp;
+    wl_list_for_each_safe (fview, tmp, &wrap->floating.views, link) {
+        wl_list_remove(&fview->link);
+        free(fview);
     }
 
     wl_list_remove(&wrap->on_close.link);
