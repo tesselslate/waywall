@@ -89,17 +89,6 @@ struct server_view_impl {
     void (*set_size)(void *impl_data, uint32_t width, uint32_t height);
 };
 
-struct ui_rectangle {
-    struct server_ui *parent;
-
-    uint32_t x, y;
-
-    struct wl_buffer *buffer;
-    struct wl_surface *surface;
-    struct wl_subsurface *subsurface;
-    struct wp_viewport *viewport;
-};
-
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
@@ -123,11 +112,5 @@ void server_view_set_visible(struct server_view *view, bool visible);
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,
                                        const struct server_view_impl *impl, void *impl_data);
 void server_view_destroy(struct server_view *view);
-
-struct ui_rectangle *ui_rectangle_create(struct server_ui *ui, uint32_t x, uint32_t y,
-                                         uint32_t width, uint32_t height,
-                                         const uint8_t rgba[static 4]);
-void ui_rectangle_destroy(struct ui_rectangle *rect);
-void ui_rectangle_set_visible(struct ui_rectangle *rect, bool visible);
 
 #endif
