@@ -598,6 +598,14 @@ handle_xcb_client_message(struct xwm *xwm, xcb_client_message_event_t *event) {
 }
 
 static void
+handle_xcb_configure_request(struct xwm *xwm, xcb_configure_request_event_t *event) {
+    static const uint32_t CONFIGURE_MASK = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+
+    xcb_configure_window(xwm->conn, event->window, CONFIGURE_MASK,
+                         (uint32_t[2]){event->width, event->height});
+}
+
+static void
 handle_xcb_create_notify(struct xwm *xwm, xcb_create_notify_event_t *event) {
     if (event->window == xwm->ewmh_window) {
         return;
@@ -815,7 +823,7 @@ handle_x11_conn(int32_t fd, uint32_t mask, void *data) {
             // Unused.
             break;
         case XCB_CONFIGURE_REQUEST:
-            // Unused.
+            handle_xcb_configure_request(xwm, (xcb_configure_request_event_t *)event);
             break;
         case XCB_CREATE_NOTIFY:
             handle_xcb_create_notify(xwm, (xcb_create_notify_event_t *)event);
