@@ -291,8 +291,10 @@ on_button(void *data, uint32_t button, bool pressed) {
 
     // If a window grab should start, then start it. Otherwise, focus the window that the user
     // clicked. (Only happens when the floating view is visible)
-    if (!wrap->floating.visible)
+    if (!wrap->floating.visible) {
         return false;
+    }
+
     if (should_grab) {
         wrap->floating.grab = fview;
         wrap->floating.grab_x = wrap->input.x - fview->x;
