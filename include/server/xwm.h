@@ -40,6 +40,7 @@ struct xwm {
 
     struct {
         bool xres;
+        bool xtest;
     } extensions;
 
     struct wl_list surfaces;       // xsurface.link

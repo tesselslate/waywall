@@ -8,6 +8,7 @@
 #include "util/prelude.h"
 #include <time.h>
 #include <xcb/xproto.h>
+#include <xcb/xtest.h>
 
 /*
  * This code is partially my own making, but was largely only possible to write after combing
@@ -157,6 +158,13 @@ server_xwayland_create(struct server *server, struct server_xwayland_shell *shel
     wl_display_add_destroy_listener(server->display, &xwl->on_display_destroy);
 
     return xwl;
+}
+
+void
+xwl_notify_key(struct server_xwayland *xwl, uint32_t keycode, bool pressed) {
+    xcb_test_fake_input(xwl->xwm->conn, pressed ? XCB_KEY_PRESS : XCB_KEY_RELEASE, keycode + 8,
+                        XCB_CURRENT_TIME, xwl->xwm->screen->root, 0, 0, 0);
+    xcb_flush(xwl->xwm->conn);
 }
 
 void

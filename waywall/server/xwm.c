@@ -17,6 +17,7 @@
 #include <xcb/xcb.h>
 #include <xcb/xcb_errors.h>
 #include <xcb/xproto.h>
+#include <xcb/xtest.h>
 
 /*
  * Additional reading:
@@ -893,6 +894,33 @@ init_xres(struct xwm *xwm) {
     free(reply);
 }
 
+static void
+init_xtest(struct xwm *xwm) {
+    const xcb_query_extension_reply_t *query_xtest =
+        xcb_get_extension_data(xwm->conn, &xcb_test_id);
+    if (!query_xtest || !query_xtest->present) {
+        ww_log(LOG_ERROR, "XTEST extension not present");
+        return;
+    }
+
+    xcb_test_get_version_cookie_t cookie =
+        xcb_test_get_version(xwm->conn, XCB_TEST_MAJOR_VERSION, XCB_TEST_MINOR_VERSION);
+    xcb_test_get_version_reply_t *reply = xcb_test_get_version_reply(xwm->conn, cookie, NULL);
+    if (!reply) {
+        ww_log(LOG_WARN, "failed to query XTEST extension version");
+        return;
+    }
+
+    ww_log(LOG_INFO, "XTEST extension version: %" PRIu32 ".%" PRIu32, reply->major_version,
+           reply->minor_version);
+
+    if (reply->major_version > 2 || (reply->major_version == 2 && reply->minor_version >= 2)) {
+        xwm->extensions.xtest = true;
+    }
+
+    free(reply);
+}
+
 static int
 init_atoms(struct xwm *xwm) {
     // Get all of the required atoms.
@@ -1000,6 +1028,12 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
         goto fail_xres;
     }
 
+    init_xtest(xwm);
+    if (!xwm->extensions.xtest) {
+        ww_log(LOG_ERROR, "no XTEST support");
+        goto fail_xtest;
+    }
+
     init_wm(xwm);
     init_ewmh(xwm);
 
@@ -1019,6 +1053,7 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
 
     return xwm;
 
+fail_xtest:
 fail_xres:
 fail_resources:
     wl_event_source_remove(xwm->src_x11);
