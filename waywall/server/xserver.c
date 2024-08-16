@@ -128,6 +128,10 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
                 ww_log_errno(LOG_ERROR, "failed to read display from displayfd");
             } else {
                 ww_log(LOG_INFO, "using X11 display :%d", srv->display);
+
+                char envbuf[32] = {0};
+                snprintf(envbuf, STATIC_ARRLEN(envbuf), ":%d", srv->display);
+                setenv("DISPLAY", envbuf, 1);
             }
         }
     }
