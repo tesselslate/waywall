@@ -308,19 +308,25 @@ on_button(void *data, uint32_t button, bool pressed) {
 }
 
 static bool
-on_key(void *data, xkb_keysym_t sym, bool pressed) {
+on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bool pressed) {
     struct wrap *wrap = data;
 
-    if (pressed) {
-        struct config_action action = {0};
-        action.type = CONFIG_ACTION_KEY;
-        action.data = sym;
-        action.modifiers = wrap->input.modifiers;
-
-        return (config_action_try(wrap->cfg, action) != 0);
-    } else {
+    if (!pressed) {
         return false;
     }
+
+    struct config_action action = {0};
+    action.type = CONFIG_ACTION_KEY;
+    action.modifiers = wrap->input.modifiers;
+
+    for (size_t i = 0; i < num_syms; i++) {
+        action.data = syms[i];
+        if (config_action_try(wrap->cfg, action) != 0) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 static void

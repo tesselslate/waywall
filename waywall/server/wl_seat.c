@@ -477,15 +477,13 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
 
         // We need to add 8 to the keycode to convert from libinput to XKB keycodes. See
         // WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1.
-        int nsyms = xkb_keymap_key_get_syms_by_level(seat->keyboard.remote_km.xkb, key + 8, group,
-                                                     0, &syms);
+        int nsyms =
+            xkb_keymap_key_get_syms_by_level(seat->keyboard.remote_km.xkb, key + 8, group, 0, &syms);
 
-        if (nsyms >= 1) {
-            bool consumed = seat->listener->key(seat->listener_data, syms[0],
-                                                state == WL_KEYBOARD_KEY_STATE_PRESSED);
-            if (consumed) {
-                return;
-            }
+        bool consumed = seat->listener->key(seat->listener_data, nsyms, syms,
+                                            state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        if (consumed) {
+            return;
         }
     }
 
