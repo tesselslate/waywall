@@ -1,6 +1,6 @@
 # Setting up waywall
 
-> [!WARNING]
+> [!NOTE]
 > waywall is still under active development. Many features are missing or may
 > not work as expected.
 
@@ -37,15 +37,6 @@ local waywall = require("waywall")
 local helpers = require("waywall.helpers")
 
 local config = {
-    general = {
-    },
-    cpu = {
-        weight_idle = 1,
-        weight_low = 2,
-        weight_high = 20,
-        weight_active = 100,
-        preview_threshold = 30,
-    },
     input = {
         remaps = {
         },
@@ -62,57 +53,16 @@ local config = {
     },
 }
 
-local wall = helpers.wall({
-    width = 2,
-    height = 3,
-    stretch_width = 640,
-    stretch_height = 216,
-
-    grace_period = 150,
-    bypass = true,
-})
-
-config.actions = {
-    ["Ctrl-Shift-D"] = function()
-        if waywall.active_instance() then
-            wall.reset_ingame()
-        else
-            wall.reset_all()
-        end
-    end,
-    ["LMB"] = wall.reset,
-    ["Shift-LMB"] = wall.play,
-    ["Ctrl-LMB"] = wall.toggle_lock,
-    ["Ctrl-Shift-LMB"] = wall.focus_reset,
-}
+config.actions = {}
 
 return config
 ```
 
 For more information in configuring waywall, visit [the configuration guide](CONFIGURATION.md).
 
-## Preparing CPUs
+## Instance setup
 
-Waywall uses a Linux feature called `cgroups` to make sure your system is prioritizing your active Minecraft instance and deprioritizing your other ones to ensure the best possible performance. Right now, we need root access to create these `cgroups`. To prepare them, run this command:
-
-```sudo waywall cpu```
-
-This doesn't need to be run every time you want to run waywall, only once after each time you restart your computer.
-
-If you've followed all of these steps correctly, running `waywall` should work properly! Try it, if it doesn't work you've done something wrong and aren't ready for the next step.
-
-It should appear as a window with the coloured background you chose in your `init.lua` file with the `config.theme` setting.
-
-## Preparing your instances.
-
-There are a few things you need to change/check about each of your Minecraft instances for them to work properly.
-
-### Mods
-
-(This is not an exhaustive list of mods recommended for speedrunning, just what you need to waywall to work properly)
-
-- Atum 1.2.2 or higher
-- State Output 1.1.6 or higher
+Before you can use an instance of Minecraft with waywall, it will require some additional setup. This guide will assume that you are using [Prism Launcher](https://prismlauncher.org), a fork of [MultiMC](https://multimc.org/) with additional features and improvements.
 
 ### GLFW
 
@@ -152,31 +102,18 @@ Now, you can use this modified and up-to-date `glfw`. Configure the path to your
 
 ![Screenshot of where to put the path to your glfw build](assets/glfw-local-screenshot.png)
 
-### Launch command
+### Launching with waywall
 
-Waywall needs you to launch your instances in a very special way so that it can pick them up.
+By default, your Minecraft instances will launch under your normal compositor. In order for a Minecraft instance to run under waywall, you must change the command used to launch it.
 
-To edit the launch command of an instance (this tutorial uses Prism Launcher but this should be possible in other launchers too), go to this menu in your instance's settings:
+To do this, you will need to go to this menu in your instance's settings:
 
 ![Wrapper command](assets/wrapper-command-screenshot.png)
 
-and insert this command into the `Wrapper command` box.
+Then, insert the following command into the `Wrapper command` box:
 
 ```sh
-sh -c "export LD_PRELOAD='/usr/lib/libjemalloc.so'; export MALLOC_CONF=background_thread:true,narenas:2,dirty_decay_ms:15000,muzzy_decay_ms:15000; waywall exec -- $INST_JAVA $@"
+waywall wrap --
 ```
 
-Now, when you launch this instance (it will only work while waywall is running), it will appear inside the waywall window!
-
-# Running waywall after setup
-
-Now that you've setup waywall, here's now to run it (this assumes you have restarted your computer since setting up waywall, but these instructions should work right away too).
-
-Open a terminal and run these commands
-
-```sh
-sudo waywall cpu
-waywall run
-```
-
-Then, launch all of the instances you prepared. You should be good to go!
+After this, your Minecraft instance should launch inside of waywall.
