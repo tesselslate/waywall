@@ -1,11 +1,12 @@
 # waywall [![Discord](https://img.shields.io/discord/1095808506239651942?style=flat-square)](https://discord.gg/fwZA2VJh7k)
 
-waywall is a Wayland compositor that also serves as a reset macro for Minecraft
-speedruns. It is designed to be nested within an existing Wayland session and is
-intended as a successor to [resetti](https://github.com/tesselslate/resetti).
+waywall is a Wayland compositor that provides various convenient features (key
+rebinding, Ninjabrain Bot support, etc) for Minecraft speedrunning. It is
+designed to be nested within an existing Wayland session and is intended as a
+successor to [resetti](https://github.com/tesselslate/resetti).
 
-> [!WARNING]
-> waywall is still under active development. Many features are missing or may
+> [!NOTE]
+> waywall is still under active development. Some features are missing or may
 > not work as expected.
 
 # Building
@@ -37,9 +38,3 @@ files.
 
 - [weston](https://gitlab.freedesktop.org/wayland/weston)
 - [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots)
-
-### Prior Art
-
-- [Julti](https://github.com/DuncanRuns/Julti)
-- [MultiResetWall](https://github.com/Specnr/MultiResetWall)
-- [resetti](https://github.com/tesselslate/resetti)
