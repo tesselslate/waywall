@@ -3,6 +3,7 @@
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
+#include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "viewporter-client-protocol.h"
@@ -25,6 +26,7 @@
 #define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
 #define USE_SUBCOMPOSITOR_VERSION 1
+#define USE_TEARING_CONTROL_VERSION 1
 #define USE_VIEWPORTER_VERSION 1
 #define USE_XDG_DECORATION_VERSION 1
 #define USE_XDG_WM_BASE_VERSION 1
@@ -217,6 +219,17 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         backend->subcompositor =
             wl_registry_bind(wl, name, &wl_subcompositor_interface, USE_SUBCOMPOSITOR_VERSION);
+    } else if (strcmp(iface, wp_tearing_control_manager_v1_interface.name) == 0) {
+        if (version < USE_TEARING_CONTROL_VERSION) {
+            ww_log(LOG_ERROR,
+                   "host compositor provides outdated wp_tearing_control_manager (%d < %d)",
+                   version, USE_TEARING_CONTROL_VERSION);
+            return;
+        }
+
+        backend->tearing_control = wl_registry_bind(
+            wl, name, &wp_tearing_control_manager_v1_interface, USE_TEARING_CONTROL_VERSION);
+        check_alloc(backend->tearing_control);
     } else if (strcmp(iface, wp_viewporter_interface.name) == 0) {
         if (version < USE_VIEWPORTER_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wp_viewporter (%d < %d)", version,
@@ -321,6 +334,9 @@ server_backend_create() {
     if (!backend->cursor_shape_manager) {
         ww_log(LOG_WARN, "host compositor does not provide wp_cursor_shape_manager");
     }
+    if (!backend->tearing_control) {
+        ww_log(LOG_INFO, "host compositor does not provide wp_tearing_control_manager");
+    }
     if (!backend->xdg_decoration_manager) {
         ww_log(LOG_WARN, "host compositor does not provide zxdg_decoration_manager");
     }
@@ -372,6 +388,9 @@ server_backend_destroy(struct server_backend *backend) {
 
     if (backend->cursor_shape_manager) {
         wp_cursor_shape_manager_v1_destroy(backend->cursor_shape_manager);
+    }
+    if (backend->tearing_control) {
+        wp_tearing_control_manager_v1_destroy(backend->tearing_control);
     }
     if (backend->xdg_decoration_manager) {
         zxdg_decoration_manager_v1_destroy(backend->xdg_decoration_manager);

@@ -39,6 +39,7 @@ struct server_backend {
 
     // optional globals
     struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
+    struct wp_tearing_control_manager_v1 *tearing_control;
     struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
 
     struct {

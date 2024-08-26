@@ -16,6 +16,7 @@ protocol_xmls = [
   wp_dir + 'stable/viewporter/viewporter.xml',
   wp_dir + 'stable/xdg-shell/xdg-shell.xml',
   wp_dir + 'staging/cursor-shape/cursor-shape-v1.xml',
+  wp_dir + 'staging/tearing-control/tearing-control-v1.xml',
   wp_dir + 'staging/xwayland-shell/xwayland-shell-v1.xml',
   wp_dir + 'unstable/pointer-constraints/pointer-constraints-unstable-v1.xml',
   wp_dir + 'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
