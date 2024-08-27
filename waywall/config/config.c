@@ -454,6 +454,10 @@ process_config_experimental(struct config *cfg) {
         return 1;
     }
 
+    if (get_bool(cfg, "tearing", &cfg->experimental.tearing, "experimental.tearing", false) != 0) {
+        return 1;
+    }
+
     return 0;
 }
 

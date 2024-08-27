@@ -19,6 +19,8 @@ struct server_ui {
     struct {
         struct wl_surface *surface;
         struct wp_viewport *viewport;
+
+        struct wp_tearing_control_v1 *tearing_control;
     } root;
     struct {
         struct wl_buffer *buffer;
@@ -45,6 +47,7 @@ struct server_ui {
 
 struct server_ui_config {
     struct wl_buffer *background;
+    bool tearing;
 };
 
 struct server_view {

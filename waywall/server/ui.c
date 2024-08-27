@@ -5,6 +5,7 @@
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
+#include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -175,6 +176,12 @@ server_ui_create(struct server *server, struct config *cfg) {
     ui->root.viewport = wp_viewporter_get_viewport(server->backend->viewporter, ui->root.surface);
     check_alloc(ui->root.viewport);
 
+    if (server->backend->tearing_control) {
+        ui->root.tearing_control = wp_tearing_control_manager_v1_get_tearing_control(
+            server->backend->tearing_control, ui->root.surface);
+        check_alloc(ui->root.tearing_control);
+    }
+
     ui->tree.buffer =
         remote_buffer_manager_color(server->remote_buf, (const uint8_t[4]){0, 0, 0, 0});
     ww_assert(ui->tree.buffer);
@@ -225,6 +232,13 @@ server_ui_create(struct server *server, struct config *cfg) {
     return ui;
 
 fail_config:
+    if (ui->root.tearing_control) {
+        wp_tearing_control_v1_destroy(ui->root.tearing_control);
+    }
+    if (ui->xdg_decoration) {
+        zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
+    }
+
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
@@ -241,6 +255,9 @@ void
 server_ui_destroy(struct server_ui *ui) {
     server_ui_config_destroy(ui->config);
 
+    if (ui->root.tearing_control) {
+        wp_tearing_control_v1_destroy(ui->root.tearing_control);
+    }
     if (ui->xdg_decoration) {
         zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
     }
@@ -296,6 +313,12 @@ server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
     }
     ui->config = config;
 
+    if (ui->root.tearing_control) {
+        wp_tearing_control_v1_set_presentation_hint(
+            ui->root.tearing_control, config->tearing
+                                          ? WP_TEARING_CONTROL_V1_PRESENTATION_HINT_ASYNC
+                                          : WP_TEARING_CONTROL_V1_PRESENTATION_HINT_VSYNC);
+    }
     if (ui->mapped) {
         wl_surface_attach(ui->root.surface, config->background, 0, 0);
         wl_surface_damage_buffer(ui->root.surface, 0, 0, INT32_MAX, INT32_MAX);
@@ -313,6 +336,8 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
         free(config);
         return NULL;
     }
+
+    config->tearing = cfg->experimental.tearing;
 
     return config;
 }

@@ -9,6 +9,7 @@
 struct config {
     struct {
         bool jit;
+        bool tearing;
     } experimental;
 
     struct {
