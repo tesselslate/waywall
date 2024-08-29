@@ -19,12 +19,15 @@ struct wrap {
         int32_t w, h;
     } active_res;
 
-    struct {
+    struct wrap_floating {
         struct wl_list views; // floating_view.link
         bool visible;
 
         struct floating_view *grab;
         double grab_x, grab_y;
+
+        struct floating_view *anchored;
+        struct wl_listener on_anchored_resize;
     } floating;
 
     struct {

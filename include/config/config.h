@@ -35,6 +35,17 @@ struct config {
         char *cursor_theme;
         char *cursor_icon;
         int cursor_size;
+
+        enum floating_anchor {
+            ANCHOR_TOPLEFT,
+            ANCHOR_TOP,
+            ANCHOR_TOPRIGHT,
+            ANCHOR_LEFT,
+            ANCHOR_RIGHT,
+            ANCHOR_BOTTOMLEFT,
+            ANCHOR_BOTTOMRIGHT,
+            ANCHOR_NONE,
+        } ninb_anchor;
     } theme;
 
     lua_State *L;

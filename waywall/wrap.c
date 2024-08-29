@@ -25,12 +25,50 @@
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
 
+#define IS_ANCHORED(wrap, view) (wrap->floating.anchored == view)
+#define SHOULD_ANCHOR(wrap) (wrap->cfg->theme.ninb_anchor != ANCHOR_NONE)
+
+static void on_anchored_resize(struct wl_listener *listener, void *data);
+
 struct floating_view {
     struct wl_list link;
 
     struct server_view *view;
     int32_t x, y;
 };
+
+static void
+set_anchored(struct wrap *wrap, struct floating_view *fview) {
+    ww_assert(!wrap->floating.anchored);
+
+    wrap->floating.anchored = fview;
+    wrap->floating.on_anchored_resize.notify = on_anchored_resize;
+    wl_signal_add(&fview->view->events.resize, &wrap->floating.on_anchored_resize);
+}
+
+static void
+unset_anchored(struct wrap *wrap) {
+    ww_assert(!!wrap->floating.anchored);
+
+    wrap->floating.anchored = NULL;
+    wl_list_remove(&wrap->floating.on_anchored_resize.link);
+}
+
+static void
+floating_find_anchored(struct wrap *wrap) {
+    ww_assert(!wrap->floating.anchored);
+
+    if (wl_list_empty(&wrap->floating.views)) {
+        return;
+    }
+
+    // Floating views are inserted at the front of the list, so the view which was created earliest
+    // is at the end.
+    struct floating_view *fview;
+    wl_list_for_each (fview, &wrap->floating.views, link)
+        ;
+    set_anchored(wrap, fview);
+}
 
 static void
 floating_set_visible(struct wrap *wrap, bool visible) {
@@ -61,6 +99,64 @@ floating_set_visible(struct wrap *wrap, bool visible) {
             server_set_input_focus(wrap->server, wrap->view);
         }
     }
+}
+
+static void
+floating_update_anchored(struct wrap *wrap) {
+    ww_assert(SHOULD_ANCHOR(wrap));
+
+    if (!wrap->floating.anchored) {
+        return;
+    }
+
+    struct floating_view *fview = wrap->floating.anchored;
+    uint32_t win_width, win_height;
+    server_buffer_get_size(server_surface_next_buffer(fview->view->surface), &win_width,
+                           &win_height);
+
+    uint32_t center_x = (wrap->width / 2) - (win_width / 2);
+    uint32_t center_y = (wrap->height / 2) - (win_height / 2);
+
+    uint32_t x, y;
+
+    switch (wrap->cfg->theme.ninb_anchor) {
+    case ANCHOR_TOPLEFT:
+        x = 0;
+        y = 0;
+        break;
+    case ANCHOR_TOP:
+        x = center_x;
+        y = 0;
+        break;
+    case ANCHOR_TOPRIGHT:
+        x = wrap->width - win_width;
+        y = 0;
+        break;
+    case ANCHOR_LEFT:
+        x = 0;
+        y = center_y;
+        break;
+    case ANCHOR_RIGHT:
+        x = wrap->width - win_width;
+        y = center_y;
+        break;
+    case ANCHOR_BOTTOMLEFT:
+        x = 0;
+        y = wrap->height - win_height;
+        break;
+    case ANCHOR_BOTTOMRIGHT:
+        x = wrap->width - win_width;
+        y = wrap->height - win_height;
+        break;
+    case ANCHOR_NONE:
+        ww_unreachable();
+    }
+
+    fview->x = x;
+    fview->y = y;
+
+    server_view_set_pos(fview->view, x, y);
+    server_view_commit(fview->view);
 }
 
 static struct floating_view *
@@ -95,9 +191,18 @@ floating_view_create(struct wrap *wrap, struct server_view *view) {
         server_view_set_visible(view, true);
     }
 
-    server_view_set_centered(view, false);
-    server_view_set_pos(view, 0, 0);
-    server_view_commit(view);
+    if (!SHOULD_ANCHOR(wrap) || wl_list_length(&wrap->floating.views) > 1) {
+        server_view_set_centered(view, false);
+        server_view_set_pos(view, 0, 0);
+        server_view_commit(view);
+    } else {
+        ww_assert(!wrap->floating.anchored);
+
+        set_anchored(wrap, fview);
+
+        server_view_set_centered(view, false);
+        floating_update_anchored(wrap);
+    }
 }
 
 static void
@@ -107,6 +212,9 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
         if (fview->view != view) {
             continue;
         }
+
+        // If this view was anchored, a new view will need to be anchored (if one exists.)
+        bool anchored = IS_ANCHORED(wrap, fview);
 
         // If the destroyed view was being interactively moved, then stop the interactive move.
         if (fview == wrap->floating.grab) {
@@ -122,6 +230,12 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
 
         wl_list_remove(&fview->link);
         free(fview);
+
+        if (anchored) {
+            unset_anchored(wrap);
+            floating_find_anchored(wrap);
+            floating_update_anchored(wrap);
+        }
         return;
     }
 
@@ -134,6 +248,15 @@ process_state_update(int wd, uint32_t mask, const char *name, void *data) {
 
     instance_state_update(wrap->instance);
     config_api_signal(wrap->cfg, "state");
+}
+
+static void
+on_anchored_resize(struct wl_listener *listener, void *data) {
+    struct wrap_floating *wrap_floating =
+        wl_container_of(listener, wrap_floating, on_anchored_resize);
+    struct wrap *wrap = wl_container_of(wrap_floating, wrap, floating);
+
+    floating_update_anchored(wrap);
 }
 
 static void
@@ -182,6 +305,10 @@ on_resize(struct wl_listener *listener, void *data) {
         } else {
             server_view_refresh(wrap->view);
         }
+    }
+
+    if (SHOULD_ANCHOR(wrap)) {
+        floating_update_anchored(wrap);
     }
 
     if (wrap->input.pointer_locked) {
@@ -297,7 +424,7 @@ on_button(void *data, uint32_t button, bool pressed) {
         return false;
     }
 
-    if (should_grab) {
+    if (should_grab && !IS_ANCHORED(wrap, fview)) {
         wrap->floating.grab = fview;
         wrap->floating.grab_x = wrap->input.x - fview->x;
         wrap->floating.grab_y = wrap->input.y - fview->y;
@@ -440,6 +567,17 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
     config_api_set_wrap(cfg, wrap);
 
     wrap->cfg = cfg;
+    if (wrap->cfg->theme.ninb_anchor == ANCHOR_NONE) {
+        // If anchoring has been disabled, ensure there is no anchored view.
+        unset_anchored(wrap);
+    } else {
+        // If anchoring is enabled, find a view to anchor (if needed) and reposition it.
+        if (!wrap->floating.anchored) {
+            floating_find_anchored(wrap);
+        }
+        floating_update_anchored(wrap);
+    }
+
     return 0;
 }
 

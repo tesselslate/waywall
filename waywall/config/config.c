@@ -40,6 +40,7 @@ static const struct config defaults = {
             .cursor_theme = "",
             .cursor_icon = "",
             .cursor_size = 0,
+            .ninb_anchor = ANCHOR_NONE,
         },
 };
 
@@ -609,6 +610,36 @@ process_config_theme(struct config *cfg) {
         ww_log(LOG_ERROR, "'theme.cursor_size' must be a positive integer");
         return 1;
     }
+
+    char *ninb_anchor = NULL;
+    if (get_string(cfg, "ninb_anchor", &ninb_anchor, "theme.ninb_anchor", false) != 0) {
+        return 1;
+    }
+    if (ninb_anchor) {
+        static const char *anchor_names[] = {
+            [ANCHOR_TOPLEFT] = "topleft",
+            [ANCHOR_TOP] = "top",
+            [ANCHOR_TOPRIGHT] = "topright",
+            [ANCHOR_LEFT] = "left",
+            [ANCHOR_RIGHT] = "right",
+            [ANCHOR_BOTTOMLEFT] = "bottomleft",
+            [ANCHOR_BOTTOMRIGHT] = "bottomright",
+        };
+
+        for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {
+            if (strcasecmp(anchor_names[i], ninb_anchor) == 0) {
+                cfg->theme.ninb_anchor = i;
+                break;
+            }
+        }
+
+        if (cfg->theme.ninb_anchor == ANCHOR_NONE) {
+            ww_log(LOG_ERROR, "invalid value '%s' for 'theme.ninb_anchor'", ninb_anchor);
+            free(ninb_anchor);
+            return 1;
+        }
+    }
+    free(ninb_anchor);
 
     return 0;
 }
