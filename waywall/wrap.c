@@ -11,6 +11,7 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
+#include "subproc.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -19,6 +20,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/inotify.h>
+#include <unistd.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
@@ -371,6 +373,7 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wrap->cfg = cfg;
     wrap->server = server;
     wrap->inotify = inotify;
+    wrap->subproc = subproc_create(server);
 
     wl_list_init(&wrap->floating.views);
 
@@ -405,6 +408,8 @@ wrap_destroy(struct wrap *wrap) {
         instance_destroy(wrap->instance);
     }
 
+    subproc_destroy(wrap->subproc);
+
     struct floating_view *fview, *tmp;
     wl_list_for_each_safe (fview, tmp, &wrap->floating.views, link) {
         wl_list_remove(&fview->link);
@@ -436,6 +441,11 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
 
     wrap->cfg = cfg;
     return 0;
+}
+
+void
+wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]) {
+    subproc_exec(wrap->subproc, cmd);
 }
 
 void

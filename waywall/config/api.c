@@ -111,6 +111,43 @@ l_current_time(lua_State *L) {
 }
 
 static int
+l_exec(lua_State *L) {
+    struct wrap *wrap = get_wrap(L);
+
+    const char *lua_str = luaL_checkstring(L, 1);
+    ww_assert(lua_str);
+
+    char *cmd_str = strdup(lua_str);
+    check_alloc(cmd_str);
+
+    char *cmd[64] = {0};
+    char *needle = cmd_str;
+    char *elem;
+
+    bool ok = true;
+    size_t i = 0;
+    while (ok) {
+        elem = needle;
+        while (*needle && *needle != ' ') {
+            needle++;
+        }
+        ok = !!*needle;
+        *needle = '\0';
+        needle++;
+
+        cmd[i++] = elem;
+        if (i == STATIC_ARRLEN(cmd)) {
+            free(cmd_str);
+            return luaL_error(L, "command '%s' contains more than 63 arguments", lua_str);
+        }
+    }
+
+    wrap_lua_exec(wrap, cmd);
+    free(cmd_str);
+    return 0;
+}
+
+static int
 l_active_res(lua_State *L) {
     struct wrap *wrap = get_wrap(L);
     if (!wrap) {
@@ -346,8 +383,9 @@ l_register(lua_State *L) {
 
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
-    {"current_time", l_current_time},
     {"active_res", l_active_res},
+    {"current_time", l_current_time},
+    {"exec", l_exec},
     {"press_key", l_press_key},
     {"profile", l_profile},
     {"set_keymap", l_set_keymap},

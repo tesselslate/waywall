@@ -9,6 +9,7 @@ struct wrap {
     struct config *cfg;
     struct server *server;
     struct inotify *inotify;
+    struct subproc *subproc;
 
     int32_t width, height;
 
@@ -44,6 +45,7 @@ struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct 
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 
+void wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]);
 void wrap_lua_press_key(struct wrap *wrap, uint32_t keycode);
 int wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height);
 void wrap_lua_show_floating(struct wrap *wrap, bool show);

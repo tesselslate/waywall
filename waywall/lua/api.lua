@@ -48,6 +48,18 @@ M.active_res = priv.active_res
 --- Get the current time, in milliseconds, with an arbitrary epoch.
 M.current_time = priv.current_time
 
+--- Forks and executes the given command.
+-- The command will be run using fork() and execvp(). Arguments will be split by
+-- spaces; no further processing of arguments will happen.
+--
+-- It is recommended that you use this function instead of io.popen(), which will
+-- cause waywall to freeze if the configuration is reloaded while a subprocess is
+-- still running.
+--
+-- A maximum of 63 arguments may be provided.
+-- @param command The command to run.
+M.exec = priv.exec
+
 --- Register a listener for a specific event.
 -- @param event The name of the event to listen for.
 -- @param listener The function to call when the event occurs.
