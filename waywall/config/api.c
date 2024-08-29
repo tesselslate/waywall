@@ -136,7 +136,7 @@ l_exec(lua_State *L) {
         needle++;
 
         cmd[i++] = elem;
-        if (i == STATIC_ARRLEN(cmd)) {
+        if (ok && i == STATIC_ARRLEN(cmd)) {
             free(cmd_str);
             return luaL_error(L, "command '%s' contains more than 63 arguments", lua_str);
         }
