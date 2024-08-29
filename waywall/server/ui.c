@@ -152,11 +152,19 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         return;
     }
 
-    if (!view->subsurface) {
-        return;
+    if (view->surface->current.buffer) {
+        uint32_t prev_width, prev_height;
+        uint32_t pending_width, pending_height;
+
+        server_buffer_get_size(view->surface->current.buffer, &prev_width, &prev_height);
+        server_buffer_get_size(view->surface->pending.buffer, &pending_width, &pending_height);
+
+        if (prev_width != pending_width || prev_height != pending_height) {
+            wl_signal_emit_mutable(&view->events.resize, NULL);
+        }
     }
 
-    if (view->current.centered) {
+    if (view->subsurface && view->current.centered) {
         layout_centered(view);
     }
 }
@@ -472,6 +480,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     wl_list_insert(&ui->views, &view->link);
 
     wl_signal_init(&view->events.destroy);
+    wl_signal_init(&view->events.resize);
 
     wl_signal_emit_mutable(&ui->events.view_create, view);
 

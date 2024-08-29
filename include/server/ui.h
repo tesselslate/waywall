@@ -80,6 +80,7 @@ struct server_view {
 
     struct {
         struct wl_signal destroy; // data: NULL
+        struct wl_signal resize;  // data: NULL
     } events;
 };
 
