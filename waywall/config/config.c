@@ -20,6 +20,11 @@
 #include <xkbcommon/xkbcommon.h>
 
 static const struct config defaults = {
+    .experimental =
+        {
+            .jit = false,
+            .tearing = false,
+        },
     .input =
         {
             .keymap =
@@ -30,9 +35,11 @@ static const struct config defaults = {
                     .variant = "",
                     .options = "",
                 },
+            .remaps = {0},
             .repeat_rate = -1,
             .repeat_delay = -1,
             .sens = 1.0,
+            .confine = false,
         },
     .theme =
         {
