@@ -569,7 +569,9 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
     wrap->cfg = cfg;
     if (wrap->cfg->theme.ninb_anchor == ANCHOR_NONE) {
         // If anchoring has been disabled, ensure there is no anchored view.
-        unset_anchored(wrap);
+        if (wrap->floating.anchored) {
+            unset_anchored(wrap);
+        }
     } else {
         // If anchoring is enabled, find a view to anchor (if needed) and reposition it.
         if (!wrap->floating.anchored) {
