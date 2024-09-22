@@ -248,8 +248,11 @@ surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource,
 static void
 surface_set_buffer_transform(struct wl_client *client, struct wl_resource *resource,
                              int32_t transform) {
-    // This method appears to be unused by relevant clients.
-    wl_client_post_implementation_error(client, "wl_surface.set_buffer_transform is not supported");
+    // It appears that the userspace NVIDIA driver calls wl_surface.set_buffer_transform for some
+    // reason, so we cannot kill the client for using it.
+    if (transform != WL_OUTPUT_TRANSFORM_NORMAL) {
+        ww_log(LOG_WARN, "client requested non-normal buffer transform");
+    }
 }
 
 static void
