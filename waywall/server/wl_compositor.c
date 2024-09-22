@@ -223,12 +223,6 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
 
 static void
 surface_offset(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y) {
-    if (wl_resource_get_version(resource) > 5) {
-        wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_OFFSET,
-                               "cannot call wl_surface.offset on surfaces greater than version 5");
-        return;
-    }
-
     // The NVIDIA driver seems to use this for some reason, so we need to allow calling it.
     if (x != 0 || y != 0) {
         ww_log(LOG_WARN, "wl_surface.offset called with non-zero offset");
