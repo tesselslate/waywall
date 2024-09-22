@@ -102,6 +102,9 @@ Now, you can use this modified and up-to-date `glfw`. Configure the path to your
 
 ![Screenshot of where to put the path to your glfw build](assets/glfw-local-screenshot.png)
 
+> [!IMPORTANT]
+> If you are using an NVIDIA GPU, you need to set the environment variable `__GL_THREADED_OPTIMIZATIONS` to `0` or else Minecraft will crash when starting up. This can be done in the `Environment variables` tab in your instance's settings.
+
 ### Launching with waywall
 
 By default, your Minecraft instances will launch under your normal compositor. In order for a Minecraft instance to run under waywall, you must change the command used to launch it.
