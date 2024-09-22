@@ -223,9 +223,16 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
 
 static void
 surface_offset(struct wl_client *client, struct wl_resource *resource, int32_t x, int32_t y) {
-    // This method appears to be unused by relevant clients (GLFW, Xserver, Mesa). We do not want
-    // to support it anyway.
-    wl_client_post_implementation_error(client, "wl_surface.offset is not supported");
+    if (wl_resource_get_version(resource) > 5) {
+        wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_OFFSET,
+                               "cannot call wl_surface.offset on surfaces greater than version 5");
+        return;
+    }
+
+    // The NVIDIA driver seems to use this for some reason, so we need to allow calling it.
+    if (x != 0 || y != 0) {
+        ww_log(LOG_WARN, "wl_surface.offset called with non-zero offset");
+    }
 }
 
 static void
@@ -248,8 +255,8 @@ surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource,
 static void
 surface_set_buffer_transform(struct wl_client *client, struct wl_resource *resource,
                              int32_t transform) {
-    // It appears that the userspace NVIDIA driver calls wl_surface.set_buffer_transform for some
-    // reason, so we cannot kill the client for using it.
+    // It appears that the userspace NVIDIA driver calls wl_surface.set_buffer_transform for
+    // some reason, so we cannot kill the client for using it.
     if (transform != WL_OUTPUT_TRANSFORM_NORMAL) {
         ww_log(LOG_WARN, "client requested non-normal buffer transform");
     }
