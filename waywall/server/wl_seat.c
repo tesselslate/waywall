@@ -428,10 +428,8 @@ static bool
 try_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
     for (size_t i = 0; i < seat->config->remaps.num_keys; i++) {
         if (seat->config->remaps.keys[i].src == keycode) {
-            if (seat->config->remaps.buttons[i].src == keycode) {
-                process_remap(seat, seat->config->remaps.buttons[i], state);
-                return true;
-            }
+            process_remap(seat, seat->config->remaps.keys[i], state);
+            return true;
         }
     }
     return false;
