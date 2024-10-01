@@ -61,7 +61,7 @@ destroy_entry(struct subproc *subproc, ssize_t index) {
     close(entry->pidfd);
 
     memmove(subproc->data + index, subproc->data + index + 1,
-            sizeof(*subproc->data) - (subproc->len - index - 1));
+            sizeof(*subproc->data) * (subproc->len - index - 1));
     subproc->len--;
 }
 
