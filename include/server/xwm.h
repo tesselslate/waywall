@@ -8,7 +8,6 @@
 #include "server/xwayland.h"
 #include <wayland-server-core.h>
 #include <xcb/xcb.h>
-#include <xcb/xcb_errors.h>
 
 enum xwm_atom {
     CLIPBOARD,
@@ -30,7 +29,6 @@ struct xwm {
     struct server_xwayland_shell *shell;
 
     xcb_connection_t *conn;
-    xcb_errors_context_t *errctx;
     xcb_screen_t *screen;
 
     xcb_window_t ewmh_window;

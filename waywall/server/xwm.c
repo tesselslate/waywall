@@ -15,7 +15,6 @@
 #include <xcb/composite.h>
 #include <xcb/res.h>
 #include <xcb/xcb.h>
-#include <xcb/xcb_errors.h>
 #include <xcb/xproto.h>
 #include <xcb/xtest.h>
 
@@ -756,48 +755,16 @@ handle_xcb_unmap_notify(struct xwm *xwm, xcb_unmap_notify_event_t *event) {
 
 static void
 handle_xcb_error(struct xwm *xwm, xcb_value_error_t *event) {
-    const char *major_name = xcb_errors_get_name_for_major_code(xwm->errctx, event->major_opcode);
-    if (!major_name) {
-        goto fail;
-    }
-
-    const char *minor_name =
-        xcb_errors_get_name_for_minor_code(xwm->errctx, event->major_opcode, event->minor_opcode);
-
-    const char *extension = NULL;
-    const char *error_name =
-        xcb_errors_get_name_for_error(xwm->errctx, event->error_code, &extension);
-    if (!error_name) {
-        goto fail;
-    }
-
     ww_log(LOG_ERROR,
-           "xcb error: op %s (%s), error code %s (%s), sequence %" PRIu16 ", value %" PRIu32,
-           major_name, minor_name ? minor_name : "no minor", error_name,
-           extension ? extension : "no extension", event->sequence, event->bad_value);
-
-    return;
-
-fail:
-    ww_log(LOG_ERROR,
-           "unknown xcb error: opcode %" PRIu8 ":%" PRIu16 ", error code %" PRIu8
-           ", sequence %" PRIu16 ", value %" PRIu32,
+           "xcb error: opcode %" PRIu8 ":%" PRIu16 ", error code %" PRIu8 ", sequence %" PRIu16
+           ", value %" PRIu32,
            event->major_opcode, event->minor_opcode, event->error_code, event->sequence,
            event->bad_value);
-    return;
 }
 
 static void
 handle_xcb_unknown(struct xwm *xwm, xcb_generic_event_t *event) {
-    const char *extension = NULL;
-    const char *name = xcb_errors_get_name_for_xcb_event(xwm->errctx, event, &extension);
-
-    if (!name) {
-        ww_log(LOG_INFO, "unhandled X11 event (type: %u)", event->response_type);
-    } else {
-        ww_log(LOG_INFO, "unhandled X11 event (type: %u | %s) %s", event->response_type, name,
-               extension ? extension : "");
-    }
+    ww_log(LOG_INFO, "unhandled X11 event (type: %u)", event->response_type);
 }
 
 static int
@@ -999,11 +966,6 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
         goto fail_xcb_connect;
     }
 
-    if (xcb_errors_context_new(xwm->conn, &xwm->errctx) != 0) {
-        ww_log(LOG_ERROR, "failed to create xcb error context");
-        goto fail_errctx;
-    }
-
     xcb_screen_iterator_t screen_iter = xcb_setup_roots_iterator(xcb_get_setup(xwm->conn));
     xwm->screen = screen_iter.data;
     ww_assert(xwm->screen);
@@ -1057,8 +1019,6 @@ fail_xtest:
 fail_xres:
 fail_resources:
     wl_event_source_remove(xwm->src_x11);
-
-fail_errctx:
     xcb_disconnect(xwm->conn);
 
 fail_xcb_connect:
@@ -1069,7 +1029,6 @@ fail_xcb_connect:
 void
 xwm_destroy(struct xwm *xwm) {
     xcb_disconnect(xwm->conn);
-    xcb_errors_context_free(xwm->errctx);
 
     // The X11 pipe event source will have been removed already if the connection died.
     if (xwm->src_x11) {

@@ -75,7 +75,6 @@ waywall_deps = [
 if get_option('xwayland').enabled()
   waywall_deps += dependency('xcb')
   waywall_deps += dependency('xcb-composite')
-  waywall_deps += dependency('xcb-errors')
   waywall_deps += dependency('xcb-res')
   waywall_deps += dependency('xcb-xtest')
   waywall_deps += dependency('xwayland')
