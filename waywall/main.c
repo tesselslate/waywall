@@ -210,7 +210,7 @@ set_realtime() {
 
     const struct sched_param param = {.sched_priority = priority};
     if (sched_setscheduler(getpid(), SCHED_RR, &param) == -1) {
-        ww_log_errno(LOG_ERROR, "failed to set scheduler priority");
+        ww_log_errno(LOG_WARN, "failed to set scheduler priority");
         return;
     }
 }
