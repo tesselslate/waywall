@@ -2,6 +2,7 @@
 #define WAYWALL_RELOAD_H
 
 #include "config/config.h"
+#include "util/list.h"
 #include "util/str.h"
 #include <sys/types.h>
 
@@ -16,10 +17,7 @@ struct reload {
 
     str config_path;
     int config_dir_wd;
-    struct {
-        int *data;
-        ssize_t len, cap;
-    } config_wd;
+    struct list_int config_wd;
 };
 
 struct reload *reload_create(struct inotify *inotify, const char *profile, reload_func_t callback,

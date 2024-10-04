@@ -1,9 +1,12 @@
 #ifndef WAYWALL_INOTIFY_H
 #define WAYWALL_INOTIFY_H
 
+#include "util/list.h"
 #include <stdint.h>
 #include <sys/types.h>
 #include <wayland-server-core.h>
+
+LIST_DEFINE(struct inotify_entry, list_inotify_entry);
 
 typedef void (*inotify_func_t)(int wd, uint32_t mask, const char *name, void *data);
 
@@ -11,11 +14,12 @@ struct inotify {
     struct wl_event_source *src;
     int fd;
 
-    struct {
-        inotify_func_t func;
-        void *data;
-    } *wd;
-    ssize_t len, cap;
+    struct list_inotify_entry entries;
+};
+
+struct inotify_entry {
+    inotify_func_t func;
+    void *data;
 };
 
 struct inotify *inotify_create(struct wl_event_loop *loop);

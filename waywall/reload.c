@@ -2,6 +2,7 @@
 #include "config/config.h"
 #include "inotify.h"
 #include "util/alloc.h"
+#include "util/list.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include <dirent.h>
@@ -21,9 +22,7 @@ handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
                 continue;
             }
 
-            memmove(rl->config_wd.data + i, rl->config_wd.data + i + 1,
-                    sizeof(int) * (rl->config_wd.len - i - 1));
-            rl->config_wd.len--;
+            list_int_remove(&rl->config_wd, i);
             return;
         }
 
@@ -54,18 +53,7 @@ add_config_watch(struct reload *rl, const char *name) {
     }
     str_free(path);
 
-    if (rl->config_wd.len == rl->config_wd.cap) {
-        ww_assert(rl->config_wd.cap > 0);
-
-        ssize_t cap = rl->config_wd.cap * 2;
-        int *new_data = realloc(rl->config_wd.data, sizeof(int) * cap);
-        check_alloc(new_data);
-
-        rl->config_wd.data = new_data;
-        rl->config_wd.cap *= 2;
-    }
-
-    rl->config_wd.data[rl->config_wd.len++] = wd;
+    list_int_append(&rl->config_wd, wd);
     return 0;
 }
 
@@ -77,9 +65,7 @@ rm_config_watch(struct reload *rl, int wd) {
         }
 
         inotify_unsubscribe(rl->inotify, wd);
-        memmove(rl->config_wd.data + i, rl->config_wd.data + i + 1,
-                sizeof(int) * (rl->config_wd.len - i - 1));
-        rl->config_wd.len--;
+        list_int_remove(&rl->config_wd, i);
         return;
     }
 
@@ -144,9 +130,7 @@ reload_create(struct inotify *inotify, const char *profile, reload_func_t callba
         goto fail_watchdir;
     }
 
-    rl->config_wd.data = zalloc(8, sizeof(int));
-    rl->config_wd.len = 0;
-    rl->config_wd.cap = 8;
+    rl->config_wd = list_int_create();
 
     DIR *dir = opendir(rl->config_path);
     if (!dir) {
@@ -176,7 +160,7 @@ fail_watch:
     }
 
 fail_opendir:
-    free(rl->config_wd.data);
+    list_int_destroy(&rl->config_wd);
     inotify_unsubscribe(rl->inotify, rl->config_dir_wd);
 
 fail_watchdir:
@@ -191,7 +175,7 @@ reload_destroy(struct reload *rl) {
     for (ssize_t i = 0; i < rl->config_wd.len; i++) {
         inotify_unsubscribe(rl->inotify, rl->config_wd.data[i]);
     }
-    free(rl->config_wd.data);
+    list_int_destroy(&rl->config_wd);
     str_free(rl->config_path);
     free(rl);
 }

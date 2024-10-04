@@ -2,6 +2,7 @@
 #define WAYWALL_SERVER_WL_SEAT_H
 
 #include "config/config.h"
+#include "util/list.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -40,10 +41,7 @@ struct server_seat {
         int32_t repeat_rate, repeat_delay;
 
         uint8_t mod_indices[8];
-        struct {
-            uint32_t *data;
-            size_t cap, len;
-        } pressed;
+        struct list_uint32 pressed;
     } keyboard;
     struct {
         struct wl_pointer *remote;

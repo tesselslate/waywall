@@ -178,39 +178,26 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
 static bool
 modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
     if (state) {
-        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
             if (seat->keyboard.pressed.data[i] == keycode) {
                 ww_log(LOG_WARN, "duplicate key press event received");
                 return false;
             }
         }
 
-        if (seat->keyboard.pressed.len == seat->keyboard.pressed.cap) {
-            ww_assert(seat->keyboard.pressed.cap > 0);
-
-            uint32_t *new_data = realloc(seat->keyboard.pressed.data,
-                                         sizeof(uint32_t) * seat->keyboard.pressed.cap * 2);
-            check_alloc(new_data);
-
-            seat->keyboard.pressed.data = new_data;
-            seat->keyboard.pressed.cap *= 2;
-        }
-
-        seat->keyboard.pressed.data[seat->keyboard.pressed.len++] = keycode;
+        list_uint32_append(&seat->keyboard.pressed, keycode);
         if (xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_DOWN) != 0) {
             return true;
         }
     } else {
         bool found = false;
 
-        for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
             if (seat->keyboard.pressed.data[i] != keycode) {
                 continue;
             }
 
-            memmove(seat->keyboard.pressed.data + i, seat->keyboard.pressed.data + i + 1,
-                    sizeof(uint32_t) * (seat->keyboard.pressed.len - i - 1));
-            seat->keyboard.pressed.len--;
+            list_uint32_remove(&seat->keyboard.pressed, i);
             found = true;
             break;
         }
@@ -232,7 +219,7 @@ send_keyboard_enter(struct server_seat *seat) {
     wl_array_init(&keys);
     uint32_t *data = wl_array_add(&keys, sizeof(uint32_t) * seat->keyboard.pressed.len);
     check_alloc(data);
-    for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+    for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
         data[i] = seat->keyboard.pressed.data[i];
     }
 
@@ -368,7 +355,7 @@ send_pointer_leave(struct server_seat *seat) {
 
 static void
 reset_keyboard_state(struct server_seat *seat) {
-    for (size_t i = 0; i < seat->keyboard.pressed.len; i++) {
+    for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
         xkb_state_update_key(seat->config->keymap.state, seat->keyboard.pressed.data[i] + 8,
                              XKB_KEY_UP);
         send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
@@ -981,8 +968,7 @@ server_seat_create(struct server *server, struct config *cfg) {
     check_alloc(seat->global);
 
     seat->keyboard.remote_km.fd = -1;
-    seat->keyboard.pressed.cap = 8;
-    seat->keyboard.pressed.data = zalloc(seat->keyboard.pressed.cap, sizeof(uint32_t));
+    seat->keyboard.pressed = list_uint32_create();
 
     wl_list_init(&seat->keyboards);
     wl_list_init(&seat->pointers);

@@ -1,5 +1,6 @@
 #include "inotify.h"
 #include "util/alloc.h"
+#include "util/list.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include <errno.h>
@@ -10,6 +11,8 @@
 #include <sys/inotify.h>
 #include <unistd.h>
 #include <wayland-server-core.h>
+
+LIST_DEFINE_IMPL(struct inotify_entry, list_inotify_entry);
 
 static int
 tick_inotify(int fd, uint32_t mask, void *data) {
@@ -31,9 +34,9 @@ tick_inotify(int fd, uint32_t mask, void *data) {
         for (char *ptr = buf; ptr < buf + len; ptr += sizeof(struct inotify_event) + event->len) {
             event = (const struct inotify_event *)ptr;
 
-            ww_assert(event->wd >= 0 && event->wd <= inotify->len);
+            ww_assert(event->wd >= 0 && event->wd <= inotify->entries.len);
 
-            if (!inotify->wd[event->wd].func) {
+            if (!inotify->entries.data[event->wd].func) {
                 if (event->mask & IN_IGNORED) {
                     continue;
                 }
@@ -42,8 +45,8 @@ tick_inotify(int fd, uint32_t mask, void *data) {
                 continue;
             }
 
-            inotify->wd[event->wd].func(event->wd, event->mask, event->name,
-                                        inotify->wd[event->wd].data);
+            inotify->entries.data[event->wd].func(event->wd, event->mask, event->name,
+                                                  inotify->entries.data[event->wd].data);
         }
     }
 }
@@ -65,9 +68,9 @@ inotify_create(struct wl_event_loop *loop) {
         goto fail_src;
     }
 
-    inotify->wd = zalloc(8, sizeof(*inotify->wd));
-    inotify->len = 1; // Watch descriptors are allocated starting at 1.
-    inotify->cap = 8;
+    // inotify watch descriptors start at 1.
+    inotify->entries = list_inotify_entry_create();
+    inotify->entries.len = 1;
 
     return inotify;
 
@@ -83,9 +86,7 @@ void
 inotify_destroy(struct inotify *inotify) {
     wl_event_source_remove(inotify->src);
     close(inotify->fd);
-    if (inotify->wd) {
-        free(inotify->wd);
-    }
+    list_inotify_entry_destroy(&inotify->entries);
     free(inotify);
 }
 
@@ -100,34 +101,25 @@ inotify_subscribe(struct inotify *inotify, const char *path, uint32_t mask, inot
 
     // This assumption will fail if INT_MAX watch descriptors are allocated, which should not
     // happen under any circumstances.
-    ww_assert(wd >= inotify->len);
+    ww_assert(wd == inotify->entries.len);
 
-    if (wd >= inotify->cap) {
-        ww_assert(inotify->cap < SSIZE_MAX / 2);
+    struct inotify_entry entry = {0};
 
-        ssize_t cap = inotify->cap * 2;
-        void *data = realloc(inotify->wd, cap * sizeof(*inotify->wd));
-        check_alloc(data);
+    entry.func = func;
+    entry.data = data;
 
-        inotify->wd = data;
-        inotify->cap = cap;
-    }
-
-    inotify->wd[wd].func = func;
-    inotify->wd[wd].data = data;
-    inotify->len = wd;
-
+    list_inotify_entry_append(&inotify->entries, entry);
     return wd;
 }
 
 void
 inotify_unsubscribe(struct inotify *inotify, int wd) {
-    ww_assert(wd >= 0 && wd <= inotify->len);
+    ww_assert(wd >= 0 && wd <= inotify->entries.len);
 
     if (inotify_rm_watch(inotify->fd, wd) != 0) {
         ww_log_errno(LOG_ERROR, "failed to remove watch %d", wd);
     }
 
-    inotify->wd[wd].func = NULL;
-    inotify->wd[wd].data = NULL;
+    inotify->entries.data[wd].func = NULL;
+    inotify->entries.data[wd].data = NULL;
 }
