@@ -29,7 +29,6 @@ waywall_src = files(
   'util/syscall.c',
   'util/sysinfo.c',
   'util/zip.c',
-  'counter.c',
   'inotify.c',
   'instance.c',
   'main.c',
