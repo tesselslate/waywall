@@ -100,6 +100,12 @@ M.set_resolution = priv.set_resolution
 -- @param show Whether or not to show floating windows.
 M.show_floating = priv.show_floating
 
+--- Pauses the current action for the given number of milliseconds.
+-- This function may only be called from within a keybind handler. Calling it
+-- from within another context will result in an error.
+-- @param ms Number of milliseconds to sleep for
+M.sleep = priv.sleep
+
 --- Gets the state of the Minecraft instance.
 -- StateOutput must be present and enabled on the instance for an accurate
 -- result.

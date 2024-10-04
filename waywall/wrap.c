@@ -12,6 +12,7 @@
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
 #include "subproc.h"
+#include "timer.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -450,9 +451,8 @@ on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bo
 
     for (size_t i = 0; i < num_syms; i++) {
         action.data = syms[i];
-        if (config_action_try(wrap->cfg, action) != 0) {
-            return true;
-        }
+
+        return config_action_try(wrap->cfg, action);
     }
 
     return false;
@@ -501,6 +501,7 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wrap->server = server;
     wrap->inotify = inotify;
     wrap->subproc = subproc_create(server);
+    wrap->timer = ww_timer_create(server);
 
     wl_list_init(&wrap->floating.views);
 
@@ -535,6 +536,7 @@ wrap_destroy(struct wrap *wrap) {
         instance_destroy(wrap->instance);
     }
 
+    ww_timer_destroy(wrap->timer);
     subproc_destroy(wrap->subproc);
 
     struct floating_view *fview, *tmp;

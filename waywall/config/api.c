@@ -8,6 +8,7 @@
 #include "server/ui.h"
 #include "server/wl_seat.h"
 #include "server/wp_relative_pointer.h"
+#include "timer.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -40,6 +41,34 @@ static struct {
 };
 
 #undef K
+
+static void
+handle_sleep_alarm(void *data) {
+    struct config_coro *ccoro = data;
+    if (!ccoro->parent) {
+        config_coro_delete(ccoro);
+        return;
+    }
+
+    lua_settop(ccoro->L, 0);
+    int ret = lua_resume(ccoro->L, 0);
+
+    switch (ret) {
+    case LUA_YIELD:
+        // Do nothing. The coroutine will remain in the table so that it can
+        // still be resumed later.
+        return;
+    case 0:
+        // The coroutine finished. Remove it from the coroutines table.
+        config_coro_delete(ccoro);
+        return;
+    default:
+        // The coroutine failed. Remove it from the coroutines table and log the error.
+        ww_log(LOG_ERROR, "failed to resume keybind action: '%s'", lua_tostring(ccoro->L, -1));
+        config_coro_delete(ccoro);
+        return;
+    }
+}
 
 static struct xkb_rule_names
 get_rule_names(lua_State *L) {
@@ -249,6 +278,39 @@ l_show_floating(lua_State *L) {
 }
 
 static int
+l_sleep(lua_State *L) {
+    static const int ARG_MS = 1;
+
+    struct wrap *wrap = config_get_wrap(L);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("sleep"));
+    }
+
+    // Ensure that sleep was called from within a coroutine.
+    if (lua_pushthread(L) == 1) {
+        return luaL_error(L, "sleep called from invalid execution context");
+    }
+
+    luaL_argcheck(L, lua_type(L, ARG_MS) == LUA_TNUMBER, ARG_MS, "ms must be a number");
+    int ms = lua_tointeger(L, ARG_MS);
+
+    // Setup the timer for this sleep call.
+    struct timespec duration = {
+        .tv_sec = ms / 1000,
+        .tv_nsec = (ms % 1000) * 1000000,
+    };
+
+    struct config_coro *ccoro = config_coro_lookup(L);
+    ww_assert(ccoro);
+
+    if (ww_timer_add_entry(wrap->timer, duration, handle_sleep_alarm, ccoro) != 0) {
+        return luaL_error(L, "failed to prepare sleep");
+    }
+
+    return lua_yield(L, 0);
+}
+
+static int
 l_state(lua_State *L) {
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
@@ -370,6 +432,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
     {"show_floating", l_show_floating},
+    {"sleep", l_sleep},
     {"state", l_state},
     {"window_size", l_window_size},
 

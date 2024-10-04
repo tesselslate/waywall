@@ -10,6 +10,7 @@ struct wrap {
     struct server *server;
     struct inotify *inotify;
     struct subproc *subproc;
+    struct ww_timer *timer;
 
     int32_t width, height;
 
