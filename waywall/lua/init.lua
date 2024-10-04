@@ -51,13 +51,12 @@ _G.print = function(...)
 end
 
 -- Setup the package path to include the waywall configuration directory.
-local getenv = priv.getenv
-local xdg_config_home = getenv("XDG_CONFIG_HOME")
+local xdg_config_home = os.getenv("XDG_CONFIG_HOME")
 local path = nil
 if xdg_config_home then
     path = xdg_config_home .. "/waywall/"
 else
-    local home = getenv("HOME")
+    local home = os.getenv("HOME")
     if not home then
         error("no $XDG_CONFIG_HOME or $HOME")
     end

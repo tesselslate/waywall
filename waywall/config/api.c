@@ -374,21 +374,6 @@ l_window_size(lua_State *L) {
 }
 
 static int
-l_getenv(lua_State *L) {
-    static const int ARG_ENV = 1;
-
-    const char *var = luaL_checkstring(L, ARG_ENV);
-    const char *result = getenv(var);
-    if (result) {
-        lua_pushstring(L, result);
-    } else {
-        lua_pushnil(L);
-    }
-
-    return 1;
-}
-
-static int
 l_log(lua_State *L) {
     ww_log(LOG_INFO, "lua: %s", lua_tostring(L, 1));
     return 0;
@@ -437,7 +422,6 @@ static const struct luaL_Reg lua_lib[] = {
     {"window_size", l_window_size},
 
     // private (see init.lua)
-    {"getenv", l_getenv},
     {"log", l_log},
     {"log_error", l_log_error},
     {"register", l_register},
