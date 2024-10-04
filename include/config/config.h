@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <wayland-server-core.h>
 
 struct config {
     struct {
@@ -48,6 +49,7 @@ struct config {
         } ninb_anchor;
     } theme;
 
+    struct wl_list coroutines; // config_coro.link
     lua_State *L;
 };
 

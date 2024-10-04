@@ -739,11 +739,17 @@ config_create() {
         check_alloc(*storage);
     }
 
+    wl_list_init(&cfg->coroutines);
     return cfg;
 }
 
 void
 config_destroy(struct config *cfg) {
+    struct config_coro *ccoro;
+    wl_list_for_each (ccoro, &cfg->coroutines, link) {
+        ccoro->parent = NULL;
+    }
+
     if (cfg->input.remaps.data) {
         free(cfg->input.remaps.data);
     }

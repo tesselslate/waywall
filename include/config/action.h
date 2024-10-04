@@ -15,6 +15,6 @@ struct config_action {
     uint32_t modifiers;
 };
 
-int config_action_try(struct config *config, struct config_action action);
+bool config_action_try(struct config *cfg, struct config_action action);
 
 #endif

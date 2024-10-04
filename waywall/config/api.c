@@ -77,28 +77,6 @@ get_rule_names(lua_State *L) {
     return rule_names;
 }
 
-static struct wrap *
-get_wrap(lua_State *L) {
-    ssize_t stack_start = lua_gettop(L);
-
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.wrap);
-    lua_rawget(L, LUA_REGISTRYINDEX);
-
-    if (!luaL_testudata(L, -1, METATABLE_WRAP)) {
-        lua_pop(L, 1);
-        ww_assert(lua_gettop(L) == stack_start);
-
-        return NULL;
-    }
-
-    struct wrap **wrap = lua_touserdata(L, -1);
-
-    lua_pop(L, 1);
-    ww_assert(lua_gettop(L) == stack_start);
-
-    return *wrap;
-}
-
 static int
 l_current_time(lua_State *L) {
     struct timespec now;
@@ -112,7 +90,7 @@ l_current_time(lua_State *L) {
 
 static int
 l_exec(lua_State *L) {
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
 
     const char *lua_str = luaL_checkstring(L, 1);
     ww_assert(lua_str);
@@ -149,7 +127,7 @@ l_exec(lua_State *L) {
 
 static int
 l_active_res(lua_State *L) {
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("active_res"));
     }
@@ -161,7 +139,7 @@ l_active_res(lua_State *L) {
 
 static int
 l_press_key(lua_State *L) {
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("press_key"));
     }
@@ -202,7 +180,7 @@ static int
 l_set_keymap(lua_State *L) {
     static const int ARG_KEYMAP = 1;
 
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_keymap"));
     }
@@ -220,7 +198,7 @@ l_set_resolution(lua_State *L) {
     static const int ARG_WIDTH = 1;
     static const int ARG_HEIGHT = 2;
 
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_resolution"));
     }
@@ -241,7 +219,7 @@ static int
 l_set_sensitivity(lua_State *L) {
     static const int ARG_SENS = 1;
 
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_sensitivity"));
     }
@@ -257,7 +235,7 @@ static int
 l_show_floating(lua_State *L) {
     static const int ARG_SHOW = 1;
 
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("show_floating"));
     }
@@ -272,7 +250,7 @@ l_show_floating(lua_State *L) {
 
 static int
 l_state(lua_State *L) {
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("state"));
     }
@@ -318,7 +296,7 @@ l_state(lua_State *L) {
 
 static int
 l_window_size(lua_State *L) {
-    struct wrap *wrap = get_wrap(L);
+    struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("window_size"));
     }
@@ -416,6 +394,10 @@ config_api_init(struct config *cfg, const char *profile) {
         lua_pushstring(cfg->L, profile);
         lua_rawset(cfg->L, LUA_REGISTRYINDEX);
     }
+
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.coroutines);
+    lua_newtable(cfg->L);
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
 
     lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
     lua_newtable(cfg->L);

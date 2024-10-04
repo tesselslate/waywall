@@ -12,6 +12,8 @@ local orig_pcall = _G.pcall
 local orig_xpcall = _G.xpcall
 
 _G.priv_waywall = nil
+
+_G.coroutine = nil
 _G.load = nil
 _G.loadfile = nil
 _G.loadstring = nil
