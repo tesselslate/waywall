@@ -213,10 +213,6 @@ server_create(struct config *cfg) {
     if (!server->data_device_manager) {
         goto fail_globals;
     }
-    server->drm = server_drm_create(server);
-    if (!server->drm) {
-        goto fail_globals;
-    }
     server->linux_dmabuf = server_linux_dmabuf_create(server);
     if (!server->linux_dmabuf) {
         goto fail_globals;
@@ -240,6 +236,13 @@ server_create(struct config *cfg) {
     server->xdg_shell = server_xdg_wm_base_create(server);
     if (!server->xdg_shell) {
         goto fail_globals;
+    }
+
+    if (server->backend->drm.found) {
+        server->drm = server_drm_create(server);
+        if (!server->drm) {
+            goto fail_globals;
+        }
     }
 
 #ifdef WAYWALL_XWAYLAND

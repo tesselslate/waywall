@@ -326,13 +326,12 @@ server_backend_create() {
         ww_log(LOG_ERROR, "host compositor does not provide xdg_wm_base");
         goto fail_registry;
     }
-    if (!backend->drm.found) {
-        ww_log(LOG_ERROR, "host compositor does not provide wl_drm");
-        goto fail_registry;
-    }
 
     if (!backend->cursor_shape_manager) {
         ww_log(LOG_WARN, "host compositor does not provide wp_cursor_shape_manager");
+    }
+    if (!backend->drm.found) {
+        ww_log(LOG_WARN, "host compositor does not provide wl_drm");
     }
     if (!backend->tearing_control) {
         ww_log(LOG_INFO, "host compositor does not provide wp_tearing_control_manager");
