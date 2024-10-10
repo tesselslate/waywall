@@ -17,15 +17,14 @@ start_coro(struct config *cfg, struct config_coro *ccoro) {
         // The coroutine has yielded. Let it remain in the coroutines table.
         return true;
     case 0:
-        // The coroutine finished. Remove it from the coroutines table.
-        config_coro_delete(ccoro);
-
-        // Check if the function returned a value stating that the input should not be consumed.
+        // The coroutine finished. Check if the function returned a value stating that the input
+        // should not be consumed.
         if (lua_gettop(ccoro->L) == 0) {
             lua_pushnil(ccoro->L);
         }
         bool consumed = (!lua_isboolean(ccoro->L, 1) || lua_toboolean(ccoro->L, 1));
 
+        config_coro_delete(ccoro);
         return consumed;
     default:
         // The coroutine failed. Remove it from the coroutines table and log the error.
