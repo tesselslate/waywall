@@ -8,7 +8,7 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-bool
+static bool
 start_coro(struct config *cfg, struct config_coro *ccoro) {
     int ret = lua_resume(ccoro->L, 0);
 

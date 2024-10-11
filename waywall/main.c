@@ -67,7 +67,7 @@ handle_signal(int signal, void *data) {
     return 0;
 }
 
-int
+static int
 cmd_wrap(const char *profile, char **argv) {
     char logname[32] = {0};
     ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wrap-%jd", (intmax_t)getpid());
