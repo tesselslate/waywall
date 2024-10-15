@@ -162,6 +162,10 @@ server_xwayland_create(struct server *server, struct server_xwayland_shell *shel
 
 void
 xwl_notify_key(struct server_xwayland *xwl, uint32_t keycode, bool pressed) {
+    if (!xwl->xwm) {
+        return;
+    }
+
     xcb_test_fake_input(xwl->xwm->conn, pressed ? XCB_KEY_PRESS : XCB_KEY_RELEASE, keycode + 8,
                         XCB_CURRENT_TIME, xwl->xwm->screen->root, 0, 0, 0);
     xcb_flush(xwl->xwm->conn);
@@ -169,6 +173,10 @@ xwl_notify_key(struct server_xwayland *xwl, uint32_t keycode, bool pressed) {
 
 void
 xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
+    if (!xwl->xwm) {
+        return;
+    }
+
     // HACK: Sending an EnterNotify event causes GLFW to update the mouse pointer coordinates, so
     // we don't accidentally click any menu buttons.
 
@@ -206,6 +214,10 @@ xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
 void
 xwl_send_keys(struct server_xwayland *xwl, struct server_view *view, size_t num_keys,
               const struct syn_key keys[static num_keys]) {
+    if (!xwl->xwm) {
+        return;
+    }
+
     xcb_window_t window = xwm_window_from_view(view);
 
     for (size_t i = 0; i < num_keys; i++) {
@@ -217,5 +229,9 @@ xwl_send_keys(struct server_xwayland *xwl, struct server_view *view, size_t num_
 
 void
 xwl_set_clipboard(struct server_xwayland *xwl, const char *content) {
+    if (!xwl->xwm) {
+        return;
+    }
+
     xwm_set_clipboard(xwl->xwm, content);
 }
