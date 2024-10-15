@@ -133,13 +133,12 @@ cmd_wrap(const char *profile, char **argv) {
         goto fail_fork;
     }
 
-    ww_assert(close(STDIN_FILENO) == 0);
-
     int pidfd = pidfd_open(ww.child, 0);
     if (pidfd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open pidfd for child process");
         goto fail_pidfd;
     }
+    ww_log(LOG_INFO, "got pidfd %d for child process %jd", pidfd, (intmax_t)ww.child);
 
     ww.src_pidfd = wl_event_loop_add_fd(loop, pidfd, WL_EVENT_READABLE, handle_pidfd, &ww);
 
@@ -147,7 +146,7 @@ cmd_wrap(const char *profile, char **argv) {
 
     if (pidfd_send_signal(pidfd, SIGKILL, NULL, 0) != 0) {
         if (errno != ESRCH) {
-            ww_log_errno(LOG_ERROR, "failed to kill child process");
+            ww_log_errno(LOG_ERROR, "failed to kill child process (pidfd: %d)", pidfd);
         }
     }
 
