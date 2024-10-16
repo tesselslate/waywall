@@ -10,7 +10,7 @@
 
 static bool
 start_coro(struct config *cfg, struct config_coro *ccoro) {
-    int ret = lua_resume(ccoro->L, 0);
+    int ret = lua_resume(ccoro->L, 0); // stack: unknown
 
     switch (ret) {
     case LUA_YIELD:
@@ -20,7 +20,7 @@ start_coro(struct config *cfg, struct config_coro *ccoro) {
         // The coroutine finished. Check if the function returned a value stating that the input
         // should not be consumed.
         if (lua_gettop(ccoro->L) == 0) {
-            lua_pushnil(ccoro->L);
+            lua_pushnil(ccoro->L); // stack: unknown (>= 1)
         }
         bool consumed = (!lua_isboolean(ccoro->L, 1) || lua_toboolean(ccoro->L, 1));
 
@@ -44,38 +44,38 @@ config_action_try(struct config *cfg, struct config_action action) {
     char buf[BIND_BUFLEN];
     config_encode_bind(buf, action);
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.actions);
-    lua_gettable(cfg->L, LUA_REGISTRYINDEX);
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.actions); // stack: 1
+    lua_gettable(cfg->L, LUA_REGISTRYINDEX); // stack: 1 (IDX_ACTIONS_TABLE)
 
-    lua_pushlstring(cfg->L, buf, STATIC_ARRLEN(buf));
-    lua_gettable(cfg->L, IDX_ACTIONS_TABLE);
+    lua_pushlstring(cfg->L, buf, STATIC_ARRLEN(buf)); // stack: 2
+    lua_gettable(cfg->L, IDX_ACTIONS_TABLE);          // stack: 2 (IDX_ACTIONS_RESULT)
 
     switch (lua_type(cfg->L, IDX_ACTIONS_RESULT)) {
     case LUA_TFUNCTION: {
-        lua_State *coro = lua_newthread(cfg->L);
+        lua_State *coro = lua_newthread(cfg->L); // stack: 3
         struct config_coro *ccoro = config_coro_add(coro);
 
         // Pop the coroutine itself from the main Lua stack. config_coro_add places it in the global
         // coroutines table so that it will not be garbage collected.
-        lua_pop(cfg->L, 1);
+        lua_pop(cfg->L, 1); // stack: 2
+
+        // Cleanup the rest of the main Lua stack now.
+        lua_pop(cfg->L, 2); // stack: 0
+        ww_assert(lua_gettop(cfg->L) == 0);
 
         // The new Lua coroutine has a completely separate execution stack, so we need to push the
         // function onto it.
-        lua_pushlightuserdata(coro, (void *)&config_registry_keys.actions);
-        lua_gettable(coro, LUA_REGISTRYINDEX);
-        lua_pushlstring(coro, buf, STATIC_ARRLEN(buf));
-        lua_gettable(coro, IDX_ACTIONS_TABLE);
+        lua_pushlightuserdata(coro, (void *)&config_registry_keys.actions); // stack: 1
+        lua_gettable(coro, LUA_REGISTRYINDEX);                              // stack: 1
+        lua_pushlstring(coro, buf, STATIC_ARRLEN(buf));                     // stack: 2
+        lua_gettable(coro, IDX_ACTIONS_TABLE);                              // stack: 2
 
-        // Call the function, clean up the main Lua stack, and return.
+        // Call the function.
         bool consumed = start_coro(cfg, ccoro);
-
-        lua_pop(cfg->L, 2);
-        ww_assert(lua_gettop(cfg->L) == 0);
-
         return consumed;
     }
     case LUA_TNIL:
-        lua_pop(cfg->L, 2);
+        lua_pop(cfg->L, 2); // stack: 0
         ww_assert(lua_gettop(cfg->L) == 0);
 
         return false;

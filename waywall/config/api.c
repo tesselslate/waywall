@@ -25,6 +25,39 @@
 #include <time.h>
 #include <xkbcommon/xkbcommon.h>
 
+/*
+ * Lua interop code can be a bit obtuse due to working with the stack. The code in this file follows
+ * a few conventions:
+ *
+ *  1. Each Lua API function should be split into 3 sections, each labeled with a comment:
+ *
+ *       a. Prologue: retrieve and validate arguments, ensure stack ends with last argument
+ *       b. Body: perform the actual operation
+ *       c. Epilogue: push return values to the stack and end the function
+ *
+ *     Some notes:
+ *
+ *       - Return values may be pushed to the stack during the body, but this should be noted in the
+ *         epilogue comment.
+ *       - If the prologue and/or body are not present, their comments can be omitted.
+ *       - If there are any number of arguments, lua_settop() should be called to ensure the stack
+ *         size is correct, even if the stack is not used later in the function. This ensures that
+ *         the check will be present if the function is later modified to make use of the stack.
+ *
+ *  2. Calls to lua_* functions which modify the stack should be postfixed with a comment stating
+ *     the current stack top.
+ *
+ *        - In some cases, the stack top is irrelevant or obvious (i.e. after calls to lua_settop or
+ *          when pushing arguments at the end of a function). When this happens, there's no need to
+ *          write a comment noting the stack top.
+ *
+ *  3. Constant stack indices should be used wherever possible and labelled with an associated
+ *     constant value at the start of the function (ARG_*, IDX_*).
+ *
+ * You should also attempt to follow some of these conventions (stack top comments, constant stack
+ * indices) in the Lua interop code present in other files.
+ */
+
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
 #define K(x) {#x, KEY_##x}
@@ -45,13 +78,20 @@ static struct {
 static void
 handle_sleep_alarm(void *data) {
     struct config_coro *ccoro = data;
+
+    // If the owning config instance has been destroyed (i.e. the user's configuration was
+    // modified and reloaded), then the coroutine is invalid and cannot be resumed.
+    //
+    // TODO: Sleep alarms should probably be deleted in config_destroy instead of allowing
+    // them to fire and removing the coroutines from the global table here.
     if (!ccoro->parent) {
         config_coro_delete(ccoro);
         return;
     }
 
+    // Clear the stack and resume the coroutine with no arguments.
     lua_settop(ccoro->L, 0);
-    int ret = lua_resume(ccoro->L, 0);
+    int ret = lua_resume(ccoro->L, 0); // stack: unknown
 
     switch (ret) {
     case LUA_YIELD:
@@ -70,60 +110,34 @@ handle_sleep_alarm(void *data) {
     }
 }
 
-static struct xkb_rule_names
-get_rule_names(lua_State *L) {
-    struct xkb_rule_names rule_names = {0};
-
-    const struct {
-        const char *key;
-        const char **value;
-    } mappings[] = {
-        {"layout", &rule_names.layout},   {"model", &rule_names.model},
-        {"rules", &rule_names.rules},     {"variant", &rule_names.variant},
-        {"options", &rule_names.options},
-    };
-
-    for (size_t i = 0; i < STATIC_ARRLEN(mappings); i++) {
-        lua_pushstring(L, mappings[i].key);
-        lua_rawget(L, 1);
-
-        switch (lua_type(L, -1)) {
-        case LUA_TSTRING: {
-            const char *value = lua_tostring(L, -1);
-            *mappings[i].value = value;
-            break;
-        }
-        case LUA_TNIL:
-            break;
-        default:
-            luaL_error(L, "expected '%s' to be of type 'string' or 'nil', was '%s'",
-                       mappings[i].key, luaL_typename(L, -1));
-        }
-
-        lua_pop(L, 1);
-    }
-
-    return rule_names;
-}
-
 static int
 l_current_time(lua_State *L) {
+    // Body
     struct timespec now;
     clock_gettime(CLOCK_MONOTONIC, &now);
     uint32_t time = (uint32_t)((uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
 
+    // Epilogue
     lua_pushinteger(L, time);
-
     return 1;
 }
 
 static int
 l_exec(lua_State *L) {
+    static const int ARG_COMMAND = 1;
+
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("exec"));
+    }
 
-    const char *lua_str = luaL_checkstring(L, 1);
-    ww_assert(lua_str);
+    const char *lua_str = luaL_checkstring(L, ARG_COMMAND);
 
+    lua_settop(L, ARG_COMMAND);
+
+    // Body. Duplicate the string from the Lua VM so that it can be modified for in-place argument
+    // parsing.
     char *cmd_str = strdup(lua_str);
     check_alloc(cmd_str);
 
@@ -151,16 +165,20 @@ l_exec(lua_State *L) {
 
     wrap_lua_exec(wrap, cmd);
     free(cmd_str);
+
+    // Epilogue
     return 0;
 }
 
 static int
 l_active_res(lua_State *L) {
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("active_res"));
     }
 
+    // Epilogue
     lua_pushinteger(L, wrap->active_res.w);
     lua_pushinteger(L, wrap->active_res.h);
     return 2;
@@ -168,25 +186,32 @@ l_active_res(lua_State *L) {
 
 static int
 l_floating_shown(lua_State *L) {
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
-        lua_pushboolean(L, false);
-        return 1;
+        return luaL_error(L, STARTUP_ERRMSG("floating_shown"));
     }
 
+    // Epilogue
     lua_pushboolean(L, wrap->floating.visible);
     return 1;
 }
 
 static int
 l_press_key(lua_State *L) {
+    static const int ARG_KEYNAME = 1;
+
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("press_key"));
     }
 
-    const char *key = luaL_checkstring(L, 1);
+    const char *key = luaL_checkstring(L, ARG_KEYNAME);
 
+    lua_settop(L, ARG_KEYNAME);
+
+    // Body. Determine which keycode to send to the Minecraft instance.
     uint32_t keycode = UINT32_MAX;
     for (size_t i = 0; i < STATIC_ARRLEN(key_mapping); i++) {
         if (strcasecmp(key_mapping[i].name, key) == 0) {
@@ -199,28 +224,35 @@ l_press_key(lua_State *L) {
     }
 
     wrap_lua_press_key(wrap, keycode);
+
+    // Epilogue
     return 0;
 }
 
 static int
 l_profile(lua_State *L) {
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.profile);
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    // Prologue
+    lua_settop(L, 0);
 
-    if (lua_isnil(L, -1)) {
-        lua_pop(L, 1);
-        lua_pushnil(L);
-    } else {
+    // Body
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.profile); // stack: 1
+    lua_rawget(L, LUA_REGISTRYINDEX);                                // stack: 1
+
+    if (!lua_isnil(L, -1)) {
         ww_assert(lua_isstring(L, -1));
     }
 
+    // Epilogue. The string (or nil) value to return was already pushed to the stack by the above
+    // code.
     return 1;
 }
 
 static int
 l_set_keymap(lua_State *L) {
     static const int ARG_KEYMAP = 1;
+    static const int IDX_VALUE = 2;
 
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_keymap"));
@@ -228,9 +260,43 @@ l_set_keymap(lua_State *L) {
 
     luaL_argcheck(L, lua_istable(L, ARG_KEYMAP), ARG_KEYMAP, "expected table");
 
-    const struct xkb_rule_names rule_names = get_rule_names(L);
+    lua_settop(L, ARG_KEYMAP);
+
+    // Body. Construct an instance of xkb_rule_names from the provided options table.
+    struct xkb_rule_names rule_names = {0};
+
+    const struct {
+        const char *key;
+        const char **value;
+    } mappings[] = {
+        {"layout", &rule_names.layout},   {"model", &rule_names.model},
+        {"rules", &rule_names.rules},     {"variant", &rule_names.variant},
+        {"options", &rule_names.options},
+    };
+
+    for (size_t i = 0; i < STATIC_ARRLEN(mappings); i++) {
+        lua_pushstring(L, mappings[i].key); // stack: ARG_KEYMAP + 1
+        lua_rawget(L, ARG_KEYMAP);          // stack: ARG_KEYMAP + 1 (IDX_VALUE)
+
+        switch (lua_type(L, IDX_VALUE)) {
+        case LUA_TSTRING: {
+            const char *value_str = lua_tostring(L, IDX_VALUE);
+            *mappings[i].value = value_str;
+            break;
+        }
+        case LUA_TNIL:
+            break;
+        default:
+            return luaL_error(L, "expected '%s' to be of type 'string' or 'nil', was '%s'",
+                              mappings[i].key, luaL_typename(L, IDX_VALUE));
+        }
+
+        lua_pop(L, 1); // stack: ARG_KEYMAP
+    }
+
     server_seat_lua_set_keymap(wrap->server->seat, &rule_names);
 
+    // Epilogue
     return 0;
 }
 
@@ -239,6 +305,7 @@ l_set_resolution(lua_State *L) {
     static const int ARG_WIDTH = 1;
     static const int ARG_HEIGHT = 2;
 
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_resolution"));
@@ -249,10 +316,16 @@ l_set_resolution(lua_State *L) {
 
     luaL_argcheck(L, width >= 0, ARG_WIDTH, "width must be non-negative");
     luaL_argcheck(L, height >= 0, ARG_HEIGHT, "height must be non-negative");
+
+    lua_settop(L, ARG_HEIGHT);
+
+    // Body
     bool ok = wrap_lua_set_res(wrap, width, height) == 0;
     if (!ok) {
         return luaL_error(L, "cannot set resolution");
     }
+
+    // Epilogue
     return 0;
 }
 
@@ -260,6 +333,7 @@ static int
 l_set_sensitivity(lua_State *L) {
     static const int ARG_SENS = 1;
 
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_sensitivity"));
@@ -268,10 +342,15 @@ l_set_sensitivity(lua_State *L) {
     double sens = luaL_checknumber(L, ARG_SENS);
     luaL_argcheck(L, sens >= 0, ARG_SENS, "sensitivity must be a positive number");
 
+    lua_settop(L, ARG_SENS);
+
+    // Body
     if (sens == 0) {
         sens = wrap->cfg->input.sens;
     }
     server_relative_pointer_set_sens(wrap->server->relative_pointer, sens);
+
+    // Epilogue
     return 0;
 }
 
@@ -279,6 +358,7 @@ static int
 l_show_floating(lua_State *L) {
     static const int ARG_SHOW = 1;
 
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("show_floating"));
@@ -288,7 +368,12 @@ l_show_floating(lua_State *L) {
                   "visibility must be a boolean");
     bool show = lua_toboolean(L, ARG_SHOW);
 
+    lua_settop(L, ARG_SHOW);
+
+    // Body
     wrap_lua_show_floating(wrap, show);
+
+    // Epilogue
     return 0;
 }
 
@@ -296,20 +381,22 @@ static int
 l_sleep(lua_State *L) {
     static const int ARG_MS = 1;
 
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("sleep"));
     }
 
-    // Ensure that sleep was called from within a coroutine.
     if (lua_pushthread(L) == 1) {
+        // This function can only be called from within a coroutine (i.e. a keybind handler.)
         return luaL_error(L, "sleep called from invalid execution context");
     }
 
-    luaL_argcheck(L, lua_type(L, ARG_MS) == LUA_TNUMBER, ARG_MS, "ms must be a number");
-    int ms = lua_tointeger(L, ARG_MS);
+    int ms = luaL_checkinteger(L, ARG_MS);
 
-    // Setup the timer for this sleep call.
+    lua_settop(L, ARG_MS);
+
+    // Body. Setup the timer for this sleep call.
     struct timespec duration = {
         .tv_sec = ms / 1000,
         .tv_nsec = (ms % 1000) * 1000000,
@@ -322,15 +409,23 @@ l_sleep(lua_State *L) {
         return luaL_error(L, "failed to prepare sleep");
     }
 
+    // Epilogue
     return lua_yield(L, 0);
 }
 
 static int
 l_state(lua_State *L) {
+    static const int IDX_STATE = 1;
+
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("state"));
     }
+
+    lua_settop(L, 0);
+
+    // Body
     if (!wrap->instance) {
         return luaL_error(L, "no state output");
     }
@@ -349,35 +444,36 @@ l_state(lua_State *L) {
 
     struct instance_state *state = &wrap->instance->state;
 
-    static const int IDX_STATE = 1;
+    lua_newtable(L); // stack: IDX_STATE
 
-    lua_newtable(L);
-
-    lua_pushstring(L, "screen");
-    lua_pushstring(L, screen_names[state->screen]);
-    lua_rawset(L, IDX_STATE);
+    lua_pushstring(L, "screen");                    // stack: IDX_STATE + 1 (key)
+    lua_pushstring(L, screen_names[state->screen]); // stack: IDX_STATE + 2 (value)
+    lua_rawset(L, IDX_STATE);                       // stack: IDX_STATE
 
     if (state->screen == SCREEN_GENERATING || state->screen == SCREEN_PREVIEWING) {
-        lua_pushstring(L, "percent");
-        lua_pushinteger(L, state->data.percent);
-        lua_rawset(L, IDX_STATE);
+        lua_pushstring(L, "percent");            // stack: IDX_STATE + 1 (key)
+        lua_pushinteger(L, state->data.percent); // stack: IDX_STATE + 2 (value)
+        lua_rawset(L, IDX_STATE);                // stack: IDX_STATE
     } else if (state->screen == SCREEN_INWORLD) {
-        lua_pushstring(L, "inworld");
-        lua_pushstring(L, inworld_names[state->data.inworld]);
-        lua_rawset(L, IDX_STATE);
+        lua_pushstring(L, "inworld");                          // stack: IDX_STATE + 1 (key)
+        lua_pushstring(L, inworld_names[state->data.inworld]); // stack: IDX_STATE + 2 (value)
+        lua_rawset(L, IDX_STATE);                              // stack: IDX_STATE
     }
 
+    // Epilogue. The state table was already pushed to the stack by the above code.
     ww_assert(lua_gettop(L) == IDX_STATE);
     return 1;
 }
 
 static int
 l_window_size(lua_State *L) {
+    // Prologue
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("window_size"));
     }
 
+    // Epilogue
     if (!wrap->server->ui->mapped) {
         lua_pushinteger(L, 0);
         lua_pushinteger(L, 0);
@@ -404,20 +500,24 @@ static int
 l_register(lua_State *L) {
     static const int ARG_SIGNAL = 1;
     static const int ARG_HANDLER = 2;
+    static const int IDX_TABLE = 3;
 
+    // Prologue
     const char *signal = luaL_checkstring(L, ARG_SIGNAL);
     luaL_argcheck(L, lua_type(L, ARG_HANDLER) == LUA_TFUNCTION, ARG_HANDLER,
                   "handler must be a function");
 
-    static const int IDX_TABLE = 3;
+    lua_settop(L, ARG_HANDLER);
 
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.events);
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    // Body
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.events); // stack: ARG_HANDLER + 1
+    lua_rawget(L, LUA_REGISTRYINDEX); // stack: ARG_HANDLER + 1 (IDX_TABLE)
 
-    lua_pushstring(L, signal);
-    lua_pushvalue(L, ARG_HANDLER);
-    lua_rawset(L, IDX_TABLE);
+    lua_pushstring(L, signal);     // stack: IDX_TABLE + 1 (key)
+    lua_pushvalue(L, ARG_HANDLER); // stack: IDX_TABLE + 2 (value)
+    lua_rawset(L, IDX_TABLE);      // stack: IDX_TABLE
 
+    // Epilogue
     return 0;
 }
 
@@ -426,6 +526,7 @@ l_setenv(lua_State *L) {
     static const int ARG_NAME = 1;
     static const int ARG_VALUE = 2;
 
+    // Prologue
     const char *name = luaL_checkstring(L, ARG_NAME);
     const char *value = NULL;
     switch (lua_type(L, ARG_VALUE)) {
@@ -439,12 +540,16 @@ l_setenv(lua_State *L) {
                           luaL_typename(L, ARG_VALUE));
     }
 
+    lua_settop(L, ARG_VALUE);
+
+    // Body
     if (value) {
         setenv(name, value, 1);
     } else {
         unsetenv(name);
     }
 
+    // Epilogue
     return 0;
 }
 
@@ -476,24 +581,24 @@ int
 config_api_init(struct config *cfg, const char *profile) {
     ww_assert(lua_gettop(cfg->L) == 0);
 
-    lua_getglobal(cfg->L, "_G");
-    luaL_register(cfg->L, "priv_waywall", lua_lib);
-    lua_pop(cfg->L, 2);
+    luaL_register(cfg->L, "priv_waywall", lua_lib); // stack: 1
+    lua_pop(cfg->L, 1);                             // stack: 0
 
     if (profile) {
-        lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.profile);
-        lua_pushstring(cfg->L, profile);
-        lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+        lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.profile); // stack: 1 (key)
+        lua_pushstring(cfg->L, profile);                                      // stack: 2 (value)
+        lua_rawset(cfg->L, LUA_REGISTRYINDEX);                                // stack: 0
     }
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.coroutines);
-    lua_newtable(cfg->L);
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.coroutines); // stack: 1 (key)
+    lua_newtable(cfg->L);                                                    // stack: 2 (value)
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                                   // stack: 0
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
-    lua_newtable(cfg->L);
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events); // stack: 1 (key)
+    lua_newtable(cfg->L);                                                // stack: 2 (value)
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                               // stack: 0
 
+    // luaL_loadbuffer pushes a value to the stack. config_pcall pops it from the stack.
     if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_api, luaJIT_BC_api_SIZE, "__api") != 0) {
         ww_log(LOG_ERROR, "failed to load internal api chunk");
         goto fail_loadbuffer;
@@ -526,37 +631,42 @@ fail_loadbuffer:
 
 void
 config_api_set_wrap(struct config *cfg, struct wrap *wrap) {
+    static const int IDX_USERDATA = 1;
+
     ww_assert(lua_gettop(cfg->L) == 0);
 
-    struct wrap **udata = lua_newuserdata(cfg->L, sizeof(*udata));
-    luaL_getmetatable(cfg->L, METATABLE_WRAP);
-    lua_setmetatable(cfg->L, -2);
+    struct wrap **udata = lua_newuserdata(cfg->L, sizeof(*udata)); // stack: 1 (IDX_USERDATA)
+    luaL_getmetatable(cfg->L, METATABLE_WRAP);                     // stack: 2
+    lua_setmetatable(cfg->L, IDX_USERDATA);                        // stack: 1 (IDX_USERDATA)
     *udata = wrap;
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.wrap);
-    lua_pushvalue(cfg->L, -2);
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.wrap); // stack: 2
+    lua_pushvalue(cfg->L, IDX_USERDATA);                               // stack: 3
+    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                             // stack: 1 (IDX_USERDATA)
 
-    lua_pop(cfg->L, 1);
+    lua_pop(cfg->L, 1); // stack: 0
     ww_assert(lua_gettop(cfg->L) == 0);
 }
 
 void
 config_api_signal(struct config *cfg, const char *signal) {
     static const int IDX_TABLE = 1;
+    static const int IDX_FUNCTION = 2;
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events);
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);
+    ww_assert(lua_gettop(cfg->L) == 0);
 
-    lua_pushstring(cfg->L, signal);
-    lua_rawget(cfg->L, IDX_TABLE);
+    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events); // stack: 1
+    lua_rawget(cfg->L, LUA_REGISTRYINDEX);                               // stack: 1 (IDX_TABLE)
 
-    ww_assert(lua_type(cfg->L, -1) == LUA_TFUNCTION);
+    lua_pushstring(cfg->L, signal); // stack: 2
+    lua_rawget(cfg->L, IDX_TABLE);  // stack: 2 (IDX_FUNCTION)
+
+    ww_assert(lua_type(cfg->L, IDX_FUNCTION) == LUA_TFUNCTION);
     if (config_pcall(cfg, 0, 0, 0) != 0) {
         ww_log(LOG_ERROR, "failed to call event listeners: %s", lua_tostring(cfg->L, -1));
-        lua_pop(cfg->L, 1);
+        lua_pop(cfg->L, 1); // stack: 1 (IDX_TABLE)
     }
 
-    lua_pop(cfg->L, 1);
+    lua_pop(cfg->L, 1); // stack: 0
     ww_assert(lua_gettop(cfg->L) == 0);
 }

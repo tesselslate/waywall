@@ -22,26 +22,26 @@ pcall_hook(lua_State *L, struct lua_Debug *dbg) {
 }
 
 struct config_coro *
-config_coro_add(lua_State *coro) {
-    ssize_t stack_start = lua_gettop(coro);
+config_coro_add(lua_State *L) {
+    ssize_t stack_start = lua_gettop(L);
 
-    struct wrap *wrap = config_get_wrap(coro);
+    struct wrap *wrap = config_get_wrap(L);
     ww_assert(wrap);
 
     struct config_coro *ccoro = zalloc(1, sizeof(*ccoro));
     ccoro->parent = wrap->cfg;
-    ccoro->L = coro;
+    ccoro->L = L;
 
     // Lua coroutines are garbage collected and do not have an explicit destructor in the C API.
     // Thus, we need to store the coroutine in a global table.
-    lua_pushlightuserdata(coro, (void *)&config_registry_keys.coroutines);
-    lua_gettable(coro, LUA_REGISTRYINDEX);
-    lua_pushthread(coro);
-    lua_pushlightuserdata(coro, ccoro);
-    lua_rawset(coro, -3);
-    lua_pop(coro, 1);
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.coroutines); // stack: n+1
+    lua_gettable(L, LUA_REGISTRYINDEX);                                 // stack: n+1
+    lua_pushthread(L);                                                  // stack: n+2
+    lua_pushlightuserdata(L, ccoro);                                    // stack: n+3
+    lua_rawset(L, -3);                                                  // stack: n+1
+    lua_pop(L, 1);                                                      // stack: n
 
-    ww_assert(lua_gettop(coro) == stack_start);
+    ww_assert(lua_gettop(L) == stack_start);
 
     wl_list_insert(&wrap->cfg->coroutines, &ccoro->link);
     return ccoro;
@@ -52,11 +52,14 @@ config_coro_delete(struct config_coro *ccoro) {
     // Only remove the coroutine from the global coroutines table if the owning Lua VM is still
     // alive.
     if (ccoro->parent) {
-        lua_pushlightuserdata(ccoro->L, (void *)&config_registry_keys.coroutines);
-        lua_gettable(ccoro->L, LUA_REGISTRYINDEX);
-        lua_pushthread(ccoro->L);
-        lua_pushnil(ccoro->L);
-        lua_rawset(ccoro->L, -3);
+        lua_pushlightuserdata(ccoro->L, (void *)&config_registry_keys.coroutines); // stack: n+1
+        lua_gettable(ccoro->L, LUA_REGISTRYINDEX);                                 // stack: n+1
+        lua_pushthread(ccoro->L);                                                  // stack: n+2
+        lua_pushnil(ccoro->L);                                                     // stack: n+3
+        lua_rawset(ccoro->L, -3);                                                  // stack: n+1
+
+        // The leftover stack value does not matter because this coroutine will no longer be used
+        // and will thus get garbage collected at some future point in time.
     }
 
     wl_list_remove(&ccoro->link);
@@ -121,11 +124,11 @@ struct wrap *
 config_get_wrap(lua_State *L) {
     ssize_t stack_start = lua_gettop(L);
 
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.wrap);
-    lua_rawget(L, LUA_REGISTRYINDEX);
+    lua_pushlightuserdata(L, (void *)&config_registry_keys.wrap); // stack: n+1
+    lua_rawget(L, LUA_REGISTRYINDEX);                             // stack: n+1
 
     if (!luaL_testudata(L, -1, METATABLE_WRAP)) {
-        lua_pop(L, 1);
+        lua_pop(L, 1); // stack: n
         ww_assert(lua_gettop(L) == stack_start);
 
         return NULL;
@@ -133,7 +136,7 @@ config_get_wrap(lua_State *L) {
 
     struct wrap **wrap = lua_touserdata(L, -1);
 
-    lua_pop(L, 1);
+    lua_pop(L, 1); // stack: n
     ww_assert(lua_gettop(L) == stack_start);
 
     return *wrap;
