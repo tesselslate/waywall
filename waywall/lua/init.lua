@@ -60,6 +60,9 @@ _G.print = function(...)
     priv.log(str)
 end
 
+-- Lua does not provide a setenv function, so we do.
+package.loaded["os"].setenv = priv.setenv
+
 --[[
     Run the user's configuration.
 ]]

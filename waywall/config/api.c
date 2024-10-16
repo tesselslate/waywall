@@ -421,6 +421,33 @@ l_register(lua_State *L) {
     return 0;
 }
 
+static int
+l_setenv(lua_State *L) {
+    static const int ARG_NAME = 1;
+    static const int ARG_VALUE = 2;
+
+    const char *name = luaL_checkstring(L, ARG_NAME);
+    const char *value = NULL;
+    switch (lua_type(L, ARG_VALUE)) {
+    case LUA_TSTRING:
+        value = lua_tostring(L, ARG_VALUE);
+        break;
+    case LUA_TNIL:
+        break;
+    default:
+        return luaL_error(L, "expected value to be of type 'string' or 'nil', was '%s'",
+                          luaL_typename(L, ARG_VALUE));
+    }
+
+    if (value) {
+        setenv(name, value, 1);
+    } else {
+        unsetenv(name);
+    }
+
+    return 0;
+}
+
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_res", l_active_res},
@@ -441,6 +468,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"log", l_log},
     {"log_error", l_log_error},
     {"register", l_register},
+    {"setenv", l_setenv},
     {NULL, NULL},
 };
 
