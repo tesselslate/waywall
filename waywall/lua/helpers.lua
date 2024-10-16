@@ -9,6 +9,23 @@ local waywall = require("waywall")
 
 local M = {}
 
+--- Wraps the given function to only run if the user is not in a menu.
+-- This will only work if the Minecraft instance has state-output; otherwise,
+-- the returned function will throw an error.
+-- @param func The function to wrap.
+-- @return ingame_func Wrapped version of func which only executes when ingame.
+M.ingame_only = function(func)
+    return function()
+        local state = waywall.state()
+
+        if state.screen == "inworld" and state.inworld == "unpaused" then
+            return func()
+        else
+            return false
+        end
+    end
+end
+
 --- Provides an easy way to switch between different resolutions.
 -- If the Minecraft window has no set resolution (or a resolution different
 -- to the one provided to `toggle_res`), the function will set it to the given
