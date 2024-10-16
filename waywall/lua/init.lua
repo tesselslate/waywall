@@ -5,19 +5,27 @@
     load their configuration.
 ]]
 
--- Setup the environment for the user's configuration.
+--[[
+    Setup the environment for the user's configuration.
+]]
+
 local priv = _G.priv_waywall
 
-local orig_pcall = _G.pcall
-local orig_xpcall = _G.xpcall
-
+-- User code should not have access to private Lua API functions.
 _G.priv_waywall = nil
 
+-- User code cannot directly use the coroutine library because waywall's Lua
+-- interop code needs to know when coroutines should be resumed.
 _G.coroutine = nil
+
+-- The load* functions can be used to circumvent security measures in LuaJIT.
 _G.load = nil
 _G.loadfile = nil
 _G.loadstring = nil
 
+-- pcall and xpcall must be overridden to prevent user code from accidentally
+-- catching the "instruction count exceeded" debug hook error.
+local orig_pcall = _G.pcall
 _G.pcall = function(fn, ...)
     local ret = { orig_pcall(fn, ...) }
 
@@ -28,6 +36,7 @@ _G.pcall = function(fn, ...)
     return unpack(ret)
 end
 
+local orig_xpcall = _G.xpcall
 _G.xpcall = function(fn, msgh, ...)
     local ret = { orig_xpcall(fn, msgh, ...) }
 
@@ -38,6 +47,7 @@ _G.xpcall = function(fn, msgh, ...)
     return unpack(ret)
 end
 
+-- The print function is overridden to annotate calls to Lua print() in stdout.
 _G.print = function(...)
     local str = nil
     for _, v in ipairs({ ... }) do
@@ -49,6 +59,10 @@ _G.print = function(...)
     end
     priv.log(str)
 end
+
+--[[
+    Run the user's configuration.
+]]
 
 -- Setup the package path to include the waywall configuration directory.
 local xdg_config_home = os.getenv("XDG_CONFIG_HOME")
