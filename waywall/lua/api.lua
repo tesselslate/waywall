@@ -86,7 +86,7 @@ M.profile = priv.profile
 M.set_keymap = priv.set_keymap
 
 --- Sets the sensitivity multiplier for relative pointer motion (3D ingame aim).
--- @param sensitivity The multiplier to use. Must be greater than zero.
+-- @param sensitivity The multiplier to use. A value of zero resets sensitivity.
 M.set_sensitivity = priv.set_sensitivity
 
 --- Sets the resolution of the Minecraft window.

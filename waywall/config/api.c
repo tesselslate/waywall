@@ -254,8 +254,11 @@ l_set_sensitivity(lua_State *L) {
     }
 
     double sens = luaL_checknumber(L, ARG_SENS);
-    luaL_argcheck(L, sens > 0, ARG_SENS, "sensitivity must be a positive, non-zero number");
+    luaL_argcheck(L, sens >= 0, ARG_SENS, "sensitivity must be a positive number");
 
+    if (sens == 0) {
+        sens = wrap->cfg->input.sens;
+    }
     server_relative_pointer_set_sens(wrap->server->relative_pointer, sens);
     return 0;
 }
