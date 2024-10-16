@@ -26,6 +26,11 @@ M.ingame_only = function(func)
     end
 end
 
+--- Toggles the visibility of floating windows.
+M.toggle_floating = function()
+    waywall.show_floating(not waywall.floating_shown())
+end
+
 --- Provides an easy way to switch between different resolutions.
 -- If the Minecraft window has no set resolution (or a resolution different
 -- to the one provided to `toggle_res`), the function will set it to the given
