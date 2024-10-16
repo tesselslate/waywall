@@ -66,8 +66,9 @@ floating_find_anchored(struct wrap *wrap) {
     // Floating views are inserted at the front of the list, so the view which was created earliest
     // is at the end.
     struct floating_view *fview;
-    wl_list_for_each (fview, &wrap->floating.views, link)
-        ;
+    wl_list_for_each_reverse (fview, &wrap->floating.views, link) {
+        break;
+    }
     set_anchored(wrap, fview);
 }
 
