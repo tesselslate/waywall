@@ -60,6 +60,10 @@ M.current_time = priv.current_time
 -- @param command The command to run.
 M.exec = priv.exec
 
+--- Returns whether or not floating windows are currently visible.
+-- @return shown Whether floating windows are shown.
+M.floating_shown = priv.floating_shown
+
 --- Register a listener for a specific event.
 -- @param event The name of the event to listen for.
 -- @param listener The function to call when the event occurs.

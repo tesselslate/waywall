@@ -167,6 +167,18 @@ l_active_res(lua_State *L) {
 }
 
 static int
+l_floating_shown(lua_State *L) {
+    struct wrap *wrap = config_get_wrap(L);
+    if (!wrap) {
+        lua_pushboolean(L, false);
+        return 1;
+    }
+
+    lua_pushboolean(L, wrap->floating.visible);
+    return 1;
+}
+
+static int
 l_press_key(lua_State *L) {
     struct wrap *wrap = config_get_wrap(L);
     if (!wrap) {
@@ -414,6 +426,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"active_res", l_active_res},
     {"current_time", l_current_time},
     {"exec", l_exec},
+    {"floating_shown", l_floating_shown},
     {"press_key", l_press_key},
     {"profile", l_profile},
     {"set_keymap", l_set_keymap},
