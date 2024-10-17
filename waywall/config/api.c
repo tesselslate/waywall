@@ -10,10 +10,10 @@
 #include "server/wp_relative_pointer.h"
 #include "timer.h"
 #include "util/alloc.h"
+#include "util/keycodes.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "wrap.h"
-#include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
 #include <stdbool.h>
@@ -59,21 +59,6 @@
  */
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
-
-#define K(x) {#x, KEY_##x}
-
-// TODO: This does not cover all possible keycodes.
-static struct {
-    const char *name;
-    uint8_t code;
-} key_mapping[] = {
-    K(0),  K(1),  K(2),  K(3),  K(4),  K(5),  K(6),  K(7),  K(8),  K(9),   K(A),   K(B),
-    K(C),  K(D),  K(E),  K(F),  K(G),  K(H),  K(I),  K(J),  K(K),  K(L),   K(M),   K(N),
-    K(O),  K(P),  K(Q),  K(R),  K(S),  K(T),  K(U),  K(V),  K(W),  K(X),   K(Y),   K(Z),
-    K(F1), K(F2), K(F3), K(F4), K(F5), K(F6), K(F7), K(F8), K(F9), K(F10), K(F11), K(F12),
-};
-
-#undef K
 
 static void
 handle_sleep_alarm(void *data) {
@@ -212,14 +197,14 @@ l_press_key(lua_State *L) {
     lua_settop(L, ARG_KEYNAME);
 
     // Body. Determine which keycode to send to the Minecraft instance.
-    uint32_t keycode = UINT32_MAX;
-    for (size_t i = 0; i < STATIC_ARRLEN(key_mapping); i++) {
-        if (strcasecmp(key_mapping[i].name, key) == 0) {
-            keycode = key_mapping[i].code;
+    uint32_t keycode = KEY_UNKNOWN;
+    for (size_t i = 0; i < STATIC_ARRLEN(util_keycodes); i++) {
+        if (strcasecmp(util_keycodes[i].name, key) == 0) {
+            keycode = util_keycodes[i].value;
             break;
         }
     }
-    if (keycode == UINT32_MAX) {
+    if (keycode == KEY_UNKNOWN) {
         return luaL_error(L, "unknown key %s", key);
     }
 

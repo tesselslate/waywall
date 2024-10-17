@@ -5,6 +5,7 @@
 #include "lua/init.h"
 #include "server/wl_seat.h"
 #include "util/alloc.h"
+#include "util/keycodes.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include <linux/input-event-codes.h>
@@ -50,51 +51,6 @@ static const struct config defaults = {
             .ninb_anchor = ANCHOR_NONE,
         },
 };
-
-#define K(x) {#x, KEY_##x}
-
-static const struct {
-    const char *name;
-    uint32_t value;
-} keycode_mappings[] = {
-    K(ESC),         K(1),          K(2),          K(3),
-    K(4),           K(5),          K(6),          K(7),
-    K(8),           K(9),          K(0),          K(MINUS),
-    K(EQUAL),       K(BACKSPACE),  K(TAB),        K(Q),
-    K(W),           K(E),          K(R),          K(T),
-    K(Y),           K(U),          K(I),          K(O),
-    K(P),           K(LEFTBRACE),  K(RIGHTBRACE), K(ENTER),
-    K(LEFTCTRL),    K(A),          K(S),          K(D),
-    K(F),           K(G),          K(H),          K(J),
-    K(K),           K(L),          K(SEMICOLON),  K(APOSTROPHE),
-    K(GRAVE),       K(LEFTSHIFT),  K(BACKSLASH),  K(Z),
-    K(X),           K(C),          K(V),          K(B),
-    K(N),           K(M),          K(COMMA),      K(DOT),
-    K(SLASH),       K(RIGHTSHIFT), K(KPASTERISK), K(LEFTALT),
-    K(SPACE),       K(CAPSLOCK),   K(F1),         K(F2),
-    K(F3),          K(F4),         K(F5),         K(F6),
-    K(F7),          K(F8),         K(F9),         K(F10),
-    K(NUMLOCK),     K(SCROLLLOCK), K(KP7),        K(KP8),
-    K(KP9),         K(KPMINUS),    K(KP4),        K(KP5),
-    K(KP6),         K(KPPLUS),     K(KP1),        K(KP2),
-    K(KP3),         K(KP0),        K(KPDOT),      K(ZENKAKUHANKAKU),
-    K(102ND),       K(F11),        K(F12),        K(RO),
-    K(KATAKANA),    K(HIRAGANA),   K(HENKAN),     K(KATAKANAHIRAGANA),
-    K(MUHENKAN),    K(KPJPCOMMA),  K(KPENTER),    K(RIGHTCTRL),
-    K(KPSLASH),     K(SYSRQ),      K(RIGHTALT),   K(LINEFEED),
-    K(HOME),        K(UP),         K(PAGEUP),     K(LEFT),
-    K(RIGHT),       K(END),        K(DOWN),       K(PAGEDOWN),
-    K(INSERT),      K(DELETE),     K(MACRO),      K(MUTE),
-    K(VOLUMEDOWN),  K(VOLUMEUP),   K(POWER),      K(KPEQUAL),
-    K(KPPLUSMINUS), K(PAUSE),      K(SCALE),      K(KPCOMMA),
-    K(HANGEUL),     K(HANJA),      K(YEN),        K(LEFTMETA),
-    K(RIGHTMETA),   K(F13),        K(F14),        K(F15),
-    K(F16),         K(F17),        K(F18),        K(F19),
-    K(F20),         K(F21),        K(F22),        K(F23),
-    K(F24),
-};
-
-#undef K
 
 static const struct {
     const char *name;
@@ -343,9 +299,9 @@ fail:
 
 static int
 parse_remap_half(const char *input, uint32_t *out_data, enum config_remap_type *out_type) {
-    for (size_t i = 0; i < STATIC_ARRLEN(keycode_mappings); i++) {
-        if (strcasecmp(keycode_mappings[i].name, input) == 0) {
-            *out_data = keycode_mappings[i].value;
+    for (size_t i = 0; i < STATIC_ARRLEN(util_keycodes); i++) {
+        if (strcasecmp(util_keycodes[i].name, input) == 0) {
+            *out_data = util_keycodes[i].value;
             *out_type = CONFIG_REMAP_KEY;
             return 0;
         }
