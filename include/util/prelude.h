@@ -4,6 +4,12 @@
 #include <stdbool.h>
 #include <stdnoreturn.h>
 
+#ifdef __GNUC__
+#define WW_MAYBE_UNUSED __attribute((unused))
+#else
+#define WW_MAYBE_UNUSED
+#endif
+
 #define STATIC_ARRLEN(x) (sizeof((x)) / sizeof((x)[0]))
 #define STATIC_STRLEN(x) (sizeof((x)) - 1)
 #define static_assert(x) _Static_assert(x, #x)
