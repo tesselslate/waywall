@@ -46,6 +46,31 @@ static const struct server_buffer_impl dmabuf_buffer_impl = {
 };
 
 static void
+create_buffer(struct server_linux_buffer_params *buffer_params, struct wl_resource *buffer_resource,
+              int32_t width, int32_t height, uint32_t format, uint32_t flags) {
+    buffer_params->data->width = width;
+    buffer_params->data->height = height;
+
+    zwp_linux_buffer_params_v1_create(buffer_params->remote, width, height, format, flags);
+    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
+
+    // The event listeners on the buffer params object will set `buffer_params->status`.
+    switch (buffer_params->status) {
+    case BUFFER_PARAMS_STATUS_UNKNOWN:
+        wl_client_post_implementation_error(
+            wl_resource_get_client(buffer_resource),
+            "remote compositor failed to signal status of DMABUF buffer creation");
+        break;
+    case BUFFER_PARAMS_STATUS_OK:
+        buffer_params->buffer = server_buffer_create(buffer_resource, buffer_params->ok_buffer,
+                                                     &dmabuf_buffer_impl, buffer_params->data);
+        break;
+    case BUFFER_PARAMS_STATUS_NOT_OK:
+        break;
+    }
+}
+
+static void
 on_linux_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *wl,
                                struct wl_buffer *buffer) {
     struct server_linux_buffer_params *buffer_params = data;
@@ -187,27 +212,17 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, 0);
     check_alloc(buffer_resource);
 
-    buffer_params->data->width = width;
-    buffer_params->data->height = height;
-
-    zwp_linux_buffer_params_v1_create(buffer_params->remote, width, height, format, flags);
-    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
-
-    // The event listeners on the buffer params object will set `buffer_params->status`.
+    create_buffer(buffer_params, buffer_resource, width, height, format, flags);
     switch (buffer_params->status) {
     case BUFFER_PARAMS_STATUS_UNKNOWN:
-        wl_client_post_implementation_error(
-            client, "remote compositor failed to signal status of DMABUF buffer creation");
+        // There is nothing to do. A protocol error was already sent.
         break;
     case BUFFER_PARAMS_STATUS_OK:
-        buffer_params->buffer = server_buffer_create(buffer_resource, buffer_params->ok_buffer,
-                                                     &dmabuf_buffer_impl, buffer_params->data);
-
-        zwp_linux_buffer_params_v1_send_created(buffer_params->resource,
-                                                buffer_params->buffer->resource);
+        zwp_linux_buffer_params_v1_send_created(buffer_params->resource, buffer_resource);
         break;
     case BUFFER_PARAMS_STATUS_NOT_OK:
         zwp_linux_buffer_params_v1_send_failed(buffer_params->resource);
+        wl_resource_destroy(buffer_resource);
         break;
     }
 }
@@ -228,28 +243,22 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
     check_alloc(buffer_resource);
 
-    buffer_params->data->width = width;
-    buffer_params->data->height = height;
-
-    struct wl_buffer *remote = zwp_linux_buffer_params_v1_create_immed(buffer_params->remote, width,
-                                                                       height, format, flags);
-    wl_proxy_set_queue((struct wl_proxy *)remote, buffer_params->parent->main_queue);
-
-    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
-
-    // The `failed` event listener on the buffer params object will set `buffer_params->status`.
-    if (buffer_params->status == BUFFER_PARAMS_STATUS_NOT_OK) {
-        // Implementations are allowed to kill the client if create_immed fails, so we can just
-        // do that.
+    create_buffer(buffer_params, buffer_resource, width, height, format, flags);
+    switch (buffer_params->status) {
+    case BUFFER_PARAMS_STATUS_UNKNOWN:
+        // There is nothing to do. A protocol error was already sent.
+        break;
+    case BUFFER_PARAMS_STATUS_OK:
+        // There is nothing to do, since the client already has the wl_buffer.
+        break;
+    case BUFFER_PARAMS_STATUS_NOT_OK:
+        // Implementations are allowed to kill the client if create_immed fails, so we can just do
+        // that.
         wl_resource_post_error(buffer_params->resource,
                                ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_WL_BUFFER,
                                "failed to create dmabuf");
-        return;
+        break;
     }
-
-    buffer_params->status = BUFFER_PARAMS_STATUS_OK;
-    buffer_params->buffer =
-        server_buffer_create(buffer_resource, remote, &dmabuf_buffer_impl, buffer_params->data);
 }
 
 static void
