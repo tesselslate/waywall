@@ -6,7 +6,7 @@ designed to be nested within an existing Wayland session and is intended as a
 successor to [resetti](https://github.com/tesselslate/resetti).
 
 > [!NOTE]
-> waywall is still under active development. Some features are missing or may
+> waywall is still under development. Some features are missing or may
 > not work as expected.
 
 # Building

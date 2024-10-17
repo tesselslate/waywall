@@ -1,16 +1,10 @@
 # Setting up waywall
 
 > [!NOTE]
-> waywall is still under active development. Many features are missing or may
-> not work as expected.
+> waywall is still under development. Some features are missing or may not work
+> as expected.
 
 ## Installing waywall
-
-### Option 1: Install premade package
-
-TODO
-
-### Option 2: Compile from source
 
 To compile waywall from source, first clone the repo.
 
