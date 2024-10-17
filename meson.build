@@ -20,29 +20,8 @@ includes = include_directories('include')
 cc = meson.get_compiler('c')
 
 # Remove path start from __FILE__ macro expansion (from wlroots)
-source_root = meson.current_source_dir().split('/')
-build_root = meson.global_build_root().split('/')
-relative_dir_parts = []
-i = 0
-in_prefix = true
-foreach p : build_root
-    if i >= source_root.length() or not in_prefix or p != source_root[i]
-        in_prefix = false
-        relative_dir_parts += '..'
-    endif
-    i += 1
-endforeach
-i = 0
-in_prefix = true
-foreach p : source_root
-    if i >= build_root.length() or not in_prefix or build_root[i] != p
-        in_prefix = false
-        relative_dir_parts += p
-    endif
-    i += 1
-endforeach
-relative_dir = join_paths(relative_dir_parts) + '/'
-
+fs = import('fs')
+relative_dir = fs.relative_to(meson.current_source_dir(), meson.global_build_root()) + '/'
 if cc.has_argument('-fmacro-prefix-map=/prefix/to/hide=')
     add_project_arguments(
         '-fmacro-prefix-map=@0@='.format(relative_dir),
