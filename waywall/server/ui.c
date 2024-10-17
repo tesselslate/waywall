@@ -53,6 +53,8 @@ layout_centered(struct server_view *view) {
         wp_viewport_set_destination(view->viewport, crop_width, crop_height);
     }
 
+    view->current.x = x;
+    view->current.y = y;
     wl_surface_commit(view->ui->tree.surface);
 }
 
