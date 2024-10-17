@@ -14,12 +14,6 @@
 #include <wayland-client-protocol.h>
 #include <wayland-util.h>
 
-/*
- * TODO: Investigate the usage of wl_event_queue.
- * It would be nice to not have to do a full remote display roundtrip whenever certain requests are
- * issued.
- */
-
 #define SRV_LINUX_DMABUF_VERSION 4
 
 #define MAX_PLANES 4
@@ -55,6 +49,9 @@ static void
 on_linux_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *wl,
                                struct wl_buffer *buffer) {
     struct server_linux_buffer_params *buffer_params = data;
+
+    // Move the created buffer off of the linux_dmabuf queue and onto the main display queue.
+    wl_proxy_set_queue((struct wl_proxy *)buffer, buffer_params->parent->main_queue);
 
     server_buffer_validate(buffer_params->buffer, buffer, &dmabuf_buffer_impl, buffer_params->data);
     buffer_params->ok = true;
@@ -197,7 +194,7 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
     // Mesa should get it right anyways.
     buffer_params->used = true;
     zwp_linux_buffer_params_v1_create(buffer_params->remote, width, height, format, flags);
-    wl_display_roundtrip(buffer_params->remote_display);
+    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
 
     if (buffer_params->ok) {
         zwp_linux_buffer_params_v1_send_created(buffer_params->resource,
@@ -232,7 +229,8 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
     buffer_params->ok = true;
     struct wl_buffer *remote = zwp_linux_buffer_params_v1_create_immed(buffer_params->remote, width,
                                                                        height, format, flags);
-    wl_display_roundtrip(buffer_params->remote_display);
+    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
+    wl_proxy_set_queue((struct wl_proxy *)remote, buffer_params->parent->main_queue);
 
     if (buffer_params->ok) {
         server_buffer_validate(buffer_params->buffer, remote, &dmabuf_buffer_impl,
@@ -284,6 +282,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 
     struct server_linux_buffer_params *buffer_params = zalloc(1, sizeof(*buffer_params));
     buffer_params->data = buffer_data;
+    buffer_params->parent = linux_dmabuf;
 
     buffer_params->resource = wl_resource_create(client, &zwp_linux_buffer_params_v1_interface,
                                                  wl_resource_get_version(resource), id);
@@ -296,9 +295,7 @@ linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resourc
 
     zwp_linux_buffer_params_v1_add_listener(buffer_params->remote, &linux_buffer_params_listener,
                                             buffer_params);
-    wl_display_roundtrip(linux_dmabuf->remote_display);
-
-    buffer_params->remote_display = linux_dmabuf->remote_display;
+    wl_display_roundtrip_queue(linux_dmabuf->remote_display, linux_dmabuf->queue);
 
     return;
 }
@@ -326,7 +323,7 @@ linux_dmabuf_get_default_feedback(struct wl_client *client, struct wl_resource *
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
-    wl_display_roundtrip(linux_dmabuf->remote_display);
+    wl_display_roundtrip_queue(linux_dmabuf->remote_display, linux_dmabuf->queue);
 }
 
 static void
@@ -349,7 +346,7 @@ linux_dmabuf_get_surface_feedback(struct wl_client *client, struct wl_resource *
 
     zwp_linux_dmabuf_feedback_v1_add_listener(feedback->remote, &linux_dmabuf_feedback_listener,
                                               feedback);
-    wl_display_roundtrip(linux_dmabuf->remote_display);
+    wl_display_roundtrip_queue(linux_dmabuf->remote_display, linux_dmabuf->queue);
 }
 
 static const struct zwp_linux_dmabuf_v1_interface linux_dmabuf_impl = {
@@ -387,6 +384,9 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_global_destroy(linux_dmabuf->global);
 
+    wl_proxy_wrapper_destroy(linux_dmabuf->remote);
+    wl_event_queue_destroy(linux_dmabuf->queue);
+
     wl_list_remove(&linux_dmabuf->on_display_destroy.link);
 
     free(linux_dmabuf);
@@ -400,8 +400,19 @@ server_linux_dmabuf_create(struct server *server) {
                                             SRV_LINUX_DMABUF_VERSION, linux_dmabuf, on_global_bind);
     check_alloc(linux_dmabuf->global);
 
-    linux_dmabuf->remote = server->backend->linux_dmabuf;
     linux_dmabuf->remote_display = server->backend->display;
+
+    // Setup the event queue and create the necessary proxy wrappers.
+    linux_dmabuf->queue =
+        wl_display_create_queue_with_name(server->backend->display, "linux_dmabuf");
+    check_alloc(linux_dmabuf->queue);
+
+    linux_dmabuf->main_queue = wl_proxy_get_queue((struct wl_proxy *)server->backend->display);
+    ww_assert(linux_dmabuf->main_queue);
+
+    linux_dmabuf->remote = wl_proxy_create_wrapper(server->backend->linux_dmabuf);
+    check_alloc(linux_dmabuf->remote);
+    wl_proxy_set_queue((struct wl_proxy *)linux_dmabuf->remote, linux_dmabuf->queue);
 
     linux_dmabuf->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &linux_dmabuf->on_display_destroy);
