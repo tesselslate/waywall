@@ -115,12 +115,6 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
         return;
     }
 
-    // Invalid buffers (typically from linux_dmabuf) are not acceptable.
-    if (server_buffer_is_invalid(buffer)) {
-        wl_client_post_implementation_error(client, "cannot attach invalid buffer");
-        return;
-    }
-
     // We don't want offset surfaces in general, but we need to check which type of error to send.
     if (x != 0 || y != 0) {
         int version = wl_resource_get_version(resource);

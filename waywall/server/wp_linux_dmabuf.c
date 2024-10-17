@@ -53,15 +53,15 @@ on_linux_buffer_params_created(void *data, struct zwp_linux_buffer_params_v1 *wl
     // Move the created buffer off of the linux_dmabuf queue and onto the main display queue.
     wl_proxy_set_queue((struct wl_proxy *)buffer, buffer_params->parent->main_queue);
 
-    server_buffer_validate(buffer_params->buffer, buffer, &dmabuf_buffer_impl, buffer_params->data);
-    buffer_params->ok = true;
+    buffer_params->ok_buffer = buffer;
+    buffer_params->status = BUFFER_PARAMS_STATUS_OK;
 }
 
 static void
 on_linux_buffer_params_failed(void *data, struct zwp_linux_buffer_params_v1 *wl) {
     struct server_linux_buffer_params *buffer_params = data;
 
-    buffer_params->ok = false;
+    buffer_params->status = BUFFER_PARAMS_STATUS_NOT_OK;
 }
 
 static const struct zwp_linux_buffer_params_v1_listener linux_buffer_params_listener = {
@@ -138,7 +138,7 @@ static void
 linux_buffer_params_resource_destroy(struct wl_resource *resource) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
-    if (!buffer_params->ok) {
+    if (buffer_params->status != BUFFER_PARAMS_STATUS_OK) {
         free(buffer_params->data);
     }
 
@@ -182,25 +182,33 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
                                "cannot call create on the same zwp_linux_buffer_params twice");
         return;
     }
+    buffer_params->used = true;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, 0);
     check_alloc(buffer_resource);
 
-    buffer_params->buffer = server_buffer_create_invalid(buffer_resource);
     buffer_params->data->width = width;
     buffer_params->data->height = height;
 
-    // There are a lot of ways this request can fail, many of which are too annoying to check for.
-    // Mesa should get it right anyways.
-    buffer_params->used = true;
     zwp_linux_buffer_params_v1_create(buffer_params->remote, width, height, format, flags);
     wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
 
-    if (buffer_params->ok) {
+    // The event listeners on the buffer params object will set `buffer_params->status`.
+    switch (buffer_params->status) {
+    case BUFFER_PARAMS_STATUS_UNKNOWN:
+        wl_client_post_implementation_error(
+            client, "remote compositor failed to signal status of DMABUF buffer creation");
+        break;
+    case BUFFER_PARAMS_STATUS_OK:
+        buffer_params->buffer = server_buffer_create(buffer_resource, buffer_params->ok_buffer,
+                                                     &dmabuf_buffer_impl, buffer_params->data);
+
         zwp_linux_buffer_params_v1_send_created(buffer_params->resource,
                                                 buffer_params->buffer->resource);
-    } else {
+        break;
+    case BUFFER_PARAMS_STATUS_NOT_OK:
         zwp_linux_buffer_params_v1_send_failed(buffer_params->resource);
+        break;
     }
 }
 
@@ -215,29 +223,33 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
                                "cannot call create on the same zwp_linux_buffer_params twice");
         return;
     }
+    buffer_params->used = true;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
     check_alloc(buffer_resource);
 
-    buffer_params->buffer = server_buffer_create_invalid(buffer_resource);
     buffer_params->data->width = width;
     buffer_params->data->height = height;
 
-    // There are a lot of ways this request can fail, many of which are too annoying to check for.
-    // Mesa should get it right anyways.
-    buffer_params->used = true;
-    buffer_params->ok = true;
     struct wl_buffer *remote = zwp_linux_buffer_params_v1_create_immed(buffer_params->remote, width,
                                                                        height, format, flags);
-    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
     wl_proxy_set_queue((struct wl_proxy *)remote, buffer_params->parent->main_queue);
 
-    if (buffer_params->ok) {
-        server_buffer_validate(buffer_params->buffer, remote, &dmabuf_buffer_impl,
-                               buffer_params->data);
-    } else {
-        zwp_linux_buffer_params_v1_send_failed(buffer_params->resource);
+    wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
+
+    // The `failed` event listener on the buffer params object will set `buffer_params->status`.
+    if (buffer_params->status == BUFFER_PARAMS_STATUS_NOT_OK) {
+        // Implementations are allowed to kill the client if create_immed fails, so we can just
+        // do that.
+        wl_resource_post_error(buffer_params->resource,
+                               ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_WL_BUFFER,
+                               "failed to create dmabuf");
+        return;
     }
+
+    buffer_params->status = BUFFER_PARAMS_STATUS_OK;
+    buffer_params->buffer =
+        server_buffer_create(buffer_resource, remote, &dmabuf_buffer_impl, buffer_params->data);
 }
 
 static void
@@ -361,8 +373,8 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     ww_assert(version <= SRV_LINUX_DMABUF_VERSION);
 
     if (version < ZWP_LINUX_DMABUF_V1_GET_DEFAULT_FEEDBACK_SINCE_VERSION) {
-        // Supporting versions older than v4 would require us to send the `format` and `modifier`
-        // events which would become a bit of a hassle.
+        // Supporting versions older than v4 would require us to send the `format` and
+        // `modifier` events which would become a bit of a hassle.
         wl_client_post_implementation_error(client,
                                             "zwp_linux_dmabuf versions below 4 are unsupported");
         return;

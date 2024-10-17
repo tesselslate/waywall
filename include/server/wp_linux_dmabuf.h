@@ -25,7 +25,13 @@ struct server_linux_buffer_params {
 
     struct dmabuf_buffer_data *data;
     bool used; // whether or not a create/create_immed request has been issued
-    bool ok;   // whether or not the buffer creation succeeded
+
+    struct wl_buffer *ok_buffer; // created wl_buffer (for create only)
+    enum server_linux_buffer_params_status {
+        BUFFER_PARAMS_STATUS_UNKNOWN,
+        BUFFER_PARAMS_STATUS_OK,
+        BUFFER_PARAMS_STATUS_NOT_OK,
+    } status;
 
     struct server_buffer *buffer;
 };
