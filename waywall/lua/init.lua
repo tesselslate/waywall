@@ -23,6 +23,10 @@ _G.load = nil
 _G.loadfile = nil
 _G.loadstring = nil
 
+-- Do not load the ffi and jit extensions.
+package.preload["ffi"] = nil
+package.loaded["jit"] = nil
+
 -- pcall and xpcall must be overridden to prevent user code from accidentally
 -- catching the "instruction count exceeded" debug hook error.
 local orig_pcall = _G.pcall
