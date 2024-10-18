@@ -472,26 +472,6 @@ l_state(lua_State *L) {
 }
 
 static int
-l_window_size(lua_State *L) {
-    // Prologue
-    struct config_vm *vm = config_vm_from(L);
-    struct wrap *wrap = config_vm_get_wrap(vm);
-    if (!wrap) {
-        return luaL_error(L, STARTUP_ERRMSG("window_size"));
-    }
-
-    // Epilogue
-    if (!wrap->server->ui->mapped) {
-        lua_pushinteger(L, 0);
-        lua_pushinteger(L, 0);
-    } else {
-        lua_pushinteger(L, wrap->width);
-        lua_pushinteger(L, wrap->height);
-    }
-    return 2;
-}
-
-static int
 l_log(lua_State *L) {
     ww_log(LOG_INFO, "lua: %s", lua_tostring(L, 1));
     return 0;
@@ -570,7 +550,6 @@ static const struct luaL_Reg lua_lib[] = {
     {"show_floating", l_show_floating},
     {"sleep", l_sleep},
     {"state", l_state},
-    {"window_size", l_window_size},
 
     // private (see init.lua)
     {"log", l_log},
