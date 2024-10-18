@@ -391,6 +391,18 @@ static bool
 on_button(void *data, uint32_t button, bool pressed) {
     struct wrap *wrap = data;
 
+    // Attempt to match the button press with an action.
+    if (pressed) {
+        struct config_action action = {0};
+        action.type = CONFIG_ACTION_BUTTON;
+        action.data = button;
+        action.modifiers = wrap->input.modifiers;
+
+        if (config_vm_try_action(wrap->cfg->vm, &action)) {
+            return true;
+        }
+    }
+
     // Process the active grab, if any.
     if (wrap->floating.grab) {
         if (button == BTN_LEFT && !pressed) {
@@ -452,7 +464,9 @@ on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bo
     for (size_t i = 0; i < num_syms; i++) {
         action.data = syms[i];
 
-        return config_vm_try_action(wrap->cfg->vm, &action);
+        if (config_vm_try_action(wrap->cfg->vm, &action)) {
+            return true;
+        }
     }
 
     return false;
