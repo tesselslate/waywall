@@ -1,6 +1,7 @@
 #ifndef WAYWALL_UTIL_LOG_H
 #define WAYWALL_UTIL_LOG_H
 
+#include "util/prelude.h"
 #include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -16,7 +17,7 @@ enum ww_log_level {
     LOG_ERROR,
 };
 
-void util_log(enum ww_log_level level, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+void util_log(enum ww_log_level level, const char *fmt, ...) WW_PRINTF(2, 3);
 void util_log_va(enum ww_log_level, const char *fmt, va_list args, bool newline);
 
 int util_log_create_file(const char *name, bool cloexec);

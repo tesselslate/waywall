@@ -5,8 +5,10 @@
 #include <stdnoreturn.h>
 
 #ifdef __GNUC__
+#define WW_PRINTF(a, b) __attribute((format(printf, (a), (b))))
 #define WW_MAYBE_UNUSED __attribute((unused))
 #else
+#define WW_PRINTF(a, b)
 #define WW_MAYBE_UNUSED
 #endif
 
@@ -17,16 +19,16 @@
 #define ww_assert(x)                                                                               \
     do {                                                                                           \
         if (__builtin_expect(!(bool)(x), 0)) {                                                     \
-            util_panic(__FILE__, __LINE__, "assert failed: '" #x "'");                             \
+            util_panic("assert failed: '" #x "'");                                                 \
         }                                                                                          \
     } while (0)
-#define ww_panic(msg) util_panic(__FILE__, __LINE__, "panic: " msg)
+#define ww_panic(fmt, ...) util_panic("[%s:%d] panic: " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
 #define ww_unreachable()                                                                           \
     do {                                                                                           \
         ww_panic("unreachable");                                                                   \
         __builtin_unreachable();                                                                   \
     } while (0)
 
-noreturn void util_panic(const char *file, int line, const char *msg);
+noreturn void util_panic(const char *fmt, ...) WW_PRINTF(1, 2);
 
 #endif
