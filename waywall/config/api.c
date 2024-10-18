@@ -70,16 +70,39 @@ static const struct {
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
+struct waker_sleep {
+    struct ww_timer_entry *timer;
+    struct config_vm_waker *vm;
+};
+
 static void
-waker_sleep_destroy(struct config_vm_waker *vm_waker, void *data) {
-    // TODO: Delete timer entry
+waker_sleep_vm_destroy(struct config_vm_waker *vm_waker, void *data) {
+    struct waker_sleep *waker = data;
+
+    if (waker->timer) {
+        ww_timer_entry_destroy(waker->timer);
+    }
+
+    free(waker);
 }
 
 static void
-waker_sleep_fire(void *data) {
-    struct config_vm_waker *waker = data;
+waker_sleep_timer_destroy(void *data) {
+    struct waker_sleep *waker = data;
 
-    config_vm_resume(waker);
+    // This function is called if the timer entry is destroyed (which should only happen if the
+    // global timer manager is destroyed.)
+    //
+    // Remove the reference to the timer entry so that when the VM attempts to destroy the waker we
+    // do not attempt to destroy the timer entry a 2nd time.
+    waker->timer = NULL;
+}
+
+static void
+waker_sleep_timer_fire(void *data) {
+    struct waker_sleep *waker = data;
+
+    config_vm_resume(waker->vm);
 }
 
 static int
@@ -380,12 +403,16 @@ l_sleep(lua_State *L) {
         .tv_nsec = (ms % 1000) * 1000000,
     };
 
-    struct config_vm_waker *waker = config_vm_create_waker(L, waker_sleep_destroy, NULL);
-    ww_assert(waker);
-
-    if (ww_timer_add_entry(wrap->timer, duration, waker_sleep_fire, waker) != 0) {
+    struct waker_sleep *waker = zalloc(1, sizeof(*waker));
+    waker->timer = ww_timer_add_entry(wrap->timer, duration, waker_sleep_timer_fire,
+                                      waker_sleep_timer_destroy, waker);
+    if (!waker->timer) {
+        free(waker);
         return luaL_error(L, "failed to prepare sleep");
     }
+
+    waker->vm = config_vm_create_waker(L, waker_sleep_vm_destroy, waker);
+    ww_assert(waker);
 
     // Epilogue
     return lua_yield(L, 0);

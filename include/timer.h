@@ -1,31 +1,33 @@
 #ifndef WAYWALL_TIMER_H
 #define WAYWALL_TIMER_H
 
-#include "util/list.h"
 #include <sys/time.h>
 #include <sys/types.h>
-
-LIST_DEFINE(struct ww_timer_entry, list_timer_entry);
+#include <wayland-server-core.h>
 
 typedef void (*ww_timer_func_t)(void *data);
 
 struct ww_timer {
     struct server *server;
-    struct list_timer_entry entries;
+    struct wl_list entries; // ww_timer_entry.link
 };
 
 struct ww_timer_entry {
+    struct wl_list link; // ww_timer.entries
+
     int fd;
     struct wl_event_source *src;
 
-    ww_timer_func_t func;
+    ww_timer_func_t fire, destroy;
     void *data;
 };
 
 struct ww_timer *ww_timer_create(struct server *server);
 void ww_timer_destroy(struct ww_timer *timer);
 
-int ww_timer_add_entry(struct ww_timer *timer, struct timespec expiration, ww_timer_func_t func,
-                       void *data);
+struct ww_timer_entry *ww_timer_add_entry(struct ww_timer *timer, struct timespec expiration,
+                                          ww_timer_func_t fire, ww_timer_func_t destroy,
+                                          void *data);
+void ww_timer_entry_destroy(struct ww_timer_entry *entry);
 
 #endif
