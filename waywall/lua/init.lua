@@ -14,10 +14,6 @@ local priv = _G.priv_waywall
 -- User code should not have access to private Lua API functions.
 _G.priv_waywall = nil
 
--- User code cannot directly use the coroutine library because waywall's Lua
--- interop code needs to know when coroutines should be resumed.
-_G.coroutine = nil
-
 -- The load* functions can be used to circumvent security measures in LuaJIT.
 _G.load = nil
 _G.loadfile = nil
