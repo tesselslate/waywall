@@ -1,7 +1,6 @@
 #include "wrap.h"
-#include "config/action.h"
-#include "config/api.h"
 #include "config/config.h"
+#include "config/vm.h"
 #include "inotify.h"
 #include "instance.h"
 #include "server/buffer.h"
@@ -249,7 +248,7 @@ process_state_update(int wd, uint32_t mask, const char *name, void *data) {
     struct wrap *wrap = data;
 
     instance_state_update(wrap->instance);
-    config_api_signal(wrap->cfg, "state");
+    config_vm_signal_event(wrap->cfg->vm, "state");
 }
 
 static void
@@ -453,7 +452,7 @@ on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bo
     for (size_t i = 0; i < num_syms; i++) {
         action.data = syms[i];
 
-        return config_action_try(wrap->cfg, action);
+        return config_vm_try_action(wrap->cfg->vm, &action);
     }
 
     return false;
@@ -506,7 +505,7 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
 
     wl_list_init(&wrap->floating.views);
 
-    config_api_set_wrap(wrap->cfg, wrap);
+    config_vm_set_wrap(wrap->cfg->vm, wrap);
 
     wrap->on_close.notify = on_close;
     wl_signal_add(&server->ui->events.close, &wrap->on_close);
@@ -567,7 +566,7 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
     server_use_config(wrap->server, server_config);
     server_config_destroy(server_config);
 
-    config_api_set_wrap(cfg, wrap);
+    config_vm_set_wrap(cfg->vm, wrap);
 
     wrap->cfg = cfg;
     if (wrap->cfg->theme.ninb_anchor == ANCHOR_NONE) {

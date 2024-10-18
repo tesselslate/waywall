@@ -1,7 +1,6 @@
 #include "config/config.h"
-#include "config/action.h"
-#include "config/api.h"
 #include "config/internal.h"
+#include "config/vm.h"
 #include "lua/init.h"
 #include "server/wl_seat.h"
 #include "util/alloc.h"
@@ -77,12 +76,12 @@ static const struct {
 
 static int
 get_bool(struct config *cfg, const char *key, bool *dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->L, key); // stack: n+1
-    lua_rawget(cfg->L, -2);      // stack: n+1
+    lua_pushstring(cfg->vm->L, key); // stack: n+1
+    lua_rawget(cfg->vm->L, -2);      // stack: n+1
 
-    switch (lua_type(cfg->L, -1)) {
+    switch (lua_type(cfg->vm->L, -1)) {
     case LUA_TBOOLEAN: {
-        bool x = lua_toboolean(cfg->L, -1);
+        bool x = lua_toboolean(cfg->vm->L, -1);
         *dst = x;
         break;
     }
@@ -94,22 +93,22 @@ get_bool(struct config *cfg, const char *key, bool *dst, const char *full_name, 
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'boolean', was '%s'", full_name,
-               luaL_typename(cfg->L, -1));
+               luaL_typename(cfg->vm->L, -1));
         return 1;
     }
 
-    lua_pop(cfg->L, 1); // stack: n
+    lua_pop(cfg->vm->L, 1); // stack: n
     return 0;
 }
 
 static int
 get_double(struct config *cfg, const char *key, double *dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->L, key); // stack: n+1
-    lua_rawget(cfg->L, -2);      // stack: n+1
+    lua_pushstring(cfg->vm->L, key); // stack: n+1
+    lua_rawget(cfg->vm->L, -2);      // stack: n+1
 
-    switch (lua_type(cfg->L, -1)) {
+    switch (lua_type(cfg->vm->L, -1)) {
     case LUA_TNUMBER: {
-        double x = lua_tonumber(cfg->L, -1);
+        double x = lua_tonumber(cfg->vm->L, -1);
         *dst = x;
         break;
     }
@@ -121,22 +120,22 @@ get_double(struct config *cfg, const char *key, double *dst, const char *full_na
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
-               luaL_typename(cfg->L, -1));
+               luaL_typename(cfg->vm->L, -1));
         return 1;
     }
 
-    lua_pop(cfg->L, 1); // stack: n
+    lua_pop(cfg->vm->L, 1); // stack: n
     return 0;
 }
 
 static int
 get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->L, key); // stack: n+1
-    lua_rawget(cfg->L, -2);      // stack: n+1
+    lua_pushstring(cfg->vm->L, key); // stack: n+1
+    lua_rawget(cfg->vm->L, -2);      // stack: n+1
 
-    switch (lua_type(cfg->L, -1)) {
+    switch (lua_type(cfg->vm->L, -1)) {
     case LUA_TNUMBER: {
-        double x = lua_tonumber(cfg->L, -1);
+        double x = lua_tonumber(cfg->vm->L, -1);
         int ix = (int)x;
         if (ix != x) {
             ww_log(LOG_ERROR, "expected '%s' to be an integer, got '%lf'", full_name, x);
@@ -153,23 +152,23 @@ get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bo
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'number', was '%s'", full_name,
-               luaL_typename(cfg->L, -1));
+               luaL_typename(cfg->vm->L, -1));
         return 1;
     }
 
-    lua_pop(cfg->L, 1); // stack: n
+    lua_pop(cfg->vm->L, 1); // stack: n
     return 0;
 }
 
 static int
 get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
-    lua_pushstring(cfg->L, key); // stack: n+1
-    lua_rawget(cfg->L, -2);      // stack: n+1
+    lua_pushstring(cfg->vm->L, key); // stack: n+1
+    lua_rawget(cfg->vm->L, -2);      // stack: n+1
 
-    switch (lua_type(cfg->L, -1)) {
+    switch (lua_type(cfg->vm->L, -1)) {
     case LUA_TSTRING:
         free(*dst);
-        *dst = strdup(lua_tostring(cfg->L, -1));
+        *dst = strdup(lua_tostring(cfg->vm->L, -1));
         check_alloc(*dst);
         break;
     case LUA_TNIL:
@@ -180,21 +179,21 @@ get_string(struct config *cfg, const char *key, char **dst, const char *full_nam
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'string', was '%s'", full_name,
-               luaL_typename(cfg->L, -1));
+               luaL_typename(cfg->vm->L, -1));
         return 1;
     }
 
-    lua_pop(cfg->L, 1); // stack: n
+    lua_pop(cfg->vm->L, 1); // stack: n
     return 0;
 }
 
 static int
 get_table(struct config *cfg, const char *key, int (*func)(struct config *), const char *full_name,
           bool required) {
-    lua_pushstring(cfg->L, key); // stack: n+1
-    lua_rawget(cfg->L, -2);      // stack: n+1
+    lua_pushstring(cfg->vm->L, key); // stack: n+1
+    lua_rawget(cfg->vm->L, -2);      // stack: n+1
 
-    switch (lua_type(cfg->L, -1)) {
+    switch (lua_type(cfg->vm->L, -1)) {
     case LUA_TTABLE:
         if (func(cfg) != 0) {
             return 1;
@@ -208,11 +207,11 @@ get_table(struct config *cfg, const char *key, int (*func)(struct config *), con
         break;
     default:
         ww_log(LOG_ERROR, "expected '%s' to be of type 'table', was '%s'", full_name,
-               luaL_typename(cfg->L, -1));
+               luaL_typename(cfg->vm->L, -1));
         return 1;
     }
 
-    lua_pop(cfg->L, 1); // stack: n
+    lua_pop(cfg->vm->L, 1); // stack: n
     return 0;
 }
 
@@ -352,62 +351,60 @@ process_config_actions(struct config *cfg) {
     // stack state
     // 2 (IDX_ACTIONS): config.actions
     // 1              : config
-    ww_assert(lua_gettop(cfg->L) == IDX_ACTIONS);
+    ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTIONS);
 
-    lua_newtable(cfg->L); // stack: 3 (IDX_DUP_TABLE)
-    lua_pushnil(cfg->L);  // stack: 4 (IDX_ACTION_KEY)
-    while (lua_next(cfg->L, IDX_ACTIONS)) {
+    lua_newtable(cfg->vm->L); // stack: 3 (IDX_DUP_TABLE)
+    lua_pushnil(cfg->vm->L);  // stack: 4 (IDX_ACTION_KEY)
+    while (lua_next(cfg->vm->L, IDX_ACTIONS)) {
         // stack state
         // 5 (IDX_ACTION_VAL) : config.actions[key] (should be a function)
         // 4 (IDX_ACTION_KEY) : key                 (should be a string)
         // 3 (IDX_DUP_TABLE)  : duplicate actions table
         // 2 (IDX_ACTIONS)    : config.actions
         // 1                  : config
-        ww_assert(lua_gettop(cfg->L) == IDX_ACTION_VAL);
+        ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTION_VAL);
 
-        if (!lua_isstring(cfg->L, IDX_ACTION_KEY)) {
+        if (!lua_isstring(cfg->vm->L, IDX_ACTION_KEY)) {
             ww_log(LOG_ERROR, "non-string key '%s' found in actions table",
-                   lua_tostring(cfg->L, IDX_ACTION_KEY));
+                   lua_tostring(cfg->vm->L, IDX_ACTION_KEY));
             return 1;
         }
-        if (!lua_isfunction(cfg->L, IDX_ACTION_VAL)) {
+        if (!lua_isfunction(cfg->vm->L, IDX_ACTION_VAL)) {
             ww_log(LOG_ERROR, "non-function value for key '%s' found in actions table",
-                   lua_tostring(cfg->L, IDX_ACTION_KEY));
+                   lua_tostring(cfg->vm->L, IDX_ACTION_KEY));
             return 1;
         }
 
-        const char *bind = lua_tostring(cfg->L, IDX_ACTION_KEY);
+        const char *bind = lua_tostring(cfg->vm->L, IDX_ACTION_KEY);
         struct config_action action = {0};
         if (parse_bind(bind, &action) != 0) {
             return 1;
         }
 
         char buf[BIND_BUFLEN];
-        config_encode_bind(buf, action);
+        config_encode_bind(buf, &action);
 
         // The key (encoded bind) and value (action function) need to be pushed to the top of the
         // stack to be put in the duplicate table.
-        lua_pushlstring(cfg->L, buf, STATIC_ARRLEN(buf)); // stack: 6 (IDX_ACTION_VAL + 1)
-        lua_pushvalue(cfg->L, IDX_ACTION_VAL);            // stack: 7 (IDX_ACTION_VAL + 2)
-        lua_rawset(cfg->L, IDX_DUP_TABLE);                // stack: 5 (IDX_ACTION_VAL)
+        lua_pushlstring(cfg->vm->L, buf, STATIC_ARRLEN(buf)); // stack: 6 (IDX_ACTION_VAL + 1)
+        lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);            // stack: 7 (IDX_ACTION_VAL + 2)
+        lua_rawset(cfg->vm->L, IDX_DUP_TABLE);                // stack: 5 (IDX_ACTION_VAL)
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
-        lua_pop(cfg->L, 1); // stack: 4 (IDX_ACTION_KEY)
-        ww_assert(lua_gettop(cfg->L) == IDX_ACTION_KEY);
+        lua_pop(cfg->vm->L, 1); // stack: 4 (IDX_ACTION_KEY)
+        ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTION_KEY);
     }
 
     // stack state:
     // 3 (IDX_DUP_TABLE)  : duplicate actions table
     // 2 (IDX_ACTIONS)    : config.actions
     // 1                  : config
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.actions); // stack: 4
-    lua_pushvalue(cfg->L, IDX_DUP_TABLE);                                 // stack: 5
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                                // stack: 3
+    config_vm_register_actions(cfg->vm, cfg->vm->L);
 
     // Pop the duplicate actions table which was created at the start of this function.
-    lua_pop(cfg->L, 1); // stack: 2 (IDX_ACTIONS)
-    ww_assert(lua_gettop(cfg->L) == IDX_ACTIONS);
+    lua_pop(cfg->vm->L, 1); // stack: 2 (IDX_ACTIONS)
+    ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTIONS);
 
     return 0;
 }
@@ -435,10 +432,10 @@ process_config_input_remaps(struct config *cfg) {
     // 3 (IDX_REMAPS)     : config.input.remaps
     // 2                  : config.input
     // 1                  : config
-    ww_assert(lua_gettop(cfg->L) == IDX_REMAPS);
+    ww_assert(lua_gettop(cfg->vm->L) == IDX_REMAPS);
 
-    lua_pushnil(cfg->L); // stack: 4 (IDX_REMAP_KEY)
-    while (lua_next(cfg->L, IDX_REMAPS)) {
+    lua_pushnil(cfg->vm->L); // stack: 4 (IDX_REMAP_KEY)
+    while (lua_next(cfg->vm->L, IDX_REMAPS)) {
         // stack state:
         // 5 (IDX_REMAP_VAL) : config.input.remaps[key] (should be a string)
         // 4 (IDX_REMAP_KEY)  : key (should be a string)
@@ -446,19 +443,19 @@ process_config_input_remaps(struct config *cfg) {
         // 2                  : config.input
         // 1                  : config
 
-        if (!lua_isstring(cfg->L, IDX_REMAP_KEY)) {
+        if (!lua_isstring(cfg->vm->L, IDX_REMAP_KEY)) {
             ww_log(LOG_ERROR, "non-string key '%s' found in remaps table",
-                   lua_tostring(cfg->L, IDX_REMAP_KEY));
+                   lua_tostring(cfg->vm->L, IDX_REMAP_KEY));
             return 1;
         }
-        if (!lua_isstring(cfg->L, IDX_REMAP_VAL)) {
+        if (!lua_isstring(cfg->vm->L, IDX_REMAP_VAL)) {
             ww_log(LOG_ERROR, "non-string value for key '%s' found in remaps table",
-                   lua_tostring(cfg->L, IDX_REMAP_KEY));
+                   lua_tostring(cfg->vm->L, IDX_REMAP_KEY));
             return 1;
         }
 
-        const char *src_input = lua_tostring(cfg->L, IDX_REMAP_KEY);
-        const char *dst_input = lua_tostring(cfg->L, IDX_REMAP_VAL);
+        const char *src_input = lua_tostring(cfg->vm->L, IDX_REMAP_KEY);
+        const char *dst_input = lua_tostring(cfg->vm->L, IDX_REMAP_VAL);
 
         struct config_remap remap = {0};
         if (parse_remap(src_input, dst_input, &remap) != 0) {
@@ -468,15 +465,15 @@ process_config_input_remaps(struct config *cfg) {
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
-        lua_pop(cfg->L, 1); // stack: 4 (IDX_REMAP_KEY)
-        ww_assert(lua_gettop(cfg->L) == IDX_REMAP_KEY);
+        lua_pop(cfg->vm->L, 1); // stack: 4 (IDX_REMAP_KEY)
+        ww_assert(lua_gettop(cfg->vm->L) == IDX_REMAP_KEY);
     }
 
     // stack state:
     // 3 (IDX_REMAPS)     : config.input.remaps
     // 2                  : config.input
     // 1                  : config
-    ww_assert(lua_gettop(cfg->L) == 3);
+    ww_assert(lua_gettop(cfg->vm->L) == 3);
 
     return 0;
 }
@@ -486,7 +483,7 @@ process_config_input(struct config *cfg) {
     // stack state:
     // 2:   config.input
     // 1:   config
-    ww_assert(lua_gettop(cfg->L) == 2);
+    ww_assert(lua_gettop(cfg->vm->L) == 2);
 
     if (get_table(cfg, "remaps", process_config_input_remaps, "input.remaps", false) != 0) {
         return 1;
@@ -541,7 +538,7 @@ process_config_theme(struct config *cfg) {
     // stack state:
     // 1:   config.theme
     // 2:   config
-    ww_assert(lua_gettop(cfg->L) == 2);
+    ww_assert(lua_gettop(cfg->vm->L) == 2);
 
     char *raw_background = NULL;
     if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
@@ -611,7 +608,7 @@ static int
 process_config(struct config *cfg) {
     // stack state:
     // 1:   config
-    ww_assert(lua_gettop(cfg->L) == 1);
+    ww_assert(lua_gettop(cfg->vm->L) == 1);
 
     if (get_table(cfg, "actions", process_config_actions, "actions", true) != 0) {
         return 1;
@@ -636,23 +633,22 @@ static int
 load_config(struct config *cfg) {
     static const int ARG_CONFIG = 1;
 
-    ww_assert(lua_gettop(cfg->L) == 0);
+    ww_assert(lua_gettop(cfg->vm->L) == 0);
 
-    // luaL_loadbuffer pushes a value to the stack. config_pcall pops it from the stack and pushes
-    // the return value.
-    if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE, "__init") != 0) {
+    if (luaL_loadbuffer(cfg->vm->L, (const char *)luaJIT_BC_init, luaJIT_BC_init_SIZE,
+                        "waywall.init") != 0) {
         ww_log(LOG_ERROR, "failed to load internal init chunk");
         goto fail_loadbuffer;
     }
-    if (config_pcall(cfg, 0, 1, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->L, -1));
+    if (config_vm_pcall(cfg->vm, 0, 1, 0) != 0) {
+        ww_log(LOG_ERROR, "failed to load config: '%s'", lua_tostring(cfg->vm->L, -1));
         goto fail_pcall;
     }
 
-    int type = lua_type(cfg->L, ARG_CONFIG);
+    int type = lua_type(cfg->vm->L, ARG_CONFIG);
     if (type != LUA_TTABLE) {
         ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
-               lua_typename(cfg->L, ARG_CONFIG));
+               lua_typename(cfg->vm->L, ARG_CONFIG));
         goto fail_table;
     }
 
@@ -661,8 +657,8 @@ load_config(struct config *cfg) {
         goto fail_load;
     }
 
-    lua_pop(cfg->L, 1); // stack: 0
-    ww_assert(lua_gettop(cfg->L) == 0);
+    lua_pop(cfg->vm->L, 1); // stack: 0
+    ww_assert(lua_gettop(cfg->vm->L) == 0);
 
     return 0;
 
@@ -670,7 +666,7 @@ fail_load:
 fail_table:
 fail_pcall:
 fail_loadbuffer:
-    lua_settop(cfg->L, 0);
+    lua_settop(cfg->vm->L, 0);
     return 1;
 }
 
@@ -701,17 +697,11 @@ config_create() {
         check_alloc(*storage);
     }
 
-    wl_list_init(&cfg->coroutines);
     return cfg;
 }
 
 void
 config_destroy(struct config *cfg) {
-    struct config_coro *ccoro;
-    wl_list_for_each (ccoro, &cfg->coroutines, link) {
-        ccoro->parent = NULL;
-    }
-
     if (cfg->input.remaps.data) {
         free(cfg->input.remaps.data);
     }
@@ -724,34 +714,24 @@ config_destroy(struct config *cfg) {
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
 
-    if (cfg->L) {
-        lua_close(cfg->L);
-    }
+    config_vm_destroy(cfg->vm);
     free(cfg);
 }
 
 int
 config_load(struct config *cfg, const char *profile) {
-    ww_assert(!cfg->L);
+    ww_assert(!cfg->vm);
 
-    cfg->L = luaL_newstate();
-    if (!cfg->L) {
-        ww_log(LOG_ERROR, "failed to create lua VM");
+    cfg->vm = config_vm_create();
+    if (!cfg->vm) {
         return 1;
     }
 
-    // The JIT can be re-enabled later if the user enables it in their config.
-    if (!luaJIT_setmode(cfg->L, 0, LUAJIT_MODE_OFF)) {
-        ww_log(LOG_WARN, "failed to disable the JIT");
+    if (profile) {
+        config_vm_set_profile(cfg->vm, profile);
     }
 
-    luaL_newmetatable(cfg->L, METATABLE_WALL); // stack: 1
-    luaL_newmetatable(cfg->L, METATABLE_WRAP); // stack: 2
-    lua_pop(cfg->L, 2);                        // stack: 0
-
-    luaL_openlibs(cfg->L); // stack: 0
-
-    if (config_api_init(cfg, profile) != 0) {
+    if (config_api_init(cfg->vm) != 0) {
         goto fail;
     }
 
@@ -760,18 +740,17 @@ config_load(struct config *cfg, const char *profile) {
     }
 
     if (cfg->experimental.jit) {
-        if (!luaJIT_setmode(cfg->L, 0, LUAJIT_MODE_ON)) {
+        if (!luaJIT_setmode(cfg->vm->L, 0, LUAJIT_MODE_ON)) {
             ww_log(LOG_WARN, "failed to re-enable the JIT");
         } else {
             ww_log(LOG_INFO, "JIT re-enabled");
         }
     }
 
-    ww_assert(lua_gettop(cfg->L) == 0);
+    ww_assert(lua_gettop(cfg->vm->L) == 0);
     return 0;
 
 fail:
-    lua_close(cfg->L);
-    cfg->L = NULL;
+    config_vm_destroy(cfg->vm);
     return 1;
 }

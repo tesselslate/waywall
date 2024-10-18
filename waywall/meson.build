@@ -1,10 +1,10 @@
 subdir('lua')
 
 waywall_src = files(
-  'config/action.c',
   'config/api.c',
   'config/config.c',
   'config/internal.c',
+  'config/vm.c',
   'server/backend.c',
   'server/buffer.c',
   'server/cursor.c',

@@ -49,8 +49,18 @@ struct config {
         } ninb_anchor;
     } theme;
 
-    struct wl_list coroutines; // config_coro.link
-    lua_State *L;
+    struct config_vm *vm;
+};
+
+struct config_action {
+    enum config_action_type {
+        CONFIG_ACTION_NONE,
+        CONFIG_ACTION_BUTTON,
+        CONFIG_ACTION_KEY,
+    } type;
+
+    uint32_t data;
+    uint32_t modifiers;
 };
 
 enum config_remap_type {

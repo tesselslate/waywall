@@ -1,9 +1,5 @@
 #include "config/internal.h"
-#include "config/action.h"
 #include "config/config.h"
-#include "util/alloc.h"
-#include "util/prelude.h"
-#include "wrap.h"
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
 #include <stdbool.h>
@@ -11,77 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-
-const struct config_registry_keys config_registry_keys = {0};
-
-#define MAX_INSTRUCTIONS 50000000
-
-static void
-pcall_hook(lua_State *L, struct lua_Debug *dbg) {
-    luaL_error(L, "instruction count exceeded");
-}
-
-struct config_coro *
-config_coro_add(lua_State *L) {
-    ssize_t stack_start = lua_gettop(L);
-
-    struct wrap *wrap = config_get_wrap(L);
-    ww_assert(wrap);
-
-    struct config_coro *ccoro = zalloc(1, sizeof(*ccoro));
-    ccoro->parent = wrap->cfg;
-    ccoro->L = L;
-
-    // Lua coroutines are garbage collected and do not have an explicit destructor in the C API.
-    // Thus, we need to store the coroutine in a global table.
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.coroutines); // stack: n+1
-    lua_gettable(L, LUA_REGISTRYINDEX);                                 // stack: n+1
-    lua_pushthread(L);                                                  // stack: n+2
-    lua_pushlightuserdata(L, ccoro);                                    // stack: n+3
-    lua_rawset(L, -3);                                                  // stack: n+1
-    lua_pop(L, 1);                                                      // stack: n
-
-    ww_assert(lua_gettop(L) == stack_start);
-
-    wl_list_insert(&wrap->cfg->coroutines, &ccoro->link);
-    return ccoro;
-}
-
-void
-config_coro_delete(struct config_coro *ccoro) {
-    // Only remove the coroutine from the global coroutines table if the owning Lua VM is still
-    // alive.
-    if (ccoro->parent) {
-        lua_pushlightuserdata(ccoro->L, (void *)&config_registry_keys.coroutines); // stack: n+1
-        lua_gettable(ccoro->L, LUA_REGISTRYINDEX);                                 // stack: n+1
-        lua_pushthread(ccoro->L);                                                  // stack: n+2
-        lua_pushnil(ccoro->L);                                                     // stack: n+3
-        lua_rawset(ccoro->L, -3);                                                  // stack: n+1
-
-        // The leftover stack value does not matter because this coroutine will no longer be used
-        // and will thus get garbage collected at some future point in time.
-    }
-
-    wl_list_remove(&ccoro->link);
-    free(ccoro);
-}
-
-struct config_coro *
-config_coro_lookup(lua_State *coro) {
-    // config_coro_lookup MUST NOT be called if the owning Lua VM has already been closed (i.e. it
-    // cannot be called from timer callbacks, since the owning VM may have already been destroyed.)
-    struct wrap *wrap = config_get_wrap(coro);
-    ww_assert(wrap);
-
-    struct config_coro *ccoro;
-    wl_list_for_each (ccoro, &wrap->cfg->coroutines, link) {
-        if (ccoro->L == coro) {
-            return ccoro;
-        }
-    }
-
-    return NULL;
-}
 
 // This function is intended for debugging purposes.
 // Adapted from: https://stackoverflow.com/a/59097940
@@ -111,35 +36,13 @@ config_dump_stack(lua_State *L) {
 }
 
 void
-config_encode_bind(char buf[static BIND_BUFLEN], struct config_action action) {
-    uint64_t data = (((uint64_t)action.data) << 32) | (uint64_t)action.modifiers;
+config_encode_bind(char buf[static BIND_BUFLEN], const struct config_action *action) {
+    uint64_t data = (((uint64_t)action->data) << 32) | (uint64_t)action->modifiers;
 
-    buf[0] = (action.type == CONFIG_ACTION_BUTTON) ? 'm' : 'k';
+    buf[0] = (action->type == CONFIG_ACTION_BUTTON) ? 'm' : 'k';
     for (size_t i = 0; i < 16; i++) {
         buf[i + 1] = "0123456789abcdef"[(data >> (i * 4)) & 0xF];
     }
-}
-
-struct wrap *
-config_get_wrap(lua_State *L) {
-    ssize_t stack_start = lua_gettop(L);
-
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.wrap); // stack: n+1
-    lua_rawget(L, LUA_REGISTRYINDEX);                             // stack: n+1
-
-    if (!luaL_testudata(L, -1, METATABLE_WRAP)) {
-        lua_pop(L, 1); // stack: n
-        ww_assert(lua_gettop(L) == stack_start);
-
-        return NULL;
-    }
-
-    struct wrap **wrap = lua_touserdata(L, -1);
-
-    lua_pop(L, 1); // stack: n
-    ww_assert(lua_gettop(L) == stack_start);
-
-    return *wrap;
 }
 
 int
@@ -170,19 +73,4 @@ config_parse_hex(uint8_t rgba[static 4], const char *raw) {
     rgba[3] = a;
 
     return 0;
-}
-
-int
-config_pcall(struct config *cfg, int nargs, int nresults, int errfunc) {
-    if (!cfg->experimental.jit) {
-        lua_sethook(cfg->L, pcall_hook, LUA_MASKCOUNT, MAX_INSTRUCTIONS);
-    }
-
-    int ret = lua_pcall(cfg->L, nargs, nresults, errfunc);
-
-    if (!cfg->experimental.jit) {
-        lua_sethook(cfg->L, NULL, 0, 0);
-    }
-
-    return ret;
 }

@@ -1,9 +1,10 @@
-#include "config/api.h"
-#include "config/config.h"
-#include "config/internal.h"
-#include "instance.h"
 #include "lua/api.h"
 #include "lua/helpers.h"
+
+#include "config/config.h"
+#include "config/internal.h"
+#include "config/vm.h"
+#include "instance.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"
@@ -58,41 +59,27 @@
  * indices) in the Lua interop code present in other files.
  */
 
+static const struct {
+    const unsigned char *data;
+    size_t size;
+    const char *name;
+} EMBEDDED_LUA[] = {
+    {luaJIT_BC_api, luaJIT_BC_api_SIZE, "waywall"},
+    {luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE, "waywall.helpers"},
+};
+
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
 static void
-handle_sleep_alarm(void *data) {
-    struct config_coro *ccoro = data;
+waker_sleep_destroy(struct config_vm_waker *vm_waker, void *data) {
+    // TODO: Delete timer entry
+}
 
-    // If the owning config instance has been destroyed (i.e. the user's configuration was
-    // modified and reloaded), then the coroutine is invalid and cannot be resumed.
-    //
-    // TODO: Sleep alarms should probably be deleted in config_destroy instead of allowing
-    // them to fire and removing the coroutines from the global table here.
-    if (!ccoro->parent) {
-        config_coro_delete(ccoro);
-        return;
-    }
+static void
+waker_sleep_fire(void *data) {
+    struct config_vm_waker *waker = data;
 
-    // Clear the stack and resume the coroutine with no arguments.
-    lua_settop(ccoro->L, 0);
-    int ret = lua_resume(ccoro->L, 0); // stack: unknown
-
-    switch (ret) {
-    case LUA_YIELD:
-        // Do nothing. The coroutine will remain in the table so that it can
-        // still be resumed later.
-        return;
-    case 0:
-        // The coroutine finished. Remove it from the coroutines table.
-        config_coro_delete(ccoro);
-        return;
-    default:
-        // The coroutine failed. Remove it from the coroutines table and log the error.
-        ww_log(LOG_ERROR, "failed to resume keybind action: '%s'", lua_tostring(ccoro->L, -1));
-        config_coro_delete(ccoro);
-        return;
-    }
+    config_vm_resume(waker);
 }
 
 static int
@@ -112,7 +99,8 @@ l_exec(lua_State *L) {
     static const int ARG_COMMAND = 1;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("exec"));
     }
@@ -158,7 +146,8 @@ l_exec(lua_State *L) {
 static int
 l_active_res(lua_State *L) {
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("active_res"));
     }
@@ -172,7 +161,8 @@ l_active_res(lua_State *L) {
 static int
 l_floating_shown(lua_State *L) {
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("floating_shown"));
     }
@@ -187,7 +177,8 @@ l_press_key(lua_State *L) {
     static const int ARG_KEYNAME = 1;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("press_key"));
     }
@@ -217,18 +208,15 @@ l_press_key(lua_State *L) {
 static int
 l_profile(lua_State *L) {
     // Prologue
+    struct config_vm *vm = config_vm_from(L);
     lua_settop(L, 0);
 
-    // Body
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.profile); // stack: 1
-    lua_rawget(L, LUA_REGISTRYINDEX);                                // stack: 1
-
-    if (!lua_isnil(L, -1)) {
-        ww_assert(lua_isstring(L, -1));
+    // Epilogue
+    if (vm->profile) {
+        lua_pushstring(L, vm->profile);
+    } else {
+        lua_pushnil(L);
     }
-
-    // Epilogue. The string (or nil) value to return was already pushed to the stack by the above
-    // code.
     return 1;
 }
 
@@ -238,7 +226,8 @@ l_set_keymap(lua_State *L) {
     static const int IDX_VALUE = 2;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_keymap"));
     }
@@ -291,7 +280,8 @@ l_set_resolution(lua_State *L) {
     static const int ARG_HEIGHT = 2;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_resolution"));
     }
@@ -319,7 +309,8 @@ l_set_sensitivity(lua_State *L) {
     static const int ARG_SENS = 1;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("set_sensitivity"));
     }
@@ -344,7 +335,8 @@ l_show_floating(lua_State *L) {
     static const int ARG_SHOW = 1;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("show_floating"));
     }
@@ -367,12 +359,13 @@ l_sleep(lua_State *L) {
     static const int ARG_MS = 1;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("sleep"));
     }
 
-    if (lua_pushthread(L) == 1) {
+    if (!config_vm_is_thread(L)) {
         // This function can only be called from within a coroutine (i.e. a keybind handler.)
         return luaL_error(L, "sleep called from invalid execution context");
     }
@@ -387,10 +380,10 @@ l_sleep(lua_State *L) {
         .tv_nsec = (ms % 1000) * 1000000,
     };
 
-    struct config_coro *ccoro = config_coro_lookup(L);
-    ww_assert(ccoro);
+    struct config_vm_waker *waker = config_vm_create_waker(L, waker_sleep_destroy, NULL);
+    ww_assert(waker);
 
-    if (ww_timer_add_entry(wrap->timer, duration, handle_sleep_alarm, ccoro) != 0) {
+    if (ww_timer_add_entry(wrap->timer, duration, waker_sleep_fire, waker) != 0) {
         return luaL_error(L, "failed to prepare sleep");
     }
 
@@ -403,7 +396,8 @@ l_state(lua_State *L) {
     static const int IDX_STATE = 1;
 
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("state"));
     }
@@ -453,7 +447,8 @@ l_state(lua_State *L) {
 static int
 l_window_size(lua_State *L) {
     // Prologue
-    struct wrap *wrap = config_get_wrap(L);
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
         return luaL_error(L, STARTUP_ERRMSG("window_size"));
     }
@@ -485,9 +480,10 @@ static int
 l_register(lua_State *L) {
     static const int ARG_SIGNAL = 1;
     static const int ARG_HANDLER = 2;
-    static const int IDX_TABLE = 3;
 
     // Prologue
+    struct config_vm *vm = config_vm_from(L);
+
     const char *signal = luaL_checkstring(L, ARG_SIGNAL);
     luaL_argcheck(L, lua_type(L, ARG_HANDLER) == LUA_TFUNCTION, ARG_HANDLER,
                   "handler must be a function");
@@ -495,12 +491,7 @@ l_register(lua_State *L) {
     lua_settop(L, ARG_HANDLER);
 
     // Body
-    lua_pushlightuserdata(L, (void *)&config_registry_keys.events); // stack: ARG_HANDLER + 1
-    lua_rawget(L, LUA_REGISTRYINDEX); // stack: ARG_HANDLER + 1 (IDX_TABLE)
-
-    lua_pushstring(L, signal);     // stack: IDX_TABLE + 1 (key)
-    lua_pushvalue(L, ARG_HANDLER); // stack: IDX_TABLE + 2 (value)
-    lua_rawset(L, IDX_TABLE);      // stack: IDX_TABLE
+    config_vm_register_event(vm, L, signal);
 
     // Epilogue
     return 0;
@@ -563,95 +554,15 @@ static const struct luaL_Reg lua_lib[] = {
 };
 
 int
-config_api_init(struct config *cfg, const char *profile) {
-    ww_assert(lua_gettop(cfg->L) == 0);
+config_api_init(struct config_vm *vm) {
+    config_vm_register_lib(vm, lua_lib, "priv_waywall");
 
-    luaL_register(cfg->L, "priv_waywall", lua_lib); // stack: 1
-    lua_pop(cfg->L, 1);                             // stack: 0
-
-    if (profile) {
-        lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.profile); // stack: 1 (key)
-        lua_pushstring(cfg->L, profile);                                      // stack: 2 (value)
-        lua_rawset(cfg->L, LUA_REGISTRYINDEX);                                // stack: 0
+    for (size_t i = 0; i < STATIC_ARRLEN(EMBEDDED_LUA); i++) {
+        if (config_vm_exec_bcode(vm, EMBEDDED_LUA[i].data, EMBEDDED_LUA[i].size,
+                                 EMBEDDED_LUA[i].name) != 0) {
+            return 1;
+        }
     }
 
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.coroutines); // stack: 1 (key)
-    lua_newtable(cfg->L);                                                    // stack: 2 (value)
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                                   // stack: 0
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events); // stack: 1 (key)
-    lua_newtable(cfg->L);                                                // stack: 2 (value)
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                               // stack: 0
-
-    // luaL_loadbuffer pushes a value to the stack. config_pcall pops it from the stack.
-    if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_api, luaJIT_BC_api_SIZE, "__api") != 0) {
-        ww_log(LOG_ERROR, "failed to load internal api chunk");
-        goto fail_loadbuffer;
-    }
-    if (config_pcall(cfg, 0, 0, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to load API: '%s'", lua_tostring(cfg->L, -1));
-        goto fail_pcall;
-    }
-
-    if (luaL_loadbuffer(cfg->L, (const char *)luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE,
-                        "__helpers") != 0) {
-        ww_log(LOG_ERROR, "failed to load internal api helpers chunk");
-        goto fail_loadbuffer_helpers;
-    }
-    if (config_pcall(cfg, 0, 0, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to load API helpers: '%s'", lua_tostring(cfg->L, -1));
-        goto fail_pcall_helpers;
-    }
-
-    ww_assert(lua_gettop(cfg->L) == 0);
     return 0;
-
-fail_pcall_helpers:
-fail_loadbuffer_helpers:
-fail_pcall:
-fail_loadbuffer:
-    lua_settop(cfg->L, 0);
-    return 1;
-}
-
-void
-config_api_set_wrap(struct config *cfg, struct wrap *wrap) {
-    static const int IDX_USERDATA = 1;
-
-    ww_assert(lua_gettop(cfg->L) == 0);
-
-    struct wrap **udata = lua_newuserdata(cfg->L, sizeof(*udata)); // stack: 1 (IDX_USERDATA)
-    luaL_getmetatable(cfg->L, METATABLE_WRAP);                     // stack: 2
-    lua_setmetatable(cfg->L, IDX_USERDATA);                        // stack: 1 (IDX_USERDATA)
-    *udata = wrap;
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.wrap); // stack: 2
-    lua_pushvalue(cfg->L, IDX_USERDATA);                               // stack: 3
-    lua_rawset(cfg->L, LUA_REGISTRYINDEX);                             // stack: 1 (IDX_USERDATA)
-
-    lua_pop(cfg->L, 1); // stack: 0
-    ww_assert(lua_gettop(cfg->L) == 0);
-}
-
-void
-config_api_signal(struct config *cfg, const char *signal) {
-    static const int IDX_TABLE = 1;
-    static const int IDX_FUNCTION = 2;
-
-    ww_assert(lua_gettop(cfg->L) == 0);
-
-    lua_pushlightuserdata(cfg->L, (void *)&config_registry_keys.events); // stack: 1
-    lua_rawget(cfg->L, LUA_REGISTRYINDEX);                               // stack: 1 (IDX_TABLE)
-
-    lua_pushstring(cfg->L, signal); // stack: 2
-    lua_rawget(cfg->L, IDX_TABLE);  // stack: 2 (IDX_FUNCTION)
-
-    ww_assert(lua_type(cfg->L, IDX_FUNCTION) == LUA_TFUNCTION);
-    if (config_pcall(cfg, 0, 0, 0) != 0) {
-        ww_log(LOG_ERROR, "failed to call event listeners: %s", lua_tostring(cfg->L, -1));
-        lua_pop(cfg->L, 1); // stack: 1 (IDX_TABLE)
-    }
-
-    lua_pop(cfg->L, 1); // stack: 0
-    ww_assert(lua_gettop(cfg->L) == 0);
 }
