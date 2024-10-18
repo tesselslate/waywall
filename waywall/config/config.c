@@ -714,7 +714,10 @@ config_destroy(struct config *cfg) {
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
 
-    config_vm_destroy(cfg->vm);
+    if (cfg->vm) {
+        config_vm_destroy(cfg->vm);
+    }
+
     free(cfg);
 }
 
@@ -732,11 +735,11 @@ config_load(struct config *cfg, const char *profile) {
     }
 
     if (config_api_init(cfg->vm) != 0) {
-        goto fail;
+        return 1;
     }
 
     if (load_config(cfg) != 0) {
-        goto fail;
+        return 1;
     }
 
     if (cfg->experimental.jit) {
@@ -749,8 +752,4 @@ config_load(struct config *cfg, const char *profile) {
 
     ww_assert(lua_gettop(cfg->vm->L) == 0);
     return 0;
-
-fail:
-    config_vm_destroy(cfg->vm);
-    return 1;
 }
