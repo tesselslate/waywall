@@ -1095,6 +1095,12 @@ server_seat_use_config(struct server_seat *seat, struct server_seat_config *conf
     seat->config = config;
 
     use_local_keymap(seat, seat->config->keymap);
+
+    struct wl_resource *resource;
+    wl_resource_for_each(resource, &seat->keyboards) {
+        wl_keyboard_send_repeat_info(resource, seat->config->repeat_rate,
+                                     seat->config->repeat_delay);
+    }
 }
 
 struct server_seat_config *
