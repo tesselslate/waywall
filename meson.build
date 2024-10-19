@@ -34,6 +34,7 @@ wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner')
 
 # Runtime dependencies
+egl = dependency('egl')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
@@ -43,6 +44,7 @@ xkbcommon = dependency('xkbcommon')
 waywall_deps = [
   cc.find_library('m'),
 
+  egl,
   luajit,
   wayland_client,
   wayland_cursor,
