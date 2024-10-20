@@ -147,6 +147,8 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         wl_surface_attach(surface->remote,
                           surface->pending.buffer ? surface->pending.buffer->remote : NULL, 0, 0);
         surface->current.buffer = surface->pending.buffer;
+
+        server_buffer_lock(surface->current.buffer);
     }
     if (surface->pending.present & SURFACE_STATE_DAMAGE) {
         struct server_surface_damage *dmg;

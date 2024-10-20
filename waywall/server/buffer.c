@@ -8,10 +8,16 @@
 #include <wayland-server-protocol.h>
 
 static void
+destroy_buffer(struct server_buffer *buffer) {
+    buffer->impl->destroy(buffer->data);
+    free(buffer);
+}
+
+static void
 on_buffer_release(void *data, struct wl_buffer *wl) {
     struct server_buffer *buffer = data;
 
-    wl_buffer_send_release(buffer->resource);
+    server_buffer_unlock(buffer);
 }
 
 static const struct wl_buffer_listener server_buffer_listener = {
@@ -22,11 +28,16 @@ static void
 buffer_resource_destroy(struct wl_resource *resource) {
     struct server_buffer *buffer = wl_resource_get_user_data(resource);
 
-    buffer->impl->destroy(buffer->data);
     if (buffer->remote) {
         wl_buffer_destroy(buffer->remote);
     }
-    free(buffer);
+
+    wl_signal_emit_mutable(&buffer->events.resource_destroy, buffer);
+
+    buffer->resource = NULL;
+    buffer->remote = NULL;
+
+    server_buffer_unref(buffer);
 }
 
 static void
@@ -48,8 +59,13 @@ server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,
     buffer->impl = impl;
     buffer->data = data;
 
+    buffer->refcount = 1;
+    buffer->lockcount = 0;
+
     wl_resource_set_implementation(resource, &server_buffer_impl, buffer, buffer_resource_destroy);
     wl_buffer_add_listener(remote, &server_buffer_listener, buffer);
+
+    wl_signal_init(&buffer->events.resource_destroy);
 
     return buffer;
 }
@@ -63,4 +79,38 @@ server_buffer_from_resource(struct wl_resource *resource) {
 void
 server_buffer_get_size(struct server_buffer *buffer, uint32_t *width, uint32_t *height) {
     buffer->impl->size(buffer->data, width, height);
+}
+
+void
+server_buffer_lock(struct server_buffer *buffer) {
+    buffer->lockcount++;
+}
+
+struct server_buffer *
+server_buffer_ref(struct server_buffer *buffer) {
+    buffer->refcount++;
+    return buffer;
+}
+
+void
+server_buffer_unlock(struct server_buffer *buffer) {
+    ww_assert(buffer->lockcount);
+    buffer->lockcount--;
+
+    if (buffer->lockcount == 0 && buffer->resource) {
+        wl_buffer_send_release(buffer->resource);
+    }
+}
+
+void
+server_buffer_unref(struct server_buffer *buffer) {
+    buffer->refcount--;
+
+    if (buffer->refcount == 0) {
+        if (buffer->resource) {
+            ww_panic("server_buffer with live resource has 0 refs");
+        }
+
+        destroy_buffer(buffer);
+    }
 }
