@@ -6,7 +6,11 @@
 
 struct server_gl {
     struct {
+        PFNEGLCREATEIMAGEKHRPROC CreateImageKHR;
+        PFNEGLDESTROYIMAGEKHRPROC DestroyImageKHR;
         PFNEGLGETPLATFORMDISPLAYEXTPROC GetPlatformDisplayEXT;
+        PFNEGLEXPORTDMABUFIMAGEMESAPROC ExportDMABUFImageMESA;
+        PFNEGLEXPORTDMABUFIMAGEQUERYMESAPROC ExportDMABUFImageQueryMESA;
 
         EGLDisplay display;
         EGLConfig config;
