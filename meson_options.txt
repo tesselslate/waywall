@@ -1,1 +1,2 @@
+option('opengl', type: 'feature', value: 'enabled', description: 'Enable OpenGL support')
 option('xwayland', type: 'feature', value: 'enabled', description: 'Enable Xwayland support')

@@ -5,7 +5,6 @@
 #include "config/internal.h"
 #include "config/vm.h"
 #include "instance.h"
-#include "server/gl.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"

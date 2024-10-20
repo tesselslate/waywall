@@ -34,27 +34,35 @@ wayland_protocols = dependency('wayland-protocols')
 wayland_scanner = dependency('wayland-scanner')
 
 # Runtime dependencies
-egl = dependency('egl')
-glesv2 = dependency('glesv2')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
-wayland_egl = dependency('wayland-egl')
 wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 
 waywall_deps = [
   cc.find_library('m'),
 
-  egl,
-  glesv2,
   luajit,
   wayland_client,
   wayland_cursor,
-  wayland_egl,
   wayland_server,
   xkbcommon,
 ]
+
+# OpenGL support
+if get_option('opengl').enabled()
+  waywall_deps += dependency('egl')
+  waywall_deps += dependency('glesv2')
+  waywall_deps += dependency('wayland-egl')
+
+  add_project_arguments(
+    [
+      '-DWAYWALL_OPENGL',
+    ],
+    language: 'c',
+  )
+endif
 
 # Xwayland support
 if get_option('xwayland').enabled()
