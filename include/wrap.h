@@ -11,6 +11,7 @@ struct wrap {
     struct inotify *inotify;
     struct subproc *subproc;
     struct ww_timer *timer;
+    struct ww_gl *gl;
 
     int32_t width, height;
 
