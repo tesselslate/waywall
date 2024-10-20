@@ -35,6 +35,7 @@ wayland_scanner = dependency('wayland-scanner')
 
 # Runtime dependencies
 egl = dependency('egl')
+glesv2 = dependency('glesv2')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
@@ -45,6 +46,7 @@ waywall_deps = [
   cc.find_library('m'),
 
   egl,
+  glesv2,
   luajit,
   wayland_client,
   wayland_cursor,
