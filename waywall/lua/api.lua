@@ -80,6 +80,11 @@ M.exec = priv.exec
 -- @return shown Whether floating windows are shown.
 M.floating_shown = priv.floating_shown
 
+--- Creates a "mirror" object which mirrors part of the Minecraft window.
+-- @param options The options to create the mirror with.
+-- @return mirror The mirror object.
+M.mirror = priv.mirror
+
 --- Press and immediately release the given key in the Minecraft window.
 -- @param key The name of the key to press.
 M.press_key = priv.press_key

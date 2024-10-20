@@ -1,6 +1,7 @@
 #ifndef WAYWALL_WRAP_H
 #define WAYWALL_WRAP_H
 
+#include "util/box.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
@@ -34,6 +35,8 @@ struct wrap {
         struct wl_listener on_anchored_resize;
     } floating;
 
+    struct wl_list mirrors; // wrap_mirror.link
+
     struct {
         uint32_t modifiers;
         bool pointer_locked;
@@ -48,13 +51,20 @@ struct wrap {
     struct wl_listener on_view_destroy;
 };
 
+struct wrap_mirror_options {
+    struct box src, dst;
+};
+
 struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct config *cfg);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 
 void wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]);
+struct wrap_mirror *wrap_lua_mirror(struct wrap *wrap, struct wrap_mirror_options options);
 void wrap_lua_press_key(struct wrap *wrap, uint32_t keycode);
 int wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height);
 void wrap_lua_show_floating(struct wrap *wrap, bool show);
+
+void wrap_mirror_destroy(struct wrap_mirror *mirror);
 
 #endif

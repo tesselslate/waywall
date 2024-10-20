@@ -5,12 +5,14 @@
 #include "config/internal.h"
 #include "config/vm.h"
 #include "instance.h"
+#include "server/gl.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"
 #include "server/wp_relative_pointer.h"
 #include "timer.h"
 #include "util/alloc.h"
+#include "util/box.h"
 #include "util/keycodes.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -68,12 +70,56 @@ static const struct {
     {luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE, "waywall.helpers"},
 };
 
+#define METATABLE_MIRROR "waywall.mirror"
+
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
+
+struct mirror {
+    struct wrap_mirror *parent;
+};
 
 struct waker_sleep {
     struct ww_timer_entry *timer;
     struct config_vm_waker *vm;
 };
+
+static int
+mirror_close(lua_State *L) {
+    struct mirror *mirror = lua_touserdata(L, 1);
+
+    if (!mirror->parent) {
+        return luaL_error(L, "cannot close mirror more than once");
+    }
+
+    wrap_mirror_destroy(mirror->parent);
+    mirror->parent = NULL;
+
+    return 0;
+}
+
+static int
+mirror_index(lua_State *L) {
+    const char *key = luaL_checkstring(L, 2);
+
+    if (strcmp(key, "close") == 0) {
+        lua_pushcfunction(L, mirror_close);
+    } else {
+        lua_pushnil(L);
+    }
+
+    return 1;
+}
+
+static int
+mirror_gc(lua_State *L) {
+    struct mirror *mirror = lua_touserdata(L, 1);
+
+    if (mirror->parent) {
+        wrap_mirror_destroy(mirror->parent);
+    }
+
+    return 0;
+}
 
 static void
 waker_sleep_vm_destroy(struct config_vm_waker *vm_waker, void *data) {
@@ -103,6 +149,63 @@ waker_sleep_timer_fire(void *data) {
     struct waker_sleep *waker = data;
 
     config_vm_resume(waker->vm);
+}
+
+static int
+unmarshal_box(lua_State *L, const char *key, struct box *out) {
+    lua_pushstring(L, key); // stack: n+1
+    lua_rawget(L, -2);      // stack: n+1
+
+    if (lua_type(L, -1) != LUA_TTABLE) {
+        return luaL_error(L, "expected '%s' to be a table, got '%s'", key, luaL_typename(L, -1));
+    }
+
+    const struct {
+        const char *key;
+        int32_t *out;
+    } pairs[] = {
+        {"x", &out->x},
+        {"y", &out->y},
+        {"w", &out->width},
+        {"h", &out->height},
+    };
+
+    for (size_t i = 0; i < STATIC_ARRLEN(pairs); i++) {
+        lua_pushstring(L, pairs[i].key); // stack: n+2
+        lua_rawget(L, -2);               // stack: n+2
+
+        if (lua_type(L, -1) != LUA_TNUMBER) {
+            return luaL_error(L, "expected '%s.%s' to be a number, got '%s'", key, pairs[i].key,
+                              luaL_typename(L, -1));
+        }
+
+        int x = lua_tointeger(L, -1);
+        if (x < 0) {
+            return luaL_error(L, "expected '%s.%s' to be positive", key, pairs[i].key);
+        }
+
+        *pairs[i].out = x;
+        lua_pop(L, 1); // stack: n+1
+    }
+
+    lua_pop(L, 1); // stack: n
+
+    return 0;
+}
+
+static int
+l_active_res(lua_State *L) {
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("active_res"));
+    }
+
+    // Epilogue
+    lua_pushinteger(L, wrap->active_res.w);
+    lua_pushinteger(L, wrap->active_res.h);
+    return 2;
 }
 
 static int
@@ -167,21 +270,6 @@ l_exec(lua_State *L) {
 }
 
 static int
-l_active_res(lua_State *L) {
-    // Prologue
-    struct config_vm *vm = config_vm_from(L);
-    struct wrap *wrap = config_vm_get_wrap(vm);
-    if (!wrap) {
-        return luaL_error(L, STARTUP_ERRMSG("active_res"));
-    }
-
-    // Epilogue
-    lua_pushinteger(L, wrap->active_res.w);
-    lua_pushinteger(L, wrap->active_res.h);
-    return 2;
-}
-
-static int
 l_floating_shown(lua_State *L) {
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -192,6 +280,41 @@ l_floating_shown(lua_State *L) {
 
     // Epilogue
     lua_pushboolean(L, wrap->floating.visible);
+    return 1;
+}
+
+static int
+l_mirror(lua_State *L) {
+    static const int ARG_OPTIONS = 1;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("mirror"));
+    }
+
+    luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
+    lua_settop(L, ARG_OPTIONS);
+
+    struct wrap_mirror_options options = {0};
+
+    unmarshal_box(L, "src", &options.src);
+    unmarshal_box(L, "dst", &options.dst);
+
+    // Body
+    struct mirror *mirror = lua_newuserdata(L, sizeof(*mirror));
+    check_alloc(mirror);
+
+    luaL_getmetatable(L, METATABLE_MIRROR);
+    lua_setmetatable(L, -2);
+
+    mirror->parent = wrap_lua_mirror(wrap, options);
+    if (!mirror->parent) {
+        return luaL_error(L, "failed to create mirror");
+    }
+
+    // Epilogue. The userdata (mirror) was already pushed to the stack by the above code.
     return 1;
 }
 
@@ -542,6 +665,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"current_time", l_current_time},
     {"exec", l_exec},
     {"floating_shown", l_floating_shown},
+    {"mirror", l_mirror},
     {"press_key", l_press_key},
     {"profile", l_profile},
     {"set_keymap", l_set_keymap},
@@ -562,6 +686,16 @@ static const struct luaL_Reg lua_lib[] = {
 int
 config_api_init(struct config_vm *vm) {
     config_vm_register_lib(vm, lua_lib, "priv_waywall");
+
+    // Create the metatable for "mirror" objects.
+    luaL_newmetatable(vm->L, METATABLE_MIRROR); // stack: n+1
+    lua_pushstring(vm->L, "__gc");              // stack: n+2
+    lua_pushcfunction(vm->L, mirror_gc);        // stack: n+3
+    lua_settable(vm->L, -3);                    // stack: n+1
+    lua_pushstring(vm->L, "__index");           // stack: n+2
+    lua_pushcfunction(vm->L, mirror_index);     // stack: n+3
+    lua_settable(vm->L, -3);                    // stack: n+1
+    lua_pop(vm->L, 1);                          // stack: n
 
     for (size_t i = 0; i < STATIC_ARRLEN(EMBEDDED_LUA); i++) {
         if (config_vm_exec_bcode(vm, EMBEDDED_LUA[i].data, EMBEDDED_LUA[i].size,
