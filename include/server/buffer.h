@@ -28,7 +28,7 @@ struct server_buffer_impl {
     const char *name;
 
     void (*destroy)(void *data);
-    void (*size)(void *data, uint32_t *width, uint32_t *height);
+    void (*size)(void *data, int32_t *width, int32_t *height);
 };
 
 struct server_buffer *server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,

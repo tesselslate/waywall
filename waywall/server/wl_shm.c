@@ -25,7 +25,7 @@ shm_buffer_destroy(void *data) {
 }
 
 static void
-shm_buffer_size(void *data, uint32_t *width, uint32_t *height) {
+shm_buffer_size(void *data, int32_t *width, int32_t *height) {
     struct shm_buffer_data *buffer_data = data;
 
     *width = buffer_data->width;
