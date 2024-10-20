@@ -7,11 +7,13 @@
 
 struct wrap {
     struct config *cfg;
+
     struct server *server;
+    struct server_gl *gl;
+
     struct inotify *inotify;
     struct subproc *subproc;
     struct ww_timer *timer;
-    struct ww_gl *gl;
 
     int32_t width, height;
 

@@ -1,4 +1,4 @@
-#include "gl.h"
+#include "server/gl.h"
 #include "server/backend.h"
 #include "server/server.h"
 #include "util/alloc.h"
@@ -72,8 +72,8 @@ str_eglerror() {
     // clang-format on
 }
 
-struct ww_gl *
-ww_gl_create(struct server *server) {
+struct server_gl *
+server_gl_create(struct server *server) {
     // clang-format off
     static const EGLint config_attributes[] = {
         EGL_SURFACE_TYPE, EGL_PBUFFER_BIT,
@@ -90,9 +90,9 @@ ww_gl_create(struct server *server) {
     };
     // clang-format on
 
-    struct ww_gl *gl = zalloc(1, sizeof(*gl));
+    struct server_gl *gl = zalloc(1, sizeof(*gl));
 
-    gl->remote_display = server->backend->display;
+    gl->server = server;
 
     const struct {
         void **out;
@@ -146,7 +146,7 @@ fail_egl_get_proc:
 }
 
 void
-ww_gl_destroy(struct ww_gl *gl) {
+server_gl_destroy(struct server_gl *gl) {
     if (gl->egl.ctx) {
         eglDestroyContext(gl->egl.display, gl->egl.ctx);
     }

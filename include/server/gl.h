@@ -1,10 +1,10 @@
-#ifndef WAYWALL_GL_H
-#define WAYWALL_GL_H
+#ifndef WAYWALL_SERVER_GL_H
+#define WAYWALL_SERVER_GL_H
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-struct ww_gl {
+struct server_gl {
     struct {
         PFNEGLGETPLATFORMDISPLAYEXTPROC GetPlatformDisplayEXT;
 
@@ -14,12 +14,10 @@ struct ww_gl {
         EGLint major, minor;
     } egl;
 
-    struct wl_display *remote_display;
+    struct server *server;
 };
 
-struct server;
-
-struct ww_gl *ww_gl_create(struct server *server);
-void ww_gl_destroy(struct ww_gl *gl);
+struct server_gl *server_gl_create(struct server *server);
+void server_gl_destroy(struct server_gl *gl);
 
 #endif

@@ -1,12 +1,12 @@
 #include "wrap.h"
 #include "config/config.h"
 #include "config/vm.h"
-#include "gl.h"
 #include "inotify.h"
 #include "instance.h"
 #include "server/buffer.h"
 #include "server/cursor.h"
 #include "server/fake_input.h"
+#include "server/gl.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -512,7 +512,7 @@ struct wrap *
 wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
 
-    wrap->gl = ww_gl_create(server);
+    wrap->gl = server_gl_create(server);
     if (!wrap->gl) {
         free(wrap);
         return NULL;
@@ -557,7 +557,7 @@ wrap_destroy(struct wrap *wrap) {
         instance_destroy(wrap->instance);
     }
 
-    ww_gl_destroy(wrap->gl);
+    server_gl_destroy(wrap->gl);
     ww_timer_destroy(wrap->timer);
     subproc_destroy(wrap->subproc);
 
