@@ -5,6 +5,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#define SERVER_BUFFER_DMABUF "dmabuf"
+#define SERVER_BUFFER_SHM "shm"
+
 struct server_buffer {
     struct wl_resource *resource;
     struct wl_buffer *remote;

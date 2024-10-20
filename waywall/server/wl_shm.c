@@ -33,7 +33,7 @@ shm_buffer_size(void *data, uint32_t *width, uint32_t *height) {
 }
 
 static const struct server_buffer_impl shm_buffer_impl = {
-    .name = "shm",
+    .name = SERVER_BUFFER_SHM,
 
     .destroy = shm_buffer_destroy,
     .size = shm_buffer_size,

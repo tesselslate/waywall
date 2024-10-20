@@ -39,7 +39,7 @@ dmabuf_buffer_size(void *data, uint32_t *width, uint32_t *height) {
 }
 
 static const struct server_buffer_impl dmabuf_buffer_impl = {
-    .name = "dmabuf",
+    .name = SERVER_BUFFER_DMABUF,
 
     .destroy = dmabuf_buffer_destroy,
     .size = dmabuf_buffer_size,
