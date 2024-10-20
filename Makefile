@@ -1,6 +1,7 @@
 .PHONY: all check clean configure_debug configure_release format lint
 
-LUA=waywall/lua/api.lua \
+LUA=waywall/glsl/embed.lua \
+	waywall/lua/api.lua \
 	waywall/lua/helpers.lua \
 	waywall/lua/init.lua
 
