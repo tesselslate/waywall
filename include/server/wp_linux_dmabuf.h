@@ -47,12 +47,12 @@ struct server_linux_dmabuf_feedback {
 struct server_dmabuf_data {
     int32_t width, height;
     uint32_t format, flags;
+    uint32_t modifier_lo, modifier_hi;
 
     uint32_t num_planes;
     struct {
         int32_t fd;
         uint32_t offset, stride;
-        uint32_t modifier_lo, modifier_hi;
     } planes[DMABUF_MAX_PLANES];
 };
 

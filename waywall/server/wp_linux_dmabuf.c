@@ -220,16 +220,23 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
         return;
     }
 
-    zwp_linux_buffer_params_v1_add(buffer_params->remote, fd, plane_idx, offset, stride,
-                                   modifier_hi, modifier_lo);
+    bool eq_modifier = (modifier_lo == buffer_params->data->modifier_lo &&
+                        modifier_hi == buffer_params->data->modifier_hi);
+    if (buffer_params->data->num_planes > 0 && !eq_modifier) {
+        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
+                               "modifier of plane %" PRIu32 " does not match", plane_idx);
+        return;
+    }
 
     buffer_params->data->planes[plane_idx].fd = fd;
     buffer_params->data->planes[plane_idx].offset = offset;
     buffer_params->data->planes[plane_idx].stride = stride;
-    buffer_params->data->planes[plane_idx].modifier_lo = modifier_lo;
-    buffer_params->data->planes[plane_idx].modifier_hi = modifier_hi;
+    buffer_params->data->modifier_lo = modifier_lo;
+    buffer_params->data->modifier_hi = modifier_hi;
 
     buffer_params->data->num_planes++;
+    zwp_linux_buffer_params_v1_add(buffer_params->remote, fd, plane_idx, offset, stride,
+                                   modifier_hi, modifier_lo);
 }
 
 static void
