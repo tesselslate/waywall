@@ -6,6 +6,8 @@
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
+#define DMABUF_MAX_PLANES 4
+
 struct server_linux_dmabuf {
     struct wl_global *global;
 
@@ -23,7 +25,7 @@ struct server_linux_buffer_params {
     struct server_linux_dmabuf *parent;
     struct zwp_linux_buffer_params_v1 *remote; // on server_linux_dmabuf.queue
 
-    struct dmabuf_buffer_data *data;
+    struct server_dmabuf_data *data;
     bool used; // whether or not a create/create_immed request has been issued
 
     struct wl_buffer *ok_buffer; // created wl_buffer (for create only)
@@ -40,6 +42,18 @@ struct server_linux_dmabuf_feedback {
     struct wl_resource *resource;
 
     struct zwp_linux_dmabuf_feedback_v1 *remote;
+};
+
+struct server_dmabuf_data {
+    int32_t width, height;
+    uint32_t format, flags;
+
+    uint32_t num_planes;
+    struct {
+        int32_t fd;
+        uint32_t offset, stride;
+        uint32_t modifier_lo, modifier_hi;
+    } planes[DMABUF_MAX_PLANES];
 };
 
 struct server_linux_dmabuf *server_linux_dmabuf_create(struct server *server);

@@ -16,23 +16,24 @@
 
 #define SRV_LINUX_DMABUF_VERSION 4
 
-#define MAX_PLANES 4
+static void
+destroy_dmabuf_buffer_data(struct server_dmabuf_data *data) {
+    for (size_t i = 0; i < data->num_planes; i++) {
+        close(data->planes[i].fd);
+    }
 
-struct dmabuf_buffer_data {
-    uint32_t planes_set; // bitmask
-    int32_t width, height;
-};
+    free(data);
+}
 
 static void
 dmabuf_buffer_destroy(void *data) {
-    struct dmabuf_buffer_data *buffer_data = data;
-
-    free(buffer_data);
+    struct server_dmabuf_data *buffer_data = data;
+    destroy_dmabuf_buffer_data(buffer_data);
 }
 
 static void
 dmabuf_buffer_size(void *data, int32_t *width, int32_t *height) {
-    struct dmabuf_buffer_data *buffer_data = data;
+    struct server_dmabuf_data *buffer_data = data;
 
     *width = buffer_data->width;
     *height = buffer_data->height;
@@ -50,6 +51,8 @@ create_buffer(struct server_linux_buffer_params *buffer_params, struct wl_resour
               int32_t width, int32_t height, uint32_t format, uint32_t flags) {
     buffer_params->data->width = width;
     buffer_params->data->height = height;
+    buffer_params->data->format = format;
+    buffer_params->data->flags = flags;
 
     zwp_linux_buffer_params_v1_create(buffer_params->remote, width, height, format, flags);
     wl_display_roundtrip_queue(buffer_params->parent->remote_display, buffer_params->parent->queue);
@@ -164,7 +167,7 @@ linux_buffer_params_resource_destroy(struct wl_resource *resource) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
     if (buffer_params->status != BUFFER_PARAMS_STATUS_OK) {
-        free(buffer_params->data);
+        destroy_dmabuf_buffer_data(buffer_params->data);
     }
 
     zwp_linux_buffer_params_v1_destroy(buffer_params->remote);
@@ -177,24 +180,28 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
                         uint32_t modifier_lo) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
-    if (plane_idx >= MAX_PLANES) {
+    if (plane_idx >= DMABUF_MAX_PLANES) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX,
-                               "plane %" PRIu32 " exceeds max of %d", plane_idx, MAX_PLANES);
+                               "plane %" PRIu32 " exceeds max of %d", plane_idx, DMABUF_MAX_PLANES);
         return;
     }
 
-    uint32_t mask = (1 << plane_idx);
-    if (mask & buffer_params->data->planes_set) {
+    if (buffer_params->data->planes[plane_idx].fd != -1) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_SET,
                                "plane %" PRIu32 " already set", plane_idx);
         return;
     }
 
-    buffer_params->data->planes_set |= mask;
-
     zwp_linux_buffer_params_v1_add(buffer_params->remote, fd, plane_idx, offset, stride,
                                    modifier_hi, modifier_lo);
-    close(fd);
+
+    buffer_params->data->planes[plane_idx].fd = fd;
+    buffer_params->data->planes[plane_idx].offset = offset;
+    buffer_params->data->planes[plane_idx].stride = stride;
+    buffer_params->data->planes[plane_idx].modifier_lo = modifier_lo;
+    buffer_params->data->planes[plane_idx].modifier_hi = modifier_hi;
+
+    buffer_params->data->num_planes++;
 }
 
 static void
@@ -299,7 +306,10 @@ static void
 linux_dmabuf_create_params(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_linux_dmabuf *linux_dmabuf = wl_resource_get_user_data(resource);
 
-    struct dmabuf_buffer_data *buffer_data = zalloc(1, sizeof(*buffer_data));
+    struct server_dmabuf_data *buffer_data = zalloc(1, sizeof(*buffer_data));
+    for (size_t i = 0; i < STATIC_ARRLEN(buffer_data->planes); i++) {
+        buffer_data->planes[i].fd = -1;
+    }
 
     struct server_linux_buffer_params *buffer_params = zalloc(1, sizeof(*buffer_params));
     buffer_params->data = buffer_data;
