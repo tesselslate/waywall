@@ -39,6 +39,7 @@ glesv2 = dependency('glesv2')
 luajit = dependency('luajit')
 wayland_client = dependency('wayland-client')
 wayland_cursor = dependency('wayland-cursor')
+wayland_egl = dependency('wayland-egl')
 wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 
@@ -50,6 +51,7 @@ waywall_deps = [
   luajit,
   wayland_client,
   wayland_cursor,
+  wayland_egl,
   wayland_server,
   xkbcommon,
 ]
