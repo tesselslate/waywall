@@ -77,7 +77,7 @@ server_buffer_from_resource(struct wl_resource *resource) {
 }
 
 void
-server_buffer_get_size(struct server_buffer *buffer, uint32_t *width, uint32_t *height) {
+server_buffer_get_size(struct server_buffer *buffer, int32_t *width, int32_t *height) {
     buffer->impl->size(buffer->data, width, height);
 }
 

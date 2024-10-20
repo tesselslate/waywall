@@ -112,7 +112,7 @@ floating_update_anchored(struct wrap *wrap) {
     }
 
     struct floating_view *fview = wrap->floating.anchored;
-    uint32_t win_width, win_height;
+    int32_t win_width, win_height;
     server_buffer_get_size(server_surface_next_buffer(fview->view->surface), &win_width,
                            &win_height);
 
@@ -165,7 +165,7 @@ static struct floating_view *
 floating_view_at(struct wrap *wrap, double x, double y) {
     struct floating_view *fview;
     wl_list_for_each (fview, &wrap->floating.views, link) {
-        uint32_t width, height;
+        int32_t width, height;
         server_buffer_get_size(server_surface_next_buffer(fview->view->surface), &width, &height);
 
         struct box area = {
@@ -350,7 +350,7 @@ on_view_create(struct wl_listener *listener, void *data) {
     // event fires?), but this works for now.
     ww_assert(wrap->view->surface->pending.buffer);
 
-    uint32_t width, height;
+    int32_t width, height;
     server_buffer_get_size(wrap->view->surface->pending.buffer, &width, &height);
 
     wrap->server->ui->width = width;

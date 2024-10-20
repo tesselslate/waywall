@@ -23,7 +23,7 @@ static void
 layout_centered(struct server_view *view) {
     ww_assert(view->subsurface);
 
-    uint32_t width, height;
+    int32_t width, height;
     server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
 
     // Center the view in the window.
@@ -38,11 +38,11 @@ layout_centered(struct server_view *view) {
         wp_viewport_set_destination(view->viewport, -1, -1);
     } else {
         // If the centered view is partially outside the window, it must be cropped.
-        uint32_t crop_width = (x >= 0) ? width : (uint32_t)view->ui->width;
-        uint32_t crop_height = (y >= 0) ? height : (uint32_t)view->ui->height;
+        int32_t crop_width = (x >= 0) ? width : view->ui->width;
+        int32_t crop_height = (y >= 0) ? height : view->ui->height;
 
-        uint32_t crop_x = (width / 2) - (crop_width / 2);
-        uint32_t crop_y = (height / 2) - (crop_height / 2);
+        int32_t crop_x = (width / 2) - (crop_width / 2);
+        int32_t crop_y = (height / 2) - (crop_height / 2);
 
         x = x >= 0 ? x : 0;
         y = y >= 0 ? y : 0;
@@ -155,8 +155,8 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
     }
 
     if (view->surface->current.buffer) {
-        uint32_t prev_width, prev_height;
-        uint32_t pending_width, pending_height;
+        int32_t prev_width, prev_height;
+        int32_t pending_width, pending_height;
 
         server_buffer_get_size(view->surface->current.buffer, &prev_width, &prev_height);
         server_buffer_get_size(view->surface->pending.buffer, &pending_width, &pending_height);

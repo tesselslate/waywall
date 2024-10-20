@@ -34,7 +34,7 @@ struct server_buffer_impl {
 struct server_buffer *server_buffer_create(struct wl_resource *resource, struct wl_buffer *remote,
                                            const struct server_buffer_impl *impl, void *data);
 struct server_buffer *server_buffer_from_resource(struct wl_resource *resource);
-void server_buffer_get_size(struct server_buffer *buffer, uint32_t *width, uint32_t *height);
+void server_buffer_get_size(struct server_buffer *buffer, int32_t *width, int32_t *height);
 void server_buffer_lock(struct server_buffer *buffer);
 struct server_buffer *server_buffer_ref(struct server_buffer *buffer);
 void server_buffer_unlock(struct server_buffer *buffer);
