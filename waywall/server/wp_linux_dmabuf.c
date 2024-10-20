@@ -46,6 +46,34 @@ static const struct server_buffer_impl dmabuf_buffer_impl = {
     .size = dmabuf_buffer_size,
 };
 
+static bool
+check_buffer_params(struct server_linux_buffer_params *buffer_params) {
+    if (buffer_params->used) {
+        wl_resource_post_error(buffer_params->resource,
+                               ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
+                               "cannot call create on the same zwp_linux_buffer_params twice");
+        return false;
+    }
+
+    if (buffer_params->data->num_planes == 0) {
+        wl_resource_post_error(buffer_params->resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE,
+                               "zwp_linux_buffer_params has no planes");
+        return false;
+    }
+
+    for (size_t i = 0; i < buffer_params->data->num_planes; i++) {
+        if (buffer_params->data->planes[i].fd == -1) {
+
+            wl_resource_post_error(buffer_params->resource,
+                                   ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INCOMPLETE,
+                                   "zwp_linux_buffer_params has gap at plane %zu", i);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static void
 create_buffer(struct server_linux_buffer_params *buffer_params, struct wl_resource *buffer_resource,
               int32_t width, int32_t height, uint32_t format, uint32_t flags) {
@@ -209,12 +237,9 @@ linux_buffer_params_create(struct wl_client *client, struct wl_resource *resourc
                            int32_t height, uint32_t format, uint32_t flags) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
-    if (buffer_params->used) {
-        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
-                               "cannot call create on the same zwp_linux_buffer_params twice");
+    if (!check_buffer_params(buffer_params)) {
         return;
     }
-    buffer_params->used = true;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, 0);
     check_alloc(buffer_resource);
@@ -240,12 +265,9 @@ linux_buffer_params_create_immed(struct wl_client *client, struct wl_resource *r
                                  uint32_t flags) {
     struct server_linux_buffer_params *buffer_params = wl_resource_get_user_data(resource);
 
-    if (buffer_params->used) {
-        wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_ALREADY_USED,
-                               "cannot call create on the same zwp_linux_buffer_params twice");
+    if (!check_buffer_params(buffer_params)) {
         return;
     }
-    buffer_params->used = true;
 
     struct wl_resource *buffer_resource = wl_resource_create(client, &wl_buffer_interface, 1, id);
     check_alloc(buffer_resource);
