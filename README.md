@@ -13,7 +13,7 @@ successor to [resetti](https://github.com/tesselslate/resetti).
 
 The following dependencies are required only at build time:
 
-- `wayland-protocols`
+ - `wayland-protocols`
 
 The following dependencies are required for both building and running:
 
@@ -22,6 +22,24 @@ The following dependencies are required for both building and running:
  - `wayland-cursor`
  - `wayland-server`
  - `xkbcommon`
+
+> [!NOTE]
+> waywall features support for OpenGL (for builtin mirroring) and Xwayland.
+> These require additional build time and runtime dependencies:
+>
+> #### OpenGL
+>
+>  - `egl`
+>  - `glesv2`
+>  - `wayland-egl`
+>
+> #### Xwayland
+>
+>  - `xcb`
+>  - `xcb-composite`
+>  - `xcb-res`
+>  - `xcb-xtest`
+>  - `xwayland`
 
 To build waywall, clone the repository and run `make`.
 
