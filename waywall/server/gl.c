@@ -471,7 +471,7 @@ gl_surface_update(struct server_gl_surface *gl_surface) {
 
     glViewport(0, 0, gl_surface->options.width, gl_surface->options.height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glClearColor(0, 0, 0, 1);
+    glClearColor(0, 0, 0, 0);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -487,6 +487,13 @@ gl_surface_update(struct server_gl_surface *gl_surface) {
     int32_t width, height;
     server_buffer_get_size(gl_surface->current->parent, &width, &height);
     glUniform2f(gl_surface->gl->shader.uniform_size, width, height);
+
+    glUniform4f(gl_surface->gl->shader.uniform_key_src, gl_surface->options.src_rgba[0],
+                gl_surface->options.src_rgba[1], gl_surface->options.src_rgba[2],
+                gl_surface->options.src_rgba[3]);
+    glUniform4f(gl_surface->gl->shader.uniform_key_dst, gl_surface->options.dst_rgba[0],
+                gl_surface->options.dst_rgba[1], gl_surface->options.dst_rgba[2],
+                gl_surface->options.dst_rgba[3]);
 
     glEnableVertexAttribArray(gl_surface->gl->shader.attrib_pos);
     glEnableVertexAttribArray(gl_surface->gl->shader.attrib_texcoord);
@@ -646,6 +653,12 @@ server_gl_create(struct server *server) {
 
     gl->shader.uniform_size = glGetUniformLocation(gl->shader.prog, "u_size");
     ww_assert(gl->shader.uniform_size != -1);
+
+    gl->shader.uniform_key_src = glGetUniformLocation(gl->shader.prog, "u_colorkey_src");
+    ww_assert(gl->shader.uniform_key_src != -1);
+
+    gl->shader.uniform_key_dst = glGetUniformLocation(gl->shader.prog, "u_colorkey_dst");
+    ww_assert(gl->shader.uniform_key_dst != -1);
 
     glGenBuffers(1, &gl->shader.vbo);
 

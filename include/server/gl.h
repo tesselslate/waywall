@@ -30,7 +30,7 @@ struct server_gl {
 
         GLuint vbo;
         GLint attrib_pos, attrib_texcoord;
-        GLint uniform_size;
+        GLint uniform_size, uniform_key_src, uniform_key_dst;
     } shader;
 };
 
@@ -48,6 +48,7 @@ struct server_gl_surface {
     struct server_gl_surface_options {
         struct box crop;
         int32_t width, height;
+        float src_rgba[4], dst_rgba[4];
     } options;
 
     struct wl_listener on_surface_commit;

@@ -193,6 +193,32 @@ unmarshal_box(lua_State *L, const char *key, struct box *out) {
 }
 
 static int
+unmarshal_color(lua_State *L, const char *key, float rgba[static 4]) {
+    lua_pushstring(L, key); // stack: n+1
+    lua_rawget(L, -2);      // stack: n+1
+
+    if (lua_type(L, -1) != LUA_TSTRING) {
+        return luaL_error(L, "expected '%s' to be a string, got '%s'", key, luaL_typename(L, -1));
+    }
+
+    const char *value = lua_tostring(L, -1);
+
+    uint8_t u8_rgba[4] = {0};
+    if (config_parse_hex(u8_rgba, value) != 0) {
+        return luaL_error(L, "expected '%s' to be a valid hex color ('%s')", key, value);
+    }
+
+    rgba[0] = (float)u8_rgba[0] / UINT8_MAX;
+    rgba[1] = (float)u8_rgba[1] / UINT8_MAX;
+    rgba[2] = (float)u8_rgba[2] / UINT8_MAX;
+    rgba[3] = (float)u8_rgba[3] / UINT8_MAX;
+
+    lua_pop(L, 1); // stack: n
+
+    return 0;
+}
+
+static int
 l_active_res(lua_State *L) {
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -300,6 +326,15 @@ l_mirror(lua_State *L) {
 
     unmarshal_box(L, "src", &options.src);
     unmarshal_box(L, "dst", &options.dst);
+
+    lua_pushstring(L, "color_key"); // stack: 2
+    lua_rawget(L, ARG_OPTIONS);     // stack: 2
+
+    if (lua_type(L, -1) == LUA_TTABLE) {
+        unmarshal_color(L, "input", options.key_src);
+        unmarshal_color(L, "output", options.key_dst);
+    }
+    lua_pop(L, 1); // stack: 1
 
     // Body
     struct mirror *mirror = lua_newuserdata(L, sizeof(*mirror));

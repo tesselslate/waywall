@@ -53,6 +53,7 @@ struct wrap {
 
 struct wrap_mirror_options {
     struct box src, dst;
+    float key_src[4], key_dst[4];
 };
 
 struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct config *cfg);

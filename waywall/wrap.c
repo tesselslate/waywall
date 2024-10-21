@@ -268,6 +268,8 @@ mirror_create(struct wrap *wrap, struct wrap_mirror_options options) {
         .width = options.dst.width,
         .height = options.dst.height,
     };
+    memcpy(&gl_options.src_rgba, options.key_src, sizeof(float) * 4);
+    memcpy(&gl_options.dst_rgba, options.key_dst, sizeof(float) * 4);
 
     mirror->gl_surface = server_gl_surface_create(wrap->gl, wrap->view->surface, gl_options);
     if (!mirror->gl_surface) {
