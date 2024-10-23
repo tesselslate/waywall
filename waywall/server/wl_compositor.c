@@ -92,7 +92,7 @@ static void
 surface_resource_destroy(struct wl_resource *resource) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
-    wl_signal_emit(&surface->events.destroy, surface);
+    wl_signal_emit_mutable(&surface->events.destroy, surface);
 
     if (surface->role && surface->role_resource) {
         surface->role->destroy(surface->role_resource);
@@ -141,7 +141,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         surface->role->commit(surface->role_resource);
     }
 
-    wl_signal_emit(&surface->events.commit, surface);
+    wl_signal_emit_mutable(&surface->events.commit, surface);
 
     if (surface->pending.present & SURFACE_STATE_BUFFER) {
         wl_surface_attach(surface->remote,

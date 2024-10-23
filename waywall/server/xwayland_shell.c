@@ -21,7 +21,7 @@ xwayland_surface_role_commit(struct wl_resource *role_resource) {
 
     xwayland_surface->pending_association = false;
     xwayland_surface->associated = true;
-    wl_signal_emit(&xwayland_surface->events.set_serial, &xwayland_surface->pending_serial);
+    wl_signal_emit_mutable(&xwayland_surface->events.set_serial, &xwayland_surface->pending_serial);
 }
 
 static void
@@ -40,7 +40,7 @@ static void
 xwayland_surface_resource_destroy(struct wl_resource *resource) {
     struct server_xwayland_surface *xwayland_surface = wl_resource_get_user_data(resource);
 
-    wl_signal_emit(&xwayland_surface->events.destroy, NULL);
+    wl_signal_emit_mutable(&xwayland_surface->events.destroy, NULL);
     free(xwayland_surface);
 }
 
@@ -113,7 +113,7 @@ xwayland_shell_get_xwayland_surface(struct wl_client *client, struct wl_resource
         return;
     }
 
-    wl_signal_emit(&xwayland_shell->events.new_surface, xwayland_surface);
+    wl_signal_emit_mutable(&xwayland_shell->events.new_surface, xwayland_surface);
 }
 
 static const struct xwayland_shell_v1_interface xwayland_shell_impl = {

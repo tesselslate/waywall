@@ -136,7 +136,7 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
     xdg_surface_ack_configure(xdg_surface, serial);
 
     if (ui->resize) {
-        wl_signal_emit(&ui->events.resize, NULL);
+        wl_signal_emit_mutable(&ui->events.resize, NULL);
         ui->resize = false;
     }
     wl_surface_commit(ui->root.surface);
