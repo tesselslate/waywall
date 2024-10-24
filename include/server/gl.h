@@ -53,6 +53,7 @@ struct server_gl {
         size_t len;
 
         struct wl_list mirrors; // server_gl_mirror.link
+        struct wl_list images;  // server_gl_image.link
     } draw;
 
     struct wl_listener on_surface_commit;
@@ -60,16 +61,21 @@ struct server_gl {
     struct wl_listener on_ui_resize;
 };
 
-struct server_gl_mirror;
-
 struct server_gl_mirror_options {
     struct box src, dst;
     float src_rgba[4], dst_rgba[4];
 };
 
+struct server_gl_image;
+struct server_gl_mirror;
+
 struct server_gl *server_gl_create(struct server *server);
 void server_gl_destroy(struct server_gl *gl);
 void server_gl_set_target(struct server_gl *gl, struct server_surface *surface);
+
+struct server_gl_image *server_gl_image_create(struct server_gl *gl, char *buf, size_t bufsize,
+                                               struct server_gl_mirror_options options);
+void server_gl_image_destroy(struct server_gl_image *image);
 
 struct server_gl_mirror *server_gl_mirror_create(struct server_gl *gl,
                                                  struct server_gl_mirror_options options);

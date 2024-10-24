@@ -15,6 +15,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
+#include <spng.h>
 #include <stdio.h>
 #include <wayland-client-core.h>
 #include <wayland-egl.h>
@@ -98,16 +99,18 @@
 
 #define DRM_FORMAT_MOD_INVALID 0xFFFFFFFFFFFFFFFull
 
+#define IMAGE_DRAWLIST_LEN 6
+
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
 
-#define VERTEX(mirror, dst_x, dst_y, src_x, src_y)                                                 \
+#define VERTEX(options, dst_x, dst_y, src_x, src_y)                                                \
     (struct vertex) {                                                                              \
         .pos = {(dst_x), (dst_y)}, .tex = {(src_x), (src_y)},                                      \
-        .src_rgba = {mirror->options.src_rgba[0], mirror->options.src_rgba[1],                     \
-                     mirror->options.src_rgba[2], mirror->options.src_rgba[3]},                    \
-        .dst_rgba = {mirror->options.dst_rgba[0], mirror->options.dst_rgba[1],                     \
-                     mirror->options.dst_rgba[2], mirror->options.dst_rgba[3]},                    \
+        .src_rgba = {options->src_rgba[0], options->src_rgba[1], options->src_rgba[2],             \
+                     options->src_rgba[3]},                                                        \
+        .dst_rgba = {options->dst_rgba[0], options->dst_rgba[1], options->dst_rgba[2],             \
+                     options->dst_rgba[3]},                                                        \
     }
 
 struct gl_buffer {
@@ -117,6 +120,16 @@ struct gl_buffer {
     struct server_buffer *parent;
     EGLImageKHR image; // imported DMABUF - must not be modified
     GLuint texture;    // must not be modified
+};
+
+struct server_gl_image {
+    struct wl_list link; // server_gl.draw.images
+    struct server_gl *gl;
+
+    int32_t width, height;
+
+    char *drawlist;
+    GLuint texture;
 };
 
 struct server_gl_mirror {
@@ -476,6 +489,24 @@ fail_create_orig:
     return NULL;
 }
 
+static struct vertex *
+draw_build_rect(struct vertex *buf, struct server_gl_mirror_options *o) {
+    const struct box *s = &o->src;
+    const struct box *d = &o->dst;
+
+    // Top-left triangle
+    *(buf++) = VERTEX(o, d->x, d->y, s->x, s->y);
+    *(buf++) = VERTEX(o, d->x + d->width, d->y, s->x + s->width, s->y);
+    *(buf++) = VERTEX(o, d->x, d->y + d->height, s->x, s->y + s->height);
+
+    // Bottom-right triangle
+    *(buf++) = VERTEX(o, d->x + d->width, d->y, s->x + s->width, s->y);
+    *(buf++) = VERTEX(o, d->x, d->y + d->height, s->x, s->y + s->height);
+    *(buf++) = VERTEX(o, d->x + d->width, d->y + d->height, s->x + s->width, s->y + s->height);
+
+    return buf;
+}
+
 static void
 draw_build_lists(struct server_gl *gl) {
     if (wl_list_empty(&gl->draw.mirrors)) {
@@ -493,25 +524,14 @@ draw_build_lists(struct server_gl *gl) {
 
     struct server_gl_mirror *mirror;
     wl_list_for_each (mirror, &gl->draw.mirrors, link) {
-        struct box s = mirror->options.src;
-        struct box d = mirror->options.dst;
-
-        // Top-left triangle
-        *(ptr++) = VERTEX(mirror, d.x, d.y, s.x, s.y);
-        *(ptr++) = VERTEX(mirror, d.x + d.width, d.y, s.x + s.width, s.y);
-        *(ptr++) = VERTEX(mirror, d.x, d.y + d.height, s.x, s.y + s.height);
-
-        // Bottom-right triangle
-        *(ptr++) = VERTEX(mirror, d.x + d.width, d.y, s.x + s.width, s.y);
-        *(ptr++) = VERTEX(mirror, d.x, d.y + d.height, s.x, s.y + s.height);
-        *(ptr++) = VERTEX(mirror, d.x + d.width, d.y + d.height, s.x + s.width, s.y + s.height);
+        ptr = draw_build_rect(ptr, &mirror->options);
     }
+}
 
-    // Update OpenGL state with the new vertex buffer.
-    eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
-
+static void
+draw_list(struct server_gl *gl, struct vertex *vertices, size_t num_vertices, GLuint texture) {
     glBindBuffer(GL_ARRAY_BUFFER, gl->shader.vbo);
-    glBufferData(GL_ARRAY_BUFFER, gl->draw.len, gl->draw.buf, GL_STREAM_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(struct vertex), vertices, GL_STREAM_DRAW);
 
     glVertexAttribPointer(gl->shader.attrib_pos, 2, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
                           (const void *)offsetof(struct vertex, pos));
@@ -521,6 +541,19 @@ draw_build_lists(struct server_gl *gl) {
                           (const void *)offsetof(struct vertex, src_rgba));
     glVertexAttribPointer(gl->shader.attrib_dst_rgba, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
                           (const void *)offsetof(struct vertex, dst_rgba));
+
+    glEnableVertexAttribArray(gl->shader.attrib_pos);
+    glEnableVertexAttribArray(gl->shader.attrib_tex);
+    glEnableVertexAttribArray(gl->shader.attrib_src_rgba);
+    glEnableVertexAttribArray(gl->shader.attrib_dst_rgba);
+
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glDrawArrays(GL_TRIANGLES, 0, num_vertices);
+
+    glDisableVertexAttribArray(gl->shader.attrib_pos);
+    glDisableVertexAttribArray(gl->shader.attrib_tex);
+    glDisableVertexAttribArray(gl->shader.attrib_src_rgba);
+    glDisableVertexAttribArray(gl->shader.attrib_dst_rgba);
 }
 
 static void
@@ -550,23 +583,21 @@ draw_frame(struct server_gl *gl) {
 
     int32_t buf_width, buf_height;
     server_buffer_get_size(gl->capture.current->parent, &buf_width, &buf_height);
-    glUniform2f(gl->shader.uniform_texsize, buf_width, buf_height);
     glUniform2f(gl->shader.uniform_winsize, ui_width, ui_height);
 
-    glBindBuffer(GL_ARRAY_BUFFER, gl->shader.vbo);
-    glEnableVertexAttribArray(gl->shader.attrib_pos);
-    glEnableVertexAttribArray(gl->shader.attrib_tex);
-    glEnableVertexAttribArray(gl->shader.attrib_src_rgba);
-    glEnableVertexAttribArray(gl->shader.attrib_dst_rgba);
+    // Draw all mirrors.
+    glUniform2f(gl->shader.uniform_texsize, buf_width, buf_height);
+    draw_list(gl, (struct vertex *)gl->draw.buf, gl->draw.len / sizeof(struct vertex),
+              gl->capture.current->texture);
 
-    glBindTexture(GL_TEXTURE_2D, gl->capture.current->texture);
-    glDrawArrays(GL_TRIANGLES, 0, gl->draw.len / sizeof(struct vertex));
+    // Draw all images.
+    struct server_gl_image *image;
+    wl_list_for_each (image, &gl->draw.images, link) {
+        glUniform2f(gl->shader.uniform_texsize, image->width, image->height);
+        draw_list(gl, (struct vertex *)image->drawlist, IMAGE_DRAWLIST_LEN, image->texture);
+    }
 
-    glDisableVertexAttribArray(gl->shader.attrib_pos);
-    glDisableVertexAttribArray(gl->shader.attrib_tex);
-    glDisableVertexAttribArray(gl->shader.attrib_src_rgba);
-    glDisableVertexAttribArray(gl->shader.attrib_dst_rgba);
-
+    // Push the results to the framebuffer.
     eglSwapBuffers(gl->egl.display, gl->surface.egl);
 
     // TODO: Explicit sync support
@@ -769,6 +800,7 @@ server_gl_create(struct server *server) {
     egl_print_sysinfo(gl);
 
     wl_list_init(&gl->draw.mirrors);
+    wl_list_init(&gl->draw.images);
     wl_list_init(&gl->capture.buffers);
 
     return gl;
@@ -828,6 +860,17 @@ server_gl_destroy(struct server_gl *gl) {
 
         wl_list_remove(&mirror->link);
         wl_list_init(&mirror->link);
+    }
+
+    struct server_gl_image *image, *image_tmp;
+    wl_list_for_each_safe (image, image_tmp, &gl->draw.images, link) {
+        image->gl = NULL;
+
+        eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
+        glDeleteTextures(1, &image->texture);
+
+        wl_list_remove(&image->link);
+        wl_list_init(&image->link);
     }
 
     // Destroy surface resources.
@@ -896,4 +939,100 @@ server_gl_mirror_destroy(struct server_gl_mirror *mirror) {
     }
 
     free(mirror);
+}
+
+struct server_gl_image *
+server_gl_image_create(struct server_gl *gl, char *buf, size_t bufsize,
+                       struct server_gl_mirror_options options) {
+    struct server_gl_image *image = zalloc(1, sizeof(*image));
+
+    image->gl = gl;
+
+    // Attempt to decode the PNG.
+    spng_ctx *ctx = spng_ctx_new(0);
+    if (!ctx) {
+        ww_log(LOG_ERROR, "failed to create spng_ctx");
+        goto fail_ctx_new;
+    }
+
+    int err = spng_set_png_buffer(ctx, buf, bufsize);
+    if (err != 0) {
+        ww_log(LOG_ERROR, "failed to set png buffer: %s\n", spng_strerror(err));
+        goto fail_set_png_buffer;
+    }
+
+    struct spng_ihdr ihdr = {0};
+    err = spng_get_ihdr(ctx, &ihdr);
+    if (err != 0) {
+        ww_log(LOG_ERROR, "failed to get image header: %s\n", spng_strerror(err));
+        goto fail_get_ihdr;
+    }
+
+    size_t decode_size;
+    err = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &decode_size);
+    if (err != 0) {
+        ww_log(LOG_ERROR, "failed to get decoded image size: %s\n", spng_strerror(err));
+        goto fail_get_image_size;
+    }
+
+    char *decode_buf = zalloc(decode_size, 1);
+    err = spng_decode_image(ctx, decode_buf, decode_size, SPNG_FMT_RGBA8, SPNG_DECODE_TRNS);
+    if (err != 0) {
+        ww_log(LOG_ERROR, "failed to decode image: %s\n", spng_strerror(err));
+        goto fail_decode_image;
+    }
+
+    // Create a buffer containing the vertex data for the image.
+    options.src = (struct box){0, 0, ihdr.width, ihdr.height};
+
+    image->width = ihdr.width;
+    image->height = ihdr.height;
+
+    image->drawlist = zalloc(IMAGE_DRAWLIST_LEN, sizeof(struct vertex));
+    draw_build_rect((struct vertex *)image->drawlist, &options);
+
+    // Attempt to place the PNG into an OpenGL texture.
+    eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
+
+    glGenTextures(1, &image->texture);
+    glBindTexture(GL_TEXTURE_2D, image->texture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ihdr.width, ihdr.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
+                 decode_buf);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // Cleanup the PNG decoder resources.
+    free(decode_buf);
+    spng_ctx_free(ctx);
+
+    wl_list_insert(&gl->draw.images, &image->link);
+
+    return image;
+
+fail_decode_image:
+    free(decode_buf);
+
+fail_get_image_size:
+fail_get_ihdr:
+fail_set_png_buffer:
+    spng_ctx_free(ctx);
+
+fail_ctx_new:
+    free(image);
+
+    return NULL;
+}
+
+void
+server_gl_image_destroy(struct server_gl_image *image) {
+    wl_list_remove(&image->link);
+
+    if (image->gl) {
+        eglMakeCurrent(image->gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, image->gl->egl.ctx);
+        glDeleteTextures(1, &image->texture);
+    }
+
+    free(image->drawlist);
+    free(image);
 }
