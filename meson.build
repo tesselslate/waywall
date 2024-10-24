@@ -54,6 +54,7 @@ waywall_deps = [
 if get_option('opengl').enabled()
   waywall_deps += dependency('egl')
   waywall_deps += dependency('glesv2')
+  waywall_deps += dependency('spng')
   waywall_deps += dependency('wayland-egl')
 
   add_project_arguments(
