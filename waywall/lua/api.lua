@@ -80,6 +80,12 @@ M.exec = priv.exec
 -- @return shown Whether floating windows are shown.
 M.floating_shown = priv.floating_shown
 
+--- Creates an image object which displays a PNG image from the filesystem.
+-- @param path The filepath to the image.
+-- @param options The options to create the image with.
+-- @return image The image object.
+M.image = priv.image
+
 --- Creates a "mirror" object which mirrors part of the Minecraft window.
 -- @param options The options to create the mirror with.
 -- @return mirror The mirror object.

@@ -16,6 +16,7 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "wrap.h"
+#include <fcntl.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
 #include <stdbool.h>
@@ -23,8 +24,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
+#include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
 
 #ifdef WAYWALL_OPENGL
@@ -75,6 +79,7 @@ static const struct {
     {luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE, "waywall.helpers"},
 };
 
+#define METATABLE_IMAGE "waywall.image"
 #define METATABLE_MIRROR "waywall.mirror"
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
@@ -85,6 +90,45 @@ struct waker_sleep {
 };
 
 #ifdef WAYWALL_OPENGL
+
+static int
+image_close(lua_State *L) {
+    struct server_gl_image **image = lua_touserdata(L, 1);
+
+    if (!*image) {
+        return luaL_error(L, "cannot close image more than once");
+    }
+
+    server_gl_image_destroy(*image);
+    *image = NULL;
+
+    return 0;
+}
+
+static int
+image_index(lua_State *L) {
+    const char *key = luaL_checkstring(L, 2);
+
+    if (strcmp(key, "close") == 0) {
+        lua_pushcfunction(L, image_close);
+    } else {
+        lua_pushnil(L);
+    }
+
+    return 1;
+}
+
+static int
+image_gc(lua_State *L) {
+    struct server_gl_image **image = lua_touserdata(L, 1);
+
+    if (*image) {
+        server_gl_image_destroy(*image);
+    }
+    *image = NULL;
+
+    return 0;
+}
 
 static int
 mirror_close(lua_State *L) {
@@ -158,14 +202,7 @@ waker_sleep_timer_fire(void *data) {
 }
 
 WW_MAYBE_UNUSED static int
-unmarshal_box(lua_State *L, const char *key, struct box *out) {
-    lua_pushstring(L, key); // stack: n+1
-    lua_rawget(L, -2);      // stack: n+1
-
-    if (lua_type(L, -1) != LUA_TTABLE) {
-        return luaL_error(L, "expected '%s' to be a table, got '%s'", key, luaL_typename(L, -1));
-    }
-
+unmarshal_box(lua_State *L, struct box *out) {
     const struct {
         const char *key;
         int32_t *out;
@@ -181,18 +218,32 @@ unmarshal_box(lua_State *L, const char *key, struct box *out) {
         lua_rawget(L, -2);               // stack: n+2
 
         if (lua_type(L, -1) != LUA_TNUMBER) {
-            return luaL_error(L, "expected '%s.%s' to be a number, got '%s'", key, pairs[i].key,
+            return luaL_error(L, "expected '%s' to be a number, got '%s'", pairs[i].key,
                               luaL_typename(L, -1));
         }
 
         int x = lua_tointeger(L, -1);
         if (x < 0) {
-            return luaL_error(L, "expected '%s.%s' to be positive", key, pairs[i].key);
+            return luaL_error(L, "expected '%s' to be positive", pairs[i].key);
         }
 
         *pairs[i].out = x;
         lua_pop(L, 1); // stack: n+1
     }
+
+    return 0;
+}
+
+WW_MAYBE_UNUSED static int
+unmarshal_box_key(lua_State *L, const char *key, struct box *out) {
+    lua_pushstring(L, key); // stack: n+1
+    lua_rawget(L, -2);      // stack: n+1
+
+    if (lua_type(L, -1) != LUA_TTABLE) {
+        return luaL_error(L, "expected '%s' to be a table, got '%s'", key, luaL_typename(L, -1));
+    }
+
+    unmarshal_box(L, out);
 
     lua_pop(L, 1); // stack: n
 
@@ -318,6 +369,62 @@ l_floating_shown(lua_State *L) {
 #ifdef WAYWALL_OPENGL
 
 static int
+l_image(lua_State *L) {
+    static const int ARG_PATH = 1;
+    static const int ARG_OPTIONS = 2;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("image"));
+    }
+
+    const char *path = luaL_checkstring(L, ARG_PATH);
+    luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
+    lua_settop(L, ARG_OPTIONS);
+
+    struct server_gl_mirror_options options = {0};
+    unmarshal_box(L, &options.dst);
+
+    int fd = open(path, O_RDONLY);
+    if (fd == -1) {
+        return luaL_error(L, "failed to open PNG at '%s': %s", path, strerror(errno));
+    }
+
+    struct stat stat;
+    if (fstat(fd, &stat) != 0) {
+        close(fd);
+        return luaL_error(L, "failed to stat PNG at '%s': %s", path, strerror(errno));
+    }
+
+    void *buf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (buf == MAP_FAILED) {
+        close(fd);
+        return luaL_error(L, "failed to mmap PNG at '%s': %s", path, strerror(errno));
+    }
+
+    // Body
+    struct server_gl_image **image = lua_newuserdata(L, sizeof(*image));
+    check_alloc(image);
+
+    luaL_getmetatable(L, METATABLE_IMAGE);
+    lua_setmetatable(L, -2);
+
+    *image = server_gl_image_create(wrap->gl, buf, stat.st_size, options);
+
+    ww_assert(munmap(buf, stat.st_size) == 0);
+    close(fd);
+
+    if (!*image) {
+        return luaL_error(L, "failed to create image");
+    }
+
+    // Epilogue. The userdata (image) was already pushed to the stack by the above code.
+    return 1;
+}
+
+static int
 l_mirror(lua_State *L) {
     static const int ARG_OPTIONS = 1;
 
@@ -333,8 +440,8 @@ l_mirror(lua_State *L) {
 
     struct server_gl_mirror_options options = {0};
 
-    unmarshal_box(L, "src", &options.src);
-    unmarshal_box(L, "dst", &options.dst);
+    unmarshal_box_key(L, "src", &options.src);
+    unmarshal_box_key(L, "dst", &options.dst);
 
     lua_pushstring(L, "color_key"); // stack: 2
     lua_rawget(L, ARG_OPTIONS);     // stack: 2
@@ -362,6 +469,11 @@ l_mirror(lua_State *L) {
 }
 
 #else
+
+static int
+l_image(lua_State *L) {
+    return luaL_error(L, "OpenGL support is not enabled");
+}
 
 static int
 l_mirror(lua_State *L) {
@@ -717,6 +829,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"current_time", l_current_time},
     {"exec", l_exec},
     {"floating_shown", l_floating_shown},
+    {"image", l_image},
     {"mirror", l_mirror},
     {"press_key", l_press_key},
     {"profile", l_profile},
@@ -740,6 +853,16 @@ config_api_init(struct config_vm *vm) {
     config_vm_register_lib(vm, lua_lib, "priv_waywall");
 
 #ifdef WAYWALL_OPENGL
+
+    // Create the metatable for "image" objects.
+    luaL_newmetatable(vm->L, METATABLE_IMAGE); // stack: n+1
+    lua_pushstring(vm->L, "__gc");             // stack: n+2
+    lua_pushcfunction(vm->L, image_gc);        // stack: n+3
+    lua_settable(vm->L, -3);                   // stack: n+1
+    lua_pushstring(vm->L, "__index");          // stack: n+2
+    lua_pushcfunction(vm->L, image_index);     // stack: n+3
+    lua_settable(vm->L, -3);                   // stack: n+1
+    lua_pop(vm->L, 1);                         // stack: n
 
     // Create the metatable for "mirror" objects.
     luaL_newmetatable(vm->L, METATABLE_MIRROR); // stack: n+1
