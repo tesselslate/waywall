@@ -5,12 +5,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 
-static inline void
-check_alloc(const void *data) {
-    if (__builtin_expect(!data, 0)) {
-        ww_panic("allocation failed");
-    }
-}
+#define check_alloc(data)                                                                          \
+    do {                                                                                           \
+        if (__builtin_expect(!(data), 0)) {                                                        \
+            ww_panic("allocation failed");                                                         \
+        }                                                                                          \
+    } while (0)
 
 static inline void *
 zalloc(size_t nmemb, size_t size) {
