@@ -44,13 +44,6 @@ struct floating_view {
     int32_t x, y;
 };
 
-struct wrap_mirror {
-    struct wl_list link; // wrap.mirrors
-
-    struct server_gl_surface *gl_surface;
-    struct wl_subsurface *subsurface;
-};
-
 static void
 set_anchored(struct wrap *wrap, struct floating_view *fview) {
     ww_assert(!wrap->floating.anchored);
@@ -257,83 +250,6 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
     ww_panic("could not find floating view");
 }
 
-#ifdef WAYWALL_OPENGL
-
-static struct wrap_mirror *
-mirror_create(struct wrap *wrap, struct wrap_mirror_options options) {
-    struct wrap_mirror *mirror = zalloc(1, sizeof(*mirror));
-
-    struct server_gl_surface_options gl_options = {
-        .crop = options.src,
-        .width = options.dst.width,
-        .height = options.dst.height,
-    };
-    memcpy(&gl_options.src_rgba, options.key_src, sizeof(float) * 4);
-    memcpy(&gl_options.dst_rgba, options.key_dst, sizeof(float) * 4);
-
-    mirror->gl_surface = server_gl_surface_create(wrap->gl, wrap->view->surface, gl_options);
-    if (!mirror->gl_surface) {
-        free(mirror);
-        return NULL;
-    }
-
-    mirror->subsurface =
-        wl_subcompositor_get_subsurface(wrap->server->backend->subcompositor,
-                                        mirror->gl_surface->remote, wrap->server->ui->tree.surface);
-    check_alloc(mirror->subsurface);
-
-    wl_subsurface_set_desync(mirror->subsurface);
-    wl_subsurface_set_position(mirror->subsurface, options.dst.x, options.dst.y);
-    wl_surface_commit(mirror->gl_surface->remote);
-
-    wl_list_insert(&wrap->mirrors, &mirror->link);
-
-    return mirror;
-}
-
-static void
-mirror_release(struct wrap_mirror *mirror) {
-    if (mirror->subsurface) {
-        wl_subsurface_destroy(mirror->subsurface);
-        mirror->subsurface = NULL;
-    }
-
-    if (mirror->gl_surface) {
-        server_gl_surface_destroy(mirror->gl_surface);
-        mirror->gl_surface = NULL;
-    }
-
-    // Ensure it is safe to call wl_list_remove again by reinitializing the link field.
-    wl_list_remove(&mirror->link);
-    wl_list_init(&mirror->link);
-}
-
-static void
-mirror_destroy(struct wrap_mirror *mirror) {
-    mirror_release(mirror);
-    free(mirror);
-}
-
-#else
-
-static struct wrap_mirror *
-mirror_create(struct wrap *wrap, struct wrap_mirror_options options) {
-    ww_log(LOG_ERROR, "cannot create mirror without OpenGL support");
-    return NULL;
-}
-
-static void
-mirror_destroy(struct wrap_mirror *mirror) {
-    ww_unreachable();
-}
-
-static void
-mirror_release(struct wrap_mirror *mirror) {
-    ww_unreachable();
-}
-
-#endif
-
 static void
 process_state_update(int wd, uint32_t mask, const char *name, void *data) {
     struct wrap *wrap = data;
@@ -455,6 +371,12 @@ on_view_create(struct wl_listener *listener, void *data) {
     server_view_set_centered(wrap->view, true);
     server_view_set_visible(wrap->view, true);
     server_view_commit(wrap->view);
+
+#ifdef WAYWALL_OPENGL
+
+    server_gl_set_target(wrap->gl, view->surface);
+
+#endif
 }
 
 static void
@@ -619,7 +541,6 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wrap->timer = ww_timer_create(server);
 
     wl_list_init(&wrap->floating.views);
-    wl_list_init(&wrap->mirrors);
 
     config_vm_set_wrap(wrap->cfg->vm, wrap);
 
@@ -650,11 +571,6 @@ void
 wrap_destroy(struct wrap *wrap) {
     if (wrap->instance) {
         instance_destroy(wrap->instance);
-    }
-
-    struct wrap_mirror *mirror, *tmp_mirror;
-    wl_list_for_each_safe (mirror, tmp_mirror, &wrap->mirrors, link) {
-        mirror_release(mirror);
     }
 
 #ifdef WAYWALL_OPENGL
@@ -717,11 +633,6 @@ wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]) {
     subproc_exec(wrap->subproc, cmd);
 }
 
-struct wrap_mirror *
-wrap_lua_mirror(struct wrap *wrap, struct wrap_mirror_options options) {
-    return mirror_create(wrap, options);
-}
-
 void
 wrap_lua_press_key(struct wrap *wrap, uint32_t keycode) {
     if (!wrap->view) {
@@ -763,9 +674,4 @@ wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height) {
 void
 wrap_lua_show_floating(struct wrap *wrap, bool show) {
     floating_set_visible(wrap, show);
-}
-
-void
-wrap_mirror_destroy(struct wrap_mirror *mirror) {
-    mirror_destroy(mirror);
 }

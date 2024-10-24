@@ -27,6 +27,12 @@
 #include <time.h>
 #include <xkbcommon/xkbcommon.h>
 
+#ifdef WAYWALL_OPENGL
+
+#include "server/gl.h"
+
+#endif
+
 /*
  * Lua interop code can be a bit obtuse due to working with the stack. The code in this file follows
  * a few conventions:
@@ -73,25 +79,23 @@ static const struct {
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
-struct mirror {
-    struct wrap_mirror *parent;
-};
-
 struct waker_sleep {
     struct ww_timer_entry *timer;
     struct config_vm_waker *vm;
 };
 
+#ifdef WAYWALL_OPENGL
+
 static int
 mirror_close(lua_State *L) {
-    struct mirror *mirror = lua_touserdata(L, 1);
+    struct server_gl_mirror **mirror = lua_touserdata(L, 1);
 
-    if (!mirror->parent) {
+    if (!*mirror) {
         return luaL_error(L, "cannot close mirror more than once");
     }
 
-    wrap_mirror_destroy(mirror->parent);
-    mirror->parent = NULL;
+    server_gl_mirror_destroy(*mirror);
+    *mirror = NULL;
 
     return 0;
 }
@@ -111,14 +115,17 @@ mirror_index(lua_State *L) {
 
 static int
 mirror_gc(lua_State *L) {
-    struct mirror *mirror = lua_touserdata(L, 1);
+    struct server_gl_mirror **mirror = lua_touserdata(L, 1);
 
-    if (mirror->parent) {
-        wrap_mirror_destroy(mirror->parent);
+    if (*mirror) {
+        server_gl_mirror_destroy(*mirror);
     }
+    *mirror = NULL;
 
     return 0;
 }
+
+#endif
 
 static void
 waker_sleep_vm_destroy(struct config_vm_waker *vm_waker, void *data) {
@@ -150,7 +157,7 @@ waker_sleep_timer_fire(void *data) {
     config_vm_resume(waker->vm);
 }
 
-static int
+WW_MAYBE_UNUSED static int
 unmarshal_box(lua_State *L, const char *key, struct box *out) {
     lua_pushstring(L, key); // stack: n+1
     lua_rawget(L, -2);      // stack: n+1
@@ -192,7 +199,7 @@ unmarshal_box(lua_State *L, const char *key, struct box *out) {
     return 0;
 }
 
-static int
+WW_MAYBE_UNUSED static int
 unmarshal_color(lua_State *L, const char *key, float rgba[static 4]) {
     lua_pushstring(L, key); // stack: n+1
     lua_rawget(L, -2);      // stack: n+1
@@ -308,6 +315,8 @@ l_floating_shown(lua_State *L) {
     return 1;
 }
 
+#ifdef WAYWALL_OPENGL
+
 static int
 l_mirror(lua_State *L) {
     static const int ARG_OPTIONS = 1;
@@ -322,7 +331,7 @@ l_mirror(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct wrap_mirror_options options = {0};
+    struct server_gl_mirror_options options = {0};
 
     unmarshal_box(L, "src", &options.src);
     unmarshal_box(L, "dst", &options.dst);
@@ -331,26 +340,35 @@ l_mirror(lua_State *L) {
     lua_rawget(L, ARG_OPTIONS);     // stack: 2
 
     if (lua_type(L, -1) == LUA_TTABLE) {
-        unmarshal_color(L, "input", options.key_src);
-        unmarshal_color(L, "output", options.key_dst);
+        unmarshal_color(L, "input", options.src_rgba);
+        unmarshal_color(L, "output", options.dst_rgba);
     }
     lua_pop(L, 1); // stack: 1
 
     // Body
-    struct mirror *mirror = lua_newuserdata(L, sizeof(*mirror));
+    struct server_gl_mirror **mirror = lua_newuserdata(L, sizeof(*mirror));
     check_alloc(mirror);
 
     luaL_getmetatable(L, METATABLE_MIRROR);
     lua_setmetatable(L, -2);
 
-    mirror->parent = wrap_lua_mirror(wrap, options);
-    if (!mirror->parent) {
+    *mirror = server_gl_mirror_create(wrap->gl, options);
+    if (!*mirror) {
         return luaL_error(L, "failed to create mirror");
     }
 
     // Epilogue. The userdata (mirror) was already pushed to the stack by the above code.
     return 1;
 }
+
+#else
+
+static int
+l_mirror(lua_State *L) {
+    return luaL_error(L, "OpenGL support is not enabled");
+}
+
+#endif
 
 static int
 l_press_key(lua_State *L) {
@@ -721,6 +739,8 @@ int
 config_api_init(struct config_vm *vm) {
     config_vm_register_lib(vm, lua_lib, "priv_waywall");
 
+#ifdef WAYWALL_OPENGL
+
     // Create the metatable for "mirror" objects.
     luaL_newmetatable(vm->L, METATABLE_MIRROR); // stack: n+1
     lua_pushstring(vm->L, "__gc");              // stack: n+2
@@ -730,6 +750,8 @@ config_api_init(struct config_vm *vm) {
     lua_pushcfunction(vm->L, mirror_index);     // stack: n+3
     lua_settable(vm->L, -3);                    // stack: n+1
     lua_pop(vm->L, 1);                          // stack: n
+
+#endif
 
     for (size_t i = 0; i < STATIC_ARRLEN(EMBEDDED_LUA); i++) {
         if (config_vm_exec_bcode(vm, EMBEDDED_LUA[i].data, EMBEDDED_LUA[i].size,

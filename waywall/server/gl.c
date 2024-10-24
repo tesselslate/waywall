@@ -6,6 +6,7 @@
 #include "server/buffer.h"
 #include "server/gl.h"
 #include "server/server.h"
+#include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wp_linux_dmabuf.h"
 #include "util/alloc.h"
@@ -100,13 +101,36 @@
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
 
+#define VERTEX(mirror, dst_x, dst_y, src_x, src_y)                                                 \
+    (struct vertex) {                                                                              \
+        .pos = {(dst_x), (dst_y)}, .tex = {(src_x), (src_y)},                                      \
+        .src_rgba = {mirror->options.src_rgba[0], mirror->options.src_rgba[1],                     \
+                     mirror->options.src_rgba[2], mirror->options.src_rgba[3]},                    \
+        .dst_rgba = {mirror->options.dst_rgba[0], mirror->options.dst_rgba[1],                     \
+                     mirror->options.dst_rgba[2], mirror->options.dst_rgba[3]},                    \
+    }
+
 struct gl_buffer {
-    struct wl_list link; // server_gl_surface.buffers
+    struct wl_list link; // server_gl.capture.buffers
     struct server_gl *gl;
 
     struct server_buffer *parent;
     EGLImageKHR image; // imported DMABUF - must not be modified
     GLuint texture;    // must not be modified
+};
+
+struct server_gl_mirror {
+    struct wl_list link; // server_gl.draw.mirrors
+    struct server_gl *gl;
+
+    struct server_gl_mirror_options options;
+};
+
+struct vertex {
+    float pos[2];
+    float tex[2];
+    float src_rgba[4];
+    float dst_rgba[4];
 };
 
 // clang-format off
@@ -178,62 +202,71 @@ static const char *egl_strerror();
 static bool gl_checkerr(const char *msg);
 
 static void gl_buffer_destroy(struct gl_buffer *gl_buffer);
-static struct gl_buffer *gl_buffer_import(struct server_gl_surface *gl_surface,
-                                          struct server_buffer *buffer);
-static void gl_surface_update(struct server_gl_surface *gl_surface);
+static struct gl_buffer *gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer);
+
+static void draw_build_lists(struct server_gl *gl);
+static void draw_frame(struct server_gl *gl);
+
+static const struct wl_callback_listener frame_cb_listener;
 
 static void
-on_gl_surface_commit(struct wl_listener *listener, void *data) {
-    struct server_gl_surface *gl_surface = wl_container_of(listener, gl_surface, on_surface_commit);
+on_frame_cb_done(void *data, struct wl_callback *callback, uint32_t time) {
+    struct server_gl *gl = data;
 
-    struct server_buffer *buffer = server_surface_next_buffer(gl_surface->parent);
+    wl_callback_destroy(callback);
+
+    gl->surface.frame_cb = wl_surface_frame(gl->surface.remote);
+    check_alloc(gl->surface.frame_cb);
+    wl_callback_add_listener(gl->surface.frame_cb, &frame_cb_listener, gl);
+
+    draw_frame(gl);
+}
+
+static const struct wl_callback_listener frame_cb_listener = {
+    .done = on_frame_cb_done,
+};
+
+static void
+on_surface_commit(struct wl_listener *listener, void *data) {
+    struct server_gl *gl = wl_container_of(listener, gl, on_surface_commit);
+
+    struct server_buffer *buffer = server_surface_next_buffer(gl->capture.surface);
     if (!buffer) {
-        gl_surface->current = NULL;
+        gl->capture.current = NULL;
         return;
     }
 
-    // Check if the committed wl_buffer has already been imported by this surface before.
+    // Check if the committed wl_buffer has already been imported.
     struct gl_buffer *gl_buffer;
-    bool has_gl_buffer = false;
-    wl_list_for_each (gl_buffer, &gl_surface->buffers, link) {
+    wl_list_for_each (gl_buffer, &gl->capture.buffers, link) {
         if (gl_buffer->parent == buffer) {
-            has_gl_buffer = true;
-            break;
-        }
-    }
-
-    // If the given wl_buffer needs to be imported, try to import it.
-    if (!has_gl_buffer) {
-        gl_buffer = gl_buffer_import(gl_surface, buffer);
-        if (!gl_buffer) {
-            gl_surface->current = NULL;
+            gl->capture.current = gl_buffer;
             return;
         }
     }
 
-    gl_surface->current = gl_buffer;
+    // If the given wl_buffer has not yet been imported, try to import it.
+    gl_buffer = gl_buffer_import(gl, buffer);
+    if (!gl_buffer) {
+        gl->capture.current = NULL;
+        return;
+    }
 
-    gl_surface_update(gl_surface);
+    gl->capture.current = gl_buffer;
 }
 
 static void
-on_gl_surface_destroy(struct wl_listener *listener, void *data) {
-    struct server_gl_surface *gl_surface =
-        wl_container_of(listener, gl_surface, on_surface_destroy);
+on_surface_destroy(struct wl_listener *listener, void *data) {
+    struct server_gl *gl = wl_container_of(listener, gl, on_surface_destroy);
 
-    // Release all buffers and clear the contents of the framebuffer.
-    struct gl_buffer *gl_buffer, *tmp;
-    wl_list_for_each_safe (gl_buffer, tmp, &gl_surface->buffers, link) {
-        gl_buffer_destroy(gl_buffer);
-    }
+    gl->capture.current = NULL;
+}
 
-    eglMakeCurrent(gl_surface->gl->egl.display, gl_surface->egl_surface, gl_surface->egl_surface,
-                   gl_surface->gl->egl.ctx);
+static void
+on_ui_resize(struct wl_listener *listener, void *data) {
+    struct server_gl *gl = wl_container_of(listener, gl, on_ui_resize);
 
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    eglSwapBuffers(gl_surface->gl->egl.display, gl_surface->egl_surface);
+    wl_egl_window_resize(gl->surface.window, gl->server->ui->width, gl->server->ui->height, 0, 0);
 }
 
 static bool
@@ -351,14 +384,14 @@ gl_buffer_destroy(struct gl_buffer *gl_buffer) {
 }
 
 static struct gl_buffer *
-gl_buffer_import(struct server_gl_surface *gl_surface, struct server_buffer *buffer) {
+gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
     if (strcmp(buffer->impl->name, SERVER_BUFFER_DMABUF) != 0) {
         ww_log(LOG_ERROR, "cannot create server_gl_surface for non-DMABUF buffer");
         return NULL;
     }
 
     struct gl_buffer *gl_buffer = zalloc(1, sizeof(*gl_buffer));
-    gl_buffer->gl = gl_surface->gl;
+    gl_buffer->gl = gl;
 
     gl_buffer->parent = server_buffer_ref(buffer);
 
@@ -428,7 +461,7 @@ gl_buffer_import(struct server_gl_surface *gl_surface, struct server_buffer *buf
         goto fail_image_target;
     }
 
-    wl_list_insert(&gl_surface->buffers, &gl_buffer->link);
+    wl_list_insert(&gl->capture.buffers, &gl_buffer->link);
 
     return gl_buffer;
 
@@ -444,66 +477,99 @@ fail_create_orig:
 }
 
 static void
-gl_surface_update(struct server_gl_surface *gl_surface) {
-    ww_assert(gl_surface->current);
+draw_build_lists(struct server_gl *gl) {
+    if (wl_list_empty(&gl->draw.mirrors)) {
+        return;
+    }
 
-    // TODO: Lock gl_surface->current->parent (explicit sync). I have no idea how this will work out
-    // in practice, hopefully there's an EGL/OpenGL extension for it?
+    // Allocate space for the vertices.
+    size_t cap = sizeof(struct vertex) * 6 * wl_list_length(&gl->draw.mirrors);
+    gl->draw.buf = realloc(gl->draw.buf, cap);
+    check_alloc(gl->draw.buf);
+    gl->draw.len = cap;
 
-    // Create the data to place into the vertex buffer object. There need to be two triangles to
-    // form a quad.
-    struct vertex {
-        float pos[2];
-        float texcoord[2];
-    };
+    // Fill the vertex buffer.
+    struct vertex *ptr = (struct vertex *)gl->draw.buf;
 
-    struct box *crop = &gl_surface->options.crop;
-    const struct vertex tl = {{-1, 1}, {crop->x, crop->y}};
-    const struct vertex tr = {{1, 1}, {crop->x + crop->width, crop->y}};
-    const struct vertex bl = {{-1, -1}, {crop->x, crop->y + crop->height}};
-    const struct vertex br = {{1, -1}, {crop->x + crop->width, crop->y + crop->height}};
+    struct server_gl_mirror *mirror;
+    wl_list_for_each (mirror, &gl->draw.mirrors, link) {
+        struct box s = mirror->options.src;
+        struct box d = mirror->options.dst;
 
-    const struct vertex vertices[] = {tl, tr, bl, tr, bl, br};
+        // Top-left triangle
+        *(ptr++) = VERTEX(mirror, d.x, d.y, s.x, s.y);
+        *(ptr++) = VERTEX(mirror, d.x + d.width, d.y, s.x + s.width, s.y);
+        *(ptr++) = VERTEX(mirror, d.x, d.y + d.height, s.x, s.y + s.height);
 
-    // Use OpenGL to draw a new frame with the contents of the latest surface commit.
-    eglMakeCurrent(gl_surface->gl->egl.display, gl_surface->egl_surface, gl_surface->egl_surface,
-                   gl_surface->gl->egl.ctx);
+        // Bottom-right triangle
+        *(ptr++) = VERTEX(mirror, d.x + d.width, d.y, s.x + s.width, s.y);
+        *(ptr++) = VERTEX(mirror, d.x, d.y + d.height, s.x, s.y + s.height);
+        *(ptr++) = VERTEX(mirror, d.x + d.width, d.y + d.height, s.x + s.width, s.y + s.height);
+    }
 
-    glViewport(0, 0, gl_surface->options.width, gl_surface->options.height);
+    // Update OpenGL state with the new vertex buffer.
+    eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
+
+    glBindBuffer(GL_ARRAY_BUFFER, gl->shader.vbo);
+    glBufferData(GL_ARRAY_BUFFER, gl->draw.len, gl->draw.buf, GL_STREAM_DRAW);
+
+    glVertexAttribPointer(gl->shader.attrib_pos, 2, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
+                          (const void *)offsetof(struct vertex, pos));
+    glVertexAttribPointer(gl->shader.attrib_tex, 2, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
+                          (const void *)offsetof(struct vertex, tex));
+    glVertexAttribPointer(gl->shader.attrib_src_rgba, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
+                          (const void *)offsetof(struct vertex, src_rgba));
+    glVertexAttribPointer(gl->shader.attrib_dst_rgba, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
+                          (const void *)offsetof(struct vertex, dst_rgba));
+}
+
+static void
+draw_frame(struct server_gl *gl) {
+    eglMakeCurrent(gl->egl.display, gl->surface.egl, gl->surface.egl, gl->egl.ctx);
+
+    // If there is nothing to draw, then clear the framebuffer and return.
+    if (!gl->capture.current || gl->draw.len == 0) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearColor(0, 0, 0, 0);
+
+        eglSwapBuffers(gl->egl.display, gl->surface.egl);
+        return;
+    }
+
+    // Otherwise, draw as normal.
+    int32_t ui_width = gl->server->ui->width;
+    int32_t ui_height = gl->server->ui->height;
+    glViewport(0, 0, ui_width, ui_height);
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glClearColor(0, 0, 0, 0);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glUseProgram(gl_surface->gl->shader.prog);
-    glBindBuffer(GL_ARRAY_BUFFER, gl_surface->gl->shader.vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(struct vertex) * STATIC_ARRLEN(vertices), vertices,
-                 GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(gl_surface->gl->shader.attrib_pos, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct vertex), 0);
-    glVertexAttribPointer(gl_surface->gl->shader.attrib_texcoord, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct vertex), (const void *)(sizeof(float) * 2));
+    glUseProgram(gl->shader.prog);
 
-    int32_t width, height;
-    server_buffer_get_size(gl_surface->current->parent, &width, &height);
-    glUniform2f(gl_surface->gl->shader.uniform_size, width, height);
+    int32_t buf_width, buf_height;
+    server_buffer_get_size(gl->capture.current->parent, &buf_width, &buf_height);
+    glUniform2f(gl->shader.uniform_texsize, buf_width, buf_height);
+    glUniform2f(gl->shader.uniform_winsize, ui_width, ui_height);
 
-    glUniform4f(gl_surface->gl->shader.uniform_key_src, gl_surface->options.src_rgba[0],
-                gl_surface->options.src_rgba[1], gl_surface->options.src_rgba[2],
-                gl_surface->options.src_rgba[3]);
-    glUniform4f(gl_surface->gl->shader.uniform_key_dst, gl_surface->options.dst_rgba[0],
-                gl_surface->options.dst_rgba[1], gl_surface->options.dst_rgba[2],
-                gl_surface->options.dst_rgba[3]);
+    glBindBuffer(GL_ARRAY_BUFFER, gl->shader.vbo);
+    glEnableVertexAttribArray(gl->shader.attrib_pos);
+    glEnableVertexAttribArray(gl->shader.attrib_tex);
+    glEnableVertexAttribArray(gl->shader.attrib_src_rgba);
+    glEnableVertexAttribArray(gl->shader.attrib_dst_rgba);
 
-    glEnableVertexAttribArray(gl_surface->gl->shader.attrib_pos);
-    glEnableVertexAttribArray(gl_surface->gl->shader.attrib_texcoord);
-    glBindTexture(GL_TEXTURE_2D, gl_surface->current->texture);
-    glDrawArrays(GL_TRIANGLES, 0, STATIC_ARRLEN(vertices));
-    glDisableVertexAttribArray(gl_surface->gl->shader.attrib_pos);
-    glDisableVertexAttribArray(gl_surface->gl->shader.attrib_texcoord);
+    glBindTexture(GL_TEXTURE_2D, gl->capture.current->texture);
+    glDrawArrays(GL_TRIANGLES, 0, gl->draw.len / sizeof(struct vertex));
 
-    // Commit the new frame.
-    eglSwapBuffers(gl_surface->gl->egl.display, gl_surface->egl_surface);
+    glDisableVertexAttribArray(gl->shader.attrib_pos);
+    glDisableVertexAttribArray(gl->shader.attrib_tex);
+    glDisableVertexAttribArray(gl->shader.attrib_src_rgba);
+    glDisableVertexAttribArray(gl->shader.attrib_dst_rgba);
+
+    eglSwapBuffers(gl->egl.display, gl->surface.egl);
+
+    // TODO: Explicit sync support
 }
 
 static bool
@@ -634,7 +700,7 @@ server_gl_create(struct server *server) {
         }
     }
 
-    // Create the shader program.
+    // Create the shader program and allocate buffers.
     if (!gl_make_shader(&gl->shader.vert, GL_VERTEX_SHADER, WAYWALL_GLSL_MAIN_VERT_H)) {
         goto fail_vert_shader;
     }
@@ -648,24 +714,73 @@ server_gl_create(struct server *server) {
     gl->shader.attrib_pos = glGetAttribLocation(gl->shader.prog, "v_pos");
     ww_assert(gl->shader.attrib_pos != -1);
 
-    gl->shader.attrib_texcoord = glGetAttribLocation(gl->shader.prog, "v_texcoord");
-    ww_assert(gl->shader.attrib_texcoord != -1);
+    gl->shader.attrib_tex = glGetAttribLocation(gl->shader.prog, "v_tex");
+    ww_assert(gl->shader.attrib_tex != -1);
 
-    gl->shader.uniform_size = glGetUniformLocation(gl->shader.prog, "u_size");
-    ww_assert(gl->shader.uniform_size != -1);
+    gl->shader.attrib_src_rgba = glGetAttribLocation(gl->shader.prog, "v_src_rgba");
+    ww_assert(gl->shader.attrib_src_rgba != -1);
 
-    gl->shader.uniform_key_src = glGetUniformLocation(gl->shader.prog, "u_colorkey_src");
-    ww_assert(gl->shader.uniform_key_src != -1);
+    gl->shader.attrib_dst_rgba = glGetAttribLocation(gl->shader.prog, "v_dst_rgba");
+    ww_assert(gl->shader.attrib_dst_rgba != -1);
 
-    gl->shader.uniform_key_dst = glGetUniformLocation(gl->shader.prog, "u_colorkey_dst");
-    ww_assert(gl->shader.uniform_key_dst != -1);
+    gl->shader.uniform_texsize = glGetUniformLocation(gl->shader.prog, "u_texsize");
+    ww_assert(gl->shader.uniform_texsize != -1);
+
+    gl->shader.uniform_winsize = glGetUniformLocation(gl->shader.prog, "u_winsize");
+    ww_assert(gl->shader.uniform_winsize != -1);
 
     glGenBuffers(1, &gl->shader.vbo);
+
+    // Create the OpenGL surface.
+    gl->surface.remote = wl_compositor_create_surface(server->backend->compositor);
+    check_alloc(gl->surface.remote);
+    wl_surface_set_input_region(gl->surface.remote, server->ui->empty_region);
+
+    gl->surface.subsurface = wl_subcompositor_get_subsurface(
+        server->backend->subcompositor, gl->surface.remote, server->ui->tree.surface);
+    check_alloc(gl->surface.subsurface);
+    wl_subsurface_set_desync(gl->surface.subsurface);
+
+    gl->surface.frame_cb = wl_surface_frame(gl->surface.remote);
+    check_alloc(gl->surface.frame_cb);
+    wl_callback_add_listener(gl->surface.frame_cb, &frame_cb_listener, gl);
+
+    // Use arbitrary sizes here since the main UI window has not yet been sized.
+    gl->surface.window = wl_egl_window_create(gl->surface.remote, 1, 1);
+    check_alloc(gl->surface.window);
+
+    gl->surface.egl = gl->egl.CreatePlatformWindowSurfaceEXT(gl->egl.display, gl->egl.config,
+                                                             gl->surface.window, NULL);
+    if (gl->surface.egl == EGL_NO_SURFACE) {
+        ww_log_egl(LOG_ERROR, "failed to create EGL surface");
+        goto fail_egl_surface;
+    }
+
+    eglMakeCurrent(gl->egl.display, gl->surface.egl, gl->surface.egl, gl->egl.ctx);
+    eglSwapInterval(gl->egl.display, 0);
+
+    wl_surface_commit(gl->surface.remote);
+    draw_frame(gl);
+
+    gl->on_ui_resize.notify = on_ui_resize;
+    wl_signal_add(&server->ui->events.resize, &gl->on_ui_resize);
 
     // Log debug information about the user's EGL/OpenGL implementation.
     egl_print_sysinfo(gl);
 
+    wl_list_init(&gl->draw.mirrors);
+    wl_list_init(&gl->capture.buffers);
+
     return gl;
+
+fail_egl_surface:
+    wl_egl_window_destroy(gl->surface.window);
+    wl_callback_destroy(gl->surface.frame_cb);
+    wl_subsurface_destroy(gl->surface.subsurface);
+    wl_surface_destroy(gl->surface.remote);
+
+    glDeleteBuffers(1, &gl->shader.vbo);
+    glDeleteProgram(gl->shader.prog);
 
 fail_link_program:
     glDeleteShader(gl->shader.frag);
@@ -694,9 +809,40 @@ fail_get_proc:
 
 void
 server_gl_destroy(struct server_gl *gl) {
-    // Destroy OpenGL resources.
     eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
 
+    // Destroy capture resources.
+    if (gl->capture.surface) {
+        wl_list_remove(&gl->on_surface_commit.link);
+        wl_list_remove(&gl->on_surface_destroy.link);
+    }
+
+    struct gl_buffer *gl_buffer, *gl_buffer_tmp;
+    wl_list_for_each_safe (gl_buffer, gl_buffer_tmp, &gl->capture.buffers, link) {
+        gl_buffer_destroy(gl_buffer);
+    }
+
+    struct server_gl_mirror *mirror, *mirror_tmp;
+    wl_list_for_each_safe (mirror, mirror_tmp, &gl->draw.mirrors, link) {
+        mirror->gl = NULL;
+
+        wl_list_remove(&mirror->link);
+        wl_list_init(&mirror->link);
+    }
+
+    // Destroy surface resources.
+    wl_list_remove(&gl->on_ui_resize.link);
+
+    eglDestroySurface(gl->egl.display, gl->surface.egl);
+    wl_egl_window_destroy(gl->surface.window);
+    wl_subsurface_destroy(gl->surface.subsurface);
+    wl_surface_destroy(gl->surface.remote);
+
+    if (gl->surface.frame_cb) {
+        wl_callback_destroy(gl->surface.frame_cb);
+    }
+
+    // Destroy OpenGL resources.
     glDeleteBuffers(1, &gl->shader.vbo);
     glDeleteProgram(gl->shader.prog);
     glDeleteShader(gl->shader.frag);
@@ -707,80 +853,47 @@ server_gl_destroy(struct server_gl *gl) {
     eglDestroyContext(gl->egl.display, gl->egl.ctx);
     eglTerminate(gl->egl.display);
 
+    if (gl->draw.buf) {
+        free(gl->draw.buf);
+    }
     free(gl);
 }
 
-struct server_gl_surface *
-server_gl_surface_create(struct server_gl *gl, struct server_surface *surface,
-                         struct server_gl_surface_options options) {
-    struct server_gl_surface *gl_surface = zalloc(1, sizeof(*gl_surface));
-
-    gl_surface->gl = gl;
-    gl_surface->parent = surface;
-    gl_surface->options = options;
-
-    gl_surface->remote = wl_compositor_create_surface(gl->server->backend->compositor);
-    check_alloc(gl_surface->remote);
-
-    struct wl_region *empty_region = wl_compositor_create_region(gl->server->backend->compositor);
-    check_alloc(empty_region);
-
-    wl_surface_set_input_region(gl_surface->remote, empty_region);
-    wl_region_destroy(empty_region);
-
-    gl_surface->window = wl_egl_window_create(gl_surface->remote, options.width, options.height);
-    if (!gl_surface->window) {
-        ww_log(LOG_ERROR, "failed to create wl_egl_window (%dx%d)", options.crop.width,
-               options.crop.height);
-        goto fail_window;
+void
+server_gl_set_target(struct server_gl *gl, struct server_surface *surface) {
+    if (gl->capture.surface) {
+        ww_panic("cannot overwrite capture surface");
     }
 
-    gl_surface->egl_surface = gl->egl.CreatePlatformWindowSurfaceEXT(
-        gl->egl.display, gl->egl.config, gl_surface->window, NULL);
+    gl->capture.surface = surface;
 
-    // Mesa (and probably the NVIDIA driver as well, if I had to guess) will create and wait for
-    // wl_surface.frame callbacks if the swap interval is non-zero.
-    eglMakeCurrent(gl->egl.display, gl_surface->egl_surface, gl_surface->egl_surface, gl->egl.ctx);
-    eglSwapInterval(gl->egl.display, 0);
+    gl->on_surface_commit.notify = on_surface_commit;
+    wl_signal_add(&surface->events.commit, &gl->on_surface_commit);
 
-    gl_surface->on_surface_commit.notify = on_gl_surface_commit;
-    wl_signal_add(&gl_surface->parent->events.commit, &gl_surface->on_surface_commit);
+    gl->on_surface_destroy.notify = on_surface_destroy;
+    wl_signal_add(&surface->events.destroy, &gl->on_surface_destroy);
+}
 
-    // TODO: I don't think this is really needed since surface destruction means we're shutting down
-    // anyway?
-    gl_surface->on_surface_destroy.notify = on_gl_surface_destroy;
-    wl_signal_add(&gl_surface->parent->events.destroy, &gl_surface->on_surface_destroy);
+struct server_gl_mirror *
+server_gl_mirror_create(struct server_gl *gl, struct server_gl_mirror_options options) {
+    struct server_gl_mirror *mirror = zalloc(1, sizeof(*mirror));
 
-    wl_list_init(&gl_surface->buffers);
+    mirror->gl = gl;
+    mirror->options = options;
 
-    return gl_surface;
+    wl_list_insert(&gl->draw.mirrors, &mirror->link);
+    draw_build_lists(gl);
 
-fail_window:
-    wl_surface_destroy(gl_surface->remote);
-    free(gl_surface);
-
-    return NULL;
+    return mirror;
 }
 
 void
-server_gl_surface_destroy(struct server_gl_surface *gl_surface) {
-    struct gl_buffer *gl_buffer, *tmp;
-    wl_list_for_each_safe (gl_buffer, tmp, &gl_surface->buffers, link) {
-        gl_buffer_destroy(gl_buffer);
+server_gl_mirror_destroy(struct server_gl_mirror *mirror) {
+    wl_list_remove(&mirror->link);
+
+    if (mirror->gl) {
+        draw_build_lists(mirror->gl);
     }
 
-    if (eglMakeCurrent(gl_surface->gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE,
-                       gl_surface->gl->egl.ctx)) {
-        eglDestroySurface(gl_surface->gl->egl.display, gl_surface->egl_surface);
-        wl_egl_window_destroy(gl_surface->window);
-    } else {
-        ww_log_egl(LOG_ERROR, "failed to make EGL context current");
-    }
-
-    wl_surface_destroy(gl_surface->remote);
-
-    wl_list_remove(&gl_surface->on_surface_commit.link);
-    wl_list_remove(&gl_surface->on_surface_destroy.link);
-
-    free(gl_surface);
+    free(mirror);
 }

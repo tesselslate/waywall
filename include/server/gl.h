@@ -10,6 +10,8 @@
 #include <wayland-server-core.h>
 
 struct server_gl {
+    struct server *server;
+
     struct {
         PFNEGLCREATEIMAGEKHRPROC CreateImageKHR;
         PFNEGLCREATEPLATFORMWINDOWSURFACEEXTPROC CreatePlatformWindowSurfaceEXT;
@@ -23,44 +25,54 @@ struct server_gl {
         EGLint major, minor;
     } egl;
 
-    struct server *server;
-
     struct {
         GLuint frag, vert, prog;
 
         GLuint vbo;
-        GLint attrib_pos, attrib_texcoord;
-        GLint uniform_size, uniform_key_src, uniform_key_dst;
+        GLint attrib_pos, attrib_tex, attrib_src_rgba, attrib_dst_rgba;
+        GLint uniform_texsize, uniform_winsize;
     } shader;
-};
 
-struct server_gl_surface {
-    struct server_gl *gl;
-    struct server_surface *parent;
+    struct {
+        struct wl_surface *remote;
+        struct wl_subsurface *subsurface;
+        struct wl_egl_window *window;
+        EGLSurface egl;
 
-    struct wl_surface *remote;
-    struct wl_egl_window *window;
-    EGLSurface egl_surface;
+        struct wl_callback *frame_cb;
+    } surface;
 
-    struct wl_list buffers; // gl_buffer.link
-    struct gl_buffer *current;
+    struct {
+        struct server_surface *surface;
+        struct wl_list buffers; // gl_buffer.link
+        struct gl_buffer *current;
+    } capture;
 
-    struct server_gl_surface_options {
-        struct box crop;
-        int32_t width, height;
-        float src_rgba[4], dst_rgba[4];
-    } options;
+    struct {
+        char *buf;
+        size_t len;
+
+        struct wl_list mirrors; // server_gl_mirror.link
+    } draw;
 
     struct wl_listener on_surface_commit;
     struct wl_listener on_surface_destroy;
+    struct wl_listener on_ui_resize;
+};
+
+struct server_gl_mirror;
+
+struct server_gl_mirror_options {
+    struct box src, dst;
+    float src_rgba[4], dst_rgba[4];
 };
 
 struct server_gl *server_gl_create(struct server *server);
 void server_gl_destroy(struct server_gl *gl);
+void server_gl_set_target(struct server_gl *gl, struct server_surface *surface);
 
-struct server_gl_surface *server_gl_surface_create(struct server_gl *gl,
-                                                   struct server_surface *surface,
-                                                   struct server_gl_surface_options options);
-void server_gl_surface_destroy(struct server_gl_surface *gl_surface);
+struct server_gl_mirror *server_gl_mirror_create(struct server_gl *gl,
+                                                 struct server_gl_mirror_options options);
+void server_gl_mirror_destroy(struct server_gl_mirror *mirror);
 
 #endif
