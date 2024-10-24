@@ -31,6 +31,7 @@ The following dependencies are required for both building and running:
 >
 >  - `egl`
 >  - `glesv2`
+>  - `spng`
 >  - `wayland-egl`
 >
 > #### Xwayland
