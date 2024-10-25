@@ -211,12 +211,14 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
     if (plane_idx >= DMABUF_MAX_PLANES) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_IDX,
                                "plane %" PRIu32 " exceeds max of %d", plane_idx, DMABUF_MAX_PLANES);
+        close(fd);
         return;
     }
 
     if (buffer_params->data->planes[plane_idx].fd != -1) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_PLANE_SET,
                                "plane %" PRIu32 " already set", plane_idx);
+        close(fd);
         return;
     }
 
@@ -225,6 +227,7 @@ linux_buffer_params_add(struct wl_client *client, struct wl_resource *resource, 
     if (buffer_params->data->num_planes > 0 && !eq_modifier) {
         wl_resource_post_error(resource, ZWP_LINUX_BUFFER_PARAMS_V1_ERROR_INVALID_FORMAT,
                                "modifier of plane %" PRIu32 " does not match", plane_idx);
+        close(fd);
         return;
     }
 
