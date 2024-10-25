@@ -100,6 +100,7 @@
 #define DRM_FORMAT_MOD_INVALID 0xFFFFFFFFFFFFFFFull
 
 #define IMAGE_DRAWLIST_LEN 6
+#define MAX_CACHED_DMABUF 2
 
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
@@ -263,6 +264,15 @@ on_surface_commit(struct wl_listener *listener, void *data) {
     if (!gl_buffer) {
         gl->capture.current = NULL;
         return;
+    }
+
+    // If there are too many cached buffers, remove the oldest one.
+    if (wl_list_length(&gl->capture.buffers) > MAX_CACHED_DMABUF) {
+        struct gl_buffer *buffer;
+        wl_list_for_each_reverse (buffer, &gl->capture.buffers, link) {
+            gl_buffer_destroy(buffer);
+            break;
+        }
     }
 
     gl->capture.current = gl_buffer;
