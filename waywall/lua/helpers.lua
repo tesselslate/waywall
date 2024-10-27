@@ -53,6 +53,8 @@ M.toggle_res = function(width, height, sens)
             waywall.set_resolution(width, height)
             if type(sens) == "number" then
                 waywall.set_sensitivity(sens)
+            else
+                waywall.set_sensitivity(0)
             end
         end
 
