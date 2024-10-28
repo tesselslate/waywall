@@ -484,6 +484,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
 
     if (format != WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1) {
         ww_log(LOG_WARN, "received keymap of unknown type %" PRIu32, format);
+        close(fd);
         return;
     }
 
@@ -491,6 +492,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     char *km_str = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (km_str == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap keymap data");
+        close(fd);
         return;
     }
 
@@ -498,6 +500,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
         seat->ctx, km_str, XKB_KEYMAP_FORMAT_TEXT_V1, XKB_MAP_COMPILE_NO_FLAGS);
     ww_assert(munmap(km_str, size) == 0);
     if (!keymap) {
+        close(fd);
         return;
     }
 
