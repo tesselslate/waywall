@@ -4,6 +4,7 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
+#include "server/xwayland.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -23,12 +24,6 @@
 #include <wayland-server-protocol.h>
 #include <xkbcommon/xkbcommon-names.h>
 #include <xkbcommon/xkbcommon.h>
-
-#ifdef WAYWALL_XWAYLAND
-
-#include "server/xwayland.h"
-
-#endif
 
 #define SRV_SEAT_VERSION 6
 
@@ -437,16 +432,12 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
-#ifdef WAYWALL_XWAYLAND
-
     // TODO: This could probably be improved. Key presses need to be forwarded to X11 so that
     // Ninjabrain Bot can recognize that its hotkeys are being used, even if the focused window is a
     // Wayland toplevel.
     if (!seat->input_focus || strcmp("xwayland", seat->input_focus->impl->name) != 0) {
         xwl_notify_key(seat->server->xwayland, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
     }
-
-#endif
 
     if (try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED)) {
         return;

@@ -32,12 +32,8 @@ struct server {
     struct server_xdg_decoration_manager *xdg_decoration;
     struct server_xdg_wm_base *xdg_shell;
 
-#ifdef WAYWALL_XWAYLAND
-
     struct server_xwayland_shell *xwayland_shell;
     struct server_xwayland *xwayland;
-
-#endif
 
     struct wl_list clients; // server_client.link
     struct wl_listener on_client_created;

@@ -1,10 +1,6 @@
 #ifndef WAYWALL_SERVER_XWAYLAND_H
 #define WAYWALL_SERVER_XWAYLAND_H
 
-#ifndef WAYWALL_XWAYLAND
-#error xwayland.h should only be included with Xwayland support enabled
-#endif
-
 #include "server/ui.h"
 #include "server/wl_seat.h"
 #include <stdint.h>

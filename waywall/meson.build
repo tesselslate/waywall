@@ -25,6 +25,10 @@ waywall_src = files(
   'server/wp_relative_pointer.c',
   'server/xdg_decoration.c',
   'server/xdg_shell.c',
+  'server/xserver.c',
+  'server/xwayland.c',
+  'server/xwayland_shell.c',
+  'server/xwm.c',
   'util/log.c',
   'util/prelude.c',
   'util/str.c',
@@ -39,15 +43,6 @@ waywall_src = files(
   'timer.c',
   'wrap.c',
 )
-
-if get_option('xwayland').enabled()
-  waywall_src += files(
-    'server/xserver.c',
-    'server/xwayland.c',
-    'server/xwayland_shell.c',
-    'server/xwm.c',
-  )
-endif
 
 executable('waywall',
   waywall_src,

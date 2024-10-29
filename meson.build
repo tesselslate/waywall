@@ -46,6 +46,12 @@ glesv2 = dependency('glesv2')
 spng = dependency('spng')
 wayland_egl = dependency('wayland-egl')
 
+xcb = dependency('xcb')
+xcb_composite = dependency('xcb-composite')
+xcb_res = dependency('xcb-res')
+xcb_xtest = dependency('xcb-xtest')
+xwayland = dependency('xwayland')
+
 waywall_deps = [
   cc.find_library('m'),
 
@@ -59,23 +65,13 @@ waywall_deps = [
   glesv2,
   spng,
   wayland_egl,
+
+  xcb,
+  xcb_composite,
+  xcb_res,
+  xcb_xtest,
+  xwayland,
 ]
-
-# Xwayland support
-if get_option('xwayland').enabled()
-  waywall_deps += dependency('xcb')
-  waywall_deps += dependency('xcb-composite')
-  waywall_deps += dependency('xcb-res')
-  waywall_deps += dependency('xcb-xtest')
-  waywall_deps += dependency('xwayland')
-
-  add_project_arguments(
-    [
-      '-DWAYWALL_XWAYLAND',
-    ],
-    language: 'c',
-  )
-endif
 
 subdir('protocol')
 subdir('waywall')

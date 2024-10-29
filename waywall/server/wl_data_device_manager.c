@@ -4,6 +4,7 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_seat.h"
+#include "server/xwayland.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -13,12 +14,6 @@
 #include <unistd.h>
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
-
-#ifdef WAYWALL_XWAYLAND
-
-#include "server/xwayland.h"
-
-#endif
 
 #define SRV_DATA_DEVICE_MANAGER_VERSION 1
 
@@ -70,14 +65,9 @@ handle_selection_pipe(int32_t fd, uint32_t mask, void *data) {
     data_device_manager->selection_content.len = new_len;
 
     if (eof) {
-
-#ifdef WAYWALL_XWAYLAND
+        ww_log(LOG_INFO, "received selection content of length %lu", strlen(*str));
 
         xwl_set_clipboard(data_device_manager->server->xwayland, *str);
-
-#endif
-
-        ww_log(LOG_INFO, "received selection content of length %lu", strlen(*str));
 
         wl_event_source_remove(data_device_manager->selection_content.src_pipe);
         data_device_manager->selection_content.src_pipe = NULL;
