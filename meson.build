@@ -41,6 +41,11 @@ wayland_cursor = dependency('wayland-cursor')
 wayland_server = dependency('wayland-server')
 xkbcommon = dependency('xkbcommon')
 
+egl = dependency('egl')
+glesv2 = dependency('glesv2')
+spng = dependency('spng')
+wayland_egl = dependency('wayland-egl')
+
 waywall_deps = [
   cc.find_library('m'),
 
@@ -49,22 +54,12 @@ waywall_deps = [
   wayland_cursor,
   wayland_server,
   xkbcommon,
+
+  egl,
+  glesv2,
+  spng,
+  wayland_egl,
 ]
-
-# OpenGL support
-if get_option('opengl').enabled()
-  waywall_deps += dependency('egl')
-  waywall_deps += dependency('glesv2')
-  waywall_deps += dependency('spng')
-  waywall_deps += dependency('wayland-egl')
-
-  add_project_arguments(
-    [
-      '-DWAYWALL_OPENGL',
-    ],
-    language: 'c',
-  )
-endif
 
 # Xwayland support
 if get_option('xwayland').enabled()

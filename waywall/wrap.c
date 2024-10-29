@@ -3,10 +3,12 @@
 #include "config/vm.h"
 #include "inotify.h"
 #include "instance.h"
+#include "scene.h"
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/cursor.h"
 #include "server/fake_input.h"
+#include "server/gl.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -25,12 +27,6 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
-
-#ifdef WAYWALL_OPENGL
-
-#include "server/gl.h"
-
-#endif
 
 #define IS_ANCHORED(wrap, view) (wrap->floating.anchored == view)
 #define SHOULD_ANCHOR(wrap) (wrap->cfg->theme.ninb_anchor != ANCHOR_NONE)
@@ -372,11 +368,7 @@ on_view_create(struct wl_listener *listener, void *data) {
     server_view_set_visible(wrap->view, true);
     server_view_commit(wrap->view);
 
-#ifdef WAYWALL_OPENGL
-
     server_gl_set_target(wrap->gl, view->surface);
-
-#endif
 }
 
 static void
@@ -524,15 +516,11 @@ struct wrap *
 wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
 
-#ifdef WAYWALL_OPENGL
-
     wrap->gl = server_gl_create(server);
     if (!wrap->gl) {
         free(wrap);
         return NULL;
     }
-
-#endif
 
     wrap->cfg = cfg;
     wrap->server = server;
@@ -573,11 +561,7 @@ wrap_destroy(struct wrap *wrap) {
         instance_destroy(wrap->instance);
     }
 
-#ifdef WAYWALL_OPENGL
-
     server_gl_destroy(wrap->gl);
-
-#endif
 
     ww_timer_destroy(wrap->timer);
     subproc_destroy(wrap->subproc);

@@ -1,3 +1,4 @@
+subdir('glsl')
 subdir('lua')
 
 waywall_src = files(
@@ -9,6 +10,7 @@ waywall_src = files(
   'server/buffer.c',
   'server/cursor.c',
   'server/fake_input.c',
+  'server/gl.c',
   'server/remote_buffer.c',
   'server/server.c',
   'server/ui.c',
@@ -38,13 +40,6 @@ waywall_src = files(
   'wrap.c',
 )
 
-if get_option('opengl').enabled()
-  subdir('glsl')
-
-  waywall_src += files('server/gl.c')
-  waywall_src += waywall_glsl
-endif
-
 if get_option('xwayland').enabled()
   waywall_src += files(
     'server/xserver.c',
@@ -56,6 +51,7 @@ endif
 
 executable('waywall',
   waywall_src,
+  waywall_glsl,
   waywall_lua,
   protocol_headers,
   protocol_sources,

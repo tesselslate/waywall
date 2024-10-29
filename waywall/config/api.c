@@ -5,6 +5,7 @@
 #include "config/internal.h"
 #include "config/vm.h"
 #include "instance.h"
+#include "server/gl.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"
@@ -30,12 +31,6 @@
 #include <time.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
-
-#ifdef WAYWALL_OPENGL
-
-#include "server/gl.h"
-
-#endif
 
 /*
  * Lua interop code can be a bit obtuse due to working with the stack. The code in this file follows
@@ -88,8 +83,6 @@ struct waker_sleep {
     struct ww_timer_entry *timer;
     struct config_vm_waker *vm;
 };
-
-#ifdef WAYWALL_OPENGL
 
 static int
 image_close(lua_State *L) {
@@ -168,8 +161,6 @@ mirror_gc(lua_State *L) {
 
     return 0;
 }
-
-#endif
 
 static void
 waker_sleep_vm_destroy(struct config_vm_waker *vm_waker, void *data) {
@@ -366,8 +357,6 @@ l_floating_shown(lua_State *L) {
     return 1;
 }
 
-#ifdef WAYWALL_OPENGL
-
 static int
 l_image(lua_State *L) {
     static const int ARG_PATH = 1;
@@ -479,8 +468,6 @@ static int
 l_mirror(lua_State *L) {
     return luaL_error(L, "OpenGL support is not enabled");
 }
-
-#endif
 
 static int
 l_press_key(lua_State *L) {
@@ -852,8 +839,6 @@ int
 config_api_init(struct config_vm *vm) {
     config_vm_register_lib(vm, lua_lib, "priv_waywall");
 
-#ifdef WAYWALL_OPENGL
-
     // Create the metatable for "image" objects.
     luaL_newmetatable(vm->L, METATABLE_IMAGE); // stack: n+1
     lua_pushstring(vm->L, "__gc");             // stack: n+2
@@ -873,8 +858,6 @@ config_api_init(struct config_vm *vm) {
     lua_pushcfunction(vm->L, mirror_index);     // stack: n+3
     lua_settable(vm->L, -3);                    // stack: n+1
     lua_pop(vm->L, 1);                          // stack: n
-
-#endif
 
     for (size_t i = 0; i < STATIC_ARRLEN(EMBEDDED_LUA); i++) {
         if (config_vm_exec_bcode(vm, EMBEDDED_LUA[i].data, EMBEDDED_LUA[i].size,
