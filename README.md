@@ -17,30 +17,20 @@ The following dependencies are required only at build time:
 
 The following dependencies are required for both building and running:
 
+ - `egl`
+ - `glesv2`
  - `luajit`
+ - `spng`
  - `wayland-client`
  - `wayland-cursor`
+ - `wayland-egl`
  - `wayland-server`
+ - `xcb`
+ - `xcb-composite`
+ - `xcb-res`
+ - `xcb-xtest`
+ - `xwayland`
  - `xkbcommon`
-
-> [!NOTE]
-> waywall features support for OpenGL (for builtin mirroring) and Xwayland.
-> These require additional build time and runtime dependencies:
->
-> #### OpenGL
->
->  - `egl`
->  - `glesv2`
->  - `spng`
->  - `wayland-egl`
->
-> #### Xwayland
->
->  - `xcb`
->  - `xcb-composite`
->  - `xcb-res`
->  - `xcb-xtest`
->  - `xwayland`
 
 To build waywall, clone the repository and run `make`.
 
