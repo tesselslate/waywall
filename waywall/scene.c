@@ -65,9 +65,9 @@ build_image(struct scene_image *out, struct scene *scene, const struct scene_ima
         glGenBuffers(1, &out->vbo);
         ww_assert(out->vbo != 0);
 
-        glBindBuffer(GL_ARRAY_BUFFER, out->vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        gl_using_buffer(GL_ARRAY_BUFFER, out->vbo) {
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        }
     }
 }
 
@@ -87,10 +87,10 @@ build_mirrors(struct scene *scene) {
     }
 
     server_gl_with(scene->gl, false) {
-        glBindBuffer(GL_ARRAY_BUFFER, scene->buffers.mirrors);
-        glBufferData(GL_ARRAY_BUFFER, scene->buffers.mirrors_vtxcount * sizeof(*vertices), vertices,
-                     GL_STREAM_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, 0);
+        gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.mirrors) {
+            glBufferData(GL_ARRAY_BUFFER, scene->buffers.mirrors_vtxcount * sizeof(*vertices),
+                         vertices, GL_STREAM_DRAW);
+        }
     }
 
     free(vertices);
@@ -156,14 +156,12 @@ draw_image(struct scene *scene, struct scene_image *image) {
 
     glUniform2f(scene->shaders.texcopy_u_src_size, image->width, image->height);
 
-    glBindBuffer(GL_ARRAY_BUFFER, image->vbo);
-    glBindTexture(GL_TEXTURE_2D, image->tex);
-
-    // Each image has 6 vertices in its vertex buffer.
-    draw_texcopy_list(scene, 6);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    gl_using_buffer(GL_ARRAY_BUFFER, image->vbo) {
+        gl_using_texture(GL_TEXTURE_2D, image->tex) {
+            // Each image has 6 vertices in its vertex buffer.
+            draw_texcopy_list(scene, 6);
+        }
+    }
 }
 
 static void
@@ -180,13 +178,11 @@ draw_mirrors(struct scene *scene) {
     server_gl_get_capture_size(scene->gl, &width, &height);
     glUniform2f(scene->shaders.texcopy_u_src_size, width, height);
 
-    glBindBuffer(GL_ARRAY_BUFFER, scene->buffers.mirrors);
-    glBindTexture(GL_TEXTURE_2D, capture_texture);
-
-    draw_texcopy_list(scene, scene->buffers.mirrors_vtxcount);
-
-    glBindTexture(GL_TEXTURE_2D, 0);
-    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.mirrors) {
+        gl_using_texture(GL_TEXTURE_2D, capture_texture) {
+            draw_texcopy_list(scene, scene->buffers.mirrors_vtxcount);
+        }
+    }
 }
 
 static void
@@ -267,11 +263,12 @@ image_load(struct scene_image *out, struct scene *scene, void *pngbuf, size_t pn
     // Upload the decoded image data to a new OpenGL texture.
     server_gl_with(scene->gl, false) {
         glGenTextures(1, &out->tex);
-        glBindTexture(GL_TEXTURE_2D, out->tex);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ihdr.width, ihdr.height, 0, GL_RGBA,
-                     GL_UNSIGNED_BYTE, decode_buf);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        gl_using_texture(GL_TEXTURE_2D, out->tex) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ihdr.width, ihdr.height, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, decode_buf);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
     }
 
     free(decode_buf);

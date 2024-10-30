@@ -13,6 +13,14 @@
     for (int _glscope = (server_gl_enter((gl), (surface)), 0); _glscope == 0;                      \
          _glscope = (server_gl_exit((gl)), 1))
 
+#define gl_using_buffer(type, buffer)                                                              \
+    for (int _gl_bufscope = (glBindBuffer((type), (buffer)), 0); _gl_bufscope == 0;                \
+         _gl_bufscope = (glBindBuffer((type), 0), 1))
+
+#define gl_using_texture(type, texture)                                                            \
+    for (int _gl_texscope = (glBindTexture((type), (texture)), 0); _gl_texscope == 0;              \
+         _gl_texscope = (glBindTexture((type), 0), 1))
+
 struct server_gl {
     struct server *server;
 

@@ -431,16 +431,16 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
     }
 
     glGenTextures(1, &gl_buffer->texture);
-    glBindTexture(GL_TEXTURE_2D, gl_buffer->texture);
+    gl_using_texture(GL_TEXTURE_2D, gl_buffer->texture) {
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    gl_buffer->gl->egl.ImageTargetTexture2DOES(GL_TEXTURE_2D, gl_buffer->image);
-    if (!gl_checkerr("failed to import texture")) {
-        goto fail_image_target;
+        gl_buffer->gl->egl.ImageTargetTexture2DOES(GL_TEXTURE_2D, gl_buffer->image);
+        if (!gl_checkerr("failed to import texture")) {
+            goto fail_image_target;
+        }
     }
 
     wl_list_insert(&gl->capture.buffers, &gl_buffer->link);
