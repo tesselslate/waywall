@@ -347,6 +347,8 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
             glGetAttribLocation(scene->shaders.texcopy->program, "v_src_rgba");
         scene->shaders.texcopy_a_dst_rgba =
             glGetAttribLocation(scene->shaders.texcopy->program, "v_dst_rgba");
+
+        glGenBuffers(1, &scene->buffers.mirrors);
     }
 
     scene->on_gl_frame.notify = on_gl_frame;
