@@ -39,6 +39,7 @@ waywall_src = files(
   'instance.c',
   'main.c',
   'reload.c',
+  'scene.c',
   'subproc.c',
   'timer.c',
   'wrap.c',

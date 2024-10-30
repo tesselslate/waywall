@@ -1,10 +1,7 @@
-#include "glsl/main.frag.h"
-#include "glsl/main.vert.h"
-
+#include "server/gl.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "server/backend.h"
 #include "server/buffer.h"
-#include "server/gl.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
@@ -14,7 +11,6 @@
 #include "util/prelude.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include <GLES2/gl2.h>
 #include <spng.h>
 #include <stdio.h>
 #include <wayland-client-core.h>
@@ -99,20 +95,10 @@
 
 #define DRM_FORMAT_MOD_INVALID 0xFFFFFFFFFFFFFFFull
 
-#define IMAGE_DRAWLIST_LEN 6
 #define MAX_CACHED_DMABUF 2
 
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
-
-#define VERTEX(options, dst_x, dst_y, src_x, src_y)                                                \
-    (struct vertex) {                                                                              \
-        .pos = {(dst_x), (dst_y)}, .tex = {(src_x), (src_y)},                                      \
-        .src_rgba = {options->src_rgba[0], options->src_rgba[1], options->src_rgba[2],             \
-                     options->src_rgba[3]},                                                        \
-        .dst_rgba = {options->dst_rgba[0], options->dst_rgba[1], options->dst_rgba[2],             \
-                     options->dst_rgba[3]},                                                        \
-    }
 
 struct gl_buffer {
     struct wl_list link; // server_gl.capture.buffers
@@ -121,30 +107,6 @@ struct gl_buffer {
     struct server_buffer *parent;
     EGLImageKHR image; // imported DMABUF - must not be modified
     GLuint texture;    // must not be modified
-};
-
-struct server_gl_image {
-    struct wl_list link; // server_gl.draw.images
-    struct server_gl *gl;
-
-    int32_t width, height;
-
-    char *drawlist;
-    GLuint texture;
-};
-
-struct server_gl_mirror {
-    struct wl_list link; // server_gl.draw.mirrors
-    struct server_gl *gl;
-
-    struct server_gl_mirror_options options;
-};
-
-struct vertex {
-    float pos[2];
-    float tex[2];
-    float src_rgba[4];
-    float dst_rgba[4];
 };
 
 // clang-format off
@@ -218,9 +180,6 @@ static bool gl_checkerr(const char *msg);
 static void gl_buffer_destroy(struct gl_buffer *gl_buffer);
 static struct gl_buffer *gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer);
 
-static void draw_build_lists(struct server_gl *gl);
-static void draw_frame(struct server_gl *gl);
-
 static const struct wl_callback_listener frame_cb_listener;
 
 static void
@@ -233,7 +192,7 @@ on_frame_cb_done(void *data, struct wl_callback *callback, uint32_t time) {
     check_alloc(gl->surface.frame_cb);
     wl_callback_add_listener(gl->surface.frame_cb, &frame_cb_listener, gl);
 
-    draw_frame(gl);
+    wl_signal_emit_mutable(&gl->events.frame, NULL);
 }
 
 static const struct wl_callback_listener frame_cb_listener = {
@@ -499,159 +458,47 @@ fail_create_orig:
     return NULL;
 }
 
-static struct vertex *
-draw_build_rect(struct vertex *buf, struct server_gl_mirror_options *o) {
-    const struct box *s = &o->src;
-    const struct box *d = &o->dst;
-
-    // Top-left triangle
-    *(buf++) = VERTEX(o, d->x, d->y, s->x, s->y);
-    *(buf++) = VERTEX(o, d->x + d->width, d->y, s->x + s->width, s->y);
-    *(buf++) = VERTEX(o, d->x, d->y + d->height, s->x, s->y + s->height);
-
-    // Bottom-right triangle
-    *(buf++) = VERTEX(o, d->x + d->width, d->y, s->x + s->width, s->y);
-    *(buf++) = VERTEX(o, d->x, d->y + d->height, s->x, s->y + s->height);
-    *(buf++) = VERTEX(o, d->x + d->width, d->y + d->height, s->x + s->width, s->y + s->height);
-
-    return buf;
-}
-
-static void
-draw_build_lists(struct server_gl *gl) {
-    if (wl_list_empty(&gl->draw.mirrors)) {
-        return;
-    }
-
-    // Allocate space for the vertices.
-    size_t cap = sizeof(struct vertex) * 6 * wl_list_length(&gl->draw.mirrors);
-    gl->draw.buf = realloc(gl->draw.buf, cap);
-    check_alloc(gl->draw.buf);
-    gl->draw.len = cap;
-
-    // Fill the vertex buffer.
-    struct vertex *ptr = (struct vertex *)gl->draw.buf;
-
-    struct server_gl_mirror *mirror;
-    wl_list_for_each (mirror, &gl->draw.mirrors, link) {
-        ptr = draw_build_rect(ptr, &mirror->options);
-    }
-}
-
-static void
-draw_list(struct server_gl *gl, struct vertex *vertices, size_t num_vertices, GLuint texture) {
-    glBindBuffer(GL_ARRAY_BUFFER, gl->shader.vbo);
-    glBufferData(GL_ARRAY_BUFFER, num_vertices * sizeof(struct vertex), vertices, GL_STREAM_DRAW);
-
-    glVertexAttribPointer(gl->shader.attrib_pos, 2, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
-                          (const void *)offsetof(struct vertex, pos));
-    glVertexAttribPointer(gl->shader.attrib_tex, 2, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
-                          (const void *)offsetof(struct vertex, tex));
-    glVertexAttribPointer(gl->shader.attrib_src_rgba, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
-                          (const void *)offsetof(struct vertex, src_rgba));
-    glVertexAttribPointer(gl->shader.attrib_dst_rgba, 4, GL_FLOAT, GL_FALSE, sizeof(struct vertex),
-                          (const void *)offsetof(struct vertex, dst_rgba));
-
-    glEnableVertexAttribArray(gl->shader.attrib_pos);
-    glEnableVertexAttribArray(gl->shader.attrib_tex);
-    glEnableVertexAttribArray(gl->shader.attrib_src_rgba);
-    glEnableVertexAttribArray(gl->shader.attrib_dst_rgba);
-
-    glBindTexture(GL_TEXTURE_2D, texture);
-    glDrawArrays(GL_TRIANGLES, 0, num_vertices);
-
-    glDisableVertexAttribArray(gl->shader.attrib_pos);
-    glDisableVertexAttribArray(gl->shader.attrib_tex);
-    glDisableVertexAttribArray(gl->shader.attrib_src_rgba);
-    glDisableVertexAttribArray(gl->shader.attrib_dst_rgba);
-}
-
-static void
-draw_frame(struct server_gl *gl) {
-    eglMakeCurrent(gl->egl.display, gl->surface.egl, gl->surface.egl, gl->egl.ctx);
-
-    // If there is nothing to draw, then clear the framebuffer and return.
-    if (!gl->capture.current || gl->draw.len == 0) {
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glClearColor(0, 0, 0, 0);
-
-        eglSwapBuffers(gl->egl.display, gl->surface.egl);
-        return;
-    }
-
-    // Otherwise, draw as normal.
-    int32_t ui_width = gl->server->ui->width;
-    int32_t ui_height = gl->server->ui->height;
-    glViewport(0, 0, ui_width, ui_height);
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glClearColor(0, 0, 0, 0);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-    glUseProgram(gl->shader.prog);
-
-    int32_t buf_width, buf_height;
-    server_buffer_get_size(gl->capture.current->parent, &buf_width, &buf_height);
-    glUniform2f(gl->shader.uniform_winsize, ui_width, ui_height);
-
-    // Draw all mirrors.
-    glUniform2f(gl->shader.uniform_texsize, buf_width, buf_height);
-    draw_list(gl, (struct vertex *)gl->draw.buf, gl->draw.len / sizeof(struct vertex),
-              gl->capture.current->texture);
-
-    // Draw all images.
-    struct server_gl_image *image;
-    wl_list_for_each (image, &gl->draw.images, link) {
-        glUniform2f(gl->shader.uniform_texsize, image->width, image->height);
-        draw_list(gl, (struct vertex *)image->drawlist, IMAGE_DRAWLIST_LEN, image->texture);
-    }
-
-    // Push the results to the framebuffer.
-    eglSwapBuffers(gl->egl.display, gl->surface.egl);
-
-    // TODO: Explicit sync support
-}
-
 static bool
-gl_link_program(struct server_gl *gl) {
-    gl->shader.prog = glCreateProgram();
-    ww_assert(gl->shader.prog != 0);
+compile_shader(GLuint *out, GLint type, const char *source) {
+    GLuint shader = glCreateShader(type);
+    ww_assert(shader != 0);
+    *out = shader;
 
-    glAttachShader(gl->shader.prog, gl->shader.vert);
-    glAttachShader(gl->shader.prog, gl->shader.frag);
-    glLinkProgram(gl->shader.prog);
+    glShaderSource(shader, 1, &source, NULL);
+    glCompileShader(shader);
 
     GLint status;
-    glGetProgramiv(gl->shader.prog, GL_LINK_STATUS, &status);
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
     if (status == GL_TRUE) {
         return true;
     }
 
     char buf[4096] = {0};
-    glGetProgramInfoLog(gl->shader.prog, STATIC_ARRLEN(buf) - 1, NULL, buf);
-    ww_log(LOG_ERROR, "failed to link shader program: %s", buf);
+    glGetShaderInfoLog(shader, STATIC_ARRLEN(buf) - 1, NULL, buf);
+    ww_log(LOG_ERROR, "failed to compile shader (type %d): %s", (int)type, buf);
 
     return false;
 }
 
 static bool
-gl_make_shader(GLuint *output, GLint type, const char *src) {
-    *output = glCreateShader(type);
-    ww_assert(*output != 0);
+compile_program(GLuint *out, GLuint vert, GLuint frag) {
+    GLuint prog = glCreateProgram();
+    ww_assert(prog != 0);
+    *out = prog;
 
-    glShaderSource(*output, 1, &src, NULL);
-    glCompileShader(*output);
+    glAttachShader(prog, vert);
+    glAttachShader(prog, frag);
+    glLinkProgram(prog);
 
     GLint status;
-    glGetShaderiv(*output, GL_COMPILE_STATUS, &status);
+    glGetProgramiv(prog, GL_LINK_STATUS, &status);
     if (status == GL_TRUE) {
         return true;
     }
 
     char buf[4096] = {0};
-    glGetShaderInfoLog(*output, STATIC_ARRLEN(buf) - 1, NULL, buf);
-    ww_log(LOG_ERROR, "failed to compile shader: %s", buf);
+    glGetProgramInfoLog(prog, STATIC_ARRLEN(buf) - 1, NULL, buf);
+    ww_log(LOG_ERROR, "failed to link shader program: %s", buf);
 
     return false;
 }
@@ -741,37 +588,6 @@ server_gl_create(struct server *server) {
         }
     }
 
-    // Create the shader program and allocate buffers.
-    if (!gl_make_shader(&gl->shader.vert, GL_VERTEX_SHADER, WAYWALL_GLSL_MAIN_VERT_H)) {
-        goto fail_vert_shader;
-    }
-    if (!gl_make_shader(&gl->shader.frag, GL_FRAGMENT_SHADER, WAYWALL_GLSL_MAIN_FRAG_H)) {
-        goto fail_frag_shader;
-    }
-    if (!gl_link_program(gl)) {
-        goto fail_link_program;
-    }
-
-    gl->shader.attrib_pos = glGetAttribLocation(gl->shader.prog, "v_pos");
-    ww_assert(gl->shader.attrib_pos != -1);
-
-    gl->shader.attrib_tex = glGetAttribLocation(gl->shader.prog, "v_tex");
-    ww_assert(gl->shader.attrib_tex != -1);
-
-    gl->shader.attrib_src_rgba = glGetAttribLocation(gl->shader.prog, "v_src_rgba");
-    ww_assert(gl->shader.attrib_src_rgba != -1);
-
-    gl->shader.attrib_dst_rgba = glGetAttribLocation(gl->shader.prog, "v_dst_rgba");
-    ww_assert(gl->shader.attrib_dst_rgba != -1);
-
-    gl->shader.uniform_texsize = glGetUniformLocation(gl->shader.prog, "u_texsize");
-    ww_assert(gl->shader.uniform_texsize != -1);
-
-    gl->shader.uniform_winsize = glGetUniformLocation(gl->shader.prog, "u_winsize");
-    ww_assert(gl->shader.uniform_winsize != -1);
-
-    glGenBuffers(1, &gl->shader.vbo);
-
     // Create the OpenGL surface.
     gl->surface.remote = wl_compositor_create_surface(server->backend->compositor);
     check_alloc(gl->surface.remote);
@@ -797,11 +613,7 @@ server_gl_create(struct server *server) {
         goto fail_egl_surface;
     }
 
-    eglMakeCurrent(gl->egl.display, gl->surface.egl, gl->surface.egl, gl->egl.ctx);
-    eglSwapInterval(gl->egl.display, 0);
-
     wl_surface_commit(gl->surface.remote);
-    draw_frame(gl);
 
     gl->on_ui_resize.notify = on_ui_resize;
     wl_signal_add(&server->ui->events.resize, &gl->on_ui_resize);
@@ -809,9 +621,9 @@ server_gl_create(struct server *server) {
     // Log debug information about the user's EGL/OpenGL implementation.
     egl_print_sysinfo(gl);
 
-    wl_list_init(&gl->draw.mirrors);
-    wl_list_init(&gl->draw.images);
     wl_list_init(&gl->capture.buffers);
+
+    wl_signal_init(&gl->events.frame);
 
     return gl;
 
@@ -821,16 +633,6 @@ fail_egl_surface:
     wl_subsurface_destroy(gl->surface.subsurface);
     wl_surface_destroy(gl->surface.remote);
 
-    glDeleteBuffers(1, &gl->shader.vbo);
-    glDeleteProgram(gl->shader.prog);
-
-fail_link_program:
-    glDeleteShader(gl->shader.frag);
-
-fail_frag_shader:
-    glDeleteShader(gl->shader.vert);
-
-fail_vert_shader:
 fail_extensions_gl:
 fail_make_current:
     eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
@@ -864,25 +666,6 @@ server_gl_destroy(struct server_gl *gl) {
         gl_buffer_destroy(gl_buffer);
     }
 
-    struct server_gl_mirror *mirror, *mirror_tmp;
-    wl_list_for_each_safe (mirror, mirror_tmp, &gl->draw.mirrors, link) {
-        mirror->gl = NULL;
-
-        wl_list_remove(&mirror->link);
-        wl_list_init(&mirror->link);
-    }
-
-    struct server_gl_image *image, *image_tmp;
-    wl_list_for_each_safe (image, image_tmp, &gl->draw.images, link) {
-        image->gl = NULL;
-
-        eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
-        glDeleteTextures(1, &image->texture);
-
-        wl_list_remove(&image->link);
-        wl_list_init(&image->link);
-    }
-
     // Destroy surface resources.
     wl_list_remove(&gl->on_ui_resize.link);
 
@@ -895,25 +678,78 @@ server_gl_destroy(struct server_gl *gl) {
         wl_callback_destroy(gl->surface.frame_cb);
     }
 
-    // Destroy OpenGL resources.
-    glDeleteBuffers(1, &gl->shader.vbo);
-    glDeleteProgram(gl->shader.prog);
-    glDeleteShader(gl->shader.frag);
-    glDeleteShader(gl->shader.vert);
-
     // Destroy EGL resources.
     eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroyContext(gl->egl.display, gl->egl.ctx);
     eglTerminate(gl->egl.display);
 
-    if (gl->draw.buf) {
-        free(gl->draw.buf);
-    }
     free(gl);
 }
 
 void
-server_gl_set_target(struct server_gl *gl, struct server_surface *surface) {
+server_gl_enter(struct server_gl *gl, bool surface) {
+    EGLSurface egl_surface = surface ? gl->surface.egl : EGL_NO_SURFACE;
+
+    if (!eglMakeCurrent(gl->egl.display, egl_surface, egl_surface, gl->egl.ctx)) {
+        ww_panic("failed to make EGL context current (surface: %s): %s", surface ? "yes" : "no",
+                 egl_strerror());
+    }
+}
+
+void
+server_gl_exit(struct server_gl *gl) {
+    if (!eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT)) {
+        ww_panic("failed to exit EGL context: %s", egl_strerror());
+    }
+}
+
+struct server_gl_shader *
+server_gl_compile(struct server_gl *gl, const char *vert, const char *frag) {
+    // The OpenGL context must be current.
+
+    struct server_gl_shader *shader = zalloc(1, sizeof(*shader));
+
+    if (!compile_shader(&shader->vert, GL_VERTEX_SHADER, vert)) {
+        goto fail_vert;
+    }
+    if (!compile_shader(&shader->frag, GL_FRAGMENT_SHADER, frag)) {
+        goto fail_frag;
+    }
+    if (!compile_program(&shader->program, shader->vert, shader->frag)) {
+        goto fail_link;
+    }
+
+    return shader;
+
+fail_link:
+    glDeleteShader(shader->frag);
+
+fail_frag:
+    glDeleteShader(shader->vert);
+
+fail_vert:
+    free(shader);
+
+    return NULL;
+}
+
+GLuint
+server_gl_get_capture(struct server_gl *gl) {
+    if (!gl->capture.current) {
+        return 0;
+    }
+
+    return gl->capture.current->texture;
+}
+
+void
+server_gl_get_capture_size(struct server_gl *gl, int32_t *width, int32_t *height) {
+    ww_assert(gl->capture.current);
+    server_buffer_get_size(gl->capture.current->parent, width, height);
+}
+
+void
+server_gl_set_capture(struct server_gl *gl, struct server_surface *surface) {
     if (gl->capture.surface) {
         ww_panic("cannot overwrite capture surface");
     }
@@ -927,122 +763,26 @@ server_gl_set_target(struct server_gl *gl, struct server_surface *surface) {
     wl_signal_add(&surface->events.destroy, &gl->on_surface_destroy);
 }
 
-struct server_gl_mirror *
-server_gl_mirror_create(struct server_gl *gl, struct server_gl_mirror_options options) {
-    struct server_gl_mirror *mirror = zalloc(1, sizeof(*mirror));
-
-    mirror->gl = gl;
-    mirror->options = options;
-
-    wl_list_insert(&gl->draw.mirrors, &mirror->link);
-    draw_build_lists(gl);
-
-    return mirror;
+void
+server_gl_swap_buffers(struct server_gl *gl) {
+    eglSwapInterval(gl->egl.display, 0);
+    eglSwapBuffers(gl->egl.display, gl->surface.egl);
 }
 
 void
-server_gl_mirror_destroy(struct server_gl_mirror *mirror) {
-    wl_list_remove(&mirror->link);
+server_gl_shader_destroy(struct server_gl_shader *shader) {
+    // The OpenGL context must be current.
 
-    if (mirror->gl) {
-        draw_build_lists(mirror->gl);
-    }
+    glDeleteProgram(shader->program);
+    glDeleteShader(shader->frag);
+    glDeleteShader(shader->vert);
 
-    free(mirror);
-}
-
-struct server_gl_image *
-server_gl_image_create(struct server_gl *gl, char *buf, size_t bufsize,
-                       struct server_gl_mirror_options options) {
-    struct server_gl_image *image = zalloc(1, sizeof(*image));
-
-    image->gl = gl;
-
-    // Attempt to decode the PNG.
-    spng_ctx *ctx = spng_ctx_new(0);
-    if (!ctx) {
-        ww_log(LOG_ERROR, "failed to create spng_ctx");
-        goto fail_ctx_new;
-    }
-
-    int err = spng_set_png_buffer(ctx, buf, bufsize);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to set png buffer: %s\n", spng_strerror(err));
-        goto fail_set_png_buffer;
-    }
-
-    struct spng_ihdr ihdr = {0};
-    err = spng_get_ihdr(ctx, &ihdr);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to get image header: %s\n", spng_strerror(err));
-        goto fail_get_ihdr;
-    }
-
-    size_t decode_size;
-    err = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &decode_size);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to get decoded image size: %s\n", spng_strerror(err));
-        goto fail_get_image_size;
-    }
-
-    char *decode_buf = zalloc(decode_size, 1);
-    err = spng_decode_image(ctx, decode_buf, decode_size, SPNG_FMT_RGBA8, SPNG_DECODE_TRNS);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to decode image: %s\n", spng_strerror(err));
-        goto fail_decode_image;
-    }
-
-    // Create a buffer containing the vertex data for the image.
-    options.src = (struct box){0, 0, ihdr.width, ihdr.height};
-
-    image->width = ihdr.width;
-    image->height = ihdr.height;
-
-    image->drawlist = zalloc(IMAGE_DRAWLIST_LEN, sizeof(struct vertex));
-    draw_build_rect((struct vertex *)image->drawlist, &options);
-
-    // Attempt to place the PNG into an OpenGL texture.
-    eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, gl->egl.ctx);
-
-    glGenTextures(1, &image->texture);
-    glBindTexture(GL_TEXTURE_2D, image->texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ihdr.width, ihdr.height, 0, GL_RGBA, GL_UNSIGNED_BYTE,
-                 decode_buf);
-
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // Cleanup the PNG decoder resources.
-    free(decode_buf);
-    spng_ctx_free(ctx);
-
-    wl_list_insert(&gl->draw.images, &image->link);
-
-    return image;
-
-fail_decode_image:
-    free(decode_buf);
-
-fail_get_image_size:
-fail_get_ihdr:
-fail_set_png_buffer:
-    spng_ctx_free(ctx);
-
-fail_ctx_new:
-    free(image);
-
-    return NULL;
+    free(shader);
 }
 
 void
-server_gl_image_destroy(struct server_gl_image *image) {
-    wl_list_remove(&image->link);
+server_gl_shader_use(struct server_gl_shader *shader) {
+    // The OpenGL context must be current.
 
-    if (image->gl) {
-        eglMakeCurrent(image->gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, image->gl->egl.ctx);
-        glDeleteTextures(1, &image->texture);
-    }
-
-    free(image->drawlist);
-    free(image);
+    glUseProgram(shader->program);
 }

@@ -5,7 +5,7 @@
 #include "config/internal.h"
 #include "config/vm.h"
 #include "instance.h"
-#include "server/gl.h"
+#include "scene.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"
@@ -86,13 +86,13 @@ struct waker_sleep {
 
 static int
 image_close(lua_State *L) {
-    struct server_gl_image **image = lua_touserdata(L, 1);
+    struct scene_image **image = lua_touserdata(L, 1);
 
     if (!*image) {
         return luaL_error(L, "cannot close image more than once");
     }
 
-    server_gl_image_destroy(*image);
+    scene_image_destroy(*image);
     *image = NULL;
 
     return 0;
@@ -113,10 +113,10 @@ image_index(lua_State *L) {
 
 static int
 image_gc(lua_State *L) {
-    struct server_gl_image **image = lua_touserdata(L, 1);
+    struct scene_image **image = lua_touserdata(L, 1);
 
     if (*image) {
-        server_gl_image_destroy(*image);
+        scene_image_destroy(*image);
     }
     *image = NULL;
 
@@ -125,13 +125,13 @@ image_gc(lua_State *L) {
 
 static int
 mirror_close(lua_State *L) {
-    struct server_gl_mirror **mirror = lua_touserdata(L, 1);
+    struct scene_mirror **mirror = lua_touserdata(L, 1);
 
     if (!*mirror) {
         return luaL_error(L, "cannot close mirror more than once");
     }
 
-    server_gl_mirror_destroy(*mirror);
+    scene_mirror_destroy(*mirror);
     *mirror = NULL;
 
     return 0;
@@ -152,10 +152,10 @@ mirror_index(lua_State *L) {
 
 static int
 mirror_gc(lua_State *L) {
-    struct server_gl_mirror **mirror = lua_touserdata(L, 1);
+    struct scene_mirror **mirror = lua_touserdata(L, 1);
 
     if (*mirror) {
-        server_gl_mirror_destroy(*mirror);
+        scene_mirror_destroy(*mirror);
     }
     *mirror = NULL;
 
@@ -373,7 +373,7 @@ l_image(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct server_gl_mirror_options options = {0};
+    struct scene_image_options options = {0};
     unmarshal_box(L, &options.dst);
 
     int fd = open(path, O_RDONLY);
@@ -394,20 +394,21 @@ l_image(lua_State *L) {
     }
 
     // Body
-    struct server_gl_image **image = lua_newuserdata(L, sizeof(*image));
+    struct scene_image **image = lua_newuserdata(L, sizeof(*image));
     check_alloc(image);
 
     luaL_getmetatable(L, METATABLE_IMAGE);
     lua_setmetatable(L, -2);
 
-    *image = server_gl_image_create(wrap->gl, buf, stat.st_size, options);
+    *image = scene_add_image(wrap->scene, &options, buf, stat.st_size);
+    if (!*image) {
+        ww_assert(munmap(buf, stat.st_size) == 0);
+        close(fd);
+        return luaL_error(L, "failed to create image");
+    }
 
     ww_assert(munmap(buf, stat.st_size) == 0);
     close(fd);
-
-    if (!*image) {
-        return luaL_error(L, "failed to create image");
-    }
 
     // Epilogue. The userdata (image) was already pushed to the stack by the above code.
     return 1;
@@ -427,7 +428,7 @@ l_mirror(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct server_gl_mirror_options options = {0};
+    struct scene_mirror_options options = {0};
 
     unmarshal_box_key(L, "src", &options.src);
     unmarshal_box_key(L, "dst", &options.dst);
@@ -442,31 +443,19 @@ l_mirror(lua_State *L) {
     lua_pop(L, 1); // stack: 1
 
     // Body
-    struct server_gl_mirror **mirror = lua_newuserdata(L, sizeof(*mirror));
+    struct scene_mirror **mirror = lua_newuserdata(L, sizeof(*mirror));
     check_alloc(mirror);
 
     luaL_getmetatable(L, METATABLE_MIRROR);
     lua_setmetatable(L, -2);
 
-    *mirror = server_gl_mirror_create(wrap->gl, options);
+    *mirror = scene_add_mirror(wrap->scene, &options);
     if (!*mirror) {
         return luaL_error(L, "failed to create mirror");
     }
 
     // Epilogue. The userdata (mirror) was already pushed to the stack by the above code.
     return 1;
-}
-
-#else
-
-static int
-l_image(lua_State *L) {
-    return luaL_error(L, "OpenGL support is not enabled");
-}
-
-static int
-l_mirror(lua_State *L) {
-    return luaL_error(L, "OpenGL support is not enabled");
 }
 
 static int

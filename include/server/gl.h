@@ -9,6 +9,10 @@
 #include <stdbool.h>
 #include <wayland-server-core.h>
 
+#define server_gl_with(gl, surface)                                                                \
+    for (int _glscope = (server_gl_enter((gl), (surface)), 0); _glscope == 0;                      \
+         _glscope = (server_gl_exit((gl)), 1))
+
 struct server_gl {
     struct server *server;
 
@@ -26,14 +30,6 @@ struct server_gl {
     } egl;
 
     struct {
-        GLuint frag, vert, prog;
-
-        GLuint vbo;
-        GLint attrib_pos, attrib_tex, attrib_src_rgba, attrib_dst_rgba;
-        GLint uniform_texsize, uniform_winsize;
-    } shader;
-
-    struct {
         struct wl_surface *remote;
         struct wl_subsurface *subsurface;
         struct wl_egl_window *window;
@@ -48,37 +44,33 @@ struct server_gl {
         struct gl_buffer *current;
     } capture;
 
-    struct {
-        char *buf;
-        size_t len;
-
-        struct wl_list mirrors; // server_gl_mirror.link
-        struct wl_list images;  // server_gl_image.link
-    } draw;
-
     struct wl_listener on_surface_commit;
     struct wl_listener on_surface_destroy;
     struct wl_listener on_ui_resize;
+
+    struct {
+        struct wl_signal frame; // data: NULL
+    } events;
 };
 
-struct server_gl_mirror_options {
-    struct box src, dst;
-    float src_rgba[4], dst_rgba[4];
+struct server_gl_shader {
+    GLuint vert, frag;
+    GLuint program;
 };
-
-struct server_gl_image;
-struct server_gl_mirror;
 
 struct server_gl *server_gl_create(struct server *server);
 void server_gl_destroy(struct server_gl *gl);
-void server_gl_set_target(struct server_gl *gl, struct server_surface *surface);
+void server_gl_enter(struct server_gl *gl, bool surface);
+void server_gl_exit(struct server_gl *gl);
 
-struct server_gl_image *server_gl_image_create(struct server_gl *gl, char *buf, size_t bufsize,
-                                               struct server_gl_mirror_options options);
-void server_gl_image_destroy(struct server_gl_image *image);
+struct server_gl_shader *server_gl_compile(struct server_gl *gl, const char *vertex,
+                                           const char *fragment);
+GLuint server_gl_get_capture(struct server_gl *gl);
+void server_gl_get_capture_size(struct server_gl *gl, int32_t *width, int32_t *height);
+void server_gl_set_capture(struct server_gl *gl, struct server_surface *surface);
+void server_gl_swap_buffers(struct server_gl *gl);
 
-struct server_gl_mirror *server_gl_mirror_create(struct server_gl *gl,
-                                                 struct server_gl_mirror_options options);
-void server_gl_mirror_destroy(struct server_gl_mirror *mirror);
+void server_gl_shader_destroy(struct server_gl_shader *shader);
+void server_gl_shader_use(struct server_gl_shader *shader);
 
 #endif

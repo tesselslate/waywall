@@ -2,8 +2,8 @@ luajit_cmd = find_program('luajit')
 embed_lua = find_program('./embed.lua', native: true)
 
 waywall_glsl_files = [
-  'main.frag',
-  'main.vert',
+  'texcopy.frag',
+  'texcopy.vert',
 ]
 
 waywall_glsl = []

@@ -368,7 +368,7 @@ on_view_create(struct wl_listener *listener, void *data) {
     server_view_set_visible(wrap->view, true);
     server_view_commit(wrap->view);
 
-    server_gl_set_target(wrap->gl, view->surface);
+    server_gl_set_capture(wrap->gl, view->surface);
 }
 
 static void
@@ -518,8 +518,14 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
 
     wrap->gl = server_gl_create(server);
     if (!wrap->gl) {
-        free(wrap);
-        return NULL;
+        ww_log(LOG_ERROR, "failed to initialize OpenGL");
+        goto fail_gl;
+    }
+
+    wrap->scene = scene_create(wrap->gl, server->ui);
+    if (!wrap->scene) {
+        ww_log(LOG_ERROR, "failed to create scene");
+        goto fail_scene;
     }
 
     wrap->cfg = cfg;
@@ -553,6 +559,14 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     server_seat_set_listener(server->seat, &seat_listener, wrap);
 
     return wrap;
+
+fail_scene:
+    server_gl_destroy(wrap->gl);
+
+fail_gl:
+    free(wrap);
+
+    return NULL;
 }
 
 void
@@ -561,6 +575,7 @@ wrap_destroy(struct wrap *wrap) {
         instance_destroy(wrap->instance);
     }
 
+    scene_destroy(wrap->scene);
     server_gl_destroy(wrap->gl);
 
     ww_timer_destroy(wrap->timer);

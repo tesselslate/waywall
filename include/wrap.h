@@ -11,6 +11,7 @@ struct wrap {
 
     struct server *server;
     struct server_gl *gl;
+    struct scene *scene;
 
     struct inotify *inotify;
     struct subproc *subproc;
