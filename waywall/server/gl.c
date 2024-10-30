@@ -298,7 +298,6 @@ egl_print_sysinfo(struct server_gl *gl) {
     }
 
     // Print OpenGL debug information.
-    ww_assert(eglGetCurrentContext() == gl->egl.ctx);
     for (size_t i = 0; i < STATIC_ARRLEN(GL_STRINGS); i++) {
         const char *value = (const char *)glGetString(GL_STRINGS[i].name);
         if (!value) {
@@ -613,13 +612,19 @@ server_gl_create(struct server *server) {
         goto fail_egl_surface;
     }
 
-    wl_surface_commit(gl->surface.remote);
+    server_gl_with(gl, true) {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearColor(0, 0, 0, 0);
+        server_gl_swap_buffers(gl);
+    }
 
     gl->on_ui_resize.notify = on_ui_resize;
     wl_signal_add(&server->ui->events.resize, &gl->on_ui_resize);
 
     // Log debug information about the user's EGL/OpenGL implementation.
-    egl_print_sysinfo(gl);
+    server_gl_with(gl, false) {
+        egl_print_sysinfo(gl);
+    }
 
     wl_list_init(&gl->capture.buffers);
 
