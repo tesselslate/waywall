@@ -32,15 +32,15 @@ struct server_backend {
     struct wp_viewporter *viewporter;
     struct xdg_wm_base *xdg_wm_base;
 
+    // optional globals
+    struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
+    struct wp_linux_drm_syncobj_manager_v1 *linux_drm_syncobj_manager;
+    struct wp_tearing_control_manager_v1 *tearing_control;
+    struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
     struct {
         uint32_t name;
         bool found;
     } drm;
-
-    // optional globals
-    struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
-    struct wp_tearing_control_manager_v1 *tearing_control;
-    struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
 
     struct {
         struct wl_signal seat_data_device; // data: NULL

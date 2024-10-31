@@ -1,6 +1,7 @@
 #include "server/backend.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "linux-drm-syncobj-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
@@ -21,6 +22,7 @@
 #define USE_DATA_DEVICE_MANAGER_VERSION 2
 #define USE_DRM_VERSION 2
 #define USE_LINUX_DMABUF_VERSION 4
+#define USE_LINUX_DRM_SYNCOBJ_VERSION 1
 #define USE_POINTER_CONSTRAINTS_VERSION 1
 #define USE_RELATIVE_POINTER_MANAGER_VERSION 1
 #define USE_SEAT_VERSION 5
@@ -144,6 +146,17 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->linux_dmabuf =
             wl_registry_bind(wl, name, &zwp_linux_dmabuf_v1_interface, USE_LINUX_DMABUF_VERSION);
         check_alloc(backend->linux_dmabuf);
+    } else if (strcmp(iface, wp_linux_drm_syncobj_manager_v1_interface.name) == 0) {
+        if (version < USE_LINUX_DRM_SYNCOBJ_VERSION) {
+            ww_log(LOG_WARN,
+                   "host compositor provides outdated wp_linux_drm_syncobj_manager (%d < %d)",
+                   version, USE_LINUX_DRM_SYNCOBJ_VERSION);
+            return;
+        }
+
+        backend->linux_drm_syncobj_manager = wl_registry_bind(
+            wl, name, &wp_linux_drm_syncobj_manager_v1_interface, USE_LINUX_DRM_SYNCOBJ_VERSION);
+        check_alloc(backend->linux_drm_syncobj_manager);
     } else if (strcmp(iface, wl_drm_interface.name) == 0) {
         if (version < USE_DRM_VERSION) {
             ww_log(LOG_WARN, "host compositor provides outdated wl_drm (%d < %d)", version,
@@ -330,14 +343,17 @@ server_backend_create() {
     if (!backend->cursor_shape_manager) {
         ww_log(LOG_WARN, "host compositor does not provide wp_cursor_shape_manager");
     }
-    if (!backend->drm.found) {
-        ww_log(LOG_WARN, "host compositor does not provide wl_drm");
+    if (!backend->linux_drm_syncobj_manager) {
+        ww_log(LOG_INFO, "host compositor does not provide wp_linux_drm_syncobj_manager");
     }
     if (!backend->tearing_control) {
         ww_log(LOG_INFO, "host compositor does not provide wp_tearing_control_manager");
     }
     if (!backend->xdg_decoration_manager) {
         ww_log(LOG_WARN, "host compositor does not provide zxdg_decoration_manager");
+    }
+    if (!backend->drm.found) {
+        ww_log(LOG_WARN, "host compositor does not provide wl_drm");
     }
 
     return backend;
@@ -387,6 +403,9 @@ server_backend_destroy(struct server_backend *backend) {
 
     if (backend->cursor_shape_manager) {
         wp_cursor_shape_manager_v1_destroy(backend->cursor_shape_manager);
+    }
+    if (backend->linux_drm_syncobj_manager) {
+        wp_linux_drm_syncobj_manager_v1_destroy(backend->linux_drm_syncobj_manager);
     }
     if (backend->tearing_control) {
         wp_tearing_control_manager_v1_destroy(backend->tearing_control);
