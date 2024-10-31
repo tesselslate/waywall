@@ -95,7 +95,7 @@ xwayland_shell_get_xwayland_surface(struct wl_client *client, struct wl_resource
 
     struct wl_resource *xwayland_surface_resource = wl_resource_create(
         client, &xwayland_surface_v1_interface, wl_resource_get_version(resource), id);
-    check_alloc(resource);
+    check_alloc(xwayland_surface_resource);
     wl_resource_set_implementation(xwayland_surface_resource, &xwayland_surface_impl,
                                    xwayland_surface, xwayland_surface_resource_destroy);
 
