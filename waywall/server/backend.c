@@ -146,7 +146,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         check_alloc(backend->linux_dmabuf);
     } else if (strcmp(iface, wl_drm_interface.name) == 0) {
         if (version < USE_DRM_VERSION) {
-            ww_log(LOG_ERROR, "host compositor provides outdated wl_drm (%d < %d)", version,
+            ww_log(LOG_WARN, "host compositor provides outdated wl_drm (%d < %d)", version,
                    USE_DRM_VERSION);
             return;
         }
@@ -221,7 +221,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
             wl_registry_bind(wl, name, &wl_subcompositor_interface, USE_SUBCOMPOSITOR_VERSION);
     } else if (strcmp(iface, wp_tearing_control_manager_v1_interface.name) == 0) {
         if (version < USE_TEARING_CONTROL_VERSION) {
-            ww_log(LOG_ERROR,
+            ww_log(LOG_WARN,
                    "host compositor provides outdated wp_tearing_control_manager (%d < %d)",
                    version, USE_TEARING_CONTROL_VERSION);
             return;
