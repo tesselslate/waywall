@@ -11,6 +11,7 @@
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
 #include "server/wp_linux_dmabuf.h"
+#include "server/wp_linux_drm_syncobj.h"
 #include "server/wp_pointer_constraints.h"
 #include "server/wp_relative_pointer.h"
 #include "server/xdg_decoration.h"
@@ -228,6 +229,12 @@ server_create(struct config *cfg) {
     if (server->backend->drm.found) {
         server->drm = server_drm_create(server);
         if (!server->drm) {
+            goto fail_globals;
+        }
+    }
+    if (server->backend->linux_drm_syncobj_manager) {
+        server->drm_syncobj = server_drm_syncobj_manager_create(server);
+        if (!server->drm_syncobj) {
             goto fail_globals;
         }
     }
