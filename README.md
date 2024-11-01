@@ -47,3 +47,7 @@ files.
 
 - [weston](https://gitlab.freedesktop.org/wayland/weston)
 - [wlroots](https://gitlab.freedesktop.org/wlroots/wlroots)
+
+waywall bundles a version of the [Terminus Font](https://terminus-font.sourceforge.net/),
+which is licensed under the Open Font License. See `include/util/font.h` for
+more information.
