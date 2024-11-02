@@ -20,10 +20,13 @@ struct scene {
     struct {
         unsigned int mirrors;
         size_t mirrors_vtxcount;
+
+        unsigned int font_tex;
     } buffers;
 
     struct wl_list images;  // scene_image.link
     struct wl_list mirrors; // scene_mirror.link
+    struct wl_list text;    // scene_text.link
 
     struct wl_listener on_gl_frame;
 };
@@ -45,9 +48,10 @@ struct scene_image *scene_add_image(struct scene *scene, const struct scene_imag
                                     void *pngbuf, size_t pngbuf_size);
 struct scene_mirror *scene_add_mirror(struct scene *scene,
                                       const struct scene_mirror_options *options);
+struct scene_text *scene_add_text(struct scene *scene, const char *data, int32_t x, int32_t y);
 
 void scene_image_destroy(struct scene_image *image);
-
 void scene_mirror_destroy(struct scene_mirror *mirror);
+void scene_text_destroy(struct scene_text *text);
 
 #endif

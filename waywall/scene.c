@@ -5,10 +5,24 @@
 #include "server/gl.h"
 #include "server/ui.h"
 #include "util/alloc.h"
+#include "util/font.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include <GLES2/gl2.h>
 #include <spng.h>
+
+#define PACKED_ATLAS_SIZE 4096
+#define PACKED_ATLAS_WIDTH 2048
+#define PACKED_ATLAS_HEIGHT 16
+#define ATLAS_WIDTH 128
+#define ATLAS_HEIGHT 256
+#define CHAR_WIDTH 8
+#define CHAR_HEIGHT 16
+#define CHARS_PER_ROW (ATLAS_WIDTH / CHAR_WIDTH)
+
+static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
+static_assert(PACKED_ATLAS_WIDTH * PACKED_ATLAS_HEIGHT == ATLAS_WIDTH * ATLAS_HEIGHT);
+static_assert(ATLAS_WIDTH * ATLAS_HEIGHT == PACKED_ATLAS_SIZE * 8);
 
 struct vtx_texcopy {
     float src_pos[2];
@@ -33,15 +47,29 @@ struct scene_mirror {
     struct scene_mirror_options options;
 };
 
+struct scene_text {
+    struct wl_list link; // scene.text
+    struct scene *parent;
+
+    GLuint vbo;
+    size_t vtxcount;
+
+    int32_t x, y;
+};
+
 static void build_image(struct scene_image *out, struct scene *scene,
                         const struct scene_image_options *options, int32_t width, int32_t height);
 static void build_mirrors(struct scene *scene);
 static void build_rect(struct vtx_texcopy out[static 6], const struct box *src,
                        const struct box *dst, float src_rgba[static 4], float dst_rgba[static 4]);
+static void build_text(struct scene_text *out, struct scene *scene, const char *data, int32_t x,
+                       int32_t y);
 
 static void draw_frame(struct scene *scene);
 static void draw_image(struct scene *scene, struct scene_image *image);
 static void draw_mirrors(struct scene *scene);
+static void draw_text(struct scene *scene, struct scene_text *text);
+
 static void draw_texcopy_list(struct scene *scene, size_t num_vertices);
 
 static void
@@ -125,6 +153,50 @@ build_rect(struct vtx_texcopy out[static 6], const struct box *s, const struct b
 }
 
 static void
+build_text(struct scene_text *out, struct scene *scene, const char *data, int32_t x, int32_t y) {
+    out->vtxcount = strlen(data) * 6;
+
+    struct vtx_texcopy *vertices = zalloc(out->vtxcount, sizeof(*vertices));
+    struct vtx_texcopy *ptr = vertices;
+
+    for (const char *c = data; *c != '\0'; c++) {
+        if (*c == '\n') {
+            y += CHAR_HEIGHT;
+            continue;
+        }
+
+        struct box src = {
+            .x = (*c % CHARS_PER_ROW) * CHAR_WIDTH,
+            .y = (*c / CHARS_PER_ROW) * CHAR_HEIGHT,
+            .width = CHAR_WIDTH,
+            .height = CHAR_HEIGHT,
+        };
+
+        struct box dst = {
+            .x = x + (c - data) * CHAR_WIDTH,
+            .y = y,
+            .width = CHAR_WIDTH,
+            .height = CHAR_HEIGHT,
+        };
+
+        build_rect(ptr, &src, &dst, (float[4]){0, 0, 0, 0}, (float[4]){0, 0, 0, 0});
+        ptr += 6;
+    }
+
+    server_gl_with(scene->gl, false) {
+        glGenBuffers(1, &out->vbo);
+        ww_assert(out->vbo != 0);
+
+        gl_using_buffer(GL_ARRAY_BUFFER, out->vbo) {
+            glBufferData(GL_ARRAY_BUFFER, out->vtxcount * sizeof(*vertices), vertices,
+                         GL_STATIC_DRAW);
+        }
+    }
+
+    free(vertices);
+}
+
+static void
 draw_frame(struct scene *scene) {
     // The OpenGL context must be current.
 
@@ -145,6 +217,16 @@ draw_frame(struct scene *scene) {
     struct scene_image *image;
     wl_list_for_each (image, &scene->images, link) {
         draw_image(scene, image);
+    }
+
+    // Draw all text using the texcopy shader.
+    gl_using_texture(GL_TEXTURE_2D, scene->buffers.font_tex) {
+        glUniform2f(scene->shaders.texcopy_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
+
+        struct scene_text *text;
+        wl_list_for_each (text, &scene->text, link) {
+            draw_text(scene, text);
+        }
     }
 
     server_gl_swap_buffers(scene->gl);
@@ -182,6 +264,16 @@ draw_mirrors(struct scene *scene) {
         gl_using_texture(GL_TEXTURE_2D, capture_texture) {
             draw_texcopy_list(scene, scene->buffers.mirrors_vtxcount);
         }
+    }
+}
+
+static void
+draw_text(struct scene *scene, struct scene_text *text) {
+    // The OpenGL context must be current, the texcopy shader must be in use, and the font atlas
+    // texture must be bound.
+
+    gl_using_buffer(GL_ARRAY_BUFFER, text->vbo) {
+        draw_texcopy_list(scene, text->vtxcount);
     }
 }
 
@@ -295,6 +387,7 @@ image_release(struct scene_image *image) {
     if (image->parent) {
         server_gl_with(image->parent->gl, false) {
             glDeleteTextures(1, &image->tex);
+            glDeleteBuffers(1, &image->vbo);
         }
     }
 
@@ -313,6 +406,20 @@ mirror_release(struct scene_mirror *mirror) {
     mirror->parent = NULL;
 }
 
+static void
+text_release(struct scene_text *text) {
+    wl_list_remove(&text->link);
+    wl_list_init(&text->link);
+
+    if (text->parent) {
+        server_gl_with(text->parent->gl, false) {
+            glDeleteBuffers(1, &text->vbo);
+        }
+    }
+
+    text->parent = NULL;
+}
+
 struct scene *
 scene_create(struct server_gl *gl, struct server_ui *ui) {
     struct scene *scene = zalloc(1, sizeof(*scene));
@@ -329,6 +436,9 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
         ww_log(LOG_INFO, "max image size: %" PRIu32 "x%" PRIu32 "\n", scene->image_max_size,
                scene->image_max_size);
 
+        glGenBuffers(1, &scene->buffers.mirrors);
+
+        // Initialize the texcopy shader.
         scene->shaders.texcopy =
             server_gl_compile(scene->gl, WAYWALL_GLSL_TEXCOPY_VERT_H, WAYWALL_GLSL_TEXCOPY_FRAG_H);
         if (!scene->shaders.texcopy) {
@@ -348,7 +458,36 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
         scene->shaders.texcopy_a_dst_rgba =
             glGetAttribLocation(scene->shaders.texcopy->program, "v_dst_rgba");
 
-        glGenBuffers(1, &scene->buffers.mirrors);
+        // Initialize the font texture atlas.
+        glGenTextures(1, &scene->buffers.font_tex);
+        unsigned char *atlas = zalloc(1, PACKED_ATLAS_SIZE * 32);
+        for (size_t py = 0; py < PACKED_ATLAS_HEIGHT; py++) {
+            for (size_t px = 0; px < PACKED_ATLAS_WIDTH; px++) {
+                size_t packed_pos = py * PACKED_ATLAS_WIDTH + px;
+                bool set = UTIL_TERMINUS_FONT[packed_pos / 8] & (1 << (7 - packed_pos % 8));
+
+                if (set) {
+                    size_t x = px % ATLAS_WIDTH;
+                    size_t y = py + (px / ATLAS_WIDTH) * CHAR_HEIGHT;
+                    size_t pos = (y * ATLAS_WIDTH + x) * 4;
+
+                    atlas[pos] = 0xFF;
+                    atlas[pos + 1] = 0xFF;
+                    atlas[pos + 2] = 0xFF;
+                    atlas[pos + 3] = 0xFF;
+                }
+            }
+        }
+
+        gl_using_texture(GL_TEXTURE_2D, scene->buffers.font_tex) {
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ATLAS_WIDTH, ATLAS_HEIGHT, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, atlas);
+
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
+
+        free(atlas);
     }
 
     scene->on_gl_frame.notify = on_gl_frame;
@@ -356,6 +495,7 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
 
     wl_list_init(&scene->images);
     wl_list_init(&scene->mirrors);
+    wl_list_init(&scene->text);
 
     return scene;
 
@@ -377,7 +517,17 @@ scene_destroy(struct scene *scene) {
         mirror_release(mirror);
     }
 
-    server_gl_shader_destroy(scene->shaders.texcopy);
+    struct scene_text *text, *text_tmp;
+    wl_list_for_each_safe (text, text_tmp, &scene->text, link) {
+        text_release(text);
+    }
+
+    server_gl_with(scene->gl, false) {
+        server_gl_shader_destroy(scene->shaders.texcopy);
+
+        glDeleteBuffers(1, &scene->buffers.mirrors);
+        glDeleteTextures(1, &scene->buffers.font_tex);
+    }
 
     wl_list_remove(&scene->on_gl_frame.link);
 
@@ -419,6 +569,21 @@ scene_add_mirror(struct scene *scene, const struct scene_mirror_options *options
     return mirror;
 }
 
+struct scene_text *
+scene_add_text(struct scene *scene, const char *data, int32_t x, int32_t y) {
+    struct scene_text *text = zalloc(1, sizeof(*text));
+
+    text->parent = scene;
+    text->x = x;
+    text->y = y;
+
+    wl_list_insert(&scene->text, &text->link);
+
+    build_text(text, scene, data, x, y);
+
+    return text;
+}
+
 void
 scene_image_destroy(struct scene_image *image) {
     image_release(image);
@@ -429,4 +594,10 @@ void
 scene_mirror_destroy(struct scene_mirror *mirror) {
     mirror_release(mirror);
     free(mirror);
+}
+
+void
+scene_text_destroy(struct scene_text *text) {
+    text_release(text);
+    free(text);
 }
