@@ -41,6 +41,14 @@ struct scene_mirror_options {
     float dst_rgba[4];
 };
 
+struct scene_text_options {
+    int32_t x;
+    int32_t y;
+
+    float rgba[4];
+    int32_t size_multiplier;
+};
+
 struct scene *scene_create(struct server_gl *gl, struct server_ui *ui);
 void scene_destroy(struct scene *scene);
 
@@ -48,7 +56,8 @@ struct scene_image *scene_add_image(struct scene *scene, const struct scene_imag
                                     void *pngbuf, size_t pngbuf_size);
 struct scene_mirror *scene_add_mirror(struct scene *scene,
                                       const struct scene_mirror_options *options);
-struct scene_text *scene_add_text(struct scene *scene, const char *data, int32_t x, int32_t y);
+struct scene_text *scene_add_text(struct scene *scene, const char *data,
+                                  const struct scene_text_options *options);
 
 void scene_image_destroy(struct scene_image *image);
 void scene_mirror_destroy(struct scene_mirror *mirror);

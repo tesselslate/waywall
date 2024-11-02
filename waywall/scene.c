@@ -61,9 +61,10 @@ static void build_image(struct scene_image *out, struct scene *scene,
                         const struct scene_image_options *options, int32_t width, int32_t height);
 static void build_mirrors(struct scene *scene);
 static void build_rect(struct vtx_texcopy out[static 6], const struct box *src,
-                       const struct box *dst, float src_rgba[static 4], float dst_rgba[static 4]);
-static void build_text(struct scene_text *out, struct scene *scene, const char *data, int32_t x,
-                       int32_t y);
+                       const struct box *dst, const float src_rgba[static 4],
+                       const float dst_rgba[static 4]);
+static void build_text(struct scene_text *out, struct scene *scene, const char *data,
+                       const struct scene_text_options *options);
 
 static void draw_frame(struct scene *scene);
 static void draw_image(struct scene *scene, struct scene_image *image);
@@ -126,7 +127,7 @@ build_mirrors(struct scene *scene) {
 
 static void
 build_rect(struct vtx_texcopy out[static 6], const struct box *s, const struct box *d,
-           float src_rgba[static 4], float dst_rgba[static 4]) {
+           const float src_rgba[static 4], const float dst_rgba[static 4]) {
     const struct {
         float src[2];
         float dst[2];
@@ -153,15 +154,20 @@ build_rect(struct vtx_texcopy out[static 6], const struct box *s, const struct b
 }
 
 static void
-build_text(struct scene_text *out, struct scene *scene, const char *data, int32_t x, int32_t y) {
+build_text(struct scene_text *out, struct scene *scene, const char *data,
+           const struct scene_text_options *options) {
     out->vtxcount = strlen(data) * 6;
 
     struct vtx_texcopy *vertices = zalloc(out->vtxcount, sizeof(*vertices));
     struct vtx_texcopy *ptr = vertices;
 
+    int32_t x = options->x;
+    int32_t y = options->y;
+
     for (const char *c = data; *c != '\0'; c++) {
         if (*c == '\n') {
-            y += CHAR_HEIGHT;
+            y += CHAR_HEIGHT * options->size_multiplier;
+            x = options->x;
             continue;
         }
 
@@ -173,14 +179,16 @@ build_text(struct scene_text *out, struct scene *scene, const char *data, int32_
         };
 
         struct box dst = {
-            .x = x + (c - data) * CHAR_WIDTH,
+            .x = x,
             .y = y,
-            .width = CHAR_WIDTH,
-            .height = CHAR_HEIGHT,
+            .width = CHAR_WIDTH * options->size_multiplier,
+            .height = CHAR_HEIGHT * options->size_multiplier,
         };
 
-        build_rect(ptr, &src, &dst, (float[4]){0, 0, 0, 0}, (float[4]){0, 0, 0, 0});
+        build_rect(ptr, &src, &dst, (float[4]){1.0, 1.0, 1.0, 1.0}, options->rgba);
         ptr += 6;
+
+        x += CHAR_WIDTH * options->size_multiplier;
     }
 
     server_gl_with(scene->gl, false) {
@@ -570,16 +578,16 @@ scene_add_mirror(struct scene *scene, const struct scene_mirror_options *options
 }
 
 struct scene_text *
-scene_add_text(struct scene *scene, const char *data, int32_t x, int32_t y) {
+scene_add_text(struct scene *scene, const char *data, const struct scene_text_options *options) {
     struct scene_text *text = zalloc(1, sizeof(*text));
 
     text->parent = scene;
-    text->x = x;
-    text->y = y;
+    text->x = options->x;
+    text->y = options->y;
 
     wl_list_insert(&scene->text, &text->link);
 
-    build_text(text, scene, data, x, y);
+    build_text(text, scene, data, options);
 
     return text;
 }
