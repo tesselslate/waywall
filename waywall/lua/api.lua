@@ -131,4 +131,13 @@ M.sleep = priv.sleep
 -- @return state A table containing information about the instance state.
 M.state = priv.state
 
+--- Creates a "text" object which displays arbitrary text.
+-- @param text The text to display.
+-- @param x The X coordinate to display the text at.
+-- @param y The Y coordinate to display the text at.
+-- @param color The color to display the text with.
+-- @param size The size multiplier for the text.
+-- @return text The text object.
+M.text = priv.text
+
 package.loaded["waywall"] = M

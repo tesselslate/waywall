@@ -76,6 +76,7 @@ static const struct {
 
 #define METATABLE_IMAGE "waywall.image"
 #define METATABLE_MIRROR "waywall.mirror"
+#define METATABLE_TEXT "waywall.text"
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
@@ -158,6 +159,45 @@ mirror_gc(lua_State *L) {
         scene_mirror_destroy(*mirror);
     }
     *mirror = NULL;
+
+    return 0;
+}
+
+static int
+text_close(lua_State *L) {
+    struct scene_text **text = lua_touserdata(L, 1);
+
+    if (!*text) {
+        return luaL_error(L, "cannot close text more than once");
+    }
+
+    scene_text_destroy(*text);
+    *text = NULL;
+
+    return 0;
+}
+
+static int
+text_index(lua_State *L) {
+    const char *key = luaL_checkstring(L, 2);
+
+    if (strcmp(key, "close") == 0) {
+        lua_pushcfunction(L, text_close);
+    } else {
+        lua_pushnil(L);
+    }
+
+    return 1;
+}
+
+static int
+text_gc(lua_State *L) {
+    struct scene_text **text = lua_touserdata(L, 1);
+
+    if (*text) {
+        scene_text_destroy(*text);
+    }
+    *text = NULL;
 
     return 0;
 }
@@ -735,6 +775,69 @@ l_state(lua_State *L) {
 }
 
 static int
+l_text(lua_State *L) {
+    static const int ARG_TEXT = 1;
+    static const int ARG_X = 2;
+    static const int ARG_Y = 3;
+    static const int ARG_COLOR = 4;
+    static const int ARG_SIZE = 5;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("text"));
+    }
+
+    const char *data = luaL_checkstring(L, ARG_TEXT);
+    int x = luaL_checkinteger(L, ARG_X);
+    int y = luaL_checkinteger(L, ARG_Y);
+
+    float rgba[4] = {1.0, 1.0, 1.0, 1.0};
+    if (lua_gettop(L) >= ARG_COLOR) {
+        const char *raw_color = luaL_checkstring(L, ARG_COLOR);
+
+        uint8_t u8_rgba[4] = {0};
+        if (config_parse_hex(u8_rgba, raw_color) != 0) {
+            return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
+        }
+
+        rgba[0] = (float)u8_rgba[0] / UINT8_MAX;
+        rgba[1] = (float)u8_rgba[1] / UINT8_MAX;
+        rgba[2] = (float)u8_rgba[2] / UINT8_MAX;
+        rgba[3] = (float)u8_rgba[3] / UINT8_MAX;
+    }
+
+    int size = 1;
+    if (lua_gettop(L) >= ARG_SIZE) {
+        size = luaL_checkinteger(L, ARG_SIZE);
+    }
+    lua_settop(L, ARG_SIZE);
+
+    struct scene_text_options options = {
+        .x = x,
+        .y = y,
+        .rgba = {rgba[0], rgba[1], rgba[2], rgba[3]},
+        .size_multiplier = size,
+    };
+
+    // Body
+    struct scene_text **text = lua_newuserdata(L, sizeof(*text));
+    check_alloc(text);
+
+    luaL_getmetatable(L, METATABLE_TEXT);
+    lua_setmetatable(L, -2);
+
+    *text = scene_add_text(wrap->scene, data, &options);
+    if (!*text) {
+        return luaL_error(L, "failed to create text");
+    }
+
+    // Epilogue. The userdata (text) was already pushed to the stack by the above code.
+    return 1;
+}
+
+static int
 l_log(lua_State *L) {
     ww_log(LOG_INFO, "lua: %s", lua_tostring(L, 1));
     return 0;
@@ -815,6 +918,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"show_floating", l_show_floating},
     {"sleep", l_sleep},
     {"state", l_state},
+    {"text", l_text},
 
     // private (see init.lua)
     {"log", l_log},
@@ -847,6 +951,16 @@ config_api_init(struct config_vm *vm) {
     lua_pushcfunction(vm->L, mirror_index);     // stack: n+3
     lua_settable(vm->L, -3);                    // stack: n+1
     lua_pop(vm->L, 1);                          // stack: n
+
+    // Create the metatable for "text" objects.
+    luaL_newmetatable(vm->L, METATABLE_TEXT); // stack: n+1
+    lua_pushstring(vm->L, "__gc");            // stack: n+2
+    lua_pushcfunction(vm->L, text_gc);        // stack: n+3
+    lua_settable(vm->L, -3);                  // stack: n+1
+    lua_pushstring(vm->L, "__index");         // stack: n+2
+    lua_pushcfunction(vm->L, text_index);     // stack: n+3
+    lua_settable(vm->L, -3);                  // stack: n+1
+    lua_pop(vm->L, 1);                        // stack: n
 
     for (size_t i = 0; i < STATIC_ARRLEN(EMBEDDED_LUA); i++) {
         if (config_vm_exec_bcode(vm, EMBEDDED_LUA[i].data, EMBEDDED_LUA[i].size,
