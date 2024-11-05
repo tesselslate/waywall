@@ -173,6 +173,9 @@ build_text(GLuint vbo, struct scene *scene, const char *data,
             y += CHAR_HEIGHT * options->size_multiplier;
             x = options->x;
             continue;
+        } else if (*c == ' ') {
+            x += CHAR_WIDTH * options->size_multiplier;
+            continue;
         }
 
         struct box src = {
