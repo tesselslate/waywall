@@ -1,4 +1,5 @@
 #include "server/backend.h"
+#include "alpha-modifier-v1-client-protocol.h"
 #include "cursor-shape-v1-client-protocol.h"
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "linux-drm-syncobj-v1-client-protocol.h"
@@ -17,6 +18,7 @@
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
+#define USE_ALPHA_MODIFIER_VERSION 1
 #define USE_COMPOSITOR_VERSION 5
 #define USE_CURSOR_SHAPE_VERSION 1
 #define USE_DATA_DEVICE_MANAGER_VERSION 2
@@ -106,7 +108,17 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
                    uint32_t version) {
     struct server_backend *backend = data;
 
-    if (strcmp(iface, wl_compositor_interface.name) == 0) {
+    if (strcmp(iface, wp_alpha_modifier_v1_interface.name) == 0) {
+        if (version < USE_ALPHA_MODIFIER_VERSION) {
+            ww_log(LOG_WARN, "host compositor provides outdated wp_alpha_modifier_v1 (%d < %d)",
+                   version, USE_ALPHA_MODIFIER_VERSION);
+            return;
+        }
+
+        backend->alpha_modifier =
+            wl_registry_bind(wl, name, &wp_alpha_modifier_v1_interface, USE_ALPHA_MODIFIER_VERSION);
+        check_alloc(backend->alpha_modifier);
+    } else if (strcmp(iface, wl_compositor_interface.name) == 0) {
         if (version < USE_COMPOSITOR_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_compositor (%d < %d)", version,
                    USE_COMPOSITOR_VERSION);
@@ -340,6 +352,9 @@ server_backend_create() {
         goto fail_registry;
     }
 
+    if (!backend->alpha_modifier) {
+        ww_log(LOG_INFO, "host compositor does not provide wp_alpha_modifier");
+    }
     if (!backend->cursor_shape_manager) {
         ww_log(LOG_WARN, "host compositor does not provide wp_cursor_shape_manager");
     }
@@ -401,6 +416,9 @@ server_backend_destroy(struct server_backend *backend) {
     wp_viewporter_destroy(backend->viewporter);
     xdg_wm_base_destroy(backend->xdg_wm_base);
 
+    if (backend->alpha_modifier) {
+        wp_alpha_modifier_v1_destroy(backend->alpha_modifier);
+    }
     if (backend->cursor_shape_manager) {
         wp_cursor_shape_manager_v1_destroy(backend->cursor_shape_manager);
     }
