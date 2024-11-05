@@ -3,6 +3,7 @@
 #include "reload.h"
 #include "server/server.h"
 #include "string.h"
+#include "util/debug.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "util/syscall.h"
@@ -54,6 +55,8 @@ handle_reload(struct config *cfg, void *data) {
     if (wrap_set_config(ww->wrap, cfg) == 0) {
         config_destroy(ww->cfg);
         ww->cfg = cfg;
+
+        util_debug_enabled = cfg->experimental.debug;
     } else {
         ww_log(LOG_ERROR, "failed to apply new config");
         config_destroy(cfg);
@@ -73,6 +76,10 @@ cmd_wrap(const char *profile, char **argv) {
     ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wrap-%jd", (intmax_t)getpid());
     ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
 
+    if (!util_debug_init()) {
+        return 1;
+    }
+
     int log_fd = util_log_create_file(logname, true);
     if (log_fd == -1) {
         return 1;
@@ -89,6 +96,8 @@ cmd_wrap(const char *profile, char **argv) {
     if (config_load(ww.cfg, profile) != 0) {
         goto fail_config_populate;
     }
+
+    util_debug_enabled = ww.cfg->experimental.debug;
 
     ww.server = server_create(ww.cfg);
     if (!ww.server) {

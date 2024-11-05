@@ -21,6 +21,9 @@ struct scene {
         unsigned int mirrors;
         size_t mirrors_vtxcount;
 
+        unsigned int debug;
+        size_t debug_vtxcount;
+
         unsigned int font_tex;
     } buffers;
 

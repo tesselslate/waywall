@@ -1,5 +1,6 @@
 #include "glsl/texcopy.frag.h"
 #include "glsl/texcopy.vert.h"
+#include "util/debug.h"
 
 #include "scene.h"
 #include "server/gl.h"
@@ -63,9 +64,10 @@ static void build_mirrors(struct scene *scene);
 static void build_rect(struct vtx_texcopy out[static 6], const struct box *src,
                        const struct box *dst, const float src_rgba[static 4],
                        const float dst_rgba[static 4]);
-static void build_text(struct scene_text *out, struct scene *scene, const char *data,
-                       const struct scene_text_options *options);
+static size_t build_text(GLuint vbo, struct scene *scene, const char *data,
+                         const struct scene_text_options *options);
 
+static void draw_debug_text(struct scene *scene);
 static void draw_frame(struct scene *scene);
 static void draw_image(struct scene *scene, struct scene_image *image);
 static void draw_mirrors(struct scene *scene);
@@ -153,12 +155,14 @@ build_rect(struct vtx_texcopy out[static 6], const struct box *s, const struct b
     }
 }
 
-static void
-build_text(struct scene_text *out, struct scene *scene, const char *data,
+static size_t
+build_text(GLuint vbo, struct scene *scene, const char *data,
            const struct scene_text_options *options) {
-    out->vtxcount = strlen(data) * 6;
+    // The OpenGL context must be current.
 
-    struct vtx_texcopy *vertices = zalloc(out->vtxcount, sizeof(*vertices));
+    size_t vtxcount = strlen(data) * 6;
+
+    struct vtx_texcopy *vertices = zalloc(vtxcount, sizeof(*vertices));
     struct vtx_texcopy *ptr = vertices;
 
     int32_t x = options->x;
@@ -191,17 +195,28 @@ build_text(struct scene_text *out, struct scene *scene, const char *data,
         x += CHAR_WIDTH * options->size_multiplier;
     }
 
-    server_gl_with(scene->gl, false) {
-        glGenBuffers(1, &out->vbo);
-        ww_assert(out->vbo != 0);
-
-        gl_using_buffer(GL_ARRAY_BUFFER, out->vbo) {
-            glBufferData(GL_ARRAY_BUFFER, out->vtxcount * sizeof(*vertices), vertices,
-                         GL_STATIC_DRAW);
-        }
+    gl_using_buffer(GL_ARRAY_BUFFER, vbo) {
+        glBufferData(GL_ARRAY_BUFFER, vtxcount * sizeof(*vertices), vertices, GL_STATIC_DRAW);
     }
 
     free(vertices);
+
+    return vtxcount;
+}
+
+static void
+draw_debug_text(struct scene *scene) {
+    // The OpenGL context must be current, the texcopy shader must be in use, and the font atlas
+    // texture must be bound.
+
+    const char *str = util_debug_str();
+    scene->buffers.debug_vtxcount = build_text(
+        scene->buffers.debug, scene, str,
+        &(struct scene_text_options){.x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1});
+
+    gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.debug) {
+        draw_texcopy_list(scene, scene->buffers.debug_vtxcount);
+    }
 }
 
 static void
@@ -234,6 +249,10 @@ draw_frame(struct scene *scene) {
         struct scene_text *text;
         wl_list_for_each (text, &scene->text, link) {
             draw_text(scene, text);
+        }
+
+        if (util_debug_enabled) {
+            draw_debug_text(scene);
         }
     }
 
@@ -444,8 +463,6 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
         ww_log(LOG_INFO, "max image size: %" PRIu32 "x%" PRIu32 "\n", scene->image_max_size,
                scene->image_max_size);
 
-        glGenBuffers(1, &scene->buffers.mirrors);
-
         // Initialize the texcopy shader.
         scene->shaders.texcopy =
             server_gl_compile(scene->gl, WAYWALL_GLSL_TEXCOPY_VERT_H, WAYWALL_GLSL_TEXCOPY_FRAG_H);
@@ -465,6 +482,10 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
             glGetAttribLocation(scene->shaders.texcopy->program, "v_src_rgba");
         scene->shaders.texcopy_a_dst_rgba =
             glGetAttribLocation(scene->shaders.texcopy->program, "v_dst_rgba");
+
+        // Initialize vertex buffers.
+        glGenBuffers(1, &scene->buffers.mirrors);
+        glGenBuffers(1, &scene->buffers.debug);
 
         // Initialize the font texture atlas.
         glGenTextures(1, &scene->buffers.font_tex);
@@ -534,6 +555,7 @@ scene_destroy(struct scene *scene) {
         server_gl_shader_destroy(scene->shaders.texcopy);
 
         glDeleteBuffers(1, &scene->buffers.mirrors);
+        glDeleteBuffers(1, &scene->buffers.debug);
         glDeleteTextures(1, &scene->buffers.font_tex);
     }
 
@@ -587,7 +609,12 @@ scene_add_text(struct scene *scene, const char *data, const struct scene_text_op
 
     wl_list_insert(&scene->text, &text->link);
 
-    build_text(text, scene, data, options);
+    server_gl_with(scene->gl, false) {
+        glGenBuffers(1, &text->vbo);
+        ww_assert(text->vbo);
+
+        text->vtxcount = build_text(text->vbo, scene, data, options);
+    }
 
     return text;
 }

@@ -30,6 +30,7 @@ waywall_src = files(
   'server/xwayland.c',
   'server/xwayland_shell.c',
   'server/xwm.c',
+  'util/debug.c',
   'util/log.c',
   'util/prelude.c',
   'util/str.c',

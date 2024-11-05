@@ -22,6 +22,7 @@
 static const struct config defaults = {
     .experimental =
         {
+            .debug = false,
             .jit = false,
             .tearing = false,
         },
@@ -411,6 +412,10 @@ process_config_actions(struct config *cfg) {
 
 static int
 process_config_experimental(struct config *cfg) {
+    if (get_bool(cfg, "debug", &cfg->experimental.debug, "experimental.debug", false) != 0) {
+        return 1;
+    }
+
     if (get_bool(cfg, "jit", &cfg->experimental.jit, "experimental.jit", false) != 0) {
         return 1;
     }
