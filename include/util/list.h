@@ -16,8 +16,8 @@
 #define LIST_DEFINE_IMPL(type, name)                                                               \
     WW_MAYBE_UNUSED static inline void name##_append(struct name *list, type item) {               \
         if (list->len == list->cap) {                                                              \
-            ssize_t cap = list->cap * 2;                                                           \
-            list->data = realloc(list->data, sizeof(*list->data) * cap);                           \
+            list->cap *= 2;                                                                        \
+            list->data = realloc(list->data, sizeof(*list->data) * list->cap);                     \
             check_alloc(list->data);                                                               \
         }                                                                                          \
                                                                                                    \
