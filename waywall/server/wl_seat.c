@@ -6,6 +6,7 @@
 #include "server/wl_compositor.h"
 #include "server/xwayland.h"
 #include "util/alloc.h"
+#include "util/debug.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "util/serial.h"
@@ -374,6 +375,7 @@ use_local_keymap(struct server_seat *seat, struct server_seat_keymap keymap) {
 static void
 process_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
     bool modifiers_updated = modify_pressed_keys(seat, keycode, state);
+    WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
 
     if (modifiers_updated) {
         send_keyboard_modifiers(seat);
@@ -424,6 +426,8 @@ on_keyboard_enter(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     seat->last_serial = serial;
 
     wl_signal_emit_mutable(&seat->events.keyboard_enter, &serial);
+
+    WW_DEBUG(keyboard.active, true);
 }
 
 static void
@@ -444,6 +448,7 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     }
 
     bool modifiers_updated = modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+    WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
 
     if (seat->listener) {
         const xkb_keysym_t *syms;
@@ -530,6 +535,8 @@ on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     reset_keyboard_state(seat);
 
     wl_signal_emit_mutable(&seat->events.keyboard_leave, &serial);
+
+    WW_DEBUG(keyboard.active, false);
 }
 
 static void
@@ -538,27 +545,33 @@ on_keyboard_modifiers(void *data, struct wl_keyboard *wl, uint32_t serial, uint3
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
+    if (!seat->keyboard.remote_km.state) {
+        return;
+    }
+
+    xkb_state_update_mask(seat->keyboard.remote_km.state, mods_depressed, mods_latched, mods_locked,
+                          0, 0, group);
+
+    xkb_mod_mask_t xkb_mods =
+        xkb_state_serialize_mods(seat->keyboard.remote_km.state, XKB_STATE_MODS_EFFECTIVE);
+
+    uint32_t mods = 0;
+    for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mod_indices); i++) {
+        uint8_t index = seat->keyboard.mod_indices[i];
+        if (xkb_mods & (1 << index)) {
+            mods |= (1 << i);
+        }
+    }
+
     if (seat->listener) {
-        if (!seat->keyboard.remote_km.state) {
-            return;
-        }
-
-        xkb_state_update_mask(seat->keyboard.remote_km.state, mods_depressed, mods_latched,
-                              mods_locked, 0, 0, group);
-
-        xkb_mod_mask_t xkb_mods =
-            xkb_state_serialize_mods(seat->keyboard.remote_km.state, XKB_STATE_MODS_EFFECTIVE);
-
-        uint32_t mods = 0;
-        for (size_t i = 0; i < STATIC_ARRLEN(seat->keyboard.mod_indices); i++) {
-            uint8_t index = seat->keyboard.mod_indices[i];
-            if (xkb_mods & (1 << index)) {
-                mods |= (1 << i);
-            }
-        }
-
         seat->listener->modifiers(seat->listener_data, mods);
     }
+
+    WW_DEBUG(keyboard.remote_mods_serialized, mods);
+    WW_DEBUG(keyboard.remote_mods_depressed, mods_depressed);
+    WW_DEBUG(keyboard.remote_mods_latched, mods_latched);
+    WW_DEBUG(keyboard.remote_mods_locked, mods_locked);
+    WW_DEBUG(keyboard.remote_group, group);
 }
 
 static void
@@ -567,6 +580,9 @@ on_keyboard_repeat_info(void *data, struct wl_keyboard *wl, int32_t rate, int32_
 
     seat->keyboard.repeat_rate = rate;
     seat->keyboard.repeat_delay = delay;
+
+    WW_DEBUG(keyboard.remote_repeat_rate, rate);
+    WW_DEBUG(keyboard.remote_repeat_delay, delay);
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
@@ -693,6 +709,8 @@ on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_s
     }
 
     wl_signal_emit_mutable(&seat->events.pointer_enter, &serial);
+
+    WW_DEBUG(pointer.active, true);
 }
 
 static void
@@ -720,6 +738,8 @@ static void
 on_pointer_leave(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_surface *surface) {
     struct server_seat *seat = data;
     seat->last_serial = serial;
+
+    WW_DEBUG(pointer.active, false);
 }
 
 static void
@@ -729,6 +749,9 @@ on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t s
 
     seat->pointer.x = wl_fixed_to_double(surface_x);
     seat->pointer.y = wl_fixed_to_double(surface_y);
+
+    WW_DEBUG(pointer.x, seat->pointer.x);
+    WW_DEBUG(pointer.y, seat->pointer.y);
 
     if (seat->listener) {
         seat->listener->motion(seat->listener_data, seat->pointer.x, seat->pointer.y);
