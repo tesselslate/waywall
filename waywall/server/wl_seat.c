@@ -352,13 +352,15 @@ send_pointer_leave(struct server_seat *seat) {
 static void
 reset_keyboard_state(struct server_seat *seat) {
     bool modifiers_updated = false;
-    for (ssize_t i = seat->keyboard.pressed.len - 1; i >= 0; i--) {
-        // TODO: O(n^2)
-        modifiers_updated |= modify_pressed_keys(seat, seat->keyboard.pressed.data[i], false);
-        send_keyboard_key(seat, seat->keyboard.pressed.data[i], WL_KEYBOARD_KEY_STATE_RELEASED);
+    for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
+        uint32_t keycode = seat->keyboard.pressed.data[i];
+
+        modifiers_updated |=
+            xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_UP);
+        send_keyboard_key(seat, keycode, WL_KEYBOARD_KEY_STATE_RELEASED);
     }
 
-    ww_assert(seat->keyboard.pressed.len == 0);
+    seat->keyboard.pressed.len = 0;
     WW_DEBUG(keyboard.num_pressed, 0);
 
     if (modifiers_updated) {
