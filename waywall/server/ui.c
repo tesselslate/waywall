@@ -1,4 +1,5 @@
 #include "server/ui.h"
+#include "alpha-modifier-v1-client-protocol.h"
 #include "config/config.h"
 #include "server/backend.h"
 #include "server/buffer.h"
@@ -349,6 +350,8 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
 
     config->tearing = cfg->experimental.tearing;
 
+    config->ninb_opacity = cfg->theme.ninb_opacity * UINT32_MAX;
+
     return config;
 }
 
@@ -380,6 +383,12 @@ server_view_commit(struct server_view *view) {
 
     if (view->pending.present & VIEW_STATE_CENTERED) {
         view->current.centered = view->pending.centered;
+
+        if (view->alpha_surface) {
+            wp_alpha_modifier_surface_v1_set_multiplier(
+                view->alpha_surface,
+                view->current.centered ? UINT32_MAX : view->ui->config->ninb_opacity);
+        }
     }
     if (view->pending.present & VIEW_STATE_POS) {
         view->current.x = view->pending.x;
@@ -473,6 +482,12 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
     view->viewport = wp_viewporter_get_viewport(ui->server->backend->viewporter, surface->remote);
     check_alloc(view->viewport);
 
+    if (ui->server->backend->alpha_modifier) {
+        view->alpha_surface = wp_alpha_modifier_v1_get_surface(ui->server->backend->alpha_modifier,
+                                                               view->surface->remote);
+        check_alloc(view->alpha_surface);
+    }
+
     view->impl = impl;
     view->impl_data = impl_data;
 
@@ -493,6 +508,10 @@ void
 server_view_destroy(struct server_view *view) {
     wl_signal_emit_mutable(&view->events.destroy, NULL);
     wl_signal_emit_mutable(&view->ui->events.view_destroy, view);
+
+    if (view->alpha_surface) {
+        wp_alpha_modifier_surface_v1_destroy(view->alpha_surface);
+    }
 
     if (view->subsurface) {
         wl_subsurface_destroy(view->subsurface);

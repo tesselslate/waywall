@@ -48,6 +48,8 @@ struct server_ui {
 struct server_ui_config {
     struct wl_buffer *background;
     bool tearing;
+
+    uint32_t ninb_opacity;
 };
 
 struct server_view {
@@ -56,6 +58,7 @@ struct server_view {
 
     struct server_surface *surface;
 
+    struct wp_alpha_modifier_surface_v1 *alpha_surface;
     struct wl_subsurface *subsurface;
     struct wp_viewport *viewport;
 

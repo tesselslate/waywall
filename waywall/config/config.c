@@ -49,6 +49,7 @@ static const struct config defaults = {
             .cursor_icon = "",
             .cursor_size = 0,
             .ninb_anchor = ANCHOR_NONE,
+            .ninb_opacity = 1.0,
         },
 };
 
@@ -605,6 +606,11 @@ process_config_theme(struct config *cfg) {
         }
     }
     free(ninb_anchor);
+
+    if (get_double(cfg, "ninb_opacity", &cfg->theme.ninb_opacity, "theme.ninb_opacity", false) !=
+        0) {
+        return 1;
+    }
 
     return 0;
 }

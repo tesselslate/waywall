@@ -48,6 +48,8 @@ struct config {
             ANCHOR_BOTTOMRIGHT,
             ANCHOR_NONE,
         } ninb_anchor;
+
+        double ninb_opacity;
     } theme;
 
     struct config_vm *vm;
