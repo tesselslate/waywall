@@ -69,6 +69,7 @@ struct config_action {
 
     uint32_t data;
     uint32_t modifiers;
+    bool wildcard_modifiers;
 };
 
 enum config_remap_type {

@@ -236,6 +236,16 @@ parse_bind(const char *orig, struct config_action *action) {
         *needle = '\0';
         needle++;
 
+        if (strcmp(elem, "*") == 0) {
+            if (action->wildcard_modifiers) {
+                ww_log(LOG_ERROR, "duplicate wildcard modifier in keybind '%s'", orig);
+                goto fail;
+            }
+
+            action->wildcard_modifiers = true;
+            continue;
+        }
+
         xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
         if (sym != XKB_KEY_NoSymbol) {
             if (action->type == CONFIG_ACTION_BUTTON) {
@@ -756,8 +766,19 @@ config_find_action(struct config *cfg, const struct config_action *action) {
         if (match->data != action->data) {
             continue;
         }
-        if (match->modifiers != action->modifiers) {
-            continue;
+
+        if (match->wildcard_modifiers) {
+            // If there is a modifier wildcard, match->modifiers must be a subset of
+            // action->modifiers.
+            uint32_t mods = match->modifiers & action->modifiers;
+            if (mods != match->modifiers) {
+                continue;
+            }
+        } else {
+            // If there is no modifier wildcard, the modifiers should match exactly.
+            if (match->modifiers != action->modifiers) {
+                continue;
+            }
         }
 
         return i;
