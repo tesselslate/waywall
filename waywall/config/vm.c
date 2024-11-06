@@ -355,73 +355,48 @@ config_vm_signal_event(struct config_vm *vm, const char *name) {
 }
 
 bool
-config_vm_try_action(struct config_vm *vm, const struct config_action *action) {
-    static const int IDX_ACTIONS_TABLE = 1;
-    static const int IDX_ACTIONS_RESULT = 2;
-
+config_vm_try_action(struct config_vm *vm, size_t index) {
     ww_assert(lua_gettop(vm->L) == 0);
 
-    char buf[BIND_BUFLEN] = {0};
-    config_encode_bind(buf, action);
+    // Create a new coroutine (Lua thread) and place it in the global coroutines table so that
+    // it does not get garbage collected.
+    lua_State *coro = lua_newthread(vm->L); // stack: 1
+    coro_table_add(coro, NULL);
 
-    lua_pushlightuserdata(vm->L, (void *)&REG_KEYS.actions); // stack: 1
-    lua_rawget(vm->L, LUA_REGISTRYINDEX);                    // stack: 1 (IDX_ACTIONS_TABLE)
+    // Retrieve the given action function from the actions table.
+    lua_pushlightuserdata(coro, (void *)&REG_KEYS.actions); // stack: 1
+    lua_rawget(coro, LUA_REGISTRYINDEX);                    // stack: 1
+    lua_pushinteger(coro, index + 1);                       // stack: 2
+    lua_rawget(coro, 1);                                    // stack: 2
 
-    lua_pushlstring(vm->L, buf, STATIC_ARRLEN(buf)); // stack: 2
-    lua_rawget(vm->L, IDX_ACTIONS_TABLE);            // stack: 2 (IDX_ACTIONS_RESULT)
+    // Call the function on the new coroutine.
+    int ret = lua_resume(coro, 0);
+    bool consumed = true;
 
-    switch (lua_type(vm->L, IDX_ACTIONS_RESULT)) {
-    case LUA_TFUNCTION: {
-        // Create a new coroutine (Lua thread) and place it in the global coroutines table so that
-        // it does not get garbage collected.
-        lua_State *coro = lua_newthread(vm->L); // stack: 3
-        coro_table_add(coro, NULL);
-
-        // Because the new coroutine has a separate execution stack, we must also lookup the
-        // function on its stack and execute it from there.
-        lua_pushlightuserdata(coro, (void *)&REG_KEYS.actions); // stack: 1
-        lua_rawget(coro, LUA_REGISTRYINDEX);                    // stack: 1
-        lua_pushlstring(coro, buf, STATIC_ARRLEN(buf));         // stack: 2
-        lua_rawget(coro, 1);                                    // stack: 2
-
-        // Call the function on the new coroutine.
-        int ret = lua_resume(coro, 0);
-        bool consumed = true;
-
-        switch (ret) {
-        case LUA_YIELD:
-            process_yield(coro);
-            break;
-        case 0:
-            // The coroutine finished immediately without yielding. Check the function's return
-            // value and remove the coroutine from the global table.
-            if (lua_gettop(coro) == 0) {
-                lua_pushnil(coro);
-            }
-            consumed = (!lua_isboolean(coro, -1) || lua_toboolean(coro, -1));
-
-            coro_table_del(coro);
-            break;
-        default:
-            // The coroutine failed and threw an error. Remove it from the global table and log the
-            // error.
-            ww_log(LOG_ERROR, "failed to start action: '%s'", lua_tostring(coro, -1));
-            coro_table_del(coro);
-            break;
+    switch (ret) {
+    case LUA_YIELD:
+        process_yield(coro);
+        break;
+    case 0:
+        // The coroutine finished immediately without yielding. Check the function's return
+        // value and remove the coroutine from the global table.
+        if (lua_gettop(coro) == 0) {
+            lua_pushnil(coro);
         }
+        consumed = (!lua_isboolean(coro, -1) || lua_toboolean(coro, -1));
 
-        lua_pop(vm->L, 3); // stack: 0
-        ww_assert(lua_gettop(vm->L) == 0);
-
-        return consumed;
-    }
-    case LUA_TNIL:
-        lua_pop(vm->L, 2); // stack: 0
-        ww_assert(lua_gettop(vm->L) == 0);
-
-        return false;
+        coro_table_del(coro);
+        break;
     default:
-        // Non-function values should be filtered out by config parsing.
-        ww_unreachable();
+        // The coroutine failed and threw an error. Remove it from the global table and log the
+        // error.
+        ww_log(LOG_ERROR, "failed to start action: '%s'", lua_tostring(coro, -1));
+        coro_table_del(coro);
+        break;
     }
+
+    lua_pop(vm->L, 1); // stack: 0
+    ww_assert(lua_gettop(vm->L) == 0);
+
+    return consumed;
 }

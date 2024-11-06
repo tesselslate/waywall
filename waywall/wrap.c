@@ -408,8 +408,11 @@ on_button(void *data, uint32_t button, bool pressed) {
         action.data = button;
         action.modifiers = wrap->input.modifiers;
 
-        if (config_vm_try_action(wrap->cfg->vm, &action)) {
-            return true;
+        ssize_t idx = config_find_action(wrap->cfg, &action);
+        if (idx >= 0) {
+            if (config_vm_try_action(wrap->cfg->vm, idx)) {
+                return true;
+            }
         }
     }
 
@@ -474,8 +477,11 @@ on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bo
     for (size_t i = 0; i < num_syms; i++) {
         action.data = syms[i];
 
-        if (config_vm_try_action(wrap->cfg->vm, &action)) {
-            return true;
+        ssize_t idx = config_find_action(wrap->cfg, &action);
+        if (idx >= 0) {
+            if (config_vm_try_action(wrap->cfg->vm, idx)) {
+                return true;
+            }
         }
     }
 

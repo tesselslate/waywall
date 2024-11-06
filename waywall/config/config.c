@@ -343,6 +343,16 @@ add_remap(struct config *cfg, struct config_remap remap) {
     cfg->input.remaps.data[cfg->input.remaps.count++] = remap;
 }
 
+static void
+add_action(struct config *cfg, struct config_action action) {
+    void *data = realloc(cfg->input.actions.data,
+                         sizeof(*cfg->input.actions.data) * (cfg->input.actions.count + 1));
+    check_alloc(data);
+
+    cfg->input.actions.data = data;
+    cfg->input.actions.data[cfg->input.actions.count++] = action;
+}
+
 static int
 process_config_actions(struct config *cfg) {
     static const int IDX_ACTIONS = 2;
@@ -383,19 +393,18 @@ process_config_actions(struct config *cfg) {
             return 1;
         }
 
-        char buf[BIND_BUFLEN];
-        config_encode_bind(buf, &action);
-
-        // The key (encoded bind) and value (action function) need to be pushed to the top of the
+        // The key (numerical index) and value (action function) need to be pushed to the top of the
         // stack to be put in the duplicate table.
-        lua_pushlstring(cfg->vm->L, buf, STATIC_ARRLEN(buf)); // stack: 6 (IDX_ACTION_VAL + 1)
-        lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);            // stack: 7 (IDX_ACTION_VAL + 2)
-        lua_rawset(cfg->vm->L, IDX_DUP_TABLE);                // stack: 5 (IDX_ACTION_VAL)
+        lua_pushinteger(cfg->vm->L, cfg->input.actions.count + 1); // stack: 6 (IDX_ACTION_VAL + 1)
+        lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);                 // stack: 7 (IDX_ACTION_VAL + 2)
+        lua_rawset(cfg->vm->L, IDX_DUP_TABLE);                     // stack: 5 (IDX_ACTION_VAL)
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
         lua_pop(cfg->vm->L, 1); // stack: 4 (IDX_ACTION_KEY)
         ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTION_KEY);
+
+        add_action(cfg, action);
     }
 
     // stack state:
@@ -717,6 +726,10 @@ config_destroy(struct config *cfg) {
         free(cfg->input.remaps.data);
     }
 
+    if (cfg->input.actions.data) {
+        free(cfg->input.actions.data);
+    }
+
     free(cfg->input.keymap.layout);
     free(cfg->input.keymap.model);
     free(cfg->input.keymap.rules);
@@ -730,6 +743,27 @@ config_destroy(struct config *cfg) {
     }
 
     free(cfg);
+}
+
+ssize_t
+config_find_action(struct config *cfg, const struct config_action *action) {
+    for (size_t i = 0; i < cfg->input.actions.count; i++) {
+        const struct config_action *match = &cfg->input.actions.data[i];
+
+        if (match->type != action->type) {
+            continue;
+        }
+        if (match->data != action->data) {
+            continue;
+        }
+        if (match->modifiers != action->modifiers) {
+            continue;
+        }
+
+        return i;
+    }
+
+    return -1;
 }
 
 int

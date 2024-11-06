@@ -39,6 +39,6 @@ void config_vm_register_event(struct config_vm *vm, lua_State *L, const char *na
 void config_vm_register_lib(struct config_vm *vm, const struct luaL_Reg *lib, const char *name);
 void config_vm_resume(struct config_vm_waker *waker);
 void config_vm_signal_event(struct config_vm *vm, const char *name);
-bool config_vm_try_action(struct config_vm *vm, const struct config_action *action);
+bool config_vm_try_action(struct config_vm *vm, size_t index);
 
 #endif

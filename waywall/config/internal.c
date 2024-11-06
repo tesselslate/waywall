@@ -35,16 +35,6 @@ config_dump_stack(lua_State *L) {
     }
 }
 
-void
-config_encode_bind(char buf[static BIND_BUFLEN], const struct config_action *action) {
-    uint64_t data = (((uint64_t)action->data) << 32) | (uint64_t)action->modifiers;
-
-    buf[0] = (action->type == CONFIG_ACTION_BUTTON) ? 'm' : 'k';
-    for (size_t i = 0; i < 16; i++) {
-        buf[i + 1] = "0123456789abcdef"[(data >> (i * 4)) & 0xF];
-    }
-}
-
 int
 config_parse_hex(uint8_t rgba[static 4], const char *raw) {
     ssize_t len = strlen(raw);

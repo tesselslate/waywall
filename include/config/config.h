@@ -28,6 +28,11 @@ struct config {
             size_t count;
         } remaps;
 
+        struct {
+            struct config_action *data;
+            size_t count;
+        } actions;
+
         int repeat_rate, repeat_delay;
         double sens;
         bool confine;
@@ -79,6 +84,7 @@ struct config_remap {
 
 struct config *config_create();
 void config_destroy(struct config *cfg);
+ssize_t config_find_action(struct config *cfg, const struct config_action *action);
 int config_load(struct config *cfg, const char *profile);
 
 #endif
