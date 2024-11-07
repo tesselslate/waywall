@@ -232,7 +232,7 @@ waker_sleep_timer_fire(void *data) {
     config_vm_resume(waker->vm);
 }
 
-WW_MAYBE_UNUSED static int
+static int
 unmarshal_box(lua_State *L, struct box *out) {
     const struct {
         const char *key;
@@ -265,7 +265,7 @@ unmarshal_box(lua_State *L, struct box *out) {
     return 0;
 }
 
-WW_MAYBE_UNUSED static int
+static int
 unmarshal_box_key(lua_State *L, const char *key, struct box *out) {
     lua_pushstring(L, key); // stack: n+1
     lua_rawget(L, -2);      // stack: n+1
@@ -281,7 +281,7 @@ unmarshal_box_key(lua_State *L, const char *key, struct box *out) {
     return 0;
 }
 
-WW_MAYBE_UNUSED static int
+static int
 unmarshal_color(lua_State *L, const char *key, float rgba[static 4]) {
     lua_pushstring(L, key); // stack: n+1
     lua_rawget(L, -2);      // stack: n+1
