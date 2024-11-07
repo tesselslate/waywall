@@ -70,6 +70,8 @@ struct config_action {
     uint32_t data;
     uint32_t modifiers;
     bool wildcard_modifiers;
+
+    uint16_t lua_index;
 };
 
 enum config_remap_type {

@@ -366,7 +366,7 @@ config_vm_try_action(struct config_vm *vm, size_t index) {
     // Retrieve the given action function from the actions table.
     lua_pushlightuserdata(coro, (void *)&REG_KEYS.actions); // stack: 1
     lua_rawget(coro, LUA_REGISTRYINDEX);                    // stack: 1
-    lua_pushinteger(coro, index + 1);                       // stack: 2
+    lua_pushinteger(coro, index);                           // stack: 2
     lua_rawget(coro, 1);                                    // stack: 2
 
     // Call the function on the new coroutine.

@@ -354,13 +354,23 @@ add_remap(struct config *cfg, struct config_remap remap) {
 }
 
 static void
-add_action(struct config *cfg, struct config_action action) {
+add_action(struct config *cfg, struct config_action *action) {
     void *data = realloc(cfg->input.actions.data,
                          sizeof(*cfg->input.actions.data) * (cfg->input.actions.count + 1));
     check_alloc(data);
 
+    action->lua_index = cfg->input.actions.count + 1;
+
     cfg->input.actions.data = data;
-    cfg->input.actions.data[cfg->input.actions.count++] = action;
+    cfg->input.actions.data[cfg->input.actions.count++] = *action;
+}
+
+static int
+compare_action(const void *a_void, const void *b_void) {
+    const struct config_action *a = a_void;
+    const struct config_action *b = b_void;
+
+    return __builtin_popcount(b->modifiers) - __builtin_popcount(a->modifiers);
 }
 
 static int
@@ -403,19 +413,24 @@ process_config_actions(struct config *cfg) {
             return 1;
         }
 
+        add_action(cfg, &action);
+
         // The key (numerical index) and value (action function) need to be pushed to the top of the
         // stack to be put in the duplicate table.
-        lua_pushinteger(cfg->vm->L, cfg->input.actions.count + 1); // stack: 6 (IDX_ACTION_VAL + 1)
-        lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);                 // stack: 7 (IDX_ACTION_VAL + 2)
-        lua_rawset(cfg->vm->L, IDX_DUP_TABLE);                     // stack: 5 (IDX_ACTION_VAL)
+        lua_pushinteger(cfg->vm->L, action.lua_index); // stack: 6 (IDX_ACTION_VAL + 1)
+        lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);     // stack: 7 (IDX_ACTION_VAL + 2)
+        lua_rawset(cfg->vm->L, IDX_DUP_TABLE);         // stack: 5 (IDX_ACTION_VAL)
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
         lua_pop(cfg->vm->L, 1); // stack: 4 (IDX_ACTION_KEY)
         ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTION_KEY);
-
-        add_action(cfg, action);
     }
+
+    // Sort the action mappings so that those with the most modifier bits set are checked for
+    // matching first.
+    qsort(cfg->input.actions.data, cfg->input.actions.count, sizeof(*cfg->input.actions.data),
+          compare_action);
 
     // stack state:
     // 3 (IDX_DUP_TABLE)  : duplicate actions table
@@ -781,7 +796,7 @@ config_find_action(struct config *cfg, const struct config_action *action) {
             }
         }
 
-        return i;
+        return match->lua_index;
     }
 
     return -1;
