@@ -8,6 +8,7 @@
 #include "server/wl_compositor.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
+#include "util/debug.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "viewporter-client-protocol.h"
@@ -139,6 +140,9 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
     if (ui->resize) {
         wl_signal_emit_mutable(&ui->events.resize, NULL);
         ui->resize = false;
+
+        WW_DEBUG(ui.width, ui->width);
+        WW_DEBUG(ui.height, ui->height);
     }
     wl_surface_commit(ui->root.surface);
 }

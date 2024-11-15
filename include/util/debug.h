@@ -35,6 +35,10 @@ extern struct util_debug {
 
         bool active;
     } pointer;
+
+    struct {
+        int32_t width, height;
+    } ui;
 } util_debug_data;
 
 bool util_debug_init();

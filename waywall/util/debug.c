@@ -40,6 +40,13 @@ dbg_pointer() {
     fprintf(debug_file, "  active: %s\n", util_debug_data.pointer.active ? "yes" : "no");
 }
 
+static void
+dbg_ui() {
+    fprintf(debug_file, "ui:\n");
+    fprintf(debug_file, "  width:  %" PRIi32 "\n", util_debug_data.ui.width);
+    fprintf(debug_file, "  height: %" PRIi32 "\n", util_debug_data.ui.height);
+}
+
 bool
 util_debug_init() {
     debug_file = fmemopen(debug_buf, STATIC_STRLEN(debug_buf), "wb");
@@ -59,6 +66,7 @@ util_debug_str() {
     fprintf(debug_file, "debug enabled\n");
     dbg_keyboard();
     dbg_pointer();
+    dbg_ui();
     fwrite("\0", 1, 1, debug_file);
 
     ww_assert(fflush(debug_file) == 0);
