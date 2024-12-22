@@ -25,7 +25,7 @@ static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
 static_assert(PACKED_ATLAS_WIDTH * PACKED_ATLAS_HEIGHT == ATLAS_WIDTH * ATLAS_HEIGHT);
 static_assert(ATLAS_WIDTH * ATLAS_HEIGHT == PACKED_ATLAS_SIZE * 8);
 
-struct vtx_texcopy {
+struct vtx_shader {
     float src_pos[2];
     float dst_pos[2];
     float src_rgba[4];
@@ -36,6 +36,8 @@ struct scene_image {
     struct wl_list link; // scene.images
     struct scene *parent;
 
+    size_t shader_index;
+
     GLuint tex, vbo;
 
     int32_t width, height;
@@ -45,12 +47,18 @@ struct scene_mirror {
     struct wl_list link; // scene.mirrors
     struct scene *parent;
 
-    struct scene_mirror_options options;
+    size_t shader_index;
+
+    GLuint vbo;
+
+    float src_rgba[4], dst_rgba[4];
 };
 
 struct scene_text {
     struct wl_list link; // scene.text
     struct scene *parent;
+
+    size_t shader_index;
 
     GLuint vbo;
     size_t vtxcount;
@@ -60,8 +68,8 @@ struct scene_text {
 
 static void build_image(struct scene_image *out, struct scene *scene,
                         const struct scene_image_options *options, int32_t width, int32_t height);
-static void build_mirrors(struct scene *scene);
-static void build_rect(struct vtx_texcopy out[static 6], const struct box *src,
+static void build_mirror(struct scene_mirror *mirror, const struct scene_mirror_options *options, struct scene *scene);
+static void build_rect(struct vtx_shader out[static 6], const struct box *src,
                        const struct box *dst, const float src_rgba[static 4],
                        const float dst_rgba[static 4]);
 static size_t build_text(GLuint vbo, struct scene *scene, const char *data,
@@ -70,10 +78,10 @@ static size_t build_text(GLuint vbo, struct scene *scene, const char *data,
 static void draw_debug_text(struct scene *scene);
 static void draw_frame(struct scene *scene);
 static void draw_image(struct scene *scene, struct scene_image *image);
-static void draw_mirrors(struct scene *scene);
+static void draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int capture_texture, int32_t width, int32_t height);
 static void draw_text(struct scene *scene, struct scene_text *text);
 
-static void draw_texcopy_list(struct scene *scene, size_t num_vertices);
+static void draw_vertex_list(struct scene_shader *shader, size_t num_vertices);
 
 static void
 on_gl_frame(struct wl_listener *listener, void *data) {
@@ -87,7 +95,7 @@ on_gl_frame(struct wl_listener *listener, void *data) {
 static void
 build_image(struct scene_image *out, struct scene *scene, const struct scene_image_options *options,
             int32_t width, int32_t height) {
-    struct vtx_texcopy vertices[6] = {0};
+    struct vtx_shader vertices[6] = {0};
 
     build_rect(vertices, &(struct box){0, 0, width, height}, &options->dst, (float[4]){0, 0, 0, 0},
                (float[4]){0, 0, 0, 0});
@@ -103,32 +111,24 @@ build_image(struct scene_image *out, struct scene *scene, const struct scene_ima
 }
 
 static void
-build_mirrors(struct scene *scene) {
-    scene->buffers.mirrors_vtxcount = wl_list_length(&scene->mirrors) * 6;
+build_mirror(struct scene_mirror *mirror, const struct scene_mirror_options *options, struct scene *scene) {
+    struct vtx_shader vertices[6] = {0};
 
-    struct vtx_texcopy *vertices = zalloc(scene->buffers.mirrors_vtxcount, sizeof(*vertices));
-    struct vtx_texcopy *ptr = vertices;
-
-    struct scene_mirror *mirror;
-    wl_list_for_each (mirror, &scene->mirrors, link) {
-        build_rect(ptr, &mirror->options.src, &mirror->options.dst, mirror->options.src_rgba,
-                   mirror->options.dst_rgba);
-
-        ptr += 6;
-    }
+    build_rect(vertices, &options->src, &options->dst, options->src_rgba,
+                   mirror->dst_rgba);
 
     server_gl_with(scene->gl, false) {
-        gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.mirrors) {
-            glBufferData(GL_ARRAY_BUFFER, scene->buffers.mirrors_vtxcount * sizeof(*vertices),
-                         vertices, GL_STREAM_DRAW);
+        glGenBuffers(1, &mirror->vbo);
+        ww_assert(mirror->vbo != 0);
+
+        gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
+            glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STREAM_DRAW);
         }
     }
-
-    free(vertices);
 }
 
 static void
-build_rect(struct vtx_texcopy out[static 6], const struct box *s, const struct box *d,
+build_rect(struct vtx_shader out[static 6], const struct box *s, const struct box *d,
            const float src_rgba[static 4], const float dst_rgba[static 4]) {
     const struct {
         float src[2];
@@ -146,7 +146,7 @@ build_rect(struct vtx_texcopy out[static 6], const struct box *s, const struct b
     };
 
     for (size_t i = 0; i < STATIC_ARRLEN(data); i++) {
-        struct vtx_texcopy *vtx = &out[i];
+        struct vtx_shader *vtx = &out[i];
 
         memcpy(vtx->src_pos, data[i].src, sizeof(vtx->src_pos));
         memcpy(vtx->dst_pos, data[i].dst, sizeof(vtx->dst_pos));
@@ -162,8 +162,8 @@ build_text(GLuint vbo, struct scene *scene, const char *data,
 
     size_t vtxcount = strlen(data) * 6;
 
-    struct vtx_texcopy *vertices = zalloc(vtxcount, sizeof(*vertices));
-    struct vtx_texcopy *ptr = vertices;
+    struct vtx_shader *vertices = zalloc(vtxcount, sizeof(*vertices));
+    struct vtx_shader *ptr = vertices;
 
     int32_t x = options->x;
     int32_t y = options->y;
@@ -209,18 +209,21 @@ build_text(GLuint vbo, struct scene *scene, const char *data,
 
 static void
 draw_debug_text(struct scene *scene) {
-    // The OpenGL context must be current, the texcopy shader must be in use, and the font atlas
-    // texture must be bound.
+    // The OpenGL context must be current,
+    server_gl_shader_use(scene->shaders.data[0].shader);
+    glUniform2f(scene->shaders.data[0].shader_u_dst_size, scene->ui->width, scene->ui->height);
+    glUniform2f(scene->shaders.data[0].shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
 
     const char *str = util_debug_str();
     scene->buffers.debug_vtxcount = build_text(
         scene->buffers.debug, scene, str,
-        &(struct scene_text_options){.x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1});
+        &(struct scene_text_options){.x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1, .shader_name = NULL});
 
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.debug) {
-        draw_texcopy_list(scene, scene->buffers.debug_vtxcount);
+        draw_vertex_list(&scene->shaders.data[0], scene->buffers.debug_vtxcount);
     }
 }
+
 
 static void
 draw_frame(struct scene *scene) {
@@ -232,23 +235,25 @@ draw_frame(struct scene *scene) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glViewport(0, 0, scene->ui->width, scene->ui->height);
 
-    // Use the texcopy shader.
-    server_gl_shader_use(scene->shaders.texcopy);
-    glUniform2f(scene->shaders.texcopy_u_dst_size, scene->ui->width, scene->ui->height);
+    // Draw all mirrors using their respective shaders.
+    unsigned int capture_texture = server_gl_get_capture(scene->gl);
+    if (capture_texture != 0) {
+        int32_t width, height;
+        server_gl_get_capture_size(scene->gl, &width, &height);
+        struct scene_mirror *mirror;
+        wl_list_for_each (mirror, &scene->mirrors, link) {
+            draw_mirror(scene, mirror, capture_texture, width, height);
+        }
+    }
 
-    // Draw all mirrors using the texcopy shader.
-    draw_mirrors(scene);
-
-    // Draw all images using the texcopy shader.
+    // Draw all images using their respective shaders.
     struct scene_image *image;
     wl_list_for_each (image, &scene->images, link) {
         draw_image(scene, image);
     }
 
-    // Draw all text using the texcopy shader.
+    // Draw all text using their respective shaders.
     gl_using_texture(GL_TEXTURE_2D, scene->buffers.font_tex) {
-        glUniform2f(scene->shaders.texcopy_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
-
         struct scene_text *text;
         wl_list_for_each (text, &scene->text, link) {
             draw_text(scene, text);
@@ -259,83 +264,81 @@ draw_frame(struct scene *scene) {
         }
     }
 
+    glUseProgram(0);
     server_gl_swap_buffers(scene->gl);
 }
 
 static void
 draw_image(struct scene *scene, struct scene_image *image) {
-    // The OpenGL context must be current and the texcopy shader must be in use.
-
-    glUniform2f(scene->shaders.texcopy_u_src_size, image->width, image->height);
+    // The OpenGL context must be current.
+    server_gl_shader_use(scene->shaders.data[image->shader_index].shader);
+    glUniform2f(scene->shaders.data[image->shader_index].shader_u_dst_size, scene->ui->width, scene->ui->height);
+    glUniform2f(scene->shaders.data[image->shader_index].shader_u_src_size, image->width, image->height);
 
     gl_using_buffer(GL_ARRAY_BUFFER, image->vbo) {
         gl_using_texture(GL_TEXTURE_2D, image->tex) {
             // Each image has 6 vertices in its vertex buffer.
-            draw_texcopy_list(scene, 6);
+            draw_vertex_list(&scene->shaders.data[image->shader_index], 6);
         }
     }
 }
 
 static void
-draw_mirrors(struct scene *scene) {
-    // The OpenGL context must be current and the texcopy shader must be in use.
+draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int capture_texture, int32_t width, int32_t height) {
+    // The OpenGL context must be current.
+    server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
+    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size, scene->ui->width, scene->ui->height);
+    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
 
-    unsigned int capture_texture = server_gl_get_capture(scene->gl);
-    if (capture_texture == 0) {
-        // There is no texture to capture. Do not draw any mirrors.
-        return;
-    }
-
-    int32_t width, height;
-    server_gl_get_capture_size(scene->gl, &width, &height);
-    glUniform2f(scene->shaders.texcopy_u_src_size, width, height);
-
-    gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.mirrors) {
+    gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
         gl_using_texture(GL_TEXTURE_2D, capture_texture) {
-            draw_texcopy_list(scene, scene->buffers.mirrors_vtxcount);
+            // Each mirror has 6 vertices in its vertex buffer.
+            draw_vertex_list(&scene->shaders.data[mirror->shader_index], 6);
         }
     }
 }
 
 static void
 draw_text(struct scene *scene, struct scene_text *text) {
-    // The OpenGL context must be current, the texcopy shader must be in use, and the font atlas
-    // texture must be bound.
+    // The OpenGL context must be current.
+    server_gl_shader_use(scene->shaders.data[text->shader_index].shader);
+    glUniform2f(scene->shaders.data[text->shader_index].shader_u_dst_size, scene->ui->width, scene->ui->height);
+    glUniform2f(scene->shaders.data[text->shader_index].shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
 
     gl_using_buffer(GL_ARRAY_BUFFER, text->vbo) {
-        draw_texcopy_list(scene, text->vtxcount);
+        draw_vertex_list(&scene->shaders.data[text->shader_index], text->vtxcount);
     }
 }
 
 static void
-draw_texcopy_list(struct scene *scene, size_t num_vertices) {
+draw_vertex_list(struct scene_shader *shader, size_t num_vertices) {
     // The OpenGL context must be current, a texture must be bound to copy from, a vertex buffer
-    // with data must be bound, and the texcopy shader must be in use.
+    // with data must be bound, and a valid shader must be in use.
 
-    glVertexAttribPointer(scene->shaders.texcopy_a_src_pos, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct vtx_texcopy),
-                          (const void *)offsetof(struct vtx_texcopy, src_pos));
-    glVertexAttribPointer(scene->shaders.texcopy_a_dst_pos, 2, GL_FLOAT, GL_FALSE,
-                          sizeof(struct vtx_texcopy),
-                          (const void *)offsetof(struct vtx_texcopy, dst_pos));
-    glVertexAttribPointer(scene->shaders.texcopy_a_src_rgba, 4, GL_FLOAT, GL_FALSE,
-                          sizeof(struct vtx_texcopy),
-                          (const void *)offsetof(struct vtx_texcopy, src_rgba));
-    glVertexAttribPointer(scene->shaders.texcopy_a_dst_rgba, 4, GL_FLOAT, GL_FALSE,
-                          sizeof(struct vtx_texcopy),
-                          (const void *)offsetof(struct vtx_texcopy, dst_rgba));
+    glVertexAttribPointer(SHADER_SRC_POS_ATTRIB_LOC, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(struct vtx_shader),
+                          (const void *)offsetof(struct vtx_shader, src_pos));
+    glVertexAttribPointer(SHADER_DST_POS_ATTRIB_LOC, 2, GL_FLOAT, GL_FALSE,
+                          sizeof(struct vtx_shader),
+                          (const void *)offsetof(struct vtx_shader, dst_pos));
+    glVertexAttribPointer(SHADER_SRC_RGBA_ATTRIB_LOC, 4, GL_FLOAT, GL_FALSE,
+                          sizeof(struct vtx_shader),
+                          (const void *)offsetof(struct vtx_shader, src_rgba));
+    glVertexAttribPointer(SHADER_DST_RGBA_ATTRIB_LOC, 4, GL_FLOAT, GL_FALSE,
+                          sizeof(struct vtx_shader),
+                          (const void *)offsetof(struct vtx_shader, dst_rgba));
 
-    glEnableVertexAttribArray(scene->shaders.texcopy_a_src_pos);
-    glEnableVertexAttribArray(scene->shaders.texcopy_a_dst_pos);
-    glEnableVertexAttribArray(scene->shaders.texcopy_a_src_rgba);
-    glEnableVertexAttribArray(scene->shaders.texcopy_a_dst_rgba);
+    glEnableVertexAttribArray(SHADER_SRC_POS_ATTRIB_LOC);
+    glEnableVertexAttribArray(SHADER_DST_POS_ATTRIB_LOC);
+    glEnableVertexAttribArray(SHADER_SRC_RGBA_ATTRIB_LOC);
+    glEnableVertexAttribArray(SHADER_DST_RGBA_ATTRIB_LOC);
 
     glDrawArrays(GL_TRIANGLES, 0, num_vertices);
 
-    glDisableVertexAttribArray(scene->shaders.texcopy_a_src_pos);
-    glDisableVertexAttribArray(scene->shaders.texcopy_a_dst_pos);
-    glDisableVertexAttribArray(scene->shaders.texcopy_a_src_rgba);
-    glDisableVertexAttribArray(scene->shaders.texcopy_a_dst_rgba);
+    glDisableVertexAttribArray(SHADER_SRC_POS_ATTRIB_LOC);
+    glDisableVertexAttribArray(SHADER_DST_POS_ATTRIB_LOC);
+    glDisableVertexAttribArray(SHADER_SRC_RGBA_ATTRIB_LOC);
+    glDisableVertexAttribArray(SHADER_DST_RGBA_ATTRIB_LOC);
 }
 
 static bool
@@ -430,7 +433,9 @@ mirror_release(struct scene_mirror *mirror) {
     wl_list_init(&mirror->link);
 
     if (mirror->parent) {
-        build_mirrors(mirror->parent);
+        server_gl_with(mirror->parent->gl, false) {
+            glDeleteBuffers(1, &mirror->vbo);
+        }
     }
 
     mirror->parent = NULL;
@@ -450,8 +455,41 @@ text_release(struct scene_text *text) {
     text->parent = NULL;
 }
 
+int shader_find_index(struct scene* scene, char* key) {
+    if (key == NULL) {
+        return 0;
+    }
+    for (size_t i = 1; i < scene->shaders.count; i++) {
+        if (strcmp(scene->shaders.data[i].name, key) == 0) {
+            return i;
+        }
+    }
+    ww_log(LOG_WARN, "shader %s not found, falling back to default", key);
+    return 0;
+}
+
+bool shader_create(struct server_gl *gl, struct scene_shader *data, char* name, const char* vertex, const char* fragment) {
+    data->name = name;
+    data->shader =
+        server_gl_compile(
+            gl,
+            vertex ? vertex : WAYWALL_GLSL_TEXCOPY_VERT_H,
+            fragment ? fragment : WAYWALL_GLSL_TEXCOPY_FRAG_H
+        );
+    if (!data->shader) {
+        return false;
+    }
+
+    data->shader_u_src_size =
+        glGetUniformLocation(data->shader->program, "u_src_size");
+    data->shader_u_dst_size =
+        glGetUniformLocation(data->shader->program, "u_dst_size");
+
+    return true;
+}
+
 struct scene *
-scene_create(struct server_gl *gl, struct server_ui *ui) {
+scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
     struct scene *scene = zalloc(1, sizeof(*scene));
 
     scene->gl = gl;
@@ -466,28 +504,23 @@ scene_create(struct server_gl *gl, struct server_ui *ui) {
         ww_log(LOG_INFO, "max image size: %" PRIu32 "x%" PRIu32 "\n", scene->image_max_size,
                scene->image_max_size);
 
-        // Initialize the texcopy shader.
-        scene->shaders.texcopy =
-            server_gl_compile(scene->gl, WAYWALL_GLSL_TEXCOPY_VERT_H, WAYWALL_GLSL_TEXCOPY_FRAG_H);
-        if (!scene->shaders.texcopy) {
+        scene->shaders.count = cfg->shaders.count + 1;
+        scene->shaders.data = malloc(sizeof(struct scene_shader) * scene->shaders.count);
+        if (!shader_create(scene->gl, &scene->shaders.data[0], strdup("default"), NULL, NULL)) {
+            ww_log(LOG_ERROR, "error creating default shader");
             server_gl_exit(scene->gl);
             goto fail_compile_texture_copy;
         }
-        scene->shaders.texcopy_u_src_size =
-            glGetUniformLocation(scene->shaders.texcopy->program, "u_src_size");
-        scene->shaders.texcopy_u_dst_size =
-            glGetUniformLocation(scene->shaders.texcopy->program, "u_dst_size");
-        scene->shaders.texcopy_a_src_pos =
-            glGetAttribLocation(scene->shaders.texcopy->program, "v_src_pos");
-        scene->shaders.texcopy_a_dst_pos =
-            glGetAttribLocation(scene->shaders.texcopy->program, "v_dst_pos");
-        scene->shaders.texcopy_a_src_rgba =
-            glGetAttribLocation(scene->shaders.texcopy->program, "v_src_rgba");
-        scene->shaders.texcopy_a_dst_rgba =
-            glGetAttribLocation(scene->shaders.texcopy->program, "v_dst_rgba");
+        for (size_t i = 0; i < cfg->shaders.count; i++) {
+            if (!shader_create(scene->gl, &scene->shaders.data[i+1], strdup(cfg->shaders.data[i].name), cfg->shaders.data[i].vertex, cfg->shaders.data[i].fragment)) {
+                ww_log(LOG_ERROR, "error creating %s shader", cfg->shaders.data[i].name);
+                server_gl_exit(scene->gl);
+                goto fail_compile_texture_copy;
+            }
+            ww_log(LOG_INFO, "created %s shader", cfg->shaders.data[i].name);
+        }
 
         // Initialize vertex buffers.
-        glGenBuffers(1, &scene->buffers.mirrors);
         glGenBuffers(1, &scene->buffers.debug);
 
         // Initialize the font texture atlas.
@@ -555,12 +588,15 @@ scene_destroy(struct scene *scene) {
     }
 
     server_gl_with(scene->gl, false) {
-        server_gl_shader_destroy(scene->shaders.texcopy);
+        for (size_t i = 0; i < scene->shaders.count; i++) {
+            server_gl_shader_destroy(scene->shaders.data[i].shader);
+            free(scene->shaders.data[i].name);
+        }
 
-        glDeleteBuffers(1, &scene->buffers.mirrors);
         glDeleteBuffers(1, &scene->buffers.debug);
         glDeleteTextures(1, &scene->buffers.font_tex);
     }
+    free(scene->shaders.data);
 
     wl_list_remove(&scene->on_gl_frame.link);
 
@@ -580,6 +616,9 @@ scene_add_image(struct scene *scene, const struct scene_image_options *options, 
         return NULL;
     }
 
+    // Find correct shader for this image
+    image->shader_index = shader_find_index(scene, options->shader_name);
+
     // Build a vertex buffer containing the data for this image.
     build_image(image, scene, options, image->width, image->height);
 
@@ -593,11 +632,15 @@ scene_add_mirror(struct scene *scene, const struct scene_mirror_options *options
     struct scene_mirror *mirror = zalloc(1, sizeof(*mirror));
 
     mirror->parent = scene;
-    mirror->options = *options;
+    memcpy(mirror->src_rgba, options->src_rgba, sizeof(mirror->src_rgba));
+    memcpy(mirror->dst_rgba, options->dst_rgba, sizeof(mirror->dst_rgba));
+
+    // Find correct shader for this mirror
+    mirror->shader_index = shader_find_index(scene, options->shader_name);
 
     wl_list_insert(&scene->mirrors, &mirror->link);
 
-    build_mirrors(scene);
+    build_mirror(mirror, options, scene);
 
     return mirror;
 }
@@ -609,6 +652,9 @@ scene_add_text(struct scene *scene, const char *data, const struct scene_text_op
     text->parent = scene;
     text->x = options->x;
     text->y = options->y;
+
+    // Find correct shader for this text
+    text->shader_index = shader_find_index(scene, options->shader_name);
 
     wl_list_insert(&scene->text, &text->link);
 

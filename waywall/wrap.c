@@ -533,7 +533,7 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
         goto fail_gl;
     }
 
-    wrap->scene = scene_create(wrap->gl, server->ui);
+    wrap->scene = scene_create(cfg, wrap->gl, server->ui);
     if (!wrap->scene) {
         ww_log(LOG_ERROR, "failed to create scene");
         goto fail_scene;

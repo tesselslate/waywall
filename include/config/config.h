@@ -57,6 +57,11 @@ struct config {
         double ninb_opacity;
     } theme;
 
+    struct {
+        struct config_shader *data;
+        size_t count;
+    } shaders;
+
     struct config_vm *vm;
 };
 
@@ -83,6 +88,12 @@ enum config_remap_type {
 struct config_remap {
     enum config_remap_type src_type, dst_type;
     uint32_t src_data, dst_data;
+};
+
+struct config_shader {
+    char* name;
+    char* fragment;
+    char* vertex;
 };
 
 struct config *config_create();
