@@ -68,7 +68,8 @@ struct scene_text {
 
 static void build_image(struct scene_image *out, struct scene *scene,
                         const struct scene_image_options *options, int32_t width, int32_t height);
-static void build_mirror(struct scene_mirror *mirror, const struct scene_mirror_options *options, struct scene *scene);
+static void build_mirror(struct scene_mirror *mirror, const struct scene_mirror_options *options,
+                         struct scene *scene);
 static void build_rect(struct vtx_shader out[static 6], const struct box *src,
                        const struct box *dst, const float src_rgba[static 4],
                        const float dst_rgba[static 4]);
@@ -78,7 +79,8 @@ static size_t build_text(GLuint vbo, struct scene *scene, const char *data,
 static void draw_debug_text(struct scene *scene);
 static void draw_frame(struct scene *scene);
 static void draw_image(struct scene *scene, struct scene_image *image);
-static void draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int capture_texture, int32_t width, int32_t height);
+static void draw_mirror(struct scene *scene, struct scene_mirror *mirror,
+                        unsigned int capture_texture, int32_t width, int32_t height);
 static void draw_text(struct scene *scene, struct scene_text *text);
 
 static void draw_vertex_list(struct scene_shader *shader, size_t num_vertices);
@@ -111,11 +113,11 @@ build_image(struct scene_image *out, struct scene *scene, const struct scene_ima
 }
 
 static void
-build_mirror(struct scene_mirror *mirror, const struct scene_mirror_options *options, struct scene *scene) {
+build_mirror(struct scene_mirror *mirror, const struct scene_mirror_options *options,
+             struct scene *scene) {
     struct vtx_shader vertices[6] = {0};
 
-    build_rect(vertices, &options->src, &options->dst, options->src_rgba,
-                   mirror->dst_rgba);
+    build_rect(vertices, &options->src, &options->dst, options->src_rgba, mirror->dst_rgba);
 
     server_gl_with(scene->gl, false) {
         glGenBuffers(1, &mirror->vbo);
@@ -217,13 +219,13 @@ draw_debug_text(struct scene *scene) {
     const char *str = util_debug_str();
     scene->buffers.debug_vtxcount = build_text(
         scene->buffers.debug, scene, str,
-        &(struct scene_text_options){.x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1, .shader_name = NULL});
+        &(struct scene_text_options){
+            .x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1, .shader_name = NULL});
 
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.debug) {
         draw_vertex_list(&scene->shaders.data[0], scene->buffers.debug_vtxcount);
     }
 }
-
 
 static void
 draw_frame(struct scene *scene) {
@@ -272,8 +274,10 @@ static void
 draw_image(struct scene *scene, struct scene_image *image) {
     // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[image->shader_index].shader);
-    glUniform2f(scene->shaders.data[image->shader_index].shader_u_dst_size, scene->ui->width, scene->ui->height);
-    glUniform2f(scene->shaders.data[image->shader_index].shader_u_src_size, image->width, image->height);
+    glUniform2f(scene->shaders.data[image->shader_index].shader_u_dst_size, scene->ui->width,
+                scene->ui->height);
+    glUniform2f(scene->shaders.data[image->shader_index].shader_u_src_size, image->width,
+                image->height);
 
     gl_using_buffer(GL_ARRAY_BUFFER, image->vbo) {
         gl_using_texture(GL_TEXTURE_2D, image->tex) {
@@ -284,10 +288,12 @@ draw_image(struct scene *scene, struct scene_image *image) {
 }
 
 static void
-draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int capture_texture, int32_t width, int32_t height) {
+draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int capture_texture,
+            int32_t width, int32_t height) {
     // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
-    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size, scene->ui->width, scene->ui->height);
+    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size, scene->ui->width,
+                scene->ui->height);
     glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
 
     gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
@@ -302,8 +308,10 @@ static void
 draw_text(struct scene *scene, struct scene_text *text) {
     // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[text->shader_index].shader);
-    glUniform2f(scene->shaders.data[text->shader_index].shader_u_dst_size, scene->ui->width, scene->ui->height);
-    glUniform2f(scene->shaders.data[text->shader_index].shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
+    glUniform2f(scene->shaders.data[text->shader_index].shader_u_dst_size, scene->ui->width,
+                scene->ui->height);
+    glUniform2f(scene->shaders.data[text->shader_index].shader_u_src_size, ATLAS_WIDTH,
+                ATLAS_HEIGHT);
 
     gl_using_buffer(GL_ARRAY_BUFFER, text->vbo) {
         draw_vertex_list(&scene->shaders.data[text->shader_index], text->vtxcount);
@@ -456,7 +464,7 @@ text_release(struct scene_text *text) {
 }
 
 static int
-shader_find_index(struct scene* scene, char* key) {
+shader_find_index(struct scene *scene, char *key) {
     if (key == NULL) {
         return 0;
     }
@@ -470,22 +478,17 @@ shader_find_index(struct scene* scene, char* key) {
 }
 
 static bool
-shader_create(struct server_gl *gl, struct scene_shader *data, char* name, const char* vertex, const char* fragment) {
+shader_create(struct server_gl *gl, struct scene_shader *data, char *name, const char *vertex,
+              const char *fragment) {
     data->name = name;
-    data->shader =
-        server_gl_compile(
-            gl,
-            vertex ? vertex : WAYWALL_GLSL_TEXCOPY_VERT_H,
-            fragment ? fragment : WAYWALL_GLSL_TEXCOPY_FRAG_H
-        );
+    data->shader = server_gl_compile(gl, vertex ? vertex : WAYWALL_GLSL_TEXCOPY_VERT_H,
+                                     fragment ? fragment : WAYWALL_GLSL_TEXCOPY_FRAG_H);
     if (!data->shader) {
         return false;
     }
 
-    data->shader_u_src_size =
-        glGetUniformLocation(data->shader->program, "u_src_size");
-    data->shader_u_dst_size =
-        glGetUniformLocation(data->shader->program, "u_dst_size");
+    data->shader_u_src_size = glGetUniformLocation(data->shader->program, "u_src_size");
+    data->shader_u_dst_size = glGetUniformLocation(data->shader->program, "u_dst_size");
 
     return true;
 }
@@ -514,7 +517,9 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
             goto fail_compile_texture_copy;
         }
         for (size_t i = 0; i < cfg->shaders.count; i++) {
-            if (!shader_create(scene->gl, &scene->shaders.data[i+1], strdup(cfg->shaders.data[i].name), cfg->shaders.data[i].vertex, cfg->shaders.data[i].fragment)) {
+            if (!shader_create(scene->gl, &scene->shaders.data[i + 1],
+                               strdup(cfg->shaders.data[i].name), cfg->shaders.data[i].vertex,
+                               cfg->shaders.data[i].fragment)) {
                 ww_log(LOG_ERROR, "error creating %s shader", cfg->shaders.data[i].name);
                 server_gl_exit(scene->gl);
                 goto fail_compile_texture_copy;

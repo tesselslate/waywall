@@ -91,9 +91,9 @@ struct config_remap {
 };
 
 struct config_shader {
-    char* name;
-    char* fragment;
-    char* vertex;
+    char *name;
+    char *fragment;
+    char *vertex;
 };
 
 struct config *config_create();

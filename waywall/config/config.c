@@ -51,7 +51,7 @@ static const struct config defaults = {
             .ninb_anchor = ANCHOR_NONE,
             .ninb_opacity = 1.0,
         },
-    .shaders = {0}
+    .shaders = {0},
 };
 
 static const struct {
@@ -356,8 +356,7 @@ add_remap(struct config *cfg, struct config_remap remap) {
 
 static void
 add_shader(struct config *cfg, struct config_shader shader) {
-    void *data = realloc(cfg->shaders.data,
-                         sizeof(*cfg->shaders.data) * (cfg->shaders.count + 1));
+    void *data = realloc(cfg->shaders.data, sizeof(*cfg->shaders.data) * (cfg->shaders.count + 1));
     check_alloc(data);
 
     cfg->shaders.data = data;

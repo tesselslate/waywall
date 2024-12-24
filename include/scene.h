@@ -1,8 +1,8 @@
 #ifndef WAYWALL_SCENE_H
 #define WAYWALL_SCENE_H
 
-#include "util/box.h"
 #include "config/config.h"
+#include "util/box.h"
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 

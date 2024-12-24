@@ -1,5 +1,6 @@
 #include "server/gl.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "scene.h"
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
@@ -9,7 +10,6 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
-#include "scene.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <spng.h>

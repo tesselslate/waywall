@@ -830,7 +830,7 @@ l_text(lua_State *L) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
 
-    char* shader_name = NULL;
+    char *shader_name = NULL;
     if (lua_gettop(L) >= ARG_SHADER) {
         shader_name = luaL_checkstring(L, ARG_SHADER);
     }
