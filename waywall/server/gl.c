@@ -1,5 +1,6 @@
 #include "server/gl.h"
 #include "linux-dmabuf-v1-client-protocol.h"
+#include "scene.h"
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
@@ -447,6 +448,7 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
     return gl_buffer;
 
 fail_image_target:
+    glDeleteTextures(1, &gl_buffer->texture);
 fail_make_current:
     gl_buffer->gl->egl.DestroyImageKHR(gl_buffer->gl->egl.display, gl_buffer->image);
 
@@ -487,6 +489,12 @@ compile_program(GLuint *out, GLuint vert, GLuint frag) {
 
     glAttachShader(prog, vert);
     glAttachShader(prog, frag);
+
+    glBindAttribLocation(prog, SHADER_SRC_POS_ATTRIB_LOC, "v_src_pos");
+    glBindAttribLocation(prog, SHADER_DST_POS_ATTRIB_LOC, "v_dst_pos");
+    glBindAttribLocation(prog, SHADER_SRC_RGBA_ATTRIB_LOC, "v_src_rgba");
+    glBindAttribLocation(prog, SHADER_DST_RGBA_ATTRIB_LOC, "v_dst_rgba");
+
     glLinkProgram(prog);
 
     GLint status;

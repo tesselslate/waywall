@@ -414,7 +414,14 @@ l_image(lua_State *L) {
     lua_settop(L, ARG_OPTIONS);
 
     struct scene_image_options options = {0};
-    unmarshal_box(L, &options.dst);
+    unmarshal_box_key(L, "dst", &options.dst);
+
+    lua_pushstring(L, "shader");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
 
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
@@ -441,6 +448,7 @@ l_image(lua_State *L) {
     lua_setmetatable(L, -2);
 
     *image = scene_add_image(wrap->scene, &options, buf, stat.st_size);
+    free(options.shader_name);
     if (!*image) {
         ww_assert(munmap(buf, stat.st_size) == 0);
         close(fd);
@@ -473,6 +481,13 @@ l_mirror(lua_State *L) {
     unmarshal_box_key(L, "src", &options.src);
     unmarshal_box_key(L, "dst", &options.dst);
 
+    lua_pushstring(L, "shader");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+
     lua_pushstring(L, "color_key"); // stack: 2
     lua_rawget(L, ARG_OPTIONS);     // stack: 2
 
@@ -490,6 +505,7 @@ l_mirror(lua_State *L) {
     lua_setmetatable(L, -2);
 
     *mirror = scene_add_mirror(wrap->scene, &options);
+    free(options.shader_name);
     if (!*mirror) {
         return luaL_error(L, "failed to create mirror");
     }
@@ -781,6 +797,7 @@ l_text(lua_State *L) {
     static const int ARG_Y = 3;
     static const int ARG_COLOR = 4;
     static const int ARG_SIZE = 5;
+    static const int ARG_SHADER = 6;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -812,13 +829,19 @@ l_text(lua_State *L) {
     if (lua_gettop(L) >= ARG_SIZE) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
-    lua_settop(L, ARG_SIZE);
+
+    const char *shader_name = NULL;
+    if (lua_gettop(L) >= ARG_SHADER) {
+        shader_name = luaL_checkstring(L, ARG_SHADER);
+    }
+    lua_settop(L, ARG_SHADER);
 
     struct scene_text_options options = {
         .x = x,
         .y = y,
         .rgba = {rgba[0], rgba[1], rgba[2], rgba[3]},
         .size_multiplier = size,
+        .shader_name = shader_name,
     };
 
     // Body

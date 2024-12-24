@@ -51,6 +51,7 @@ static const struct config defaults = {
             .ninb_anchor = ANCHOR_NONE,
             .ninb_opacity = 1.0,
         },
+    .shaders = {0},
 };
 
 static const struct {
@@ -354,6 +355,15 @@ add_remap(struct config *cfg, struct config_remap remap) {
 }
 
 static void
+add_shader(struct config *cfg, struct config_shader shader) {
+    void *data = realloc(cfg->shaders.data, sizeof(*cfg->shaders.data) * (cfg->shaders.count + 1));
+    check_alloc(data);
+
+    cfg->shaders.data = data;
+    cfg->shaders.data[cfg->shaders.count++] = shader;
+}
+
+static void
 add_action(struct config *cfg, struct config_action *action) {
     void *data = realloc(cfg->input.actions.data,
                          sizeof(*cfg->input.actions.data) * (cfg->input.actions.count + 1));
@@ -650,6 +660,57 @@ process_config_theme(struct config *cfg) {
 }
 
 static int
+process_config_shaders(struct config *cfg) {
+    // stack state:
+    // 1:   config.shaders
+    // 2:   config
+    const int IDX_SHADERS = 2;
+    const int IDX_SHADER_KEY = 3;
+
+    ww_assert(lua_gettop(cfg->vm->L) == IDX_SHADERS);
+
+    lua_pushnil(cfg->vm->L); // stack: 3 (IDX_SHADER_KEY)
+    while (lua_next(cfg->vm->L, IDX_SHADERS)) {
+        // stack state:
+        // 4 (IDX_SHADER_VAL) : config.shaders[key] (should be a table)
+        // 3 (IDX_SHADER_KEY) : key (should be a string)
+        // 2 (IDX_SHADERS)    : config.shaders
+        // 1                  : config
+
+        if (!lua_isstring(cfg->vm->L, IDX_SHADER_KEY)) {
+            ww_log(LOG_ERROR, "non-string key '%s' found in shaders table",
+                   lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
+            return 1;
+        }
+
+        char *key = strdup(lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
+        char *fragment = NULL, *vertex = NULL;
+        if (get_string(cfg, "fragment", &fragment, "shaders[].fragment", false)) {
+            return 1;
+        }
+        if (get_string(cfg, "vertex", &vertex, "shaders[].vertex", false)) {
+            return 1;
+        }
+
+        struct config_shader shader = {
+            .name = key,
+            .fragment = fragment,
+            .vertex = vertex,
+        };
+        add_shader(cfg, shader);
+
+        // Pop the value from the top of the stack. The previous key will be left at the top of the
+        // stack for the next call to `lua_next`.
+        lua_pop(cfg->vm->L, 1); // stack: 3 (IDX_SHADER_KEY)
+        ww_assert(lua_gettop(cfg->vm->L) == IDX_SHADER_KEY);
+    }
+
+    ww_assert(lua_gettop(cfg->vm->L) == IDX_SHADERS);
+
+    return 0;
+}
+
+static int
 process_config(struct config *cfg) {
     // stack state:
     // 1:   config
@@ -668,6 +729,10 @@ process_config(struct config *cfg) {
     }
 
     if (get_table(cfg, "theme", process_config_theme, "theme", false) != 0) {
+        return 1;
+    }
+
+    if (get_table(cfg, "shaders", process_config_shaders, "shaders", false) != 0) {
         return 1;
     }
 
@@ -762,6 +827,15 @@ config_destroy(struct config *cfg) {
     free(cfg->input.keymap.options);
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
+
+    for (size_t i = 0; i < cfg->shaders.count; i++) {
+        free(cfg->shaders.data[i].name);
+        free(cfg->shaders.data[i].fragment);
+        free(cfg->shaders.data[i].vertex);
+    }
+    if (cfg->shaders.data) {
+        free(cfg->shaders.data);
+    }
 
     if (cfg->vm) {
         config_vm_destroy(cfg->vm);
