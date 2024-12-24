@@ -835,7 +835,9 @@ config_destroy(struct config *cfg) {
         free(cfg->shaders.data[i].fragment);
         free(cfg->shaders.data[i].vertex);
     }
-    free(cfg->shaders.data);
+    if (cfg->shaders.data) {
+        free(cfg->shaders.data);
+    }
 
     if (cfg->vm) {
         config_vm_destroy(cfg->vm);
