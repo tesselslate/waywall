@@ -830,9 +830,9 @@ l_text(lua_State *L) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
 
-    char* shader = NULL;
+    char* shader_name = NULL;
     if (lua_gettop(L) >= ARG_SHADER) {
-        shader = strdup(luaL_checkstring(L, ARG_SHADER));
+        shader_name = luaL_checkstring(L, ARG_SHADER);
     }
     lua_settop(L, ARG_SHADER);
 
@@ -841,7 +841,7 @@ l_text(lua_State *L) {
         .y = y,
         .rgba = {rgba[0], rgba[1], rgba[2], rgba[3]},
         .size_multiplier = size,
-        .shader_name = shader,
+        .shader_name = shader_name,
     };
 
     // Body
