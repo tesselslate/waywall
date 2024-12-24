@@ -464,7 +464,7 @@ text_release(struct scene_text *text) {
 }
 
 static int
-shader_find_index(struct scene *scene, char *key) {
+shader_find_index(struct scene *scene, const char *key) {
     if (key == NULL) {
         return 0;
     }
