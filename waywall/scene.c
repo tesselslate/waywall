@@ -455,7 +455,8 @@ text_release(struct scene_text *text) {
     text->parent = NULL;
 }
 
-int shader_find_index(struct scene* scene, char* key) {
+static int
+shader_find_index(struct scene* scene, char* key) {
     if (key == NULL) {
         return 0;
     }
@@ -468,7 +469,8 @@ int shader_find_index(struct scene* scene, char* key) {
     return 0;
 }
 
-bool shader_create(struct server_gl *gl, struct scene_shader *data, char* name, const char* vertex, const char* fragment) {
+static bool
+shader_create(struct server_gl *gl, struct scene_shader *data, char* name, const char* vertex, const char* fragment) {
     data->name = name;
     data->shader =
         server_gl_compile(
