@@ -667,14 +667,13 @@ process_config_shaders(struct config *cfg) {
     // 2:   config
     const int IDX_SHADERS = 2;
     const int IDX_SHADER_KEY = 3;
-    // const int IDX_SHADER_VAL = 4;
 
     ww_assert(lua_gettop(cfg->vm->L) == IDX_SHADERS);
 
     lua_pushnil(cfg->vm->L); // stack: 3 (IDX_SHADER_KEY)
     while (lua_next(cfg->vm->L, IDX_SHADERS)) {
         // stack state:
-        // 4 (IDX_SHADER_VAL) : config.shaders[key] (should be a string)
+        // 4 (IDX_SHADER_VAL) : config.shaders[key] (should be a table)
         // 3 (IDX_SHADER_KEY) : key (should be a string)
         // 2 (IDX_SHADERS)    : config.shaders
         // 1                  : config
