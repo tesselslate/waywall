@@ -439,6 +439,7 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
 
         gl_buffer->gl->egl.ImageTargetTexture2DOES(GL_TEXTURE_2D, gl_buffer->image);
         if (!gl_checkerr("failed to import texture")) {
+            glBindTexture(GL_TEXTURE_2D, 0);
             goto fail_image_target;
         }
     }
