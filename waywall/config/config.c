@@ -442,7 +442,7 @@ process_config_actions(struct config *cfg) {
     qsort(cfg->input.actions.data, cfg->input.actions.count, sizeof(*cfg->input.actions.data),
           compare_action);
 
-    // stack state:
+    // stack state
     // 3 (IDX_DUP_TABLE)  : duplicate actions table
     // 2 (IDX_ACTIONS)    : config.actions
     // 1                  : config
@@ -478,7 +478,7 @@ process_config_input_remaps(struct config *cfg) {
     static const int IDX_REMAP_KEY = 4;
     static const int IDX_REMAP_VAL = 5;
 
-    // stack state:
+    // stack state
     // 3 (IDX_REMAPS)     : config.input.remaps
     // 2                  : config.input
     // 1                  : config
@@ -486,7 +486,7 @@ process_config_input_remaps(struct config *cfg) {
 
     lua_pushnil(cfg->vm->L); // stack: 4 (IDX_REMAP_KEY)
     while (lua_next(cfg->vm->L, IDX_REMAPS)) {
-        // stack state:
+        // stack state
         // 5 (IDX_REMAP_VAL) : config.input.remaps[key] (should be a string)
         // 4 (IDX_REMAP_KEY)  : key (should be a string)
         // 3 (IDX_REMAPS)     : config.input.remaps
@@ -519,7 +519,7 @@ process_config_input_remaps(struct config *cfg) {
         ww_assert(lua_gettop(cfg->vm->L) == IDX_REMAP_KEY);
     }
 
-    // stack state:
+    // stack state
     // 3 (IDX_REMAPS)     : config.input.remaps
     // 2                  : config.input
     // 1                  : config
@@ -530,7 +530,7 @@ process_config_input_remaps(struct config *cfg) {
 
 static int
 process_config_input(struct config *cfg) {
-    // stack state:
+    // stack state
     // 2:   config.input
     // 1:   config
     ww_assert(lua_gettop(cfg->vm->L) == 2);
@@ -585,9 +585,9 @@ process_config_input(struct config *cfg) {
 
 static int
 process_config_theme(struct config *cfg) {
-    // stack state:
-    // 1:   config.theme
-    // 2:   config
+    // stack state
+    // 2:   config.theme
+    // 1:   config
     ww_assert(lua_gettop(cfg->vm->L) == 2);
 
     char *raw_background = NULL;
@@ -661,9 +661,9 @@ process_config_theme(struct config *cfg) {
 
 static int
 process_config_shaders(struct config *cfg) {
-    // stack state:
-    // 1:   config.shaders
-    // 2:   config
+    // stack state
+    // 2:   config.shaders
+    // 1:   config
     const int IDX_SHADERS = 2;
     const int IDX_SHADER_KEY = 3;
 
@@ -671,7 +671,7 @@ process_config_shaders(struct config *cfg) {
 
     lua_pushnil(cfg->vm->L); // stack: 3 (IDX_SHADER_KEY)
     while (lua_next(cfg->vm->L, IDX_SHADERS)) {
-        // stack state:
+        // stack state
         // 4 (IDX_SHADER_VAL) : config.shaders[key] (should be a table)
         // 3 (IDX_SHADER_KEY) : key (should be a string)
         // 2 (IDX_SHADERS)    : config.shaders
@@ -712,7 +712,7 @@ process_config_shaders(struct config *cfg) {
 
 static int
 process_config(struct config *cfg) {
-    // stack state:
+    // stack state
     // 1:   config
     ww_assert(lua_gettop(cfg->vm->L) == 1);
 
