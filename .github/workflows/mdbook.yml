@@ -1,0 +1,43 @@
+name: Deploy mdBook site
+
+on:
+  push:
+    branches:
+      - "main"
+
+    paths:
+      - "doc/**.md"
+
+    workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install mdbook
+        run: "./ci/install_mdbook.sh"
+
+      - name: Build book
+        run: "mdbook build"
+
+      - name: Setup pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: "book"
+
+      - name: Deploy pages
+        id: deployment
+        uses: actions/deploy-pages@v4
