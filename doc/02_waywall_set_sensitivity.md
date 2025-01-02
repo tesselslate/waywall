@@ -15,4 +15,4 @@ None
 
 > This function cannot be called during startup.
 
-[input configuration table]: 01_options_inputs.md
+[input configuration table]: 01_options_input.md
