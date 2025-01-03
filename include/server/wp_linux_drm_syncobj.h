@@ -22,7 +22,6 @@ struct server_drm_syncobj_surface {
     struct server_surface *parent;
     struct wp_linux_drm_syncobj_surface_v1 *remote;
 
-    struct wl_listener on_surface_commit;
     struct wl_listener on_surface_destroy;
 
     struct server_drm_syncobj_point {
@@ -33,6 +32,8 @@ struct server_drm_syncobj_surface {
 
 struct server_drm_syncobj_timeline {
     struct wl_resource *resource;
+    struct wp_linux_drm_syncobj_timeline_v1 *remote;
+
     int32_t fd;
 };
 

@@ -32,38 +32,6 @@ syncobj_surface_exists(struct server_drm_syncobj_manager *syncobj_manager,
 }
 
 static void
-on_surface_commit(struct wl_listener *listener, void *data) {
-    struct server_drm_syncobj_surface *syncobj_surface =
-        wl_container_of(listener, syncobj_surface, on_surface_commit);
-
-    if (syncobj_surface->acquire.fd != -1) {
-        struct wp_linux_drm_syncobj_timeline_v1 *timeline =
-            wp_linux_drm_syncobj_manager_v1_import_timeline(syncobj_surface->manager->remote,
-                                                            syncobj_surface->acquire.fd);
-        check_alloc(timeline);
-
-        wp_linux_drm_syncobj_surface_v1_set_acquire_point(syncobj_surface->remote, timeline,
-                                                          syncobj_surface->acquire.point_hi,
-                                                          syncobj_surface->acquire.point_lo);
-
-        wp_linux_drm_syncobj_timeline_v1_destroy(timeline);
-    }
-
-    if (syncobj_surface->release.fd != -1) {
-        struct wp_linux_drm_syncobj_timeline_v1 *timeline =
-            wp_linux_drm_syncobj_manager_v1_import_timeline(syncobj_surface->manager->remote,
-                                                            syncobj_surface->release.fd);
-        check_alloc(timeline);
-
-        wp_linux_drm_syncobj_surface_v1_set_release_point(syncobj_surface->remote, timeline,
-                                                          syncobj_surface->release.point_hi,
-                                                          syncobj_surface->release.point_lo);
-
-        wp_linux_drm_syncobj_timeline_v1_destroy(timeline);
-    }
-}
-
-static void
 on_surface_destroy(struct wl_listener *listener, void *data) {
     struct server_drm_syncobj_surface *syncobj_surface =
         wl_container_of(listener, syncobj_surface, on_surface_destroy);
@@ -84,7 +52,6 @@ drm_syncobj_surface_resource_destroy(struct wl_resource *resource) {
 
     wp_linux_drm_syncobj_surface_v1_destroy(syncobj_surface->remote);
 
-    wl_list_remove(&syncobj_surface->on_surface_commit.link);
     wl_list_remove(&syncobj_surface->on_surface_destroy.link);
 
     wl_list_remove(wl_resource_get_link(resource));
@@ -125,6 +92,9 @@ drm_syncobj_surface_set_acquire_point(struct wl_client *client, struct wl_resour
 
     syncobj_surface->acquire.point_hi = point_hi;
     syncobj_surface->acquire.point_lo = point_lo;
+
+    wp_linux_drm_syncobj_surface_v1_set_acquire_point(syncobj_surface->remote,
+                                                      syncobj_timeline->remote, point_hi, point_lo);
 }
 
 static void
@@ -155,6 +125,9 @@ drm_syncobj_surface_set_release_point(struct wl_client *client, struct wl_resour
 
     syncobj_surface->release.point_hi = point_hi;
     syncobj_surface->release.point_lo = point_lo;
+
+    wp_linux_drm_syncobj_surface_v1_set_release_point(syncobj_surface->remote,
+                                                      syncobj_timeline->remote, point_hi, point_lo);
 }
 
 static const struct wp_linux_drm_syncobj_surface_v1_interface drm_syncobj_surface_impl = {
@@ -167,6 +140,7 @@ static void
 drm_syncobj_timeline_resource_destroy(struct wl_resource *resource) {
     struct server_drm_syncobj_timeline *syncobj_timeline = wl_resource_get_user_data(resource);
 
+    wp_linux_drm_syncobj_timeline_v1_destroy(syncobj_timeline->remote);
     close(syncobj_timeline->fd);
     free(syncobj_timeline);
 }
@@ -221,9 +195,6 @@ drm_syncobj_manager_get_surface(struct wl_client *client, struct wl_resource *re
     syncobj_surface->acquire.fd = -1;
     syncobj_surface->release.fd = -1;
 
-    syncobj_surface->on_surface_commit.notify = on_surface_commit;
-    wl_signal_add(&surface->events.commit, &syncobj_surface->on_surface_commit);
-
     syncobj_surface->on_surface_destroy.notify = on_surface_destroy;
     wl_signal_add(&surface->events.destroy, &syncobj_surface->on_surface_destroy);
 
@@ -233,6 +204,8 @@ drm_syncobj_manager_get_surface(struct wl_client *client, struct wl_resource *re
 static void
 drm_syncobj_manager_import_timeline(struct wl_client *client, struct wl_resource *resource,
                                     uint32_t id, int32_t fd) {
+    struct server_drm_syncobj_manager *syncobj_manager = wl_resource_get_user_data(resource);
+
     struct server_drm_syncobj_timeline *syncobj_timeline = zalloc(1, sizeof(*syncobj_timeline));
 
     struct wl_resource *syncobj_timeline_resource = wl_resource_create(
@@ -240,6 +213,10 @@ drm_syncobj_manager_import_timeline(struct wl_client *client, struct wl_resource
     check_alloc(syncobj_timeline_resource);
     wl_resource_set_implementation(syncobj_timeline_resource, &drm_syncobj_timeline_impl,
                                    syncobj_timeline, drm_syncobj_timeline_resource_destroy);
+
+    syncobj_timeline->remote =
+        wp_linux_drm_syncobj_manager_v1_import_timeline(syncobj_manager->remote, fd);
+    check_alloc(syncobj_timeline->remote);
 
     syncobj_timeline->resource = syncobj_timeline_resource;
     syncobj_timeline->fd = fd;
