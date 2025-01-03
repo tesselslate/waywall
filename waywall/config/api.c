@@ -425,18 +425,21 @@ l_image(lua_State *L) {
 
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
+        free(options.shader_name);
         return luaL_error(L, "failed to open PNG at '%s': %s", path, strerror(errno));
     }
 
     struct stat stat;
     if (fstat(fd, &stat) != 0) {
         close(fd);
+        free(options.shader_name);
         return luaL_error(L, "failed to stat PNG at '%s': %s", path, strerror(errno));
     }
 
     void *buf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (buf == MAP_FAILED) {
         close(fd);
+        free(options.shader_name);
         return luaL_error(L, "failed to mmap PNG at '%s': %s", path, strerror(errno));
     }
 

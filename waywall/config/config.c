@@ -686,9 +686,11 @@ process_config_shaders(struct config *cfg) {
         char *key = strdup(lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
         char *fragment = NULL, *vertex = NULL;
         if (get_string(cfg, "fragment", &fragment, "shaders[].fragment", false)) {
+            free(key);
             return 1;
         }
         if (get_string(cfg, "vertex", &vertex, "shaders[].vertex", false)) {
+            free(key);
             return 1;
         }
 
