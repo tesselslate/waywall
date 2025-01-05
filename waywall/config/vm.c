@@ -333,25 +333,22 @@ config_vm_resume(struct config_vm_waker *waker) {
 
 void
 config_vm_signal_event(struct config_vm *vm, const char *name) {
-    static const int IDX_TABLE = 1;
-    static const int IDX_FUNCTION = 2;
+    ssize_t stack_start = lua_gettop(vm->L);
 
-    ww_assert(lua_gettop(vm->L) == 0);
+    lua_pushlightuserdata(vm->L, (void *)&REG_KEYS.events); // stack: n+1
+    lua_rawget(vm->L, LUA_REGISTRYINDEX);                   // stack: n+1
 
-    lua_pushlightuserdata(vm->L, (void *)&REG_KEYS.events); // stack: 1
-    lua_rawget(vm->L, LUA_REGISTRYINDEX);                   // stack: 1 (IDX_TABLE)
-
-    lua_pushstring(vm->L, name);  // stack: 2
-    lua_rawget(vm->L, IDX_TABLE); // stack: 2 (IDX_FUNCTION)
-    ww_assert(lua_type(vm->L, IDX_FUNCTION) == LUA_TFUNCTION);
+    lua_pushstring(vm->L, name); // stack: n+2
+    lua_rawget(vm->L, -2);       // stack: n+2
+    ww_assert(lua_type(vm->L, -1) == LUA_TFUNCTION);
 
     if (config_vm_pcall(vm, 0, 0, 0) != 0) {
         ww_log(LOG_ERROR, "failed to signal event '%s': %s", name, lua_tostring(vm->L, -1));
-        lua_pop(vm->L, 1); // stack: 1
+        lua_pop(vm->L, 1); // stack: n+1
     }
 
-    lua_pop(vm->L, 1); // stack: 0
-    ww_assert(lua_gettop(vm->L) == 0);
+    lua_pop(vm->L, 1); // stack: n
+    ww_assert(lua_gettop(vm->L) == stack_start);
 }
 
 bool
