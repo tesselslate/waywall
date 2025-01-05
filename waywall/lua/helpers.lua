@@ -26,6 +26,63 @@ M.ingame_only = function(func)
     end
 end
 
+--- Creates a mirror which only appears when a specific resolution is in use.
+-- @param options The options to create the mirror with
+-- @param width The width of the desired resolution
+-- @param height The height of the desired resolution
+-- @return cancel A function to cancel the resolution listener for this mirror
+M.res_mirror = function(options, width, height)
+    local mirror = nil
+
+    return waywall.listen("resolution", function()
+        local active_width, active_height = waywall.active_res()
+
+        if active_width == width and active_height == height then
+            if mirror then
+                return
+            end
+
+            mirror = waywall.mirror(options)
+        else
+            if not mirror then
+                return
+            end
+
+            mirror:close()
+            mirror = nil
+        end
+    end)
+end
+
+--- Creates an image which only appears when a specific resolution is in use.
+-- @param path The path to the image
+-- @param options The options to create the image with
+-- @param width The width of the desired resolution
+-- @param height The height of the desired resolution
+-- @return cancel A function to cancel the resolution listener for this image
+M.res_image = function(path, options, width, height)
+    local image = nil
+
+    return waywall.listen("resolution", function()
+        local active_width, active_height = waywall.active_res()
+
+        if active_width == width and active_height == height then
+            if image then
+                return
+            end
+
+            image = waywall.image(path, options)
+        else
+            if not image then
+                return
+            end
+
+            image:close()
+            image = nil
+        end
+    end)
+end
+
 --- Toggles the visibility of floating windows.
 M.toggle_floating = function()
     waywall.show_floating(not waywall.floating_shown())
