@@ -645,6 +645,8 @@ l_set_resolution(lua_State *L) {
         return luaL_error(L, "cannot set resolution");
     }
 
+    config_vm_signal_event(vm, "resolution");
+
     // Epilogue
     return 0;
 }
