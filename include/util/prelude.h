@@ -19,7 +19,7 @@
 #define ww_assert(x)                                                                               \
     do {                                                                                           \
         if (__builtin_expect(!(bool)(x), 0)) {                                                     \
-            util_panic("assert failed: '" #x "'");                                                 \
+            util_panic("[%s:%d] assert failed: '" #x "'", __FILE__, __LINE__);                     \
         }                                                                                          \
     } while (0)
 #define ww_panic(fmt, ...) util_panic("[%s:%d] panic: " fmt, __FILE__, __LINE__, ##__VA_ARGS__)
