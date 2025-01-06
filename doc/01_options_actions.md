@@ -42,6 +42,22 @@ return config
 The full lists of keysyms, mouse buttons, and modifiers can be found in the
 [Lookup Tables] section.
 
+<div class="warning">
+
+An action will only trigger if your pressed modifiers exactly match those
+specified. For example, an action for `"T"` will only trigger if you press T
+while Shift, Control, etc. are not pressed.
+
+The `*` modifier acts as a wildcard, allowing the action to run while other
+modifier keys are pressed. An action for `"*-T"` will trigger if you press T,
+regardless of what modifier keys (Shift, Control, etc.) are pressed.
+
+This also works in combination with other modifiers: `"*-Shift-T"` will trigger
+as long as Shift is pressed, but other modifiers will not prevent the action
+from being run.
+
+</div>
+
 ### Input consumption
 
 By default, if waywall finds and runs an action, the input which triggered the
