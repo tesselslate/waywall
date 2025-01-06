@@ -237,8 +237,22 @@ draw_frame(struct scene *scene) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glViewport(0, 0, scene->ui->width, scene->ui->height);
 
+    GLuint capture_texture = server_gl_get_capture(scene->gl);
+    bool have_mirrors = (capture_texture != 0 && !wl_list_empty(&scene->mirrors));
+    bool have_images = !wl_list_empty(&scene->images);
+    bool have_text = (util_debug_enabled || !wl_list_empty(&scene->text));
+
+    if (!have_mirrors && !have_images && !have_text) {
+        scene->skipped_frames++;
+
+        if (scene->skipped_frames > 1) {
+            return;
+        }
+    } else {
+        scene->skipped_frames = 0;
+    }
+
     // Draw all mirrors using their respective shaders.
-    unsigned int capture_texture = server_gl_get_capture(scene->gl);
     if (capture_texture != 0) {
         int32_t width, height;
         server_gl_get_capture_size(scene->gl, &width, &height);

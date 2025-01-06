@@ -28,6 +28,8 @@ struct scene {
     struct wl_list mirrors; // scene_mirror.link
     struct wl_list text;    // scene_text.link
 
+    int skipped_frames;
+
     struct wl_listener on_gl_frame;
 };
 

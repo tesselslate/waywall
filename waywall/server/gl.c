@@ -181,28 +181,11 @@ static bool gl_checkerr(const char *msg);
 static void gl_buffer_destroy(struct gl_buffer *gl_buffer);
 static struct gl_buffer *gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer);
 
-static const struct wl_callback_listener frame_cb_listener;
-
-static void
-on_frame_cb_done(void *data, struct wl_callback *callback, uint32_t time) {
-    struct server_gl *gl = data;
-
-    wl_callback_destroy(callback);
-
-    gl->surface.frame_cb = wl_surface_frame(gl->surface.remote);
-    check_alloc(gl->surface.frame_cb);
-    wl_callback_add_listener(gl->surface.frame_cb, &frame_cb_listener, gl);
-
-    wl_signal_emit_mutable(&gl->events.frame, NULL);
-}
-
-static const struct wl_callback_listener frame_cb_listener = {
-    .done = on_frame_cb_done,
-};
-
 static void
 on_surface_commit(struct wl_listener *listener, void *data) {
     struct server_gl *gl = wl_container_of(listener, gl, on_surface_commit);
+
+    wl_signal_emit_mutable(&gl->events.frame, NULL);
 
     struct server_buffer *buffer = server_surface_next_buffer(gl->capture.surface);
     if (!buffer) {
@@ -606,10 +589,6 @@ server_gl_create(struct server *server) {
     check_alloc(gl->surface.subsurface);
     wl_subsurface_set_desync(gl->surface.subsurface);
 
-    gl->surface.frame_cb = wl_surface_frame(gl->surface.remote);
-    check_alloc(gl->surface.frame_cb);
-    wl_callback_add_listener(gl->surface.frame_cb, &frame_cb_listener, gl);
-
     // Use arbitrary sizes here since the main UI window has not yet been sized.
     gl->surface.window = wl_egl_window_create(gl->surface.remote, 1, 1);
     check_alloc(gl->surface.window);
@@ -643,7 +622,6 @@ server_gl_create(struct server *server) {
 
 fail_egl_surface:
     wl_egl_window_destroy(gl->surface.window);
-    wl_callback_destroy(gl->surface.frame_cb);
     wl_subsurface_destroy(gl->surface.subsurface);
     wl_surface_destroy(gl->surface.remote);
 
@@ -687,10 +665,6 @@ server_gl_destroy(struct server_gl *gl) {
     wl_egl_window_destroy(gl->surface.window);
     wl_subsurface_destroy(gl->surface.subsurface);
     wl_surface_destroy(gl->surface.remote);
-
-    if (gl->surface.frame_cb) {
-        wl_callback_destroy(gl->surface.frame_cb);
-    }
 
     // Destroy EGL resources.
     eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);

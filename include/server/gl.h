@@ -42,8 +42,6 @@ struct server_gl {
         struct wl_subsurface *subsurface;
         struct wl_egl_window *window;
         EGLSurface egl;
-
-        struct wl_callback *frame_cb;
     } surface;
 
     struct {
