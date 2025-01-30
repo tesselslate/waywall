@@ -31,6 +31,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <xkbcommon/xkbcommon.h>
+#include "xdg-shell-client-protocol.h"
 
 /*
  * Lua interop code can be a bit obtuse due to working with the stack. The code in this file follows
@@ -930,6 +931,25 @@ l_setenv(lua_State *L) {
     return 0;
 }
 
+static bool IS_FULLSCREEN = false;
+
+static int l_toggle_fullscreen(lua_State *L) {
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("toggle_res"));
+    }
+
+    if (IS_FULLSCREEN) {
+        xdg_toplevel_unset_fullscreen(wrap->server->ui->xdg_toplevel);
+
+    } else {
+        xdg_toplevel_set_fullscreen(wrap->server->ui->xdg_toplevel, NULL);
+    }
+    IS_FULLSCREEN = !IS_FULLSCREEN;
+    return 0;
+}
+
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_res", l_active_res},
@@ -947,6 +967,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"sleep", l_sleep},
     {"state", l_state},
     {"text", l_text},
+    {"toggle_fullscreen", l_toggle_fullscreen},
 
     // private (see init.lua)
     {"log", l_log},
