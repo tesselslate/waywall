@@ -18,6 +18,7 @@ struct wrap {
     struct ww_timer *timer;
 
     int32_t width, height;
+    bool is_fullscreen;
 
     struct server_view *view;
     struct instance *instance;
@@ -58,5 +59,6 @@ void wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]);
 void wrap_lua_press_key(struct wrap *wrap, uint32_t keycode);
 int wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height);
 void wrap_lua_show_floating(struct wrap *wrap, bool show);
+void wrap_lua_toggle_fullscreen(struct wrap *wrap);
 
 #endif

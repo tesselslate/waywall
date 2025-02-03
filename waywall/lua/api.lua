@@ -141,7 +141,7 @@ M.state = priv.state
 -- @return text The text object.
 M.text = priv.text
 
----- Toggle the Waywall window between fullscreen and not
+--- Toggle the Waywall window between fullscreen and not
 M.toggle_fullscreen = priv.toggle_fullscreen
 
 package.loaded["waywall"] = M

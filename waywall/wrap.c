@@ -18,6 +18,7 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "xdg-shell-client-protocol.h"
 #include <linux/input-event-codes.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -683,4 +684,15 @@ wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height) {
 void
 wrap_lua_show_floating(struct wrap *wrap, bool show) {
     floating_set_visible(wrap, show);
+}
+
+void
+wrap_lua_toggle_fullscreen(struct wrap *wrap) {
+    if (wrap->is_fullscreen) {
+        xdg_toplevel_unset_fullscreen(wrap->server->ui->xdg_toplevel);
+
+    } else {
+        xdg_toplevel_set_fullscreen(wrap->server->ui->xdg_toplevel, NULL);
+    }
+    wrap->is_fullscreen = !wrap->is_fullscreen;
 }
