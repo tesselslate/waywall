@@ -930,6 +930,18 @@ l_setenv(lua_State *L) {
     return 0;
 }
 
+static int
+l_toggle_fullscreen(lua_State *L) {
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("toggle_fullscreen"));
+    }
+
+    wrap_lua_toggle_fullscreen(wrap);
+    return 0;
+}
+
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_res", l_active_res},
@@ -947,6 +959,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"sleep", l_sleep},
     {"state", l_state},
     {"text", l_text},
+    {"toggle_fullscreen", l_toggle_fullscreen},
 
     // private (see init.lua)
     {"log", l_log},
