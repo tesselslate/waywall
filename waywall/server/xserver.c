@@ -231,7 +231,11 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     // Set stdout and stderr to go to the Xwayland log file. Keep a CLOEXEC backup of stderr in case
     // we need to print an error.
     int stderr_backup = dup(STDERR_FILENO);
-    set_cloexec(stderr_backup, true);
+    if (stderr_backup == -1) {
+        ww_log_errno(LOG_ERROR, "failed to backup Xwayland stderr fd");
+    } else {
+        set_cloexec(stderr_backup, true);
+    }
 
     if (dup2(log_fd, STDOUT_FILENO) == -1) {
         ww_log_errno(LOG_ERROR, "failed to dup log_fd to stdout");
@@ -245,9 +249,11 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     execvp(argv[0], argv);
 
     // Restore stderr to print the error message.
-    dup2(stderr_backup, STDERR_FILENO);
-    ww_log_errno(LOG_ERROR, "failed to exec Xwayland");
-    close(log_fd);
+    if (stderr_backup != -1) {
+        dup2(stderr_backup, STDERR_FILENO);
+        ww_log_errno(LOG_ERROR, "failed to exec Xwayland");
+        close(log_fd);
+    }
 }
 
 static int
