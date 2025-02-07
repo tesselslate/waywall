@@ -33,7 +33,7 @@ struct server_ui {
     struct zxdg_toplevel_decoration_v1 *xdg_decoration;
 
     int32_t width, height;
-    bool mapped, resize;
+    bool mapped, resize, fullscreen;
 
     struct wl_list views; // server_view.link
 
@@ -99,6 +99,7 @@ struct server_view_impl {
 struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
+void server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen);
 void server_ui_show(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 

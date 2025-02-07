@@ -38,6 +38,8 @@ extern struct util_debug {
 
     struct {
         int32_t width, height;
+
+        bool fullscreen;
     } ui;
 } util_debug_data;
 

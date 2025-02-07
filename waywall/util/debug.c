@@ -43,8 +43,9 @@ dbg_pointer() {
 static void
 dbg_ui() {
     fprintf(debug_file, "ui:\n");
-    fprintf(debug_file, "  width:  %" PRIi32 "\n", util_debug_data.ui.width);
-    fprintf(debug_file, "  height: %" PRIi32 "\n", util_debug_data.ui.height);
+    fprintf(debug_file, "  width:      %" PRIi32 "\n", util_debug_data.ui.width);
+    fprintf(debug_file, "  height:     %" PRIi32 "\n", util_debug_data.ui.height);
+    fprintf(debug_file, "  fullscreen: %s\n", util_debug_data.ui.fullscreen ? "yes" : "no");
 }
 
 bool

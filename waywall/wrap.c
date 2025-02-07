@@ -688,11 +688,5 @@ wrap_lua_show_floating(struct wrap *wrap, bool show) {
 
 void
 wrap_lua_toggle_fullscreen(struct wrap *wrap) {
-    if (wrap->is_fullscreen) {
-        xdg_toplevel_unset_fullscreen(wrap->server->ui->xdg_toplevel);
-
-    } else {
-        xdg_toplevel_set_fullscreen(wrap->server->ui->xdg_toplevel, NULL);
-    }
-    wrap->is_fullscreen = !wrap->is_fullscreen;
+    server_ui_set_fullscreen(wrap->server->ui, !wrap->server->ui->fullscreen);
 }

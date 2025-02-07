@@ -107,6 +107,18 @@ on_xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
     }
 
     ui->resize = true;
+
+    bool fullscreen = false;
+
+    uint32_t *state;
+    wl_array_for_each(state, states) {
+        if (*state == XDG_TOPLEVEL_STATE_FULLSCREEN) {
+            fullscreen = true;
+        }
+    }
+
+    ui->fullscreen = fullscreen;
+    WW_DEBUG(ui.fullscreen, fullscreen);
 }
 
 static void
@@ -298,6 +310,22 @@ server_ui_hide(struct server_ui *ui) {
 
     ui->mapped = false;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
+}
+
+void
+server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen) {
+    if (ui->fullscreen == fullscreen) {
+        return;
+    }
+
+    if (fullscreen) {
+        xdg_toplevel_set_fullscreen(ui->xdg_toplevel, NULL);
+    } else {
+        xdg_toplevel_unset_fullscreen(ui->xdg_toplevel);
+    }
+
+    ui->fullscreen = fullscreen;
+    WW_DEBUG(ui.fullscreen, fullscreen);
 }
 
 void
