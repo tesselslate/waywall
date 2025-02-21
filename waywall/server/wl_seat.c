@@ -452,12 +452,13 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         xwl_notify_key(seat->server->xwayland, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
     }
 
-    if (try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED)) {
-        return;
-    }
+    bool remapped = try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 
-    bool modifiers_updated = modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
-    WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
+    bool modifiers_updated = false;
+    if (!remapped) {
+        modifiers_updated = modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
+    }
 
     if (seat->listener) {
         const xkb_keysym_t *syms;
@@ -477,10 +478,12 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         }
     }
 
-    if (modifiers_updated) {
-        send_keyboard_modifiers(seat);
+    if (!remapped) {
+        if (modifiers_updated) {
+            send_keyboard_modifiers(seat);
+        }
+        send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
     }
-    send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
 }
 
 static void
