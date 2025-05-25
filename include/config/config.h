@@ -39,6 +39,7 @@ struct config {
     } input;
     struct {
         uint8_t background[4];
+        char *background_path;
         char *cursor_theme;
         char *cursor_icon;
         int cursor_size;
