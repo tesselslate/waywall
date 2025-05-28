@@ -86,6 +86,8 @@ expand(struct remote_buffer_manager *manager, size_t min) {
     }
     manager->data = new_data;
 
+    wl_shm_pool_resize(manager->pool, manager->size);
+
     return 0;
 
 fail_mmap:
