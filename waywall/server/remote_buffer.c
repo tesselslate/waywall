@@ -161,14 +161,14 @@ load_png_from_file(const char *path, int32_t *width, int32_t *height) {
     int ret = spng_set_png_file(ctx, file);
     if (ret) {
         ww_log(LOG_ERROR, "failed to set PNG file: %s", spng_strerror(ret));
-        goto cleanup;
+        goto fail_png;
     }
 
     struct spng_ihdr ihdr;
     ret = spng_get_ihdr(ctx, &ihdr);
     if (ret) {
         ww_log(LOG_ERROR, "failed to get PNG header: %s", spng_strerror(ret));
-        goto cleanup;
+        goto fail_png;
     }
 
     *width = ihdr.width;
@@ -178,13 +178,13 @@ load_png_from_file(const char *path, int32_t *width, int32_t *height) {
     ret = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &image_size);
     if (ret) {
         ww_log(LOG_ERROR, "failed to get decoded image size: %s", spng_strerror(ret));
-        goto cleanup;
+        goto fail_png;
     }
 
     image_data = malloc(image_size);
     if (!image_data) {
         ww_log(LOG_ERROR, "failed to allocate memory for PNG data");
-        goto cleanup;
+        goto fail_png;
     }
 
     ret = spng_decode_image(ctx, image_data, image_size, SPNG_FMT_RGBA8, 0);
@@ -194,59 +194,9 @@ load_png_from_file(const char *path, int32_t *width, int32_t *height) {
         image_data = NULL;
     }
 
-cleanup:
+fail_png:
     spng_ctx_free(ctx);
     fclose(file);
-    return image_data;
-}
-
-static uint8_t *
-load_png_from_memory(const uint8_t *png_data, size_t data_size, int32_t *width, int32_t *height) {
-    spng_ctx *ctx = spng_ctx_new(0);
-    if (!ctx) {
-        ww_log(LOG_ERROR, "failed to create spng context");
-        return NULL;
-    }
-
-    uint8_t *image_data = NULL;
-    int ret = spng_set_png_buffer(ctx, png_data, data_size);
-    if (ret) {
-        ww_log(LOG_ERROR, "failed to set PNG buffer: %s", spng_strerror(ret));
-        goto cleanup;
-    }
-
-    struct spng_ihdr ihdr;
-    ret = spng_get_ihdr(ctx, &ihdr);
-    if (ret) {
-        ww_log(LOG_ERROR, "failed to get PNG header: %s", spng_strerror(ret));
-        goto cleanup;
-    }
-
-    *width = ihdr.width;
-    *height = ihdr.height;
-
-    size_t image_size;
-    ret = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &image_size);
-    if (ret) {
-        ww_log(LOG_ERROR, "failed to get decoded image size: %s", spng_strerror(ret));
-        goto cleanup;
-    }
-
-    image_data = malloc(image_size);
-    if (!image_data) {
-        ww_log(LOG_ERROR, "failed to allocate memory for PNG data");
-        goto cleanup;
-    }
-
-    ret = spng_decode_image(ctx, image_data, image_size, SPNG_FMT_RGBA8, 0);
-    if (ret) {
-        ww_log(LOG_ERROR, "failed to decode PNG image: %s", spng_strerror(ret));
-        free(image_data);
-        image_data = NULL;
-    }
-
-cleanup:
-    spng_ctx_free(ctx);
     return image_data;
 }
 
@@ -389,40 +339,6 @@ remote_buffer_manager_png(struct remote_buffer_manager *manager, const char *png
 
     memcpy(manager->data + img->slot.offset, png_data, image_size);
     free(png_data);
-
-    manager->ptr = new_ptr;
-    wl_list_insert(&manager->image_buffers, &img->link);
-
-    return make_image_buffer(manager, img);
-}
-
-struct wl_buffer *
-remote_buffer_manager_png_data(struct remote_buffer_manager *manager, 
-                              const uint8_t *png_data, size_t data_size) {
-    int32_t width, height;
-    uint8_t *image_data = load_png_from_memory(png_data, data_size, &width, &height);
-    if (!image_data) {
-        return NULL;
-    }
-
-    convert_rgba_to_argb(image_data, width * height);
-
-    size_t image_size = width * height * 4;
-    size_t new_ptr = manager->ptr + image_size;
-    
-    if (expand(manager, new_ptr) != 0) {
-        free(image_data);
-        return NULL;
-    }
-
-    struct image_buffer *img = zalloc(1, sizeof(*img));
-    img->width = width;
-    img->height = height;
-    img->slot.rc = 1;
-    img->slot.offset = manager->ptr;
-
-    memcpy(manager->data + img->slot.offset, image_data, image_size);
-    free(image_data);
 
     manager->ptr = new_ptr;
     wl_list_insert(&manager->image_buffers, &img->link);

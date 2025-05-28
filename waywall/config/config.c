@@ -164,6 +164,10 @@ get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bo
     return 0;
 }
 
+/*
+ * Puts the string in the Lua config[key] into *dst, freeing the previous value of *dst.
+ * Returns 0 iff config[key] is a string (or nil and !required. In this case *dst is unchanged). 
+ */
 static int
 get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
     lua_pushstring(cfg->vm->L, key); // stack: n+1
