@@ -551,6 +551,48 @@ l_press_key(lua_State *L) {
 }
 
 static int
+l_get_key(lua_State *L) {
+    static const int ARG_KEYNAME = 1;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("get_key"));
+    }
+
+    const char *key = luaL_checkstring(L, ARG_KEYNAME);
+
+    lua_settop(L, 0);
+
+    // Body
+    uint32_t keycode = KEY_UNKNOWN;
+    for (size_t i = 0; i < STATIC_ARRLEN(util_keycodes); i++) {
+        if (strcasecmp(util_keycodes[i].name, key) == 0) {
+            keycode = util_keycodes[i].value;
+            break;
+        }
+    }
+    if (keycode == KEY_UNKNOWN) {
+        return luaL_error(L, "unknown key %s", key);
+    }
+
+    bool found = false;
+    for (ssize_t i = 0; i < wrap->server->seat->keyboard.pressed.len; i++) {
+        if (wrap->server->seat->keyboard.pressed.data[i] != keycode) {
+            continue;
+        }
+
+        found = true;
+        break;
+    }
+
+    // Epilogue
+    lua_pushboolean(L, found);
+    return 1;
+}
+
+static int
 l_profile(lua_State *L) {
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -951,6 +993,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"image", l_image},
     {"mirror", l_mirror},
     {"press_key", l_press_key},
+    {"get_key", l_get_key},
     {"profile", l_profile},
     {"set_keymap", l_set_keymap},
     {"set_resolution", l_set_resolution},
