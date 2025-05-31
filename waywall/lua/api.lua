@@ -96,6 +96,11 @@ M.mirror = priv.mirror
 -- @param key The name of the key to press.
 M.press_key = priv.press_key
 
+--- Returns the current state of a key on the keyboard. 
+-- @param key The name of the key to press.
+-- @return pressed (boolean) Whether the key is currently pressed.
+M.get_key = priv.get_key
+
 --- Get the name of the current profile.
 -- @return The current profile, or nil if the default profile is active.
 M.profile = priv.profile
