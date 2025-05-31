@@ -373,7 +373,13 @@ struct server_ui_config *
 server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     struct server_ui_config *config = zalloc(1, sizeof(*config));
 
-    config->background = remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
+    if (strcmp(cfg->theme.background_path, "") != 0) {
+        config->background =
+            remote_buffer_manager_png(ui->server->remote_buf, cfg->theme.background_path);
+    } else {
+        config->background =
+            remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
+    }
     if (!config->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
         free(config);

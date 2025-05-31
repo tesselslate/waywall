@@ -9,6 +9,7 @@ appearance of waywall.
 local config = {
     theme = {
         background = "#000000ff",
+        background_png = "",
 
         cursor_theme = "",
         cursor_icon = "",
@@ -24,13 +25,15 @@ return config
 
 ## Background
 
-The `background` option determines the color of the background of the waywall
-window. The background is only visible while the Minecraft window does not
-occupy the entire waywall window (e.g. while using Thin BT or boat eye.)
+The `background` or `background_png` option determines the background of the 
+waywall window. `background_png` specifies the path to a PNG file, otherwise 
+`background` determines the solid color background. The background is only 
+visible while the Minecraft window does not occupy the entire waywall window 
+(e.g. while using Thin BT or boat eye.)
 
-You may specify either an RGB or RGBA hex color. Different compositors may
-handle non-opaque background colors differently, and non-opaque colors may
-not appear correctly if waywall is fullscreened.
+For `background`, you may specify either an RGB or RGBA hex color. Different 
+compositors may handle non-opaque background colors differently, and non-opaque
+colors may not appear correctly if waywall is fullscreened.
 
 ## Cursor theme
 

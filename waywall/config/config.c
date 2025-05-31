@@ -45,6 +45,7 @@ static const struct config defaults = {
     .theme =
         {
             .background = {0, 0, 0, 255},
+            .background_path = "",
             .cursor_theme = "",
             .cursor_icon = "",
             .cursor_size = 0,
@@ -163,6 +164,10 @@ get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bo
     return 0;
 }
 
+/*
+ * Puts the string in the Lua config[key] into *dst, freeing the previous value of *dst.
+ * Returns 0 iff config[key] is a string (or nil and !required. In this case *dst is unchanged).
+ */
 static int
 get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
     lua_pushstring(cfg->vm->L, key); // stack: n+1
@@ -604,6 +609,11 @@ process_config_theme(struct config *cfg) {
         free(raw_background);
     }
 
+    if (get_string(cfg, "background_png", &cfg->theme.background_path, "theme.background_png",
+                   false) != 0) {
+        return 1;
+    }
+
     if (get_string(cfg, "cursor_theme", &cfg->theme.cursor_theme, "theme.cursor_theme", false) !=
         0) {
         return 1;
@@ -798,6 +808,7 @@ config_create() {
         {&cfg->input.keymap.rules, "input.rules"},
         {&cfg->input.keymap.variant, "input.variant"},
         {&cfg->input.keymap.options, "input.options"},
+        {&cfg->theme.background_path, "theme.background_png"},
         {&cfg->theme.cursor_theme, "theme.cursor_theme"},
         {&cfg->theme.cursor_icon, "theme.cursor_icon"},
     };
@@ -827,6 +838,7 @@ config_destroy(struct config *cfg) {
     free(cfg->input.keymap.rules);
     free(cfg->input.keymap.variant);
     free(cfg->input.keymap.options);
+    free(cfg->theme.background_path);
     free(cfg->theme.cursor_theme);
     free(cfg->theme.cursor_icon);
 
