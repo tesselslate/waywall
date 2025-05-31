@@ -550,7 +550,6 @@ l_press_key(lua_State *L) {
     return 0;
 }
 
-
 static int
 l_get_key(lua_State *L) {
     static const int ARG_KEYNAME = 1;
@@ -559,7 +558,7 @@ l_get_key(lua_State *L) {
     struct config_vm *vm = config_vm_from(L);
     struct wrap *wrap = config_vm_get_wrap(vm);
     if (!wrap) {
-        return luaL_error(L, STARTUP_ERRMSG("getkey"));
+        return luaL_error(L, STARTUP_ERRMSG("get_key"));
     }
 
     const char *key = luaL_checkstring(L, ARG_KEYNAME);
