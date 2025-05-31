@@ -166,7 +166,7 @@ get_int(struct config *cfg, const char *key, int *dst, const char *full_name, bo
 
 /*
  * Puts the string in the Lua config[key] into *dst, freeing the previous value of *dst.
- * Returns 0 iff config[key] is a string (or nil and !required. In this case *dst is unchanged). 
+ * Returns 0 iff config[key] is a string (or nil and !required. In this case *dst is unchanged).
  */
 static int
 get_string(struct config *cfg, const char *key, char **dst, const char *full_name, bool required) {
@@ -609,8 +609,8 @@ process_config_theme(struct config *cfg) {
         free(raw_background);
     }
 
-    if (get_string(cfg, "background_png", &cfg->theme.background_path, "theme.background_png", false) 
-        != 0) {
+    if (get_string(cfg, "background_png", &cfg->theme.background_path, "theme.background_png",
+                   false) != 0) {
         return 1;
     }
 

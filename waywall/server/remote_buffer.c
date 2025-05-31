@@ -6,16 +6,16 @@
 #include "util/prelude.h"
 #include "util/syscall.h"
 #include <linux/memfd.h>
+#include <spng.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <wayland-client-protocol.h>
-#include <stdio.h>
-#include <spng.h>
 
 #define COLOR_POOL_SIZE 64
 #define POOL_INITIAL_SIZE 16384
@@ -42,8 +42,8 @@ struct color_result {
 
 struct image_buffer {
     struct wl_list link; // remote_buffer_manager.image_buffers
-    
-    struct slot slot;  // Contains offset and rc
+
+    struct slot slot; // Contains offset and rc
     int32_t width, height;
 };
 
@@ -134,9 +134,9 @@ make_color_buffer(struct remote_buffer_manager *manager, struct slot *slot) {
 
 static struct wl_buffer *
 make_image_buffer(struct remote_buffer_manager *manager, struct image_buffer *img) {
-    struct wl_buffer *buffer = wl_shm_pool_create_buffer(manager->pool, img->slot.offset, 
-                                                        img->width, img->height, 
-                                                        img->width * 4, WL_SHM_FORMAT_ARGB8888);
+    struct wl_buffer *buffer =
+        wl_shm_pool_create_buffer(manager->pool, img->slot.offset, img->width, img->height,
+                                  img->width * 4, WL_SHM_FORMAT_ARGB8888);
     check_alloc(buffer);
     wl_buffer_set_user_data(buffer, &img->slot);
     return buffer;
@@ -207,7 +207,7 @@ convert_rgba_to_argb(uint8_t *data, size_t pixel_count) {
         uint8_t g = data[i * 4 + 1];
         uint8_t b = data[i * 4 + 2];
         uint8_t a = data[i * 4 + 3];
-        
+
         data[i * 4 + 0] = b;
         data[i * 4 + 1] = g;
         data[i * 4 + 2] = r;
@@ -325,7 +325,7 @@ remote_buffer_manager_png(struct remote_buffer_manager *manager, const char *png
 
     size_t image_size = width * height * 4;
     size_t new_ptr = manager->ptr + image_size;
-    
+
     if (expand(manager, new_ptr) != 0) {
         free(png_data);
         return NULL;
