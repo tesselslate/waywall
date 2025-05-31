@@ -24,6 +24,7 @@
     - [current_time](02_waywall_current_time.md)
     - [exec](02_waywall_exec.md)
     - [floating_shown](02_waywall_floating_shown.md)
+    - [get_key](02_waywall_get_key.md)
     - [image](02_waywall_image.md)
     - [listen](02_waywall_listen.md)
     - [mirror](02_waywall_mirror.md)
