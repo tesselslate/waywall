@@ -22,7 +22,6 @@ struct server {
 
     struct server_compositor *compositor;
     struct server_data_device_manager *data_device_manager;
-    struct server_drm *drm;
     struct server_drm_syncobj_manager *drm_syncobj;
     struct server_linux_dmabuf *linux_dmabuf;
     struct server_output *output;

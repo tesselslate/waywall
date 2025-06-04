@@ -38,10 +38,6 @@ struct server_backend {
     struct wp_linux_drm_syncobj_manager_v1 *linux_drm_syncobj_manager;
     struct wp_tearing_control_manager_v1 *tearing_control;
     struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
-    struct {
-        uint32_t name;
-        bool found;
-    } drm;
 
     struct {
         struct wl_signal seat_data_device; // data: NULL

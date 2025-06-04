@@ -9,7 +9,6 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "viewporter-client-protocol.h"
-#include "wayland-drm-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
 #include <stdbool.h>
@@ -22,7 +21,6 @@
 #define USE_COMPOSITOR_VERSION 5
 #define USE_CURSOR_SHAPE_VERSION 1
 #define USE_DATA_DEVICE_MANAGER_VERSION 2
-#define USE_DRM_VERSION 2
 #define USE_LINUX_DMABUF_VERSION 4
 #define USE_LINUX_DRM_SYNCOBJ_VERSION 1
 #define USE_POINTER_CONSTRAINTS_VERSION 1
@@ -169,15 +167,6 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->linux_drm_syncobj_manager = wl_registry_bind(
             wl, name, &wp_linux_drm_syncobj_manager_v1_interface, USE_LINUX_DRM_SYNCOBJ_VERSION);
         check_alloc(backend->linux_drm_syncobj_manager);
-    } else if (strcmp(iface, wl_drm_interface.name) == 0) {
-        if (version < USE_DRM_VERSION) {
-            ww_log(LOG_WARN, "host compositor provides outdated wl_drm (%d < %d)", version,
-                   USE_DRM_VERSION);
-            return;
-        }
-
-        backend->drm.name = name;
-        backend->drm.found = true;
     } else if (strcmp(iface, zwp_pointer_constraints_v1_interface.name) == 0) {
         if (version < USE_POINTER_CONSTRAINTS_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated zwp_pointer_constraints (%d < %d)",
@@ -366,9 +355,6 @@ server_backend_create() {
     }
     if (!backend->xdg_decoration_manager) {
         ww_log(LOG_WARN, "host compositor does not provide zxdg_decoration_manager");
-    }
-    if (!backend->drm.found) {
-        ww_log(LOG_WARN, "host compositor does not provide wl_drm");
     }
 
     return backend;

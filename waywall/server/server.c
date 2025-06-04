@@ -6,7 +6,6 @@
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_data_device_manager.h"
-#include "server/wl_drm.h"
 #include "server/wl_output.h"
 #include "server/wl_seat.h"
 #include "server/wl_shm.h"
@@ -226,12 +225,6 @@ server_create(struct config *cfg) {
         goto fail_globals;
     }
 
-    if (server->backend->drm.found) {
-        server->drm = server_drm_create(server);
-        if (!server->drm) {
-            goto fail_globals;
-        }
-    }
     if (server->backend->linux_drm_syncobj_manager) {
         server->drm_syncobj = server_drm_syncobj_manager_create(server);
         if (!server->drm_syncobj) {

@@ -16,7 +16,6 @@ waywall_src = files(
   'server/ui.c',
   'server/wl_compositor.c',
   'server/wl_data_device_manager.c',
-  'server/wl_drm.c',
   'server/wl_output.c',
   'server/wl_seat.c',
   'server/wl_shm.c',
