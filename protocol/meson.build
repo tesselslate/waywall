@@ -8,9 +8,6 @@ protocol_headers = []
 protocol_sources = []
 
 protocol_xmls = [
-  # mesa
-  'wayland-drm.xml',
-
   # standardized protocols (available from wayland-protocols)
   wp_dir + 'stable/linux-dmabuf/linux-dmabuf-v1.xml',
   wp_dir + 'stable/viewporter/viewporter.xml',
