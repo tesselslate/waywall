@@ -25,6 +25,19 @@ should_watch(const char *name) {
 }
 
 static void
+try_reload(struct reload *rl) {
+    struct config *cfg = config_create();
+    if (config_load(cfg, rl->profile) != 0) {
+        ww_log(LOG_ERROR, "failed to load new config");
+        config_destroy(cfg);
+        return;
+    }
+
+    rl->func(cfg, rl->data);
+    ww_log(LOG_INFO, "configuration reloaded");
+}
+
+static void
 handle_config_dir(int wd, uint32_t mask, const char *name, void *data) {
     struct reload *rl = data;
 
@@ -40,7 +53,7 @@ handle_config_dir(int wd, uint32_t mask, const char *name, void *data) {
         return;
     }
 
-    if (mask & IN_CREATE) {
+    if (mask & IN_CREATE || mask & IN_MOVED_TO) {
         if (should_watch(name)) {
             add_config_watch(rl, name);
         }
@@ -54,16 +67,10 @@ handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
     // The file is gone and this watch descriptor should be removed from the list.
     if (mask & IN_IGNORED) {
         rm_config_watch(rl, wd);
+        ww_log(LOG_INFO, "removed watch %d", wd);
     }
 
-    struct config *cfg = config_create();
-    if (config_load(cfg, rl->profile) != 0) {
-        ww_log(LOG_ERROR, "failed to load new config");
-        config_destroy(cfg);
-        return;
-    }
-
-    rl->func(cfg, rl->data);
+    try_reload(rl);
 }
 
 static int
@@ -72,13 +79,16 @@ add_config_watch(struct reload *rl, const char *name) {
     str_append(&path, rl->config_path);
     str_append(&path, name);
 
-    int wd = inotify_subscribe(rl->inotify, path, IN_CLOSE_WRITE, handle_config_file, rl);
+    int wd = inotify_subscribe(rl->inotify, path, IN_CLOSE_WRITE | IN_MASK_CREATE,
+                               handle_config_file, rl);
     if (wd == -1) {
         ww_log(LOG_ERROR, "failed to watch config file '%s'", path);
         str_free(path);
         return 1;
     }
     str_free(path);
+
+    ww_log(LOG_INFO, "added watch for %s (%d)", name, wd);
 
     list_int_append(&rl->config_wd, wd);
     return 0;
@@ -125,9 +135,9 @@ reload_create(struct inotify *inotify, const char *profile, reload_func_t callba
         str_append(&rl->config_path, "/.config/waywall/");
     }
 
-    rl->config_dir_wd =
-        inotify_subscribe(rl->inotify, rl->config_path, IN_CREATE | IN_DELETE_SELF | IN_MOVE_SELF,
-                          handle_config_dir, rl);
+    rl->config_dir_wd = inotify_subscribe(rl->inotify, rl->config_path,
+                                          IN_CREATE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_TO,
+                                          handle_config_dir, rl);
     if (rl->config_dir_wd == -1) {
         ww_log(LOG_ERROR, "failed to watch config dir");
         goto fail_watchdir;
