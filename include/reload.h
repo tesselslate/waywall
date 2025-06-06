@@ -23,5 +23,6 @@ struct reload {
 struct reload *reload_create(struct inotify *inotify, const char *profile, reload_func_t callback,
                              void *data);
 void reload_destroy(struct reload *rl);
+void reload_disable(struct reload *rl);
 
 #endif

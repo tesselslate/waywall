@@ -30,7 +30,13 @@ handle_config_dir(int wd, uint32_t mask, const char *name, void *data) {
 
     if (mask & IN_DELETE_SELF) {
         ww_log(LOG_WARN, "config directory was deleted - automatic reloads will no longer occur");
-        inotify_unsubscribe(rl->inotify, wd);
+        reload_disable(rl);
+        return;
+    }
+
+    if (mask & IN_MOVE_SELF) {
+        ww_log(LOG_WARN, "config directory was moved - automatic reloads will no longer occur");
+        reload_disable(rl);
         return;
     }
 
@@ -119,8 +125,9 @@ reload_create(struct inotify *inotify, const char *profile, reload_func_t callba
         str_append(&rl->config_path, "/.config/waywall/");
     }
 
-    rl->config_dir_wd = inotify_subscribe(rl->inotify, rl->config_path, IN_CREATE | IN_DELETE_SELF,
-                                          handle_config_dir, rl);
+    rl->config_dir_wd =
+        inotify_subscribe(rl->inotify, rl->config_path, IN_CREATE | IN_DELETE_SELF | IN_MOVE_SELF,
+                          handle_config_dir, rl);
     if (rl->config_dir_wd == -1) {
         ww_log(LOG_ERROR, "failed to watch config dir");
         goto fail_watchdir;
@@ -168,10 +175,22 @@ fail_path:
 
 void
 reload_destroy(struct reload *rl) {
-    for (ssize_t i = 0; i < rl->config_wd.len; i++) {
-        inotify_unsubscribe(rl->inotify, rl->config_wd.data[i]);
+    if (rl->config_dir_wd != -1) {
+        reload_disable(rl);
     }
     list_int_destroy(&rl->config_wd);
     str_free(rl->config_path);
     free(rl);
+}
+
+void
+reload_disable(struct reload *rl) {
+    ww_assert(rl->config_dir_wd != -1);
+
+    for (ssize_t i = 0; i < rl->config_wd.len; i++) {
+        inotify_unsubscribe(rl->inotify, rl->config_wd.data[i]);
+    }
+
+    inotify_unsubscribe(rl->inotify, rl->config_dir_wd);
+    rl->config_dir_wd = -1;
 }
