@@ -11,22 +11,43 @@
 #include <string.h>
 #include <sys/inotify.h>
 
+static int add_config_watch(struct reload *rl, const char *name);
+static void rm_config_watch(struct reload *rl, int wd);
+
+static bool
+should_watch(const char *name) {
+    if (name[0] == '.') {
+        return false;
+    }
+
+    const char *ext = strrchr(name, '.');
+    return ext && strcmp(ext, ".lua") == 0;
+}
+
+static void
+handle_config_dir(int wd, uint32_t mask, const char *name, void *data) {
+    struct reload *rl = data;
+
+    if (mask & IN_DELETE_SELF) {
+        ww_log(LOG_WARN, "config directory was deleted - automatic reloads will no longer occur");
+        inotify_unsubscribe(rl->inotify, wd);
+        return;
+    }
+
+    if (mask & IN_CREATE) {
+        if (should_watch(name)) {
+            add_config_watch(rl, name);
+        }
+    }
+}
+
 static void
 handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
     struct reload *rl = data;
 
     // The file is gone and this watch descriptor should be removed from the list.
     if (mask & IN_IGNORED) {
-        for (ssize_t i = 0; i < rl->config_wd.len; i++) {
-            if (rl->config_wd.data[i] != wd) {
-                continue;
-            }
-
-            list_int_remove(&rl->config_wd, i);
-            return;
-        }
-
-        ww_panic("watch descriptor not present in array");
+        rm_config_watch(rl, wd);
     }
 
     struct config *cfg = config_create();
@@ -64,35 +85,11 @@ rm_config_watch(struct reload *rl, int wd) {
             continue;
         }
 
-        inotify_unsubscribe(rl->inotify, wd);
         list_int_remove(&rl->config_wd, i);
         return;
     }
 
     ww_panic("received unknown config watch wd");
-}
-
-static void
-handle_config_dir(int wd, uint32_t mask, const char *name, void *data) {
-    struct reload *rl = data;
-
-    if (mask & IN_DELETE_SELF) {
-        ww_log(LOG_WARN, "config directory was deleted - automatic reloads will no longer occur");
-        inotify_unsubscribe(rl->inotify, wd);
-        return;
-    }
-
-    // Ignore files that aren't Lua.
-    const char *ext = strrchr(name, '.');
-    if (!ext || strcmp(ext, ".lua") != 0) {
-        return;
-    }
-
-    if (mask & IN_CREATE) {
-        add_config_watch(rl, name);
-    } else if (mask & IN_DELETE) {
-        rm_config_watch(rl, wd);
-    }
 }
 
 struct reload *
@@ -122,9 +119,8 @@ reload_create(struct inotify *inotify, const char *profile, reload_func_t callba
         str_append(&rl->config_path, "/.config/waywall/");
     }
 
-    rl->config_dir_wd =
-        inotify_subscribe(rl->inotify, rl->config_path, IN_CREATE | IN_DELETE | IN_DELETE_SELF,
-                          handle_config_dir, rl);
+    rl->config_dir_wd = inotify_subscribe(rl->inotify, rl->config_path, IN_CREATE | IN_DELETE_SELF,
+                                          handle_config_dir, rl);
     if (rl->config_dir_wd == -1) {
         ww_log(LOG_ERROR, "failed to watch config dir");
         goto fail_watchdir;
@@ -140,14 +136,7 @@ reload_create(struct inotify *inotify, const char *profile, reload_func_t callba
 
     struct dirent *dirent;
     while ((dirent = readdir(dir))) {
-        // Skip the entries for "." and ".."
-        if (dirent->d_name[0] == '.') {
-            continue;
-        }
-
-        // Only add Lua files.
-        const char *ext = strrchr(dirent->d_name, '.');
-        if (!ext || strcmp(ext, ".lua") != 0) {
+        if (!should_watch(dirent->d_name)) {
             continue;
         }
 
