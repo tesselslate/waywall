@@ -112,7 +112,7 @@ add_config_watch(struct reload *rl, const char *name) {
     str_append(&path, rl->config_path);
     str_append(&path, name);
 
-    int wd = inotify_subscribe(rl->inotify, path, IN_CLOSE_WRITE | IN_MASK_CREATE,
+    int wd = inotify_subscribe(rl->inotify, path, IN_CLOSE_WRITE | IN_MODIFY | IN_MASK_CREATE,
                                handle_config_file, rl);
     if (wd == -1) {
         ww_log(LOG_ERROR, "failed to watch config file '%s'", path);
