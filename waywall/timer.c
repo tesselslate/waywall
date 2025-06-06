@@ -84,3 +84,18 @@ ww_timer_entry_destroy(struct ww_timer_entry *entry) {
     wl_list_remove(&entry->link);
     free(entry);
 }
+
+int
+ww_timer_entry_set_duration(struct ww_timer_entry *entry, struct timespec duration) {
+    struct itimerspec its = {
+        .it_value = duration,
+        .it_interval = {0},
+    };
+
+    if (timerfd_settime(entry->fd, 0, &its, NULL) != 0) {
+        ww_log_errno(LOG_ERROR, "failed to set timerfd");
+        return -1;
+    }
+
+    return 0;
+}

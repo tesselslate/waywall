@@ -25,9 +25,10 @@ struct ww_timer_entry {
 struct ww_timer *ww_timer_create(struct server *server);
 void ww_timer_destroy(struct ww_timer *timer);
 
-struct ww_timer_entry *ww_timer_add_entry(struct ww_timer *timer, struct timespec expiration,
+struct ww_timer_entry *ww_timer_add_entry(struct ww_timer *timer, struct timespec duration,
                                           ww_timer_func_t fire, ww_timer_func_t destroy,
                                           void *data);
 void ww_timer_entry_destroy(struct ww_timer_entry *entry);
+int ww_timer_entry_set_duration(struct ww_timer_entry *entry, struct timespec duration);
 
 #endif
