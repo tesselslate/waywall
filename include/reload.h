@@ -10,6 +10,7 @@ typedef void (*reload_func_t)(struct config *cfg, void *data);
 
 struct reload {
     struct inotify *inotify;
+    struct ww_timer *timer;
     const char *profile;
 
     reload_func_t func;
@@ -18,10 +19,12 @@ struct reload {
     str config_path;
     int config_dir_wd;
     struct list_int config_wd;
+
+    struct ww_timer_entry *timer_entry;
 };
 
-struct reload *reload_create(struct inotify *inotify, const char *profile, reload_func_t callback,
-                             void *data);
+struct reload *reload_create(struct inotify *inotify, struct ww_timer *timer, const char *profile,
+                             reload_func_t callback, void *data);
 void reload_destroy(struct reload *rl);
 void reload_disable(struct reload *rl);
 

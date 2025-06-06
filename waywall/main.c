@@ -122,7 +122,7 @@ cmd_wrap(const char *profile, char **argv) {
         goto fail_wrap;
     }
 
-    ww.reload = reload_create(ww.inotify, profile, handle_reload, &ww);
+    ww.reload = reload_create(ww.inotify, ww.timer, profile, handle_reload, &ww);
     if (!ww.reload) {
         goto fail_reload;
     }

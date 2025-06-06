@@ -1,6 +1,7 @@
 #include "reload.h"
 #include "config/config.h"
 #include "inotify.h"
+#include "timer.h"
 #include "util/alloc.h"
 #include "util/list.h"
 #include "util/log.h"
@@ -10,6 +11,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/inotify.h>
+
+static const struct timespec RELOAD_DEBOUNCE_TIME = {
+    .tv_nsec = 100 * 1000000 // 100 milliseconds
+};
 
 static int add_config_watch(struct reload *rl, const char *name);
 static void rm_config_watch(struct reload *rl, int wd);
@@ -25,7 +30,19 @@ should_watch(const char *name) {
 }
 
 static void
-try_reload(struct reload *rl) {
+reload_timer_destroy(void *data) {
+    struct reload *rl = data;
+
+    rl->timer_entry = NULL;
+}
+
+static void
+reload_timer_fire(void *data) {
+    struct reload *rl = data;
+
+    ww_timer_entry_destroy(rl->timer_entry);
+    rl->timer_entry = NULL;
+
     struct config *cfg = config_create();
     if (config_load(cfg, rl->profile) != 0) {
         ww_log(LOG_ERROR, "failed to load new config");
@@ -35,6 +52,22 @@ try_reload(struct reload *rl) {
 
     rl->func(cfg, rl->data);
     ww_log(LOG_INFO, "configuration reloaded");
+}
+
+static void
+schedule_reload(struct reload *rl) {
+    // Debounce reload attempts. This is the simplest way to deal with how certain editors (e.g.
+    // gedit) save files by creating a temporary file and replacing the saved file with it, which
+    // emits several reload-triggering inotify events in quick succession.
+    if (rl->timer_entry) {
+        ww_timer_entry_set_duration(rl->timer_entry, RELOAD_DEBOUNCE_TIME);
+    } else {
+        rl->timer_entry = ww_timer_add_entry(rl->timer, RELOAD_DEBOUNCE_TIME, reload_timer_fire,
+                                             reload_timer_destroy, rl);
+        if (!rl->timer_entry) {
+            ww_log(LOG_ERROR, "failed to create timer entry for reloading configuration");
+        }
+    }
 }
 
 static void
@@ -70,7 +103,7 @@ handle_config_file(int wd, uint32_t mask, const char *name, void *data) {
         ww_log(LOG_INFO, "removed watch %d", wd);
     }
 
-    try_reload(rl);
+    schedule_reload(rl);
 }
 
 static int
@@ -109,11 +142,13 @@ rm_config_watch(struct reload *rl, int wd) {
 }
 
 struct reload *
-reload_create(struct inotify *inotify, const char *profile, reload_func_t callback, void *data) {
+reload_create(struct inotify *inotify, struct ww_timer *timer, const char *profile,
+              reload_func_t callback, void *data) {
     ww_assert(callback);
 
     struct reload *rl = zalloc(1, sizeof(*rl));
     rl->inotify = inotify;
+    rl->timer = timer;
     rl->profile = profile;
     rl->func = callback;
     rl->data = data;
@@ -196,6 +231,10 @@ reload_destroy(struct reload *rl) {
 void
 reload_disable(struct reload *rl) {
     ww_assert(rl->config_dir_wd != -1);
+
+    if (rl->timer_entry) {
+        ww_timer_entry_destroy(rl->timer_entry);
+    }
 
     for (ssize_t i = 0; i < rl->config_wd.len; i++) {
         inotify_unsubscribe(rl->inotify, rl->config_wd.data[i]);
