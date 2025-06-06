@@ -140,7 +140,14 @@ reload_create(struct inotify *inotify, const char *profile, reload_func_t callba
 
     struct dirent *dirent;
     while ((dirent = readdir(dir))) {
+        // Skip the entries for "." and ".."
         if (dirent->d_name[0] == '.') {
+            continue;
+        }
+
+        // Only add Lua files.
+        const char *ext = strrchr(dirent->d_name, '.');
+        if (!ext || strcmp(ext, ".lua") != 0) {
             continue;
         }
 
