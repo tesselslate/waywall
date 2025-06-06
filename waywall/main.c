@@ -3,6 +3,7 @@
 #include "reload.h"
 #include "server/server.h"
 #include "string.h"
+#include "timer.h"
 #include "util/debug.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -24,6 +25,7 @@
 struct waywall {
     struct config *cfg;
     struct reload *reload;
+    struct ww_timer *timer;
 
     struct server *server;
     struct inotify *inotify;
@@ -113,7 +115,9 @@ cmd_wrap(const char *profile, char **argv) {
         goto fail_inotify;
     }
 
-    ww.wrap = wrap_create(ww.server, ww.inotify, ww.cfg);
+    ww.timer = ww_timer_create(ww.server);
+
+    ww.wrap = wrap_create(ww.server, ww.inotify, ww.timer, ww.cfg);
     if (!ww.wrap) {
         goto fail_wrap;
     }
@@ -163,6 +167,7 @@ cmd_wrap(const char *profile, char **argv) {
     close(pidfd);
     reload_destroy(ww.reload);
     wrap_destroy(ww.wrap);
+    ww_timer_destroy(ww.timer);
     inotify_destroy(ww.inotify);
     wl_event_source_remove(src_sigint);
     server_destroy(ww.server);
@@ -180,6 +185,7 @@ fail_reload:
     wrap_destroy(ww.wrap);
 
 fail_wrap:
+    ww_timer_destroy(ww.timer);
     inotify_destroy(ww.inotify);
 
 fail_inotify:

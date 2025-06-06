@@ -51,7 +51,8 @@ struct wrap {
     struct wl_listener on_view_destroy;
 };
 
-struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct config *cfg);
+struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
+                         struct config *cfg);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 

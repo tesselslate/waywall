@@ -533,7 +533,8 @@ static const struct server_seat_listener seat_listener = {
 };
 
 struct wrap *
-wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) {
+wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
+            struct config *cfg) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
 
     wrap->gl = server_gl_create(server);
@@ -552,7 +553,7 @@ wrap_create(struct server *server, struct inotify *inotify, struct config *cfg) 
     wrap->server = server;
     wrap->inotify = inotify;
     wrap->subproc = subproc_create(server);
-    wrap->timer = ww_timer_create(server);
+    wrap->timer = timer;
 
     wl_list_init(&wrap->floating.views);
 
@@ -598,7 +599,6 @@ wrap_destroy(struct wrap *wrap) {
     scene_destroy(wrap->scene);
     server_gl_destroy(wrap->gl);
 
-    ww_timer_destroy(wrap->timer);
     subproc_destroy(wrap->subproc);
 
     struct floating_view *fview, *tmp_fview;
