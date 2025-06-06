@@ -442,10 +442,12 @@ process_config_actions(struct config *cfg) {
         ww_assert(lua_gettop(cfg->vm->L) == IDX_ACTION_KEY);
     }
 
-    // Sort the action mappings so that those with the most modifier bits set are checked for
-    // matching first.
-    qsort(cfg->input.actions.data, cfg->input.actions.count, sizeof(*cfg->input.actions.data),
-          compare_action);
+    if (cfg->input.actions.data) {
+        // Sort the action mappings so that those with the most modifier bits set are checked for
+        // matching first.
+        qsort(cfg->input.actions.data, cfg->input.actions.count, sizeof(*cfg->input.actions.data),
+              compare_action);
+    }
 
     // stack state
     // 3 (IDX_DUP_TABLE)  : duplicate actions table
