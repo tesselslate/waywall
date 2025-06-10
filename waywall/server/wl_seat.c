@@ -28,6 +28,11 @@
 
 #define SRV_SEAT_VERSION 6
 
+struct key_update {
+    bool changed_keys;
+    bool changed_modifiers;
+};
+
 static const char *mod_names[] = {
     XKB_MOD_NAME_SHIFT, XKB_MOD_NAME_CAPS,
     XKB_MOD_NAME_CTRL,  XKB_MOD_NAME_ALT,
@@ -171,40 +176,42 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
     va_end(args);
 }
 
-static bool
+static struct key_update
 modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
+    struct key_update ret = {0};
+
     if (state) {
         for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
             if (seat->keyboard.pressed.data[i] == keycode) {
                 ww_log(LOG_WARN, "duplicate key press event received");
-                return false;
+                return ret;
             }
         }
 
         list_uint32_append(&seat->keyboard.pressed, keycode);
+        ret.changed_keys = true;
+
         if (xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_DOWN) != 0) {
-            return true;
+            ret.changed_modifiers = true;
         }
     } else {
-        bool found = false;
-
         for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
             if (seat->keyboard.pressed.data[i] != keycode) {
                 continue;
             }
 
             list_uint32_remove(&seat->keyboard.pressed, i);
-            found = true;
+            ret.changed_keys = true;
+
+            if (xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_UP) != 0) {
+                ret.changed_modifiers = true;
+            }
+
             break;
         }
-
-        if (found) {
-            if (xkb_state_update_key(seat->config->keymap.state, keycode + 8, XKB_KEY_UP) != 0) {
-                return true;
-            }
-        }
     }
-    return false;
+
+    return ret;
 }
 
 static void
@@ -383,13 +390,16 @@ use_local_keymap(struct server_seat *seat, struct server_seat_keymap keymap) {
 
 static void
 process_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
-    bool modifiers_updated = modify_pressed_keys(seat, keycode, state);
+    struct key_update update = modify_pressed_keys(seat, keycode, state);
     WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
 
-    if (modifiers_updated) {
+    if (update.changed_modifiers) {
         send_keyboard_modifiers(seat);
     }
-    send_keyboard_key(seat, keycode, state);
+
+    if (update.changed_keys) {
+        send_keyboard_key(seat, keycode, state);
+    }
 }
 
 static void
@@ -445,21 +455,7 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
-    // TODO: This could probably be improved. Key presses need to be forwarded to X11 so that
-    // Ninjabrain Bot can recognize that its hotkeys are being used, even if the focused window is a
-    // Wayland toplevel.
-    if (!seat->input_focus || strcmp("xwayland", seat->input_focus->impl->name) != 0) {
-        xwl_notify_key(seat->server->xwayland, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
-    }
-
-    bool remapped = try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
-
-    bool modifiers_updated = false;
-    if (!remapped) {
-        modifiers_updated = modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
-    }
-
+    // Actions should take priority over remaps.
     if (seat->listener) {
         const xkb_keysym_t *syms;
 
@@ -478,10 +474,26 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         }
     }
 
-    if (!remapped) {
-        if (modifiers_updated) {
-            send_keyboard_modifiers(seat);
-        }
+    if (try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED)) {
+        return;
+    }
+
+    // TODO: This could probably be improved. Key presses need to be forwarded to X11 so that
+    // Ninjabrain Bot can recognize that its hotkeys are being used, even if the focused window is a
+    // Wayland toplevel.
+    if (!seat->input_focus || strcmp("xwayland", seat->input_focus->impl->name) != 0) {
+        xwl_notify_key(seat->server->xwayland, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+    }
+
+    struct key_update update =
+        modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+    WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
+
+    if (update.changed_modifiers) {
+        send_keyboard_modifiers(seat);
+    }
+
+    if (update.changed_keys) {
         send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
     }
 }
@@ -694,16 +706,16 @@ on_pointer_button(void *data, struct wl_pointer *wl, uint32_t serial, uint32_t t
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
-    if (try_remap_button(seat, button, state == WL_POINTER_BUTTON_STATE_PRESSED)) {
-        return;
-    }
-
     if (seat->listener) {
         bool consumed = seat->listener->button(seat->listener_data, button,
                                                state == WL_POINTER_BUTTON_STATE_PRESSED);
         if (consumed) {
             return;
         }
+    }
+
+    if (try_remap_button(seat, button, state == WL_POINTER_BUTTON_STATE_PRESSED)) {
+        return;
     }
 
     send_pointer_button(seat, button, state == WL_POINTER_BUTTON_STATE_PRESSED);
