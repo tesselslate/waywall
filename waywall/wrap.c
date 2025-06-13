@@ -157,8 +157,9 @@ floating_update_anchored(struct wrap *wrap) {
         x = wrap->width - win_width;
         y = wrap->height - win_height;
         break;
-    case ANCHOR_NONE:
-        ww_unreachable();
+    default:
+        // Silence release mode compiler warnings.
+        return;
     }
 
     fview->x = x;
