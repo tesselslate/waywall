@@ -98,6 +98,13 @@ surface_resource_destroy(struct wl_resource *resource) {
         surface->role->destroy(surface->role_resource);
     }
 
+    if (surface->pending.buffer) {
+        server_buffer_unref(surface->pending.buffer);
+    }
+    if (surface->current.buffer) {
+        server_buffer_unref(surface->current.buffer);
+    }
+
     wl_surface_destroy(surface->remote);
     free(surface);
 }
@@ -110,6 +117,10 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
 
     // If a NULL buffer (no buffer) is being attached, skip the checks.
     if (!buffer) {
+        if (surface->pending.buffer) {
+            server_buffer_unref(surface->pending.buffer);
+        }
+
         surface->pending.buffer = NULL;
         surface->pending.present |= SURFACE_STATE_BUFFER;
         return;
@@ -129,6 +140,11 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
         }
     }
 
+    if (surface->pending.buffer) {
+        server_buffer_unref(surface->pending.buffer);
+    }
+    server_buffer_ref(buffer);
+
     surface->pending.buffer = buffer;
     surface->pending.present |= SURFACE_STATE_BUFFER;
 }
@@ -146,6 +162,10 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
     if (surface->pending.present & SURFACE_STATE_BUFFER) {
         wl_surface_attach(surface->remote,
                           surface->pending.buffer ? surface->pending.buffer->remote : NULL, 0, 0);
+
+        if (surface->current.buffer) {
+            server_buffer_unref(surface->current.buffer);
+        }
         surface->current.buffer = surface->pending.buffer;
 
         server_buffer_lock(surface->current.buffer);
