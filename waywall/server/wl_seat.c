@@ -386,6 +386,8 @@ use_local_keymap(struct server_seat *seat, struct server_seat_keymap keymap) {
         wl_keyboard_send_keymap(keyboard_resource, WL_KEYBOARD_KEYMAP_FORMAT_XKB_V1, keymap.fd,
                                 keymap.size);
     }
+
+    send_keyboard_modifiers(seat);
 }
 
 static void
