@@ -618,6 +618,13 @@ on_keyboard_repeat_info(void *data, struct wl_keyboard *wl, int32_t rate, int32_
 
     WW_DEBUG(keyboard.remote_repeat_rate, rate);
     WW_DEBUG(keyboard.remote_repeat_delay, delay);
+
+    if (seat->config->repeat_delay == -1 || seat->config->repeat_rate == -1) {
+        struct wl_resource *resource;
+        wl_resource_for_each(resource, &seat->keyboards) {
+            send_keyboard_repeat_info(seat, resource);
+        }
+    }
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {
