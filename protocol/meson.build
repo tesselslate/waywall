@@ -14,6 +14,7 @@ protocol_xmls = [
   wp_dir + 'stable/xdg-shell/xdg-shell.xml',
   wp_dir + 'staging/alpha-modifier/alpha-modifier-v1.xml',
   wp_dir + 'staging/cursor-shape/cursor-shape-v1.xml',
+  wp_dir + 'staging/single-pixel-buffer/single-pixel-buffer-v1.xml',
   wp_dir + 'staging/tearing-control/tearing-control-v1.xml',
   wp_dir + 'staging/linux-drm-syncobj/linux-drm-syncobj-v1.xml',
   wp_dir + 'staging/xwayland-shell/xwayland-shell-v1.xml',
