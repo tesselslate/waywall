@@ -5,6 +5,7 @@
 #include "server/buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
+#include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/debug.h"
@@ -24,6 +25,9 @@
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
 
+#define COLOR_BLEND(c, a) (COLOR_MULT(((c) * (a)) / UINT8_MAX))
+#define COLOR_MULT(c) ((uint32_t)(((uint64_t)(c) * UINT32_MAX) / UINT8_MAX))
+
 struct color_buffer {
     int fd;
 };
@@ -31,20 +35,26 @@ struct color_buffer {
 static void
 color_buffer_destroy(struct wl_buffer *buffer) {
     struct color_buffer *data = wl_buffer_get_user_data(buffer);
-    ww_assert(data);
+    wl_buffer_destroy(buffer);
+
+    if (!data) {
+        return;
+    }
 
     if (close(data->fd) != 0) {
         ww_log_errno(LOG_ERROR, "failed to close memfd for color buffer");
     }
 
     free(data);
-    wl_buffer_destroy(buffer);
 }
 
 static struct wl_buffer *
 color_buffer_new(struct server *server, const uint8_t color[static 4]) {
-    // TODO: Use single pixel buffer protocol if available, since some compositors perform
-    // additional optimizations when it is used
+    if (server->backend->single_pixel_buffer_manager) {
+        return wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
+            server->backend->single_pixel_buffer_manager, COLOR_BLEND(color[0], color[3]),
+            COLOR_BLEND(color[1], color[3]), COLOR_BLEND(color[2], color[3]), COLOR_MULT(color[3]));
+    }
 
     struct color_buffer *data = zalloc(1, sizeof(*data));
 
