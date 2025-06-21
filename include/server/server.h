@@ -18,8 +18,6 @@ struct server {
 
     struct wl_event_source *backend_source;
 
-    struct remote_buffer_manager *remote_buf;
-
     struct server_compositor *compositor;
     struct server_data_device_manager *data_device_manager;
     struct server_drm_syncobj_manager *drm_syncobj;

@@ -11,7 +11,6 @@ waywall_src = files(
   'server/cursor.c',
   'server/fake_input.c',
   'server/gl.c',
-  'server/remote_buffer.c',
   'server/server.c',
   'server/ui.c',
   'server/wl_compositor.c',
