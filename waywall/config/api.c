@@ -93,7 +93,7 @@ image_close(lua_State *L) {
         return luaL_error(L, "cannot close image more than once");
     }
 
-    scene_image_destroy(*image);
+    scene_object_destroy((struct scene_object *)*image);
     *image = NULL;
 
     return 0;
@@ -117,7 +117,7 @@ image_gc(lua_State *L) {
     struct scene_image **image = lua_touserdata(L, 1);
 
     if (*image) {
-        scene_image_destroy(*image);
+        scene_object_destroy((struct scene_object *)*image);
     }
     *image = NULL;
 
@@ -132,7 +132,7 @@ mirror_close(lua_State *L) {
         return luaL_error(L, "cannot close mirror more than once");
     }
 
-    scene_mirror_destroy(*mirror);
+    scene_object_destroy((struct scene_object *)*mirror);
     *mirror = NULL;
 
     return 0;
@@ -156,7 +156,7 @@ mirror_gc(lua_State *L) {
     struct scene_mirror **mirror = lua_touserdata(L, 1);
 
     if (*mirror) {
-        scene_mirror_destroy(*mirror);
+        scene_object_destroy((struct scene_object *)*mirror);
     }
     *mirror = NULL;
 
@@ -171,7 +171,7 @@ text_close(lua_State *L) {
         return luaL_error(L, "cannot close text more than once");
     }
 
-    scene_text_destroy(*text);
+    scene_object_destroy((struct scene_object *)*text);
     *text = NULL;
 
     return 0;
@@ -195,7 +195,7 @@ text_gc(lua_State *L) {
     struct scene_text **text = lua_touserdata(L, 1);
 
     if (*text) {
-        scene_text_destroy(*text);
+        scene_object_destroy((struct scene_object *)*text);
     }
     *text = NULL;
 

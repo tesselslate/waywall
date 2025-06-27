@@ -3,8 +3,14 @@
 
 #include "config/config.h"
 #include "util/box.h"
+#include "util/prelude.h"
 #include <wayland-server-core.h>
 #include <wayland-util.h>
+
+#define SHADER_SRC_POS_ATTRIB_LOC 0
+#define SHADER_DST_POS_ATTRIB_LOC 1
+#define SHADER_SRC_RGBA_ATTRIB_LOC 2
+#define SHADER_DST_RGBA_ATTRIB_LOC 3
 
 struct scene {
     struct server_gl *gl;
@@ -24,19 +30,13 @@ struct scene {
         unsigned int font_tex;
     } buffers;
 
-    struct wl_list images;  // scene_image.link
-    struct wl_list mirrors; // scene_mirror.link
-    struct wl_list text;    // scene_text.link
+    struct wl_list objects; // scene_object.link
 
     int skipped_frames;
 
     struct wl_listener on_gl_frame;
 };
 
-static const int SHADER_SRC_POS_ATTRIB_LOC = 0;
-static const int SHADER_DST_POS_ATTRIB_LOC = 1;
-static const int SHADER_SRC_RGBA_ATTRIB_LOC = 2;
-static const int SHADER_DST_RGBA_ATTRIB_LOC = 3;
 struct scene_shader {
     struct server_gl_shader *shader;
     int shader_u_src_size, shader_u_dst_size;
@@ -68,6 +68,8 @@ struct scene_text_options {
     char *shader_name;
 };
 
+struct scene_object;
+
 struct scene *scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui);
 void scene_destroy(struct scene *scene);
 
@@ -78,8 +80,6 @@ struct scene_mirror *scene_add_mirror(struct scene *scene,
 struct scene_text *scene_add_text(struct scene *scene, const char *data,
                                   const struct scene_text_options *options);
 
-void scene_image_destroy(struct scene_image *image);
-void scene_mirror_destroy(struct scene_mirror *mirror);
-void scene_text_destroy(struct scene_text *text);
+void scene_object_destroy(struct scene_object *object);
 
 #endif
