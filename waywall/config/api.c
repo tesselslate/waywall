@@ -740,9 +740,9 @@ l_set_remaps(lua_State *L) {
     // of remaps a user might reasonably have is quite small.
     struct server_seat_remaps * seat_remaps = &wrap->server->seat->config->remaps;
     seat_remaps->keys = realloc(seat_remaps->keys, remaps.count * sizeof(*seat_remaps->keys));
-    check_alloc(seat_remaps->keys);
+    if (remaps.count != 0) check_alloc(seat_remaps->keys);
     seat_remaps->buttons = realloc(seat_remaps->buttons, remaps.count * sizeof(*seat_remaps->buttons));
-    check_alloc(seat_remaps->buttons);
+    if (remaps.count != 0) check_alloc(seat_remaps->buttons);
     seat_remaps->num_keys = 0;
     seat_remaps->num_buttons = 0;
 
