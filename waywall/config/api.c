@@ -1,7 +1,6 @@
 #include "lua/api.h"
 #include "lua/helpers.h"
 
-#include "util/keycodes.h"
 #include "config/config.h"
 #include "config/internal.h"
 #include "config/vm.h"
@@ -669,8 +668,7 @@ struct config_remaps {
 
 static void
 add_remap(struct config_remaps *remaps, struct config_remap remap) {
-    void *data = realloc(remaps->data,
-                         sizeof(*remaps->data) * (remaps->count + 1));
+    void *data = realloc(remaps->data, sizeof(*remaps->data) * (remaps->count + 1));
     check_alloc(data);
 
     remaps->data = data;
@@ -695,7 +693,8 @@ l_set_remaps(lua_State *L) {
     lua_settop(L, ARG_REMAPS);
 
     // Body.
-    // A lot of this code is duplicated from process_config_input_remaps and server_seat_config_create, which probably isn't ideal.
+    // A lot of this code is duplicated from process_config_input_remaps and
+    // server_seat_config_create, which probably isn't ideal.
     struct config_remaps remaps = {0};
 
     // stack state
@@ -738,11 +737,14 @@ l_set_remaps(lua_State *L) {
     // The remaps table has been fully processed, so we can now set the remaps on the server seat.
     // It's not worth the effort to calculate how many of each kind of remap there are. The number
     // of remaps a user might reasonably have is quite small.
-    struct server_seat_remaps * seat_remaps = &wrap->server->seat->config->remaps;
+    struct server_seat_remaps *seat_remaps = &wrap->server->seat->config->remaps;
     seat_remaps->keys = realloc(seat_remaps->keys, remaps.count * sizeof(*seat_remaps->keys));
-    if (remaps.count != 0) check_alloc(seat_remaps->keys);
-    seat_remaps->buttons = realloc(seat_remaps->buttons, remaps.count * sizeof(*seat_remaps->buttons));
-    if (remaps.count != 0) check_alloc(seat_remaps->buttons);
+    if (remaps.count != 0)
+        check_alloc(seat_remaps->keys);
+    seat_remaps->buttons =
+        realloc(seat_remaps->buttons, remaps.count * sizeof(*seat_remaps->buttons));
+    if (remaps.count != 0)
+        check_alloc(seat_remaps->buttons);
     seat_remaps->num_keys = 0;
     seat_remaps->num_buttons = 0;
 
