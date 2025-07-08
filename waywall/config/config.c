@@ -335,7 +335,7 @@ parse_remap_half(const char *input, uint32_t *out_data, enum config_remap_type *
     return 1;
 }
 
-static int
+int
 parse_remap(const char *src, const char *dst, struct config_remap *remap) {
     if (parse_remap_half(src, &remap->src_data, &remap->src_type) != 0) {
         ww_log(LOG_ERROR, "unknown input '%s' for remapping", src);
