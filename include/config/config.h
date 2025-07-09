@@ -23,7 +23,7 @@ struct config {
             char *options;
         } keymap;
 
-        struct {
+        struct config_remaps {
             struct config_remap *data;
             size_t count;
         } remaps;
@@ -102,5 +102,6 @@ void config_destroy(struct config *cfg);
 ssize_t config_find_action(struct config *cfg, const struct config_action *action);
 int config_load(struct config *cfg, const char *profile);
 int parse_remap(const char *src, const char *dst, struct config_remap *remap);
+void add_remap(struct config_remaps *remaps, struct config_remap remap);
 
 #endif

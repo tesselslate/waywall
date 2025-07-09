@@ -661,20 +661,6 @@ l_set_keymap(lua_State *L) {
     return 0;
 }
 
-struct config_remaps {
-    struct config_remap *data;
-    size_t count;
-};
-
-static void
-add_remap(struct config_remaps *remaps, struct config_remap remap) {
-    void *data = realloc(remaps->data, sizeof(*remaps->data) * (remaps->count + 1));
-    check_alloc(data);
-
-    remaps->data = data;
-    remaps->data[remaps->count++] = remap;
-}
-
 static int
 l_set_remaps(lua_State *L) {
     static const int ARG_REMAPS = 1;

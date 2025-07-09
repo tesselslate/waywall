@@ -349,14 +349,13 @@ parse_remap(const char *src, const char *dst, struct config_remap *remap) {
     return 0;
 }
 
-static void
-add_remap(struct config *cfg, struct config_remap remap) {
-    void *data = realloc(cfg->input.remaps.data,
-                         sizeof(*cfg->input.remaps.data) * (cfg->input.remaps.count + 1));
+void
+add_remap(struct config_remaps *remaps, struct config_remap remap) {
+    void *data = realloc(remaps->data, sizeof(*remaps->data) * (remaps->count + 1));
     check_alloc(data);
 
-    cfg->input.remaps.data = data;
-    cfg->input.remaps.data[cfg->input.remaps.count++] = remap;
+    remaps->data = data;
+    remaps->data[remaps->count++] = remap;
 }
 
 static void
@@ -518,7 +517,7 @@ process_config_input_remaps(struct config *cfg) {
         if (parse_remap(src_input, dst_input, &remap) != 0) {
             return 1;
         }
-        add_remap(cfg, remap);
+        add_remap(&cfg->input.remaps, remap);
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
