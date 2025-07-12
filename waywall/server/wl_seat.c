@@ -811,8 +811,8 @@ on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t s
             continue;
         }
 
-        wl_pointer_send_motion(resource, current_time(), wl_fixed_from_double(x),
-                               wl_fixed_from_double(y));
+        wl_pointer_send_motion(resource, current_time(), wl_fixed_from_double(x*2),
+                               wl_fixed_from_double(y*2));
     }
 }
 
