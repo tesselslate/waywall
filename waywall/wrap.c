@@ -303,8 +303,14 @@ static void
 on_resize(struct wl_listener *listener, void *data) {
     struct wrap *wrap = wl_container_of(listener, wrap, on_resize);
 
-    int32_t new_width = wrap->server->ui->width;
-    int32_t new_height = wrap->server->ui->height;
+    int32_t scale = 1;
+    if (wrap->view && wrap->view->surface && wrap->view->surface->remote) {
+        scale = wrap->view->surface->preferred_buffer_scale;
+        if (scale <= 0) scale = 1; // Ensure valid scale
+    }
+
+    int32_t new_width = wrap->server->ui->width * scale;
+    int32_t new_height = wrap->server->ui->height * scale;
 
     if (new_width == wrap->width && new_height == wrap->height) {
         return;
