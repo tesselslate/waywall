@@ -141,23 +141,27 @@ layout_centered(struct server_view *view) {
     int32_t width, height;
     server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
 
+    // TODO: get scale from compositor
+    int32_t scale = view->surface->preferred_buffer_scale;
+    // int32_t scale = 2;
+
     // Center the view in the window.
-    int32_t x = (view->ui->width / 2) - (width / 4);
-    int32_t y = (view->ui->height / 2) - (height / 4);
+    int32_t x = (view->ui->width / 2) - (width / (2 * scale));
+    int32_t y = (view->ui->height / 2) - (height / (2 * scale));
 
     if (x >= 0 && y >= 0) {
         // If the centered view is entirely inside the window, it can be shown as normal.
         wl_subsurface_set_position(view->subsurface, x, y);
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                                wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-        wp_viewport_set_destination(view->viewport, width / 2, height / 2);
+        wp_viewport_set_destination(view->viewport, width / scale, height / scale);
     } else {
         // If the centered view is partially outside the window, it must be cropped.
-        int32_t crop_width = (x >= 0) ? width / 2 : view->ui->width;
-        int32_t crop_height = (y >= 0) ? height / 2 : view->ui->height;
+        int32_t crop_width = (x >= 0) ? width / scale : view->ui->width;
+        int32_t crop_height = (y >= 0) ? height / scale : view->ui->height;
 
-        int32_t crop_x = (width / 4) - (crop_width / 2);
-        int32_t crop_y = (height / 4) - (crop_height / 2);
+        int32_t crop_x = (width / (2 * scale)) - (crop_width / 2);
+        int32_t crop_y = (height / (2 * scale)) - (crop_height / 2);
 
         x = x >= 0 ? x : 0;
         y = y >= 0 ? y : 0;
@@ -296,8 +300,9 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         }
     }
 
-    if (view->subsurface && view->current.centered) {
+    if (view->subsurface && (view->current.centered ||view->surface->handled)) {
         layout_centered(view);
+        view->surface->handled = true;
     }
 }
 
