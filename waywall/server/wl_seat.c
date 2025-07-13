@@ -66,8 +66,15 @@ static void
 get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     ww_assert(seat->input_focus);
 
-    *x = seat->pointer.x - (double)seat->input_focus->current.x;
-    *y = seat->pointer.y - (double)seat->input_focus->current.y;
+    int32_t scale = 1;
+    if (seat->input_focus->surface->remote) {
+        scale = seat->input_focus->surface->preferred_buffer_scale;
+    }
+
+    *x = (seat->pointer.x - (double)seat->input_focus->current.x) * scale;
+    *y = (seat->pointer.y - (double)seat->input_focus->current.y) * scale;
+    // ww_log(LOG_INFO, "pointer offset: x=%f, y=%f, input focus: x=%f, y=%f", *x, *y, 
+    //          (double)seat->input_focus->current.x, (double)seat->input_focus->current.y);
 }
 
 static int
@@ -811,14 +818,8 @@ on_pointer_motion(void *data, struct wl_pointer *wl, uint32_t time, wl_fixed_t s
             continue;
         }
 
-        // TODO: get scale from compositor
-        int32_t scale = 1;
-        if (seat->input_focus->surface->remote) {
-            scale = seat->input_focus->surface->preferred_buffer_scale;
-        }
-
-        wl_pointer_send_motion(resource, current_time(), wl_fixed_from_double(x * scale),
-                               wl_fixed_from_double(y * scale));
+        wl_pointer_send_motion(resource, current_time(), wl_fixed_from_double(x),
+                               wl_fixed_from_double(y));
     }
 }
 
