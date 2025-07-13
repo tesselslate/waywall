@@ -709,10 +709,10 @@ l_set_remaps(lua_State *L) {
         const char *dst_input = lua_tostring(L, IDX_REMAP_VAL);
 
         struct config_remap remap = {0};
-        if (parse_remap(src_input, dst_input, &remap) != 0) {
+        if (config_parse_remap(src_input, dst_input, &remap) != 0) {
             return 1;
         }
-        add_remap(&remaps, remap);
+        config_add_remap(&remaps, remap);
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
@@ -753,6 +753,9 @@ l_set_remaps(lua_State *L) {
         dst->src = remap->src_data;
         dst->type = remap->dst_type;
     }
+
+    if (remaps.data)
+        free(remaps.data);
 
     // Epilogue
     return 0;

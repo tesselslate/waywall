@@ -336,7 +336,7 @@ parse_remap_half(const char *input, uint32_t *out_data, enum config_remap_type *
 }
 
 int
-parse_remap(const char *src, const char *dst, struct config_remap *remap) {
+config_parse_remap(const char *src, const char *dst, struct config_remap *remap) {
     if (parse_remap_half(src, &remap->src_data, &remap->src_type) != 0) {
         ww_log(LOG_ERROR, "unknown input '%s' for remapping", src);
         return 1;
@@ -350,7 +350,7 @@ parse_remap(const char *src, const char *dst, struct config_remap *remap) {
 }
 
 void
-add_remap(struct config_remaps *remaps, struct config_remap remap) {
+config_add_remap(struct config_remaps *remaps, struct config_remap remap) {
     void *data = realloc(remaps->data, sizeof(*remaps->data) * (remaps->count + 1));
     check_alloc(data);
 
@@ -514,10 +514,10 @@ process_config_input_remaps(struct config *cfg) {
         const char *dst_input = lua_tostring(cfg->vm->L, IDX_REMAP_VAL);
 
         struct config_remap remap = {0};
-        if (parse_remap(src_input, dst_input, &remap) != 0) {
+        if (config_parse_remap(src_input, dst_input, &remap) != 0) {
             return 1;
         }
-        add_remap(&cfg->input.remaps, remap);
+        config_add_remap(&cfg->input.remaps, remap);
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
