@@ -37,6 +37,9 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
                             WL_OUTPUT_TRANSFORM_NORMAL);
     wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT, output->ui->width, output->ui->height, 0);
 
+    // how tf do u get the scale from here? like theres no accessible wl_output i think
+    wl_output_send_scale(resource, 2.0);
+
     if (version >= WL_OUTPUT_NAME_SINCE_VERSION) {
         wl_output_send_name(resource, "waywall output");
     }
@@ -80,6 +83,8 @@ server_output_create(struct server *server, struct server_ui *ui) {
 
     output->global = wl_global_create(server->display, &wl_output_interface, SRV_OUTPUT_VERSION,
                                       output, on_global_bind);
+
+
     check_alloc(output->global);
 
     wl_list_init(&output->objects);

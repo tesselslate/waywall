@@ -309,6 +309,8 @@ on_resize(struct wl_listener *listener, void *data) {
         if (scale <= 0) scale = 1; // Ensure valid scale
     }
 
+    wl_surface_set_buffer_scale(wrap->view->surface->remote, scale);
+
     int32_t new_width = wrap->server->ui->width * scale;
     int32_t new_height = wrap->server->ui->height * scale;
 
