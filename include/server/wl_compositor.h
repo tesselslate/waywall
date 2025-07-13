@@ -31,6 +31,8 @@ struct server_surface {
 
     struct server_compositor *parent;
     struct wl_surface *remote;
+    int32_t preferred_buffer_scale;
+    bool handled;
 
     struct server_surface_state {
         struct server_buffer *buffer;
