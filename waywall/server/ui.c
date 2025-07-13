@@ -42,6 +42,9 @@ layout_centered(struct server_view *view) {
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                                wl_fixed_from_int(-1), wl_fixed_from_int(-1));
         wp_viewport_set_destination(view->viewport, width / scale, height / scale);
+
+        view->current.x = x;
+        view->current.y = y;
     } else {
         // If the centered view is partially outside the window, it must be cropped.
         int32_t crop_width = (x >= 0) ? width / scale : view->ui->width;
@@ -50,17 +53,17 @@ layout_centered(struct server_view *view) {
         int32_t crop_x = (width / (2 * scale)) - (crop_width / 2);
         int32_t crop_y = (height / (2 * scale)) - (crop_height / 2);
 
+        view->current.x = x;
+        view->current.y = y;
         x = x >= 0 ? x : 0;
         y = y >= 0 ? y : 0;
 
         wl_subsurface_set_position(view->subsurface, x, y);
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x), wl_fixed_from_int(crop_y),
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x * scale), wl_fixed_from_int(crop_y * scale),
                                wl_fixed_from_int(crop_width * scale), wl_fixed_from_int(crop_height * scale));
         wp_viewport_set_destination(view->viewport, crop_width, crop_height);
     }
 
-    view->current.x = x;
-    view->current.y = y;
     wl_surface_commit(view->ui->tree.surface);
 }
 

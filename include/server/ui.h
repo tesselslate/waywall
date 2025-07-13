@@ -63,7 +63,7 @@ struct server_view {
     struct wp_viewport *viewport;
 
     struct server_view_state {
-        uint32_t x, y;
+        int32_t x, y;
         uint32_t width, height;
         bool centered;
         bool visible;
