@@ -168,7 +168,7 @@ layout_centered(struct server_view *view) {
 
         wl_subsurface_set_position(view->subsurface, x, y);
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x), wl_fixed_from_int(crop_y),
-                               wl_fixed_from_int(crop_width), wl_fixed_from_int(crop_height));
+                               wl_fixed_from_int(crop_width * scale), wl_fixed_from_int(crop_height * scale));
         wp_viewport_set_destination(view->viewport, crop_width, crop_height);
     }
 
