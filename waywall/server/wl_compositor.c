@@ -249,16 +249,12 @@ static void
 surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource, int32_t scale) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
+    ww_log(LOG_WARN, "wl_surface.set_buffer_scale called with scale %d", scale);
+    surface->client_buffer_scale = scale;
+
     if (scale <= 0) {
         wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SCALE, "scale not positive");
         return;
-    }
-
-    // TODO: Properly support buffer scaling (including fractional scaling, probably, maybe?)
-    // As of right now, it's not actually supported, so there's no point pretending it is.
-
-    if (scale != 1) {
-        ww_log(LOG_WARN, "non-default buffer scale (%" PRIi32 " for surface %p)", scale, surface);
     }
 }
 
@@ -322,6 +318,7 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
 
 static void handle_preferred_buffer_scale(void *data, struct wl_surface *wl_surface, int32_t scale) {
     struct server_surface *surface = data;
+    ww_log(LOG_WARN, "preferred_buffer_scale for %p: %d (c %d)", surface->remote, scale, surface->client_buffer_scale);
     surface->preferred_buffer_scale = scale; // Store the scale
     surface->handled = false; // mark as true after the screen is updated
 }
@@ -343,6 +340,7 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     struct server_surface *surface = zalloc(1, sizeof(*surface));
     surface->preferred_buffer_scale = 1;
+    surface->client_buffer_scale = 1;
 
     surface->resource =
         wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
