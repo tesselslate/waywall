@@ -110,6 +110,11 @@ M.profile = priv.profile
 -- are valid keys.)
 M.set_keymap = priv.set_keymap
 
+--- Sets the input remapping map, corresponding to config.input.remaps.
+-- @param remaps A table containing the remapping map, with the same format as
+-- config.input.remaps.
+M.set_remaps = priv.set_remaps
+
 --- Sets the resolution of the Minecraft window.
 -- Providing a resolution of 0 width and 0 height will cause the instance to be
 -- set back to the size of the waywall window.
