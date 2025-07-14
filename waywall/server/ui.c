@@ -69,10 +69,17 @@ static void
 layout_floating(struct server_view *view) {
     ww_assert(view->subsurface);
 
+    int32_t width, height;
+    server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
+    int32_t scale = view->surface->preferred_buffer_scale;
+
+    ww_log(LOG_WARN, "Floating view %p at %d,%d with size %dx%d, scale %d",
+           view, view->current.x, view->current.y, width, height, scale);
+
     wl_subsurface_set_position(view->subsurface, view->current.x, view->current.y);
     wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                            wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-    wp_viewport_set_destination(view->viewport, -1, -1);
+    wp_viewport_set_destination(view->viewport, width / scale, height / scale);
 
     wl_surface_commit(view->ui->tree.surface);
 }
