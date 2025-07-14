@@ -254,7 +254,7 @@ surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource,
     }
     surface->client_buffer_scale = scale;
     // need to somehow trigger a resize event from here
-    // i mean technically i think if the user just hovers over the waywall it'll work but im not sure
+    // i mean technically i think if the user just hovers over the surface it'll work but im not sure
 
     if (scale <= 0) {
         wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SCALE, "scale not positive");
