@@ -28,9 +28,7 @@ layout_centered(struct server_view *view) {
     int32_t width, height;
     server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
 
-    // TODO: get scale from compositor
     int32_t scale = view->surface->preferred_buffer_scale;
-    // int32_t scale = 2;
 
     // Center the view in the window.
     int32_t x = (view->ui->width / 2) - (width / (2 * scale));
@@ -59,9 +57,9 @@ layout_centered(struct server_view *view) {
         y = y >= 0 ? y : 0;
 
         wl_subsurface_set_position(view->subsurface, x, y);
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x * scale), wl_fixed_from_int(crop_y * scale),
-                               wl_fixed_from_int(crop_width * scale), wl_fixed_from_int(crop_height * scale));
-        wp_viewport_set_destination(view->viewport, crop_width, crop_height);
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
+                               wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+        wp_viewport_set_destination(view->viewport, view->ui->width, view->ui->height);
     }
 
     wl_surface_commit(view->ui->tree.surface);
