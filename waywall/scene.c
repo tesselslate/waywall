@@ -22,8 +22,15 @@
 #define CHARS_PER_ROW (ATLAS_WIDTH / CHAR_WIDTH)
 
 static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
+
+// clang-format off
+// There appears to be a bug in clang-format which causes it to remove the space after some
+// of these asterisks
+
 static_assert(PACKED_ATLAS_WIDTH * PACKED_ATLAS_HEIGHT == ATLAS_WIDTH * ATLAS_HEIGHT);
 static_assert(ATLAS_WIDTH * ATLAS_HEIGHT == PACKED_ATLAS_SIZE * 8);
+
+// clang-format on
 
 struct vtx_shader {
     float src_pos[2];
