@@ -75,7 +75,7 @@ struct server_seat_config {
     int repeat_rate, repeat_delay;
     struct server_seat_keymap keymap;
 
-    struct {
+    struct server_seat_remaps {
         struct server_seat_remap {
             enum config_remap_type type;
             uint32_t src, dst;

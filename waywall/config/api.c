@@ -662,6 +662,106 @@ l_set_keymap(lua_State *L) {
 }
 
 static int
+l_set_remaps(lua_State *L) {
+    static const int ARG_REMAPS = 1;
+    static const int IDX_REMAP_KEY = 2;
+    static const int IDX_REMAP_VAL = 3;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("set_remaps"));
+    }
+
+    luaL_argcheck(L, lua_istable(L, ARG_REMAPS), ARG_REMAPS, "expected table");
+
+    lua_settop(L, ARG_REMAPS);
+
+    // Body.
+    // A lot of this code is duplicated from process_config_input_remaps and
+    // server_seat_config_create, which probably isn't ideal.
+    struct config_remaps remaps = {0};
+
+    // stack state
+    // 1 (ARG_REMAPS)     : remaps
+    ww_assert(lua_gettop(L) == ARG_REMAPS);
+
+    lua_pushnil(L); // stack: 2 (IDX_REMAP_KEY)
+    while (lua_next(L, ARG_REMAPS)) {
+        // stack state
+        // 3 (IDX_REMAP_VAL)  : remaps[key] (should be a string)
+        // 2 (IDX_REMAP_KEY)  : key (should be a string)
+        // 1 (IDX_REMAPS)     : remaps
+
+        if (!lua_isstring(L, IDX_REMAP_KEY)) {
+            ww_log(LOG_ERROR, "non-string key '%s' found in remaps table",
+                   lua_tostring(L, IDX_REMAP_KEY));
+            return 1;
+        }
+        if (!lua_isstring(L, IDX_REMAP_VAL)) {
+            ww_log(LOG_ERROR, "non-string value for key '%s' found in remaps table",
+                   lua_tostring(L, IDX_REMAP_KEY));
+            return 1;
+        }
+
+        const char *src_input = lua_tostring(L, IDX_REMAP_KEY);
+        const char *dst_input = lua_tostring(L, IDX_REMAP_VAL);
+
+        struct config_remap remap = {0};
+        if (config_parse_remap(src_input, dst_input, &remap) != 0) {
+            return 1;
+        }
+        config_add_remap(&remaps, remap);
+
+        // Pop the value from the top of the stack. The previous key will be left at the top of the
+        // stack for the next call to `lua_next`.
+        lua_pop(L, 1); // stack: 2 (IDX_REMAP_KEY)
+        ww_assert(lua_gettop(L) == IDX_REMAP_KEY);
+    }
+
+    // The remaps table has been fully processed, so we can now set the remaps on the server seat.
+    // It's not worth the effort to calculate how many of each kind of remap there are. The number
+    // of remaps a user might reasonably have is quite small.
+    struct server_seat_remaps *seat_remaps = &wrap->server->seat->config->remaps;
+    seat_remaps->keys = realloc(seat_remaps->keys, remaps.count * sizeof(*seat_remaps->keys));
+    if (remaps.count != 0)
+        check_alloc(seat_remaps->keys);
+    seat_remaps->buttons =
+        realloc(seat_remaps->buttons, remaps.count * sizeof(*seat_remaps->buttons));
+    if (remaps.count != 0)
+        check_alloc(seat_remaps->buttons);
+    seat_remaps->num_keys = 0;
+    seat_remaps->num_buttons = 0;
+
+    for (size_t i = 0; i < remaps.count; i++) {
+        struct config_remap *remap = &remaps.data[i];
+
+        struct server_seat_remap *dst = NULL;
+        switch (remap->src_type) {
+        case CONFIG_REMAP_BUTTON:
+            dst = &seat_remaps->buttons[seat_remaps->num_buttons++];
+            break;
+        case CONFIG_REMAP_KEY:
+            dst = &seat_remaps->keys[seat_remaps->num_keys++];
+            break;
+        default:
+            ww_unreachable();
+        }
+
+        dst->dst = remap->dst_data;
+        dst->src = remap->src_data;
+        dst->type = remap->dst_type;
+    }
+
+    if (remaps.data)
+        free(remaps.data);
+
+    // Epilogue
+    return 0;
+}
+
+static int
 l_set_resolution(lua_State *L) {
     static const int ARG_WIDTH = 1;
     static const int ARG_HEIGHT = 2;
@@ -996,6 +1096,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"get_key", l_get_key},
     {"profile", l_profile},
     {"set_keymap", l_set_keymap},
+    {"set_remaps", l_set_remaps},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
     {"show_floating", l_show_floating},
