@@ -75,8 +75,6 @@ get_pointer_offset(struct server_seat *seat, double *x, double *y) {
 
     *x = (seat->pointer.x - (double)seat->input_focus->current.x) * scale;
     *y = (seat->pointer.y - (double)seat->input_focus->current.y) * scale;
-    // ww_log(LOG_INFO, "pointer offset: x=%f, y=%f, input focus: x=%f, y=%f", *x, *y, 
-    //          (double)seat->input_focus->current.x, (double)seat->input_focus->current.y);
 }
 
 static int

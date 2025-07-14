@@ -355,8 +355,6 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
     check_alloc(surface->remote);
     wl_surface_add_listener(surface->remote, &surface_listener, surface);
 
-    ww_log(LOG_ERROR, "Main surface version: %d\n", wl_surface_get_version(surface->remote));
-
     // We need to ensure that input events are never given to a child surface. See
     // `surface_set_input_region` for more details.
     wl_surface_set_input_region(surface->remote, compositor->empty_region);
