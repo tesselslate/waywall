@@ -57,8 +57,8 @@ layout_centered(struct server_view *view) {
         y = y >= 0 ? y : 0;
 
         wl_subsurface_set_position(view->subsurface, x, y);
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
-                               wl_fixed_from_int(-1), wl_fixed_from_int(-1));
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x * scale), wl_fixed_from_int(crop_y * scale),
+                               wl_fixed_from_int(crop_width * scale), wl_fixed_from_int(crop_height * scale));
         wp_viewport_set_destination(view->viewport, view->ui->width, view->ui->height);
     }
 
