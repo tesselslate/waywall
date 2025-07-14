@@ -308,8 +308,6 @@ on_resize(struct wl_listener *listener, void *data) {
     if (wrap->view && wrap->view->surface && wrap->view->surface->remote) {
         targetScale = wrap->view->surface->preferred_buffer_scale;
         clientScale = wrap->view->surface->client_buffer_scale;
-        ww_log(LOG_WARN, "resizing surface %p to %dx%d, scale: %d | %d", wrap->view->surface->remote,
-               wrap->width, wrap->height, targetScale, clientScale);
         if (targetScale <= 0) targetScale = 1; // Ensure valid scale
         if (clientScale <= 0) clientScale = 1; // Ensure valid scale
     }
@@ -384,6 +382,13 @@ on_view_create(struct wl_listener *listener, void *data) {
 
     wrap->server->ui->width = width;
     wrap->server->ui->height = height;
+
+    int32_t targetScale = 1;
+    if (wrap->view && wrap->view->surface && wrap->view->surface->remote) {
+        targetScale = wrap->view->surface->preferred_buffer_scale;
+        if (targetScale <= 0) targetScale = 1; // Ensure valid scale
+    }
+    wl_surface_set_buffer_scale(wrap->view->surface->remote, targetScale);
 
     server_set_input_focus(wrap->server, wrap->view);
     server_ui_show(wrap->server->ui);
