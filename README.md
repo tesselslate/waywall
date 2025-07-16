@@ -9,7 +9,16 @@ successor to [resetti](https://github.com/tesselslate/resetti).
 > waywall is still under development. Some features are missing or may
 > not work as expected.
 
-# Building
+# Installation
+
+Distribution-specific packages are currently only available for Arch through
+the AUR.
+
+  - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-git)
+
+Users on other distributions must build waywall from source.
+
+## Building from source
 
 The following dependencies are required only at build time:
 

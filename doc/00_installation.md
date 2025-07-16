@@ -1,7 +1,11 @@
 # Installation
 
-Currently, there are no distribution packages for waywall, so compiling from
-source is the only method of installation.
+Distribution-specific packages are currently only available for Arch through
+the AUR.
+
+  - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-git)
+
+Users on other distributions must build waywall from source.
 
 ## Building from source
 
