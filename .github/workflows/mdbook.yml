@@ -6,6 +6,7 @@ on:
       - "main"
 
     paths:
+      - "ci/install_mdbook.sh"
       - "doc/**.md"
 
     workflow_dispatch:
