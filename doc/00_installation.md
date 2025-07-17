@@ -3,7 +3,7 @@
 Distribution-specific packages are currently only available for Arch through
 the AUR.
 
-  - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-git)
+  - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
 
 Users on other distributions must build waywall from source.
 
