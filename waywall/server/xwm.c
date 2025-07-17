@@ -181,6 +181,7 @@ static const char *atom_names[] = {
     [WL_SURFACE_ID] = "WL_SURFACE_ID",
     [WL_SURFACE_SERIAL] = "WL_SURFACE_SERIAL",
     [WM_DELETE_WINDOW] = "WM_DELETE_WINDOW",
+    [WM_S0] = "WM_S0",
 };
 
 static void
@@ -945,6 +946,8 @@ init_ewmh(struct xwm *xwm) {
 
     xcb_change_property(xwm->conn, XCB_PROP_MODE_REPLACE, xwm->screen->root,
                         xwm->atoms[NET_SUPPORTED], XCB_ATOM_ATOM, 32, 0, NULL);
+
+    xcb_set_selection_owner(xwm->conn, xwm->ewmh_window, xwm->atoms[WM_S0], XCB_CURRENT_TIME);
 }
 
 struct xwm *

@@ -10,6 +10,7 @@ struct xserver {
     struct wl_client *client;
 
     int display;
+    char display_name[16];
 
     int fd_xwm[2];
     int fd_wl[2];

@@ -17,10 +17,6 @@ struct server_xwayland {
 
     struct wl_listener on_display_destroy;
     struct wl_listener on_ready;
-
-    struct {
-        struct wl_signal ready;
-    } events;
 };
 
 struct server_xwayland *server_xwayland_create(struct server *server,

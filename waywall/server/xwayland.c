@@ -119,7 +119,7 @@ on_ready(struct wl_listener *listener, void *data) {
         return;
     }
 
-    wl_signal_emit_mutable(&xwl->events.ready, NULL);
+    ww_log(LOG_INFO, "initialized X11 window manager");
 }
 
 static void
@@ -148,8 +148,6 @@ server_xwayland_create(struct server *server, struct server_xwayland_shell *shel
         free(xwl);
         return NULL;
     }
-
-    wl_signal_init(&xwl->events.ready);
 
     xwl->on_ready.notify = on_ready;
     wl_signal_add(&xwl->xserver->events.ready, &xwl->on_ready);
