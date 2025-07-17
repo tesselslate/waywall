@@ -317,6 +317,17 @@ get_display(int x_sockets[static 2]) {
 }
 
 static void
+unlink_display(int display) {
+    char path[64];
+
+    snprintf(path, STATIC_ARRLEN(path), X11_SOCKET_FMT, display);
+    unlink(path);
+
+    snprintf(path, STATIC_ARRLEN(path), X11_LOCK_FMT, display);
+    unlink(path);
+}
+
+static void
 xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[static 2]) {
     // This function should only ever be run in the context of the child process created from
     // `xserver_start`.
@@ -498,6 +509,7 @@ fail_pidfd:
 fail_fork:
     safe_close(x_sockets[1]);
     safe_close(x_sockets[0]);
+    unlink_display(srv->display);
 
 fail_sockets:
     safe_close(log_fd);
@@ -574,6 +586,8 @@ xserver_destroy(struct xserver *srv) {
         }
         close(srv->pidfd);
     }
+
+    unlink_display(srv->display);
 
     free(srv);
 }
