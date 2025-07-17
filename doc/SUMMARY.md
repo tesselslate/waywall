@@ -10,6 +10,7 @@
 # Configuration
 
   - [Basics](01_basics.md)
+  - [Ninjabrain Bot](01_ninb.md)
   - [Options](01_options.md)
     - [Actions](01_options_actions.md)
     - [Input](01_options_input.md)
