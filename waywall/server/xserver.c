@@ -363,6 +363,7 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[stati
     snprintf(wmfd, STATIC_ARRLEN(wmfd), "%d", srv->fd_xwm[1]);
 
     argv[i++] = xwl_path;
+    argv[i++] = srv->display_name;
     argv[i++] = "-rootless"; // run in rootless mode
     argv[i++] = "-core";     // make core dumps
     argv[i++] = "-noreset";  // do not reset when the last client disconnects
@@ -455,11 +456,14 @@ xserver_start(struct xserver *srv) {
 
     // Attempt to acquire an X11 display.
     int x_sockets[2] = {0};
-    int display = get_display(x_sockets);
-    if (display == -1) {
+    srv->display = get_display(x_sockets);
+    if (srv->display == -1) {
         ww_log(LOG_ERROR, "failed to open an X11 display");
         goto fail_sockets;
     }
+
+    snprintf(srv->display_name, STATIC_ARRLEN(srv->display_name), ":%d", srv->display);
+    setenv("DISPLAY", srv->display_name, true);
 
     // Spawn the child process.
     srv->pid = fork();
@@ -504,6 +508,8 @@ xserver_start(struct xserver *srv) {
 
     srv->src_pidfd = wl_event_loop_add_fd(loop, srv->pidfd, WL_EVENT_READABLE, handle_pidfd, srv);
     check_alloc(srv->src_pidfd);
+
+    ww_log(LOG_INFO, "using X11 display :%d", srv->display);
 
     return 0;
 
