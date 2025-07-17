@@ -402,6 +402,8 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[stati
         ww_log_errno(LOG_ERROR, "failed to dup log_fd to stderr");
     }
 
+    close(log_fd);
+
     ww_assert(close(STDIN_FILENO) == 0);
 
     execvp(argv[0], argv);
