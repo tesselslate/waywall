@@ -74,6 +74,10 @@
  *  SOFTWARE.
  */
 
+#define X11_LOCK_FMT "/tmp/.X%d-lock"
+#define X11_SOCKET_DIR "/tmp/.X11-unix"
+#define X11_SOCKET_FMT "/tmp/.X11-unix/X%d"
+
 static int xserver_start(struct xserver *srv);
 
 static void
@@ -112,7 +116,6 @@ static int
 handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
     struct xserver *srv = data;
 
-    // To be honest, I have no idea what any of this does. I took it from wlroots.
     if (mask & WL_EVENT_READABLE) {
         char buf[64] = {0};
         ssize_t n = read(fd, buf, STATIC_ARRLEN(buf));
@@ -121,18 +124,6 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
             mask = 0;
         } else if (n <= 0 || buf[n - 1] != '\n') {
             return 1;
-        } else {
-            errno = 0;
-            srv->display = strtol(buf, NULL, 10);
-            if (errno != 0) {
-                ww_log_errno(LOG_ERROR, "failed to read display from displayfd");
-            } else {
-                ww_log(LOG_INFO, "using X11 display :%d", srv->display);
-
-                char envbuf[32] = {0};
-                snprintf(envbuf, STATIC_ARRLEN(envbuf), ":%d", srv->display);
-                setenv("DISPLAY", envbuf, 1);
-            }
         }
     }
 
@@ -178,8 +169,155 @@ set_cloexec(int fd, bool cloexec) {
     return 0;
 }
 
+static int
+open_socket(struct sockaddr_un *addr, size_t path_size) {
+    socklen_t size = offsetof(struct sockaddr_un, sun_path) + path_size + 1;
+
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to create socket %c%s",
+                     addr->sun_path[0] ? addr->sun_path[0] : '@', addr->sun_path + 1);
+        return -1;
+    }
+
+    if (addr->sun_path[0]) {
+        unlink(addr->sun_path);
+    }
+
+    if (bind(fd, (struct sockaddr *)addr, size) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to bind socket %c%s",
+                     addr->sun_path[0] ? addr->sun_path[0] : '@', addr->sun_path + 1);
+        close(fd);
+        return -1;
+    }
+
+    if (listen(fd, 1) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to listen to socket %c%s",
+                     addr->sun_path[0] ? addr->sun_path[0] : '@', addr->sun_path + 1);
+        close(fd);
+        return -1;
+    }
+
+    return fd;
+}
+
+static int
+open_sockets(int display, int lock_fd, int x_sockets[static 2]) {
+    if (mkdir(X11_SOCKET_DIR, 0755) == 0) {
+        ww_log(LOG_WARN, "created X11 socket directory");
+    } else if (errno != EEXIST) {
+        ww_log_errno(LOG_ERROR, "could not create X11 socket directory");
+        return -1;
+    } else {
+        // There are some potential security concerns when not checking the X11 socket directory
+        // (i.e. other users may be able to mess with our X11 sockets) but let's be real it doesn't
+        // really matter, we're playing Minecraft.
+        ww_log(LOG_INFO, "using existing X11 socket directory");
+    }
+
+    struct sockaddr_un addr = {.sun_family = AF_UNIX};
+
+    // Open the abstract X11 socket.
+    addr.sun_path[0] = 0;
+    size_t path_size =
+        snprintf(addr.sun_path + 1, STATIC_ARRLEN(addr.sun_path) - 1, X11_SOCKET_FMT, display);
+    x_sockets[0] = open_socket(&addr, path_size);
+    if (x_sockets[0] == -1) {
+        return -1;
+    }
+
+    // Open the non-abstract X11 socket.
+    path_size = snprintf(addr.sun_path, STATIC_ARRLEN(addr.sun_path), X11_SOCKET_FMT, display);
+    x_sockets[1] = open_socket(&addr, path_size);
+    if (x_sockets[1] == -1) {
+        close(x_sockets[0]);
+        return -1;
+    }
+
+    char pidstr[12];
+    snprintf(pidstr, STATIC_ARRLEN(pidstr), "%10d", getpid());
+    if (write(lock_fd, pidstr, STATIC_ARRLEN(pidstr)) != STATIC_ARRLEN(pidstr)) {
+        ww_log(LOG_ERROR, "failed to write X11 lock file");
+        close(x_sockets[1]);
+        close(x_sockets[0]);
+        return -1;
+    }
+
+    return 0;
+}
+
+static int
+get_display(int x_sockets[static 2]) {
+    for (int display = 0; display <= 32; display++) {
+        char lock_name[64];
+        snprintf(lock_name, sizeof(lock_name), X11_LOCK_FMT, display);
+
+        // Attempt to acquire the lock file for this display.
+        int lock_fd = open(lock_name, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0444);
+        if (lock_fd >= 0) {
+            if (open_sockets(display, lock_fd, x_sockets) == 0) {
+                close(lock_fd);
+                return display;
+            } else {
+                unlink(lock_name);
+                close(lock_fd);
+                continue;
+            }
+        }
+
+        // If the lock file already exists, check to see if the owning process is still alive.
+        lock_fd = open(lock_name, O_RDONLY | O_CLOEXEC);
+        if (lock_fd == -1) {
+            ww_log_errno(LOG_ERROR, "skipped " X11_LOCK_FMT ": failed to open for reading",
+                         display);
+            continue;
+        }
+
+        char pidstr[12] = {0};
+        ssize_t n = read(lock_fd, pidstr, STATIC_STRLEN(pidstr));
+        close(lock_fd);
+
+        if (n != STATIC_STRLEN(pidstr)) {
+            ww_log(LOG_INFO, "skipped " X11_LOCK_FMT ": length %zu", display, n);
+            continue;
+        }
+
+        long pid = strtol(pidstr, NULL, 10);
+        if (pid < 0 || pid > INT32_MAX) {
+            ww_log(LOG_INFO, "skipped " X11_LOCK_FMT ": invalid pid %ld", display, pid);
+            continue;
+        }
+
+        errno = 0;
+        if (kill((pid_t)pid, 0) == 0 || errno != ESRCH) {
+            ww_log(LOG_INFO, "skipped " X11_LOCK_FMT ": process alive (%ld)", display, pid);
+            continue;
+        }
+
+        // The process is no longer alive. Try to take the display.
+        if (unlink(lock_name) != 0) {
+            ww_log_errno(LOG_ERROR, "skipped " X11_LOCK_FMT ": failed to unlink", display);
+            continue;
+        }
+
+        lock_fd = open(lock_name, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0444);
+        if (lock_fd >= 0) {
+            if (open_sockets(display, lock_fd, x_sockets) == 0) {
+                close(lock_fd);
+                return display;
+            } else {
+                unlink(lock_name);
+                close(lock_fd);
+                continue;
+            }
+        }
+    }
+
+    return -1;
+}
+
 static void
-xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
+xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[static 2]) {
     // This function should only ever be run in the context of the child process created from
     // `xserver_start`.
 
@@ -187,6 +325,8 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     const int fds[] = {
         srv->fd_xwm[1],
         srv->fd_wl[1],
+        x_sockets[0],
+        x_sockets[1],
     };
 
     for (size_t i = 0; i < STATIC_ARRLEN(fds); i++) {
@@ -205,14 +345,21 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     char *argv[64];
     size_t i = 0;
 
-    char wmfd[16], displayfd[16];
-    snprintf(wmfd, STATIC_ARRLEN(wmfd), "%d", srv->fd_xwm[1]);
+    char listenfd0[16], listenfd1[16], displayfd[16], wmfd[16];
+    snprintf(listenfd0, STATIC_ARRLEN(listenfd0), "%d", x_sockets[0]);
+    snprintf(listenfd1, STATIC_ARRLEN(listenfd1), "%d", x_sockets[1]);
     snprintf(displayfd, STATIC_ARRLEN(displayfd), "%d", notify_fd);
+    snprintf(wmfd, STATIC_ARRLEN(wmfd), "%d", srv->fd_xwm[1]);
 
     argv[i++] = xwl_path;
     argv[i++] = "-rootless"; // run in rootless mode
     argv[i++] = "-core";     // make core dumps
     argv[i++] = "-noreset";  // do not reset when the last client disconnects
+
+    argv[i++] = "-listenfd";
+    argv[i++] = listenfd0;
+    argv[i++] = "-listenfd";
+    argv[i++] = listenfd1;
 
     argv[i++] = "-displayfd";
     argv[i++] = displayfd;
@@ -293,11 +440,19 @@ xserver_start(struct xserver *srv) {
         goto fail_log;
     }
 
+    // Attempt to acquire an X11 display.
+    int x_sockets[2] = {0};
+    int display = get_display(x_sockets);
+    if (display == -1) {
+        ww_log(LOG_ERROR, "failed to open an X11 display");
+        goto fail_sockets;
+    }
+
     // Spawn the child process.
     srv->pid = fork();
     if (srv->pid == 0) {
         // Child process
-        xserver_exec(srv, notify_fd[1], log_fd);
+        xserver_exec(srv, notify_fd[1], log_fd, x_sockets);
         exit(EXIT_FAILURE);
     } else if (srv->pid == -1) {
         // Parent process (error)
@@ -305,21 +460,33 @@ xserver_start(struct xserver *srv) {
         goto fail_fork;
     }
 
-    // We don't need the log file descriptor anymore. The Xwayland process will own it.
+    // The Xwayland process will own the log file descriptor, the X11 socket file descriptors,
+    // the other halves of the Wayland/XWM socket pairs, and the other half of the displayfd pipe.
+    // Close them since they are no longer needed.
     close(log_fd);
-
-    // The Xwayland process owns the other half of the displayfd pipe.
-    // Close any file descriptors which the Xwayland process is supposed to own.
+    close(x_sockets[0]);
+    close(x_sockets[1]);
     close(srv->fd_wl[1]);
     close(srv->fd_xwm[1]);
     close(notify_fd[1]);
 
+    log_fd = -1;
+    x_sockets[0] = -1;
+    x_sockets[1] = -1;
     srv->fd_wl[1] = -1;
     srv->fd_xwm[1] = -1;
+    notify_fd[1] = -1;
 
+    // Open a pidfd for the Xwayland process so it can be killed when waywall shuts down.
     srv->pidfd = pidfd_open(srv->pid, 0);
     if (srv->pidfd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open pidfd");
+
+        if (kill(srv->pid, SIGKILL) == -1) {
+            ww_log_errno(LOG_ERROR, "failed to kill xwayland");
+        }
+
+        goto fail_pidfd;
     }
 
     srv->src_pidfd = wl_event_loop_add_fd(loop, srv->pidfd, WL_EVENT_READABLE, handle_pidfd, srv);
@@ -327,16 +494,21 @@ xserver_start(struct xserver *srv) {
 
     return 0;
 
+fail_pidfd:
 fail_fork:
-    close(log_fd);
+    safe_close(x_sockets[1]);
+    safe_close(x_sockets[0]);
+
+fail_sockets:
+    safe_close(log_fd);
 
 fail_log:
     wl_event_source_remove(srv->src_pipe);
     srv->src_pipe = NULL;
 
 fail_cloexec:
-    close(notify_fd[0]);
-    close(notify_fd[1]);
+    safe_close(notify_fd[0]);
+    safe_close(notify_fd[1]);
     return 1;
 }
 
