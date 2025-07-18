@@ -4,8 +4,8 @@
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
-#include "server/ui.h"
 #include "server/surface.h"
+#include "server/ui.h"
 #include "server/wp_linux_dmabuf.h"
 #include "util/alloc.h"
 #include "util/log.h"
@@ -101,12 +101,13 @@ static constexpr int MAX_CACHED_DMABUF = 2;
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
 
-struct gl_buffer {
+struct server_gl_buffer {
     struct wl_list link; // server_gl.capture.buffers
     struct server_gl *gl;
 
     struct server_buffer *parent;
     EGLImageKHR image; // imported DMABUF - must not be modified
+    GLuint target;     // texture target
     GLuint texture;    // must not be modified
 };
 
@@ -179,8 +180,9 @@ static const struct {
 static const char *egl_strerror();
 static bool gl_checkerr(const char *msg);
 
-static void gl_buffer_destroy(struct gl_buffer *gl_buffer);
-static struct gl_buffer *gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer);
+static void gl_buffer_destroy(struct server_gl_buffer *gl_buffer);
+static struct server_gl_buffer *gl_buffer_import(struct server_gl *gl,
+                                                 struct server_buffer *buffer);
 
 static void
 on_surface_commit(struct wl_listener *listener, void *data) {
@@ -195,7 +197,7 @@ on_surface_commit(struct wl_listener *listener, void *data) {
     }
 
     // Check if the committed wl_buffer has already been imported.
-    struct gl_buffer *gl_buffer;
+    struct server_gl_buffer *gl_buffer;
     wl_list_for_each (gl_buffer, &gl->capture.buffers, link) {
         if (gl_buffer->parent == buffer) {
             gl->capture.current = gl_buffer;
@@ -212,7 +214,7 @@ on_surface_commit(struct wl_listener *listener, void *data) {
 
     // If there are too many cached buffers, remove the oldest one.
     if (wl_list_length(&gl->capture.buffers) > MAX_CACHED_DMABUF) {
-        struct gl_buffer *buffer;
+        struct server_gl_buffer *buffer;
         wl_list_for_each_reverse (buffer, &gl->capture.buffers, link) {
             gl_buffer_destroy(buffer);
             break;
@@ -236,7 +238,8 @@ on_ui_resize(struct wl_listener *listener, void *data) {
     wl_egl_window_resize(gl->surface.window, gl->server->ui->render_width,
                          gl->server->ui->render_height, 0, 0);
 
-    wp_viewport_set_destination(gl->surface.viewport, gl->server->ui->width, gl->server->ui->height);
+    wp_viewport_set_destination(gl->surface.viewport, gl->server->ui->width,
+                                gl->server->ui->height);
 }
 
 static bool
@@ -339,7 +342,7 @@ gl_checkerr(const char *msg) {
 }
 
 static void
-gl_buffer_destroy(struct gl_buffer *gl_buffer) {
+gl_buffer_destroy(struct server_gl_buffer *gl_buffer) {
     server_buffer_unref(gl_buffer->parent);
 
     eglMakeCurrent(gl_buffer->gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE,
@@ -352,14 +355,14 @@ gl_buffer_destroy(struct gl_buffer *gl_buffer) {
     free(gl_buffer);
 }
 
-static struct gl_buffer *
+static struct server_gl_buffer *
 gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
     if (strcmp(buffer->impl->name, SERVER_BUFFER_DMABUF) != 0) {
         ww_log(LOG_ERROR, "cannot create server_gl_surface for non-DMABUF buffer");
         return nullptr;
     }
 
-    struct gl_buffer *gl_buffer = zalloc(1, sizeof(*gl_buffer));
+    struct server_gl_buffer *gl_buffer = zalloc(1, sizeof(*gl_buffer));
     gl_buffer->gl = gl;
 
     gl_buffer->parent = server_buffer_ref(buffer);
@@ -418,16 +421,45 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
         goto fail_make_current;
     }
 
-    glGenTextures(1, &gl_buffer->texture);
-    gl_using_texture(GL_TEXTURE_2D, gl_buffer->texture) {
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // Determine whether the DMABUF should be imported as GL_TEXTURE_2D or GL_TEXTURE_EXTERNAL_OES.
+    static EGLuint64KHR modifiers[256];
+    static EGLBoolean external_only[256];
+    int num_modifiers = 0;
 
-        gl_buffer->gl->egl.ImageTargetTexture2DOES(GL_TEXTURE_2D, gl_buffer->image);
+    EGLBoolean ok = gl_buffer->gl->egl.QueryDmaBufModifiersEXT(
+        gl_buffer->gl->egl.display, data->format, STATIC_ARRLEN(modifiers), modifiers,
+        external_only, &num_modifiers);
+    if (!ok) {
+        ww_log_egl(LOG_ERROR, "failed to query dmabuf modifiers");
+        goto fail_query_modifiers;
+    }
+
+    EGLBoolean *external_ptr = NULL;
+    uint64_t modifier = ((uint64_t)data->modifier_hi << 32) | (uint64_t)data->modifier_lo;
+    for (int i = 0; i < num_modifiers; i++) {
+        if (modifier == modifiers[i]) {
+            external_ptr = &external_only[i];
+            break;
+        }
+    }
+
+    if (!external_ptr) {
+        ww_log(LOG_ERROR, "invalid DRM modifiers for DMABUF");
+        goto fail_query_modifiers;
+    }
+
+    gl_buffer->target = (*external_ptr) ? GL_TEXTURE_EXTERNAL_OES : GL_TEXTURE_2D;
+
+    glGenTextures(1, &gl_buffer->texture);
+    gl_using_texture(gl_buffer->target, gl_buffer->texture) {
+        glTexParameteri(gl_buffer->target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(gl_buffer->target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexParameteri(gl_buffer->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(gl_buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+        gl_buffer->gl->egl.ImageTargetTexture2DOES(gl_buffer->target, gl_buffer->image);
         if (!gl_checkerr("failed to import texture")) {
-            glBindTexture(GL_TEXTURE_2D, 0);
+            glBindTexture(gl_buffer->target, 0);
             goto fail_image_target;
         }
     }
@@ -438,6 +470,8 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
 
 fail_image_target:
     glDeleteTextures(1, &gl_buffer->texture);
+
+fail_query_modifiers:
 fail_make_current:
     gl_buffer->gl->egl.DestroyImageKHR(gl_buffer->gl->egl.display, gl_buffer->image);
 
@@ -550,6 +584,9 @@ server_gl_create(struct server *server) {
     if (!egl_getproc(&gl->egl.ImageTargetTexture2DOES, "glEGLImageTargetTexture2DOES")) {
         goto fail_extensions_egl;
     }
+    if (!egl_getproc(&gl->egl.QueryDmaBufModifiersEXT, "eglQueryDmaBufModifiersEXT")) {
+        goto fail_extensions_gl;
+    }
 
     // Choose a configuration and create an EGL context.
     EGLint n = 0;
@@ -621,6 +658,8 @@ server_gl_create(struct server *server) {
     // Log debug information about the user's EGL/OpenGL implementation.
     server_gl_with(gl, false) {
         egl_print_sysinfo(gl);
+
+        // TODO: Log DRM format information? (should also be logged when importing DMABUFs probably)
     }
 
     wl_list_init(&gl->capture.buffers);
@@ -663,7 +702,7 @@ server_gl_destroy(struct server_gl *gl) {
         wl_list_remove(&gl->on_surface_destroy.link);
     }
 
-    struct gl_buffer *gl_buffer, *gl_buffer_tmp;
+    struct server_gl_buffer *gl_buffer, *gl_buffer_tmp;
     wl_list_for_each_safe (gl_buffer, gl_buffer_tmp, &gl->capture.buffers, link) {
         gl_buffer_destroy(gl_buffer);
     }
@@ -732,13 +771,9 @@ fail_vert:
     return nullptr;
 }
 
-GLuint
+struct server_gl_buffer *
 server_gl_get_capture(struct server_gl *gl) {
-    if (!gl->capture.current) {
-        return 0;
-    }
-
-    return gl->capture.current->texture;
+    return gl->capture.current;
 }
 
 void
@@ -766,6 +801,16 @@ void
 server_gl_swap_buffers(struct server_gl *gl) {
     eglSwapInterval(gl->egl.display, 0);
     eglSwapBuffers(gl->egl.display, gl->surface.egl);
+}
+
+GLuint
+server_gl_buffer_get_texture(struct server_gl_buffer *buffer) {
+    return buffer->texture;
+}
+
+GLuint
+server_gl_buffer_get_target(struct server_gl_buffer *buffer) {
+    return buffer->target;
 }
 
 void

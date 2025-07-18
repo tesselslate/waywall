@@ -28,6 +28,7 @@ struct server_gl {
         PFNEGLDESTROYIMAGEKHRPROC DestroyImageKHR;
         PFNEGLGETPLATFORMDISPLAYEXTPROC GetPlatformDisplayEXT;
         PFNGLEGLIMAGETARGETTEXTURE2DOESPROC ImageTargetTexture2DOES;
+        PFNEGLQUERYDMABUFMODIFIERSEXTPROC QueryDmaBufModifiersEXT;
 
         EGLDisplay display;
         EGLConfig config;
@@ -46,7 +47,7 @@ struct server_gl {
     struct {
         struct server_surface *surface;
         struct wl_list buffers; // gl_buffer.link
-        struct gl_buffer *current;
+        struct server_gl_buffer *current;
     } capture;
 
     struct wl_listener on_surface_commit;
@@ -57,6 +58,8 @@ struct server_gl {
         struct wl_signal frame; // data: nullptr
     } events;
 };
+
+struct server_gl_buffer;
 
 struct server_gl_shader {
     GLuint vert, frag;
@@ -70,10 +73,13 @@ void server_gl_exit(struct server_gl *gl);
 
 struct server_gl_shader *server_gl_compile(struct server_gl *gl, const char *vertex,
                                            const char *fragment);
-GLuint server_gl_get_capture(struct server_gl *gl);
+struct server_gl_buffer *server_gl_get_capture(struct server_gl *gl);
 void server_gl_get_capture_size(struct server_gl *gl, int32_t *width, int32_t *height);
 void server_gl_set_capture(struct server_gl *gl, struct server_surface *surface);
 void server_gl_swap_buffers(struct server_gl *gl);
+
+GLuint server_gl_buffer_get_texture(struct server_gl_buffer *buffer);
+GLuint server_gl_buffer_get_target(struct server_gl_buffer *buffer);
 
 void server_gl_shader_destroy(struct server_gl_shader *shader);
 void server_gl_shader_use(struct server_gl_shader *shader);

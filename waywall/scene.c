@@ -191,10 +191,13 @@ mirror_render(struct scene_object *object) {
     struct scene_mirror *mirror = scene_mirror_from_object(object);
     struct scene *scene = mirror->parent;
 
-    GLuint capture_texture = server_gl_get_capture(scene->gl);
-    if (capture_texture == 0) {
+    struct server_gl_buffer *capture = server_gl_get_capture(scene->gl);
+    if (!capture) {
         return;
     }
+
+    GLuint target = server_gl_buffer_get_target(capture);
+    GLuint texture = server_gl_buffer_get_texture(capture);
 
     int32_t width, height;
     server_gl_get_capture_size(scene->gl, &width, &height);
@@ -205,7 +208,7 @@ mirror_render(struct scene_object *object) {
     glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
 
     gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
-        gl_using_texture(GL_TEXTURE_2D, capture_texture) {
+        gl_using_texture(target, texture) {
             // Each mirror has 6 vertices in its vertex buffer.
             draw_vertex_list(&scene->shaders.data[mirror->shader_index], 6);
         }
@@ -394,11 +397,14 @@ draw_stencil(struct scene *scene) {
     // The OpenGL context must be current.
 
     int32_t width, height;
-    GLuint tex = server_gl_get_capture(scene->gl);
-    if (tex == 0) {
+    struct server_gl_buffer *capture = server_gl_get_capture(scene->gl);
+    if (!capture) {
         return;
     }
     server_gl_get_capture_size(scene->gl, &width, &height);
+
+    GLuint capture_target = server_gl_buffer_get_target(capture);
+    GLuint capture_texture = server_gl_buffer_get_texture(capture);
 
     // It would be possible to listen for resizes instead of checking whether the stencil buffer
     // needs an update every frame, but that would be more complicated and there is also no event
@@ -445,7 +451,7 @@ draw_stencil(struct scene *scene) {
     struct vtx_shader buf[6];
     rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){}, (float[4]){});
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.stencil_rect) {
-        gl_using_texture(GL_TEXTURE_2D, tex) {
+        gl_using_texture(capture_target, capture_texture) {
             glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_DRAW);
             server_gl_shader_use(scene->shaders.data[0].shader);
             draw_vertex_list(&scene->shaders.data[0], 6);
