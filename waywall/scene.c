@@ -87,7 +87,7 @@ static void draw_debug_text(struct scene *scene);
 static void draw_frame(struct scene *scene);
 static void draw_image(struct scene *scene, struct scene_image *image);
 static void draw_mirror(struct scene *scene, struct scene_mirror *mirror,
-                        unsigned int capture_texture, int32_t width, int32_t height);
+                        struct server_gl_buffer *capture, int32_t width, int32_t height);
 static void draw_text(struct scene *scene, struct scene_text *text);
 
 static void draw_vertex_list(struct scene_shader *shader, size_t num_vertices);
@@ -244,8 +244,8 @@ draw_frame(struct scene *scene) {
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glViewport(0, 0, scene->ui->width, scene->ui->height);
 
-    GLuint capture_texture = server_gl_get_capture(scene->gl);
-    bool have_mirrors = (capture_texture != 0 && !wl_list_empty(&scene->mirrors));
+    struct server_gl_buffer *capture = server_gl_get_capture(scene->gl);
+    bool have_mirrors = (!!capture && !wl_list_empty(&scene->mirrors));
     bool have_images = !wl_list_empty(&scene->images);
     bool have_text = (util_debug_enabled || !wl_list_empty(&scene->text));
 
@@ -260,12 +260,12 @@ draw_frame(struct scene *scene) {
     }
 
     // Draw all mirrors using their respective shaders.
-    if (capture_texture != 0) {
+    if (capture) {
         int32_t width, height;
         server_gl_get_capture_size(scene->gl, &width, &height);
         struct scene_mirror *mirror;
         wl_list_for_each (mirror, &scene->mirrors, link) {
-            draw_mirror(scene, mirror, capture_texture, width, height);
+            draw_mirror(scene, mirror, capture, width, height);
         }
     }
 
@@ -309,7 +309,7 @@ draw_image(struct scene *scene, struct scene_image *image) {
 }
 
 static void
-draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int capture_texture,
+draw_mirror(struct scene *scene, struct scene_mirror *mirror, struct server_gl_buffer *capture,
             int32_t width, int32_t height) {
     // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
@@ -317,8 +317,11 @@ draw_mirror(struct scene *scene, struct scene_mirror *mirror, unsigned int captu
                 scene->ui->height);
     glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
 
+    GLuint target = server_gl_buffer_get_target(capture);
+    GLuint texture = server_gl_buffer_get_texture(capture);
+
     gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
-        gl_using_texture(GL_TEXTURE_2D, capture_texture) {
+        gl_using_texture(target, texture) {
             // Each mirror has 6 vertices in its vertex buffer.
             draw_vertex_list(&scene->shaders.data[mirror->shader_index], 6);
         }
