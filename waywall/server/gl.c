@@ -8,6 +8,7 @@
 #include "server/ui.h"
 #include "server/wp_linux_dmabuf.h"
 #include "util/alloc.h"
+#include "util/list.h"
 #include "util/log.h"
 #include "util/prelude.h"
 #include "viewporter-client-protocol.h"
@@ -95,8 +96,18 @@
  *  SOFTWARE.
  */
 
-static constexpr uint64_t DRM_FORMAT_MOD_INVALID = 0xFFFFFFFFFFFFFFF;
-static constexpr int MAX_CACHED_DMABUF = 2;
+struct server_drm_format {
+    uint32_t format;
+
+    EGLint num_modifiers;
+    EGLuint64KHR *modifiers;
+    EGLBoolean *external_only;
+};
+
+LIST_DEFINE_IMPL(struct server_drm_format, list_server_drm_format);
+
+#define DRM_FORMAT_MOD_INVALID 0xFFFFFFFFFFFFFFFull
+#define MAX_CACHED_DMABUF 2
 
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
@@ -330,6 +341,73 @@ egl_strerror() {
     // clang-format on
 }
 
+static void
+destroy_drm_formats(struct list_server_drm_format *formats) {
+    for (ssize_t i = 0; i < formats->len; i++) {
+        free(formats->data[i].modifiers);
+        free(formats->data[i].external_only);
+    }
+
+    list_server_drm_format_destroy(formats);
+}
+
+static int
+get_drm_formats(struct server_gl *gl) {
+    EGLint num_formats = 0;
+    if (!gl->egl.QueryDmaBufFormatsEXT(gl->egl.display, 0, NULL, &num_formats)) {
+        ww_log_egl(LOG_ERROR, "failed to query DMABUF format count");
+        return -1;
+    }
+
+    EGLint *formats = zalloc(num_formats, sizeof(*formats));
+    if (!gl->egl.QueryDmaBufFormatsEXT(gl->egl.display, num_formats, formats, &num_formats)) {
+        ww_log_egl(LOG_ERROR, "failed to query allowed DMABUF formats");
+        goto fail_query_formats;
+    }
+
+    ww_log(LOG_INFO, "received %d acceptable formats for DMABUF import", num_formats);
+
+    gl->capture.formats = list_server_drm_format_create();
+    for (int i = 0; i < num_formats; i++) {
+        struct server_drm_format format = {.format = formats[i], 0};
+
+        if (!gl->egl.QueryDmaBufModifiersEXT(gl->egl.display, formats[i], 0, NULL, NULL,
+                                             &format.num_modifiers)) {
+            ww_log_egl(LOG_ERROR, "failed to query DRM modifier count for format %x", formats[i]);
+            goto fail_query_modifiers;
+        }
+
+        format.modifiers = zalloc(format.num_modifiers, sizeof(*format.modifiers));
+        format.external_only = zalloc(format.num_modifiers, sizeof(*format.external_only));
+
+        if (!gl->egl.QueryDmaBufModifiersEXT(gl->egl.display, formats[i], format.num_modifiers,
+                                             format.modifiers, format.external_only,
+                                             &format.num_modifiers)) {
+            ww_log_egl(LOG_ERROR, "failed to query DRM modifiers (%d) for format %x",
+                       format.num_modifiers, formats[i]);
+            goto fail_query_modifiers;
+        }
+
+        ww_log(LOG_INFO, "DRM format 0x%08x:", formats[i]);
+        for (int i = 0; i < format.num_modifiers; i++) {
+            ww_log(LOG_INFO, "        %c 0x%016lx", format.external_only[i] ? '!' : ' ',
+                   format.modifiers[i]);
+        }
+
+        list_server_drm_format_append(&gl->capture.formats, format);
+    }
+
+    free(formats);
+    return 0;
+
+fail_query_modifiers:
+    destroy_drm_formats(&gl->capture.formats);
+
+fail_query_formats:
+    free(formats);
+    return -1;
+}
+
 static bool
 gl_checkerr(const char *msg) {
     GLenum err = glGetError();
@@ -421,30 +499,35 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
         goto fail_make_current;
     }
 
-    // Determine whether the DMABUF should be imported as GL_TEXTURE_2D or GL_TEXTURE_EXTERNAL_OES.
-    static EGLuint64KHR modifiers[256];
-    static EGLBoolean external_only[256];
-    int num_modifiers = 0;
-
-    EGLBoolean ok = gl_buffer->gl->egl.QueryDmaBufModifiersEXT(
-        gl_buffer->gl->egl.display, data->format, STATIC_ARRLEN(modifiers), modifiers,
-        external_only, &num_modifiers);
-    if (!ok) {
-        ww_log_egl(LOG_ERROR, "failed to query dmabuf modifiers");
-        goto fail_query_modifiers;
-    }
+    // Determine whether the DMABUF should be imported as GL_TEXTURE_2D or
+    // GL_TEXTURE_EXTERNAL_OES.
+    uint64_t modifier = ((uint64_t)data->modifier_hi << 32) | (uint64_t)data->modifier_lo;
 
     EGLBoolean *external_ptr = NULL;
-    uint64_t modifier = ((uint64_t)data->modifier_hi << 32) | (uint64_t)data->modifier_lo;
-    for (int i = 0; i < num_modifiers; i++) {
-        if (modifier == modifiers[i]) {
-            external_ptr = &external_only[i];
+    for (int i = 0; i < gl_buffer->gl->capture.formats.len; i++) {
+        struct server_drm_format *format = &gl_buffer->gl->capture.formats.data[i];
+
+        if (format->format != data->format) {
+            continue;
+        }
+
+        for (int j = 0; j < format->num_modifiers; j++) {
+            if (format->modifiers[j] != modifier) {
+                continue;
+            }
+
+            external_ptr = &format->external_only[j];
             break;
+        }
+
+        if (!external_ptr) {
+            ww_log(LOG_ERROR, "failed DMABUF import - invalid modifiers");
+            goto fail_query_modifiers;
         }
     }
 
     if (!external_ptr) {
-        ww_log(LOG_ERROR, "invalid DRM modifiers for DMABUF");
+        ww_log(LOG_INFO, "failed DMABUF import - invalid format");
         goto fail_query_modifiers;
     }
 
@@ -560,8 +643,7 @@ server_gl_create(struct server *server) {
         goto fail_initialize;
     }
 
-    // Query for EGL extension support. In particular, we need to be able to import and export
-    // DMABUFs.
+    // Query for EGL extension support. In particular, we need to be able to import DMABUFs.
     const char *egl_extensions = eglQueryString(gl->egl.display, EGL_EXTENSIONS);
     if (!egl_extensions) {
         ww_log_egl(LOG_ERROR, "failed to query EGL extensions");
@@ -584,8 +666,16 @@ server_gl_create(struct server *server) {
     if (!egl_getproc(&gl->egl.ImageTargetTexture2DOES, "glEGLImageTargetTexture2DOES")) {
         goto fail_extensions_egl;
     }
+    if (!egl_getproc(&gl->egl.QueryDmaBufFormatsEXT, "eglQueryDmaBufFormatsEXT")) {
+        goto fail_extensions_gl;
+    }
     if (!egl_getproc(&gl->egl.QueryDmaBufModifiersEXT, "eglQueryDmaBufModifiersEXT")) {
         goto fail_extensions_gl;
+    }
+
+    // Query information about the allowed DMABUF formats and modifiers.
+    if (get_drm_formats(gl) != 0) {
+        goto fail_get_drm_formats;
     }
 
     // Choose a configuration and create an EGL context.
@@ -658,8 +748,6 @@ server_gl_create(struct server *server) {
     // Log debug information about the user's EGL/OpenGL implementation.
     server_gl_with(gl, false) {
         egl_print_sysinfo(gl);
-
-        // TODO: Log DRM format information? (should also be logged when importing DMABUFs probably)
     }
 
     wl_list_init(&gl->capture.buffers);
@@ -681,6 +769,9 @@ fail_make_current:
 
 fail_create_context:
 fail_choose_config:
+    destroy_drm_formats(&gl->capture.formats);
+
+fail_get_drm_formats:
 fail_extensions_egl:
     eglTerminate(gl->egl.display);
 
@@ -720,6 +811,8 @@ server_gl_destroy(struct server_gl *gl) {
     eglMakeCurrent(gl->egl.display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
     eglDestroyContext(gl->egl.display, gl->egl.ctx);
     eglTerminate(gl->egl.display);
+
+    destroy_drm_formats(&gl->capture.formats);
 
     free(gl);
 }
