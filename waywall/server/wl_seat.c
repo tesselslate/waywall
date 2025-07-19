@@ -68,8 +68,13 @@ static void
 get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     ww_assert(seat->input_focus);
 
-    *x = seat->pointer.x - (double)seat->input_focus->current.x;
-    *y = seat->pointer.y - (double)seat->input_focus->current.y;
+    int32_t scale = 1;
+    if (seat->input_focus->surface->remote) {
+        scale = seat->input_focus->surface->preferred_buffer_scale;
+    }
+
+    *x = (seat->pointer.x - (double)seat->input_focus->current.x) * scale;
+    *y = (seat->pointer.y - (double)seat->input_focus->current.y) * scale;
 }
 
 static int

@@ -249,16 +249,16 @@ static void
 surface_set_buffer_scale(struct wl_client *client, struct wl_resource *resource, int32_t scale) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
+    if (surface->client_buffer_scale == scale) {
+        return; // No change, do nothing
+    }
+    surface->client_buffer_scale = scale;
+    // need to somehow trigger a resize event from here
+    // i mean technically i think if the user just hovers over the surface it'll work but im not sure
+
     if (scale <= 0) {
         wl_resource_post_error(resource, WL_SURFACE_ERROR_INVALID_SCALE, "scale not positive");
         return;
-    }
-
-    // TODO: Properly support buffer scaling (including fractional scaling, probably, maybe?)
-    // As of right now, it's not actually supported, so there's no point pretending it is.
-
-    if (scale != 1) {
-        ww_log(LOG_WARN, "non-default buffer scale (%" PRIi32 " for surface %p)", scale, surface);
     }
 }
 
@@ -320,11 +320,30 @@ compositor_create_region(struct wl_client *client, struct wl_resource *resource,
     check_alloc(region->remote);
 }
 
+static void handle_preferred_buffer_scale(void *data, struct wl_surface *wl_surface, int32_t scale) {
+    struct server_surface *surface = data;
+    surface->preferred_buffer_scale = scale; // Store the scale
+    surface->handled = false; // mark as true after the screen is updated
+}
+
+static void noop_enter_leave(void *data, struct wl_surface *wl_surface, struct wl_output *output) {}
+static void noop_transform(void *data, struct wl_surface *wl_surface, uint32_t transform) {}
+
+
+static const struct wl_surface_listener surface_listener = {
+    .enter = noop_enter_leave,
+    .leave = noop_enter_leave,
+    .preferred_buffer_scale = handle_preferred_buffer_scale,
+    .preferred_buffer_transform = noop_transform  // Only needed for v7+
+};
+
 static void
 compositor_create_surface(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_compositor *compositor = wl_resource_get_user_data(resource);
 
     struct server_surface *surface = zalloc(1, sizeof(*surface));
+    surface->preferred_buffer_scale = 1;
+    surface->client_buffer_scale = 1;
 
     surface->resource =
         wl_resource_create(client, &wl_surface_interface, wl_resource_get_version(resource), id);
@@ -334,6 +353,7 @@ compositor_create_surface(struct wl_client *client, struct wl_resource *resource
 
     surface->remote = wl_compositor_create_surface(compositor->remote);
     check_alloc(surface->remote);
+    wl_surface_add_listener(surface->remote, &surface_listener, surface);
 
     // We need to ensure that input events are never given to a child surface. See
     // `surface_set_input_region` for more details.
