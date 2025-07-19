@@ -189,7 +189,6 @@ static const struct {
 };
 
 static const char *egl_strerror();
-static bool gl_checkerr(const char *msg);
 
 static void gl_buffer_destroy(struct server_gl_buffer *gl_buffer);
 static struct server_gl_buffer *gl_buffer_import(struct server_gl *gl,
@@ -408,15 +407,15 @@ fail_query_formats:
     return -1;
 }
 
-static bool
-gl_checkerr(const char *msg) {
-    GLenum err = glGetError();
-    if (err == GL_NO_ERROR) {
-        return true;
-    }
+static const char *
+get_dmabuf_info(struct server_dmabuf_data *data) {
+    static char buf[4096];
 
-    ww_log(LOG_ERROR, "%s: %d", msg, (int)err);
-    return false;
+    uint64_t modifier = ((uint64_t)data->modifier_hi << 32) | (uint64_t)data->modifier_lo;
+    snprintf(buf, STATIC_ARRLEN(buf), "%dx%d, planes: %d, format: 0x%08x, modifiers: 0x%016lx",
+             data->width, data->height, data->num_planes, data->format, modifier);
+
+    return buf;
 }
 
 static void
@@ -488,7 +487,7 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
         gl_buffer->gl->egl.CreateImageKHR(gl_buffer->gl->egl.display, EGL_NO_CONTEXT,
                                           EGL_LINUX_DMA_BUF_EXT, nullptr, image_attributes);
     if (gl_buffer->image == EGL_NO_IMAGE_KHR) {
-        ww_log_egl(LOG_ERROR, "failed to create EGLImage for dmabuf");
+        ww_log_egl(LOG_ERROR, "failed to create EGLImage for dmabuf (%s)", get_dmabuf_info(data));
         goto fail_create_orig;
     }
 
@@ -521,13 +520,14 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
         }
 
         if (!external_ptr) {
-            ww_log(LOG_ERROR, "failed DMABUF import - invalid modifiers");
+            ww_log(LOG_ERROR, "failed DMABUF import - invalid modifiers (%s)",
+                   get_dmabuf_info(data));
             goto fail_query_modifiers;
         }
     }
 
     if (!external_ptr) {
-        ww_log(LOG_INFO, "failed DMABUF import - invalid format");
+        ww_log(LOG_INFO, "failed DMABUF import - invalid format (%s)", get_dmabuf_info(data));
         goto fail_query_modifiers;
     }
 
@@ -541,8 +541,9 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
         glTexParameteri(gl_buffer->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         gl_buffer->gl->egl.ImageTargetTexture2DOES(gl_buffer->target, gl_buffer->image);
-        if (!gl_checkerr("failed to import texture")) {
-            glBindTexture(gl_buffer->target, 0);
+        GLenum err = glGetError();
+        if (err != GL_NO_ERROR) {
+            ww_log(LOG_INFO, "failed DMABUF import - %d (%s)", (int)err, get_dmabuf_info(data));
             goto fail_image_target;
         }
     }
