@@ -3,23 +3,96 @@
 #include "config/config.h"
 #include "server/backend.h"
 #include "server/buffer.h"
-#include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
+#include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/debug.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/syscall.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <linux/memfd.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
+
+#define COLOR_BLEND(c, a) (COLOR_MULT(((c) * (a)) / UINT8_MAX))
+#define COLOR_MULT(c) ((uint32_t)(((uint64_t)(c) * UINT32_MAX) / UINT8_MAX))
+
+struct color_buffer {
+    int fd;
+};
+
+static void
+color_buffer_destroy(struct wl_buffer *buffer) {
+    struct color_buffer *data = wl_buffer_get_user_data(buffer);
+    wl_buffer_destroy(buffer);
+
+    if (!data) {
+        return;
+    }
+
+    if (close(data->fd) != 0) {
+        ww_log_errno(LOG_ERROR, "failed to close memfd for color buffer");
+    }
+
+    free(data);
+}
+
+static struct wl_buffer *
+color_buffer_new(struct server *server, const uint8_t color[static 4]) {
+    if (server->backend->single_pixel_buffer_manager) {
+        return wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
+            server->backend->single_pixel_buffer_manager, COLOR_BLEND(color[0], color[3]),
+            COLOR_BLEND(color[1], color[3]), COLOR_BLEND(color[2], color[3]), COLOR_MULT(color[3]));
+    }
+
+    struct color_buffer *data = zalloc(1, sizeof(*data));
+
+    data->fd = memfd_create("waywall-shm", MFD_CLOEXEC);
+    if (data->fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to create memfd for color buffer");
+        goto fail_memfd;
+    }
+
+    if (ftruncate(data->fd, 4) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to truncate memfd for color buffer");
+        goto fail_memfd;
+    }
+
+    char *buf = mmap(NULL, 4, PROT_WRITE, MAP_SHARED, data->fd, 0);
+    if (buf == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to mmap memfd for color buffer");
+        goto fail_memfd;
+    }
+
+    // Reorder bytes to ARGB and do alpha premultiplication.
+    buf[0] = (uint32_t)(color[2] * color[3]) / UINT8_MAX;
+    buf[1] = (uint32_t)(color[1] * color[3]) / UINT8_MAX;
+    buf[2] = (uint32_t)(color[0] * color[3]) / UINT8_MAX;
+    buf[3] = color[3];
+
+    struct wl_shm_pool *pool = wl_shm_create_pool(server->backend->shm, data->fd, 4);
+    struct wl_buffer *buffer = wl_shm_pool_create_buffer(pool, 0, 1, 1, 4, WL_SHM_FORMAT_ARGB8888);
+    wl_buffer_set_user_data(buffer, data);
+
+    wl_shm_pool_destroy(pool);
+
+    return buffer;
+
+fail_memfd:
+    free(data);
+    return NULL;
+}
 
 static void
 layout_centered(struct server_view *view) {
@@ -209,8 +282,7 @@ server_ui_create(struct server *server, struct config *cfg) {
         check_alloc(ui->root.tearing_control);
     }
 
-    ui->tree.buffer =
-        remote_buffer_manager_color(server->remote_buf, (const uint8_t[4]){0, 0, 0, 0});
+    ui->tree.buffer = color_buffer_new(server, (const uint8_t[4]){0, 0, 0, 0});
     ww_assert(ui->tree.buffer);
 
     ui->tree.surface = wl_compositor_create_surface(server->backend->compositor);
@@ -270,7 +342,7 @@ fail_config:
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
     wl_surface_destroy(ui->tree.surface);
-    remote_buffer_deref(ui->tree.buffer);
+    color_buffer_destroy(ui->tree.buffer);
     wp_viewport_destroy(ui->root.viewport);
     wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
@@ -293,7 +365,7 @@ server_ui_destroy(struct server_ui *ui) {
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
     wl_surface_destroy(ui->tree.surface);
-    remote_buffer_deref(ui->tree.buffer);
+    color_buffer_destroy(ui->tree.buffer);
     wp_viewport_destroy(ui->root.viewport);
     wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
@@ -373,13 +445,9 @@ struct server_ui_config *
 server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     struct server_ui_config *config = zalloc(1, sizeof(*config));
 
-    if (strcmp(cfg->theme.background_path, "") != 0) {
-        config->background =
-            remote_buffer_manager_png(ui->server->remote_buf, cfg->theme.background_path);
-    } else {
-        config->background =
-            remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
-    }
+    config->background = color_buffer_new(ui->server, (strcmp(cfg->theme.background_path, "") != 0)
+                                                          ? (const uint8_t[4]){0, 0, 0, 0}
+                                                          : cfg->theme.background);
     if (!config->background) {
         ww_log(LOG_ERROR, "failed to create root buffer");
         free(config);
@@ -395,7 +463,7 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
 
 void
 server_ui_config_destroy(struct server_ui_config *config) {
-    remote_buffer_deref(config->background);
+    color_buffer_destroy(config->background);
     free(config);
 }
 
