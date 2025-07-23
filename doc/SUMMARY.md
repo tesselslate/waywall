@@ -6,6 +6,7 @@
 
   - [Installation](00_installation.md)
   - [Setup](00_setup.md)
+  - [Known Issues](00_known_issues.md)
 
 # Configuration
 
