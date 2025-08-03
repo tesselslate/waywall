@@ -36,6 +36,7 @@ struct server_backend {
     struct wp_alpha_modifier_v1 *alpha_modifier;
     struct wp_cursor_shape_manager_v1 *cursor_shape_manager;
     struct wp_linux_drm_syncobj_manager_v1 *linux_drm_syncobj_manager;
+    struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager;
     struct wp_tearing_control_manager_v1 *tearing_control;
     struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
 
