@@ -1,4 +1,5 @@
 #include "server/wl_output.h"
+#include "server/backend.h"
 #include "server/server.h"
 #include "server/ui.h"
 #include "util/alloc.h"
@@ -37,6 +38,8 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
                             WL_OUTPUT_TRANSFORM_NORMAL);
     wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT, output->ui->width, output->ui->height, 0);
 
+    wl_output_send_scale(resource, output->parent_wl_output->scale);
+
     if (version >= WL_OUTPUT_NAME_SINCE_VERSION) {
         wl_output_send_name(resource, "waywall output");
     }
@@ -56,6 +59,9 @@ on_resize(struct wl_listener *listener, void *data) {
         wl_output_send_mode(output_resource, WL_OUTPUT_MODE_CURRENT, output->ui->width,
                             output->ui->height, 0);
 
+        wl_output_send_scale(output_resource, output->parent_wl_output->scale);
+
+
         if (wl_resource_get_version(output_resource) >= WL_OUTPUT_DONE_SINCE_VERSION) {
             wl_output_send_done(output_resource);
         }
@@ -74,12 +80,17 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     free(output);
 }
 
+
 struct server_output *
 server_output_create(struct server *server, struct server_ui *ui) {
     struct server_output *output = zalloc(1, sizeof(*output));
 
     output->global = wl_global_create(server->display, &wl_output_interface, SRV_OUTPUT_VERSION,
                                       output, on_global_bind);
+
+    struct parent_output *parent_output = wl_container_of(server->backend->outputs.next, parent_output, link);
+    output->parent_wl_output = parent_output;
+
     check_alloc(output->global);
 
     wl_list_init(&output->objects);

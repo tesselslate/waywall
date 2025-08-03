@@ -5,9 +5,19 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 
+struct parent_output {
+    struct wl_output *wl_output; // The Wayland wl_output object from parent compositor
+
+    struct wl_list link;
+
+    int32_t scale;
+};
+
 struct server_backend {
     struct wl_display *display;
     struct wl_registry *registry;
+
+    struct wl_list outputs; 
 
     struct {
         struct wl_list names; // seat_name.link

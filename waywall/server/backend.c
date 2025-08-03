@@ -18,14 +18,14 @@
 #include <wayland-client-protocol.h>
 
 #define USE_ALPHA_MODIFIER_VERSION 1
-#define USE_COMPOSITOR_VERSION 5
+#define USE_COMPOSITOR_VERSION 6
 #define USE_CURSOR_SHAPE_VERSION 1
 #define USE_DATA_DEVICE_MANAGER_VERSION 2
 #define USE_LINUX_DMABUF_VERSION 4
 #define USE_LINUX_DRM_SYNCOBJ_VERSION 1
 #define USE_POINTER_CONSTRAINTS_VERSION 1
 #define USE_RELATIVE_POINTER_MANAGER_VERSION 1
-#define USE_SEAT_VERSION 5
+#define USE_SEAT_VERSION 6
 #define USE_SHM_VERSION 1
 #define USE_SUBCOMPOSITOR_VERSION 1
 #define USE_TEARING_CONTROL_VERSION 1
@@ -101,12 +101,46 @@ static const struct xdg_wm_base_listener xdg_wm_base_listener = {
     .ping = on_xdg_wm_base_ping,
 };
 
+static void parent_output_geometry(void *data, struct wl_output *wl_output,
+    int32_t x, int32_t y,
+    int32_t phys_width, int32_t phys_height,
+    int32_t subpixel,
+    const char *make, const char *model,
+    int32_t transform
+) {}
+
+static void parent_output_mode(void *data, struct wl_output *wl_output,
+    uint32_t flags, int32_t width, int32_t height,
+    int32_t refresh
+) {}
+
+static void parent_output_done(void *data, struct wl_output *wl_output) {}
+
+static void parent_output_scale(void *data, struct wl_output *wl_output, int32_t scale) {
+    struct parent_output *output = data;
+    if (!output) return;
+    output->scale = scale;
+}
+
+static const struct wl_output_listener parent_output_listener = {
+    .geometry = parent_output_geometry,
+    .mode     = parent_output_mode,
+    .done     = parent_output_done,
+    .scale    = parent_output_scale,
+};
+
+
 static void
 on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char *iface,
                    uint32_t version) {
     struct server_backend *backend = data;
 
-    if (strcmp(iface, wp_alpha_modifier_v1_interface.name) == 0) {
+    if (strcmp(iface, wl_output_interface.name) == 0) {
+        struct parent_output *output = zalloc(1, sizeof(*output));
+        output->wl_output = wl_registry_bind(wl, name, &wl_output_interface, (version < 3 ? version : 3));
+        wl_output_add_listener(output->wl_output, &parent_output_listener, output);
+        wl_list_insert(&backend->outputs, &output->link);
+    } else if (strcmp(iface, wp_alpha_modifier_v1_interface.name) == 0) {
         if (version < USE_ALPHA_MODIFIER_VERSION) {
             ww_log(LOG_WARN, "host compositor provides outdated wp_alpha_modifier_v1 (%d < %d)",
                    version, USE_ALPHA_MODIFIER_VERSION);
@@ -294,6 +328,7 @@ server_backend_create() {
     struct server_backend *backend = zalloc(1, sizeof(*backend));
 
     wl_list_init(&backend->seat.names);
+    wl_list_init(&backend->outputs);
     wl_array_init(&backend->shm_formats);
 
     wl_signal_init(&backend->events.seat_data_device);
