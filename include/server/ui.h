@@ -28,6 +28,14 @@ struct server_ui {
         struct wl_subsurface *subsurface;
     } tree;
 
+    struct {
+        struct wl_surface *surface;
+        struct xdg_toplevel *top_level;
+        bool is_focused;
+        int32_t width;
+        int32_t height;
+    } ninbot;
+
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
     struct zxdg_toplevel_decoration_v1 *xdg_decoration;
@@ -101,6 +109,7 @@ void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen);
 void server_ui_show(struct server_ui *ui);
+void ninbot_toplevel_show(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 
 struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);

@@ -744,9 +744,14 @@ on_pointer_enter(void *data, struct wl_pointer *wl, uint32_t serial, struct wl_s
                  wl_fixed_t surface_x, wl_fixed_t surface_y) {
     struct server_seat *seat = data;
     seat->last_serial = serial;
+    seat->server->ui->ninbot.is_focused = false;
+
+    if (surface == seat->server->ui->ninbot.surface) {
+        seat->server->ui->ninbot.is_focused = true;
+        return;
+    }
 
     if (surface != seat->server->ui->root.surface) {
-        ww_log(LOG_WARN, "received wl_pointer.enter for unknown surface");
         return;
     }
 

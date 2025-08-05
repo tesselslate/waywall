@@ -645,6 +645,7 @@ process_config_theme(struct config *cfg) {
             [ANCHOR_RIGHT] = "right",
             [ANCHOR_BOTTOMLEFT] = "bottomleft",
             [ANCHOR_BOTTOMRIGHT] = "bottomright",
+            [ANCHOR_SEPARATE] = "separate",
         };
 
         for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {

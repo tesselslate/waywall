@@ -140,6 +140,34 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
     .wm_capabilities = on_xdg_toplevel_wm_capabilities,
 };
 
+void ninbot_toplevel_configure_handler
+(
+    void *data,
+    struct xdg_toplevel *xdg_toplevel,
+    int32_t width,
+    int32_t height,
+    struct wl_array *states
+) {
+    struct server_ui *ui = data;
+    ui->ninbot.width = width;
+    ui->ninbot.height = height;
+}
+
+void ninbot_toplevel_close_handler
+(
+    void *data,
+    struct xdg_toplevel *xdg_toplevel
+) {
+    struct server_ui *ui = data;
+    // TODO: only close ninbot and other floating windows
+    wl_signal_emit_mutable(&ui->events.close, NULL);
+}
+
+static const struct xdg_toplevel_listener ninbot_toplevel_listener = {
+    .configure = ninbot_toplevel_configure_handler,
+    .close = ninbot_toplevel_close_handler
+};
+
 static void
 on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
     struct server_ui *ui = data;
@@ -161,6 +189,17 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
 
 static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = on_xdg_surface_configure,
+};
+
+static void xdg_surface_configure_handler (void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
+    struct server_ui *ui = data;
+    xdg_surface_set_window_geometry(xdg_surface, 0, 0, ui->ninbot.width, ui->ninbot.height);
+    xdg_surface_ack_configure(xdg_surface, serial);
+    wl_surface_commit(ui->ninbot.surface);
+}
+
+static const struct xdg_surface_listener ninbot_surface_listener = {
+    .configure = xdg_surface_configure_handler,
 };
 
 static void
@@ -202,6 +241,19 @@ server_ui_create(struct server *server, struct config *cfg) {
 
     ui->root.viewport = wp_viewporter_get_viewport(server->backend->viewporter, ui->root.surface);
     check_alloc(ui->root.viewport);
+
+    if (cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
+        ui->ninbot.surface = wl_compositor_create_surface(server->backend->compositor);
+        check_alloc(ui->ninbot.surface);
+
+        struct xdg_surface *xdg_ninbot = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->ninbot.surface);
+        check_alloc(xdg_ninbot);
+        xdg_surface_add_listener(xdg_ninbot, &ninbot_surface_listener, ui);
+
+        ui->ninbot.top_level = xdg_surface_get_toplevel(xdg_ninbot);
+        check_alloc(ui->ninbot.top_level);
+        xdg_toplevel_add_listener(ui->ninbot.top_level, &ninbot_toplevel_listener, ui);
+    }
 
     if (server->backend->tearing_control) {
         ui->root.tearing_control = wp_tearing_control_manager_v1_get_tearing_control(
@@ -349,6 +401,21 @@ server_ui_show(struct server_ui *ui) {
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
 }
 
+void ninbot_toplevel_show(struct server_ui *ui) {
+    struct wl_display *display = ui->server->backend->display;
+
+    wl_surface_attach(ui->ninbot.surface, NULL, 0, 0);
+    wl_surface_commit(ui->ninbot.surface);
+    wl_display_roundtrip(display);
+
+    wl_surface_attach(ui->ninbot.surface, ui->config->background, 0, 0);
+    wl_surface_commit(ui->ninbot.surface);
+    wl_display_roundtrip(display);
+
+    xdg_toplevel_set_title(ui->ninbot.top_level, "NinjabrainBot Wrapper");
+    xdg_toplevel_set_app_id(ui->ninbot.top_level, "NinjabrainBot Wrapper");
+}
+
 void
 server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
     if (ui->config) {
@@ -452,10 +519,17 @@ server_view_commit(struct server_view *view) {
     if (visibility_changed && view->current.visible) {
         ww_assert(!view->subsurface);
 
-        view->subsurface =
+        if (view->current.centered) {
+            view->subsurface =
             wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor,
                                             view->surface->remote, view->ui->tree.surface);
-        check_alloc(view->subsurface);
+            check_alloc(view->subsurface);
+        } else {
+            view->subsurface =
+            wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor, view->surface->remote, view->ui->ninbot.surface);
+            check_alloc(view->subsurface);
+            wl_surface_commit(view->ui->ninbot.surface);
+        }
 
         wl_subsurface_set_desync(view->subsurface);
     } else if (visibility_changed && !view->current.visible) {
