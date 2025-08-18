@@ -1,0 +1,38 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@ --buildsystem=meson
+
+override_dh_auto_configure:
+	dh_auto_configure -- --prefix=/usr
+
+override_dh_auto_install:
+	dh_testdir
+    # Install files to the staging directory
+	install -d $(CURDIR)/debian/waywall/usr/bin
+	install -m 755 obj-x86_64-linux-gnu/waywall/waywall $(CURDIR)/debian/waywall/usr/bin/waywall
+	install -d $(CURDIR)/debian/waywall/usr/share/doc/waywall
+	install -m 644 README.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/README.md
+	install -d $(CURDIR)/debian/waywall/usr/share/licenses/waywall
+	install -m 644 LICENSE $(CURDIR)/debian/waywall/usr/share/licenses/waywall/LICENSE
+	if [ -d doc ]; then cp -r doc $(CURDIR)/debian/waywall/usr/share/doc/waywall/; fi
+	install -d $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw
+	install -m644 glfw/libglfw.so $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
+	install -m644 glfw/libglfw.so.3 $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
+	install -m644 glfw/libglfw.so.3.4 $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
+	install -m644 glfw/LICENSE.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-LICENSE.md
+	install -m644 glfw/CONTRIBUTORS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-CONTRIBUTORS.md
+	install -m644 glfw/MAINTAINERS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-MAINTAINERS.md
+
+
+    # Ensure the directories are created
+	ls -la $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw || true
+	ls -la $(CURDIR)/debian/waywall/usr/bin/ || true
+	ls -la $(CURDIR)/debian/waywall/usr/share/doc/waywall/ || true
+	ls -la $(CURDIR)/debian/waywall/usr/share/licenses/waywall/ || true
+
+override_dh_usrlocal:
+	:
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf build obj-x86_64-linux-gnu
