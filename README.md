@@ -16,7 +16,19 @@ the AUR.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
 
-Users on other distributions must build waywall from source.
+Users on other distributions must build waywall from source or use bundled build-packages.sh.
+
+## Building from build-packages.sh (Debian, Fedora and Arch)
+
+Dependencies: podman and git
+
+Setup:
+
+- Install podman containers for **archlinux** **fedora-42** and **debian-trixie**
+- Download build-packages.sh from https://github.com/tesselslate/waywall
+- Create a folder anywhere and copy build-packages.sh in the folder
+- Run build-packages.sh inside the folder
+- Enjoy (Your builds will be placed inside the folder)
 
 ## Building from source
 
