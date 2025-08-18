@@ -20,7 +20,9 @@ Users on other distributions must build waywall from source or use bundled build
 
 ## Building from build-packages.sh (Debian, Fedora and Arch)
 
-Dependencies: podman and git
+Dependencies: 
+- `podman`
+- `git`
 
 Setup:
 
