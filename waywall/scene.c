@@ -47,7 +47,9 @@ enum scene_object_type {
 
 struct scene_object {
     struct wl_list link; // scene.objects
+    struct scene *parent;
     enum scene_object_type type;
+    int32_t depth;
 };
 
 struct scene_image {
@@ -88,6 +90,7 @@ static void object_add(struct scene *scene, struct scene_object *object,
                        enum scene_object_type type);
 static void object_release(struct scene_object *object);
 static void object_render(struct scene_object *object);
+static void object_sort(struct scene *scene, struct scene_object *object);
 
 static void draw_debug_text(struct scene *scene);
 static void draw_frame(struct scene *scene);
@@ -305,8 +308,55 @@ on_gl_frame(struct wl_listener *listener, void *data) {
 
 static void
 object_add(struct scene *scene, struct scene_object *object, enum scene_object_type type) {
-    wl_list_insert(&scene->objects, &object->link);
+    object->parent = scene;
     object->type = type;
+    object_sort(scene, object);
+}
+
+static void
+object_release(struct scene_object *object) {
+    switch (object->type) {
+    case SCENE_OBJECT_IMAGE:
+        image_release(object);
+        break;
+    case SCENE_OBJECT_MIRROR:
+        mirror_release(object);
+        break;
+    case SCENE_OBJECT_TEXT:
+        text_release(object);
+        break;
+    }
+}
+
+static void
+object_render(struct scene_object *object) {
+    switch (object->type) {
+    case SCENE_OBJECT_IMAGE:
+        image_render(object);
+        break;
+    case SCENE_OBJECT_MIRROR:
+        mirror_render(object);
+        break;
+    case SCENE_OBJECT_TEXT:
+        text_render(object);
+        break;
+    }
+}
+
+static void
+object_sort(struct scene *scene, struct scene_object *object) {
+    struct scene_object *needle = NULL;
+    wl_list_for_each (needle, &scene->objects, link) {
+        if (needle->depth < object->depth) {
+            break;
+        }
+    }
+
+    if (needle) {
+        wl_list_insert(&needle->link, &object->link);
+    } else {
+        wl_list_insert(&scene->objects, &object->link);
+    }
 }
 
 static void
@@ -436,36 +486,6 @@ static inline struct scene_text *
 scene_text_from_object(struct scene_object *object) {
     ww_assert(object->type == SCENE_OBJECT_TEXT);
     return (struct scene_text *)object;
-}
-
-static void
-object_release(struct scene_object *object) {
-    switch (object->type) {
-    case SCENE_OBJECT_IMAGE:
-        image_release(object);
-        break;
-    case SCENE_OBJECT_MIRROR:
-        mirror_release(object);
-        break;
-    case SCENE_OBJECT_TEXT:
-        text_release(object);
-        break;
-    }
-}
-
-static void
-object_render(struct scene_object *object) {
-    switch (object->type) {
-    case SCENE_OBJECT_IMAGE:
-        image_render(object);
-        break;
-    case SCENE_OBJECT_MIRROR:
-        mirror_render(object);
-        break;
-    case SCENE_OBJECT_TEXT:
-        text_render(object);
-        break;
-    }
 }
 
 static bool
@@ -749,4 +769,15 @@ scene_object_destroy(struct scene_object *object) {
 
     object_release(object);
     free(object);
+}
+
+void
+scene_object_set_depth(struct scene_object *object, int32_t depth) {
+    if (depth == object->depth) {
+        return;
+    }
+
+    object->depth = depth;
+    wl_list_remove(&object->link);
+    object_sort(object->parent, object);
 }

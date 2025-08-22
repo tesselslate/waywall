@@ -81,5 +81,6 @@ struct scene_text *scene_add_text(struct scene *scene, const char *data,
                                   const struct scene_text_options *options);
 
 void scene_object_destroy(struct scene_object *object);
+void scene_object_set_depth(struct scene_object *object, int32_t depth);
 
 #endif

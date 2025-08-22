@@ -86,6 +86,19 @@ struct waker_sleep {
 };
 
 static int
+object_set_depth(lua_State *L) {
+    struct scene_object **object = lua_touserdata(L, 1);
+    if (!*object) {
+        return luaL_error(L, "object already closed");
+    }
+
+    int depth = luaL_checkint(L, 2);
+
+    scene_object_set_depth(*object, depth);
+    return 0;
+}
+
+static int
 image_close(lua_State *L) {
     struct scene_image **image = lua_touserdata(L, 1);
 
@@ -105,6 +118,8 @@ image_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, image_close);
+    } else if (strcmp(key, "set_depth") == 0) {
+        lua_pushcfunction(L, object_set_depth);
     } else {
         lua_pushnil(L);
     }
@@ -144,6 +159,8 @@ mirror_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, mirror_close);
+    } else if (strcmp(key, "set_depth") == 0) {
+        lua_pushcfunction(L, object_set_depth);
     } else {
         lua_pushnil(L);
     }
@@ -183,6 +200,8 @@ text_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, text_close);
+    } else if (strcmp(key, "set_depth") == 0) {
+        lua_pushcfunction(L, object_set_depth);
     } else {
         lua_pushnil(L);
     }
