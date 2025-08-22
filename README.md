@@ -23,10 +23,12 @@ Users on other distributions must build waywall from source or use bundled build
 Dependencies: 
 - `podman`
 - `git`
+- `pacur fedora42, arch and debian-trixie containers` (from https://github.com/pacur/pacur)
+- `docker`
 
 Setup:
 
-- Install podman containers for **archlinux** **fedora-42** and **debian-trixie**
+- Install pacur containers for **archlinux** **fedora-42** and **debian-trixie**
 - Download build-packages.sh from https://github.com/tesselslate/waywall
 - Create a folder anywhere and copy build-packages.sh in the folder
 - Run build-packages.sh inside the folder
