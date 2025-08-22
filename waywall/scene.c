@@ -345,15 +345,17 @@ object_render(struct scene_object *object) {
 
 static void
 object_sort(struct scene *scene, struct scene_object *object) {
-    struct scene_object *needle = NULL;
+    struct scene_object *needle = NULL, *prev = NULL;
     wl_list_for_each (needle, &scene->objects, link) {
-        if (needle->depth < object->depth) {
+        if (needle->depth >= object->depth) {
             break;
         }
+
+        prev = needle;
     }
 
-    if (needle) {
-        wl_list_insert(&needle->link, &object->link);
+    if (prev) {
+        wl_list_insert(&prev->link, &object->link);
     } else {
         wl_list_insert(&scene->objects, &object->link);
     }
