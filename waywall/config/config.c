@@ -872,16 +872,31 @@ config_find_action(struct config *cfg, const struct config_action *action) {
             continue;
         }
 
+        // People often run into issues with Num Lock (and more rarely, Caps Lock) preventing
+        // keybinds from triggering since they are counted as modifiers by XKB.
+        //
+        // If the keybind does not require Num Lock and/or Caps Lock, then they should be ignored
+        // when matching modifiers.
+        uint32_t effective_modifiers = action->modifiers;
+
+        bool use_caps = match->modifiers & KB_MOD_CAPS;
+        bool use_num = match->modifiers & KB_MOD_MOD2;
+        if (!use_caps) {
+            effective_modifiers &= ~KB_MOD_CAPS;
+        }
+        if (!use_num) {
+            effective_modifiers &= ~KB_MOD_MOD2;
+        }
+
+        // If there is a modifier wildcard, match->modifiers must be a subset of
+        // effective_modifiers. Otherwise, they must be exactly equal.
         if (match->wildcard_modifiers) {
-            // If there is a modifier wildcard, match->modifiers must be a subset of
-            // action->modifiers.
             uint32_t mods = match->modifiers & action->modifiers;
             if (mods != match->modifiers) {
                 continue;
             }
         } else {
-            // If there is no modifier wildcard, the modifiers should match exactly.
-            if (match->modifiers != action->modifiers) {
+            if (match->modifiers != effective_modifiers) {
                 continue;
             }
         }
