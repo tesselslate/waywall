@@ -73,9 +73,10 @@ static const struct {
 } modifier_mappings[] = {
     {"shift", KB_MOD_SHIFT},   {"caps", KB_MOD_CAPS},    {"lock", KB_MOD_CAPS},
     {"capslock", KB_MOD_CAPS}, {"control", KB_MOD_CTRL}, {"ctrl", KB_MOD_CTRL},
-    {"alt", KB_MOD_ALT},       {"mod1", KB_MOD_ALT},     {"mod2", KB_MOD_MOD2},
-    {"mod3", KB_MOD_MOD3},     {"super", KB_MOD_LOGO},   {"win", KB_MOD_LOGO},
-    {"mod4", KB_MOD_LOGO},     {"mod5", KB_MOD_MOD5},
+    {"alt", KB_MOD_MOD1},      {"mod1", KB_MOD_MOD1},    {"num", KB_MOD_MOD2},
+    {"numlock", KB_MOD_MOD2},  {"mod2", KB_MOD_MOD2},    {"mod3", KB_MOD_MOD3},
+    {"super", KB_MOD_MOD4},    {"win", KB_MOD_MOD4},     {"mod4", KB_MOD_MOD4},
+    {"mod5", KB_MOD_MOD5},
 };
 
 static int
