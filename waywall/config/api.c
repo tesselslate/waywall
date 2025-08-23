@@ -86,6 +86,17 @@ struct waker_sleep {
 };
 
 static int
+object_get_depth(lua_State *L) {
+    struct scene_object **object = lua_touserdata(L, -1);
+    if (!*object) {
+        return luaL_error(L, "object already closed");
+    }
+
+    lua_pushinteger(L, scene_object_get_depth(*object));
+    return 1;
+}
+
+static int
 object_set_depth(lua_State *L) {
     struct scene_object **object = lua_touserdata(L, 1);
     if (!*object) {
@@ -118,6 +129,8 @@ image_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, image_close);
+    } else if (strcmp(key, "get_depth") == 0) {
+        lua_pushcfunction(L, object_get_depth);
     } else if (strcmp(key, "set_depth") == 0) {
         lua_pushcfunction(L, object_set_depth);
     } else {
@@ -159,6 +172,8 @@ mirror_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, mirror_close);
+    } else if (strcmp(key, "get_depth") == 0) {
+        lua_pushcfunction(L, object_get_depth);
     } else if (strcmp(key, "set_depth") == 0) {
         lua_pushcfunction(L, object_set_depth);
     } else {
@@ -200,6 +215,8 @@ text_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, text_close);
+    } else if (strcmp(key, "get_depth") == 0) {
+        lua_pushcfunction(L, object_get_depth);
     } else if (strcmp(key, "set_depth") == 0) {
         lua_pushcfunction(L, object_set_depth);
     } else {
@@ -239,8 +256,8 @@ waker_sleep_timer_destroy(void *data) {
     // This function is called if the timer entry is destroyed (which should only happen if the
     // global timer manager is destroyed.)
     //
-    // Remove the reference to the timer entry so that when the VM attempts to destroy the waker we
-    // do not attempt to destroy the timer entry a 2nd time.
+    // Remove the reference to the timer entry so that when the VM attempts to destroy the waker
+    // we do not attempt to destroy the timer entry a 2nd time.
     waker->timer = NULL;
 }
 
@@ -368,8 +385,8 @@ l_exec(lua_State *L) {
 
     lua_settop(L, ARG_COMMAND);
 
-    // Body. Duplicate the string from the Lua VM so that it can be modified for in-place argument
-    // parsing.
+    // Body. Duplicate the string from the Lua VM so that it can be modified for in-place
+    // argument parsing.
     char *cmd_str = strdup(lua_str);
     check_alloc(cmd_str);
 
@@ -733,15 +750,15 @@ l_set_remaps(lua_State *L) {
         }
         config_add_remap(&remaps, remap);
 
-        // Pop the value from the top of the stack. The previous key will be left at the top of the
-        // stack for the next call to `lua_next`.
+        // Pop the value from the top of the stack. The previous key will be left at the top of
+        // the stack for the next call to `lua_next`.
         lua_pop(L, 1); // stack: 2 (IDX_REMAP_KEY)
         ww_assert(lua_gettop(L) == IDX_REMAP_KEY);
     }
 
-    // The remaps table has been fully processed, so we can now set the remaps on the server seat.
-    // It's not worth the effort to calculate how many of each kind of remap there are. The number
-    // of remaps a user might reasonably have is quite small.
+    // The remaps table has been fully processed, so we can now set the remaps on the server
+    // seat. It's not worth the effort to calculate how many of each kind of remap there are.
+    // The number of remaps a user might reasonably have is quite small.
     struct server_seat_remaps *seat_remaps = &wrap->server->seat->config->remaps;
     seat_remaps->keys = realloc(seat_remaps->keys, remaps.count * sizeof(*seat_remaps->keys));
     if (remaps.count != 0)

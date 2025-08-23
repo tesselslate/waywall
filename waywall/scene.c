@@ -853,6 +853,11 @@ scene_object_destroy(struct scene_object *object) {
     free(object);
 }
 
+int32_t
+scene_object_get_depth(struct scene_object *object) {
+    return object->depth;
+}
+
 void
 scene_object_set_depth(struct scene_object *object, int32_t depth) {
     if (depth == object->depth) {
