@@ -46,7 +46,7 @@ enum scene_object_type {
 };
 
 struct scene_object {
-    struct wl_list link; // scene.objects
+    struct wl_list link;
     struct scene *parent;
     enum scene_object_type type;
     int32_t depth;
@@ -88,6 +88,7 @@ struct scene_text {
 
 static void object_add(struct scene *scene, struct scene_object *object,
                        enum scene_object_type type);
+static void object_list_destroy(struct wl_list *list);
 static void object_release(struct scene_object *object);
 static void object_render(struct scene_object *object);
 static void object_sort(struct scene *scene, struct scene_object *object);
@@ -314,6 +315,18 @@ object_add(struct scene *scene, struct scene_object *object, enum scene_object_t
 }
 
 static void
+object_list_destroy(struct wl_list *list) {
+    struct scene_object *object, *tmp;
+
+    wl_list_for_each_safe (object, tmp, list, link) {
+        wl_list_remove(&object->link);
+        wl_list_init(&object->link);
+
+        object_release(object);
+    }
+}
+
+static void
 object_release(struct scene_object *object) {
     switch (object->type) {
     case SCENE_OBJECT_IMAGE:
@@ -345,8 +358,24 @@ object_render(struct scene_object *object) {
 
 static void
 object_sort(struct scene *scene, struct scene_object *object) {
+    if (object->depth == 0) {
+        switch (object->type) {
+        case SCENE_OBJECT_IMAGE:
+            wl_list_insert(&scene->objects.unsorted_images, &object->link);
+            break;
+        case SCENE_OBJECT_MIRROR:
+            wl_list_insert(&scene->objects.unsorted_mirrors, &object->link);
+            break;
+        case SCENE_OBJECT_TEXT:
+            wl_list_insert(&scene->objects.unsorted_text, &object->link);
+            break;
+        }
+
+        return;
+    }
+
     struct scene_object *needle = NULL, *prev = NULL;
-    wl_list_for_each (needle, &scene->objects, link) {
+    wl_list_for_each (needle, &scene->objects.sorted, link) {
         if (needle->depth >= object->depth) {
             break;
         }
@@ -357,7 +386,7 @@ object_sort(struct scene *scene, struct scene_object *object) {
     if (prev) {
         wl_list_insert(&prev->link, &object->link);
     } else {
-        wl_list_insert(&scene->objects, &object->link);
+        wl_list_insert(&scene->objects.sorted, &object->link);
     }
 }
 
@@ -449,6 +478,14 @@ draw_debug_text(struct scene *scene) {
     }
 }
 
+static inline bool
+should_draw_frame(struct scene *scene) {
+    return util_debug_enabled || wl_list_length(&scene->objects.sorted) ||
+           wl_list_length(&scene->objects.unsorted_text) ||
+           wl_list_length(&scene->objects.unsorted_mirrors) ||
+           wl_list_length(&scene->objects.unsorted_images);
+}
+
 static void
 draw_frame(struct scene *scene) {
     // The OpenGL context must be current.
@@ -461,7 +498,7 @@ draw_frame(struct scene *scene) {
 
     glViewport(0, 0, scene->ui->width, scene->ui->height);
 
-    if (!util_debug_enabled && wl_list_empty(&scene->objects)) {
+    if (!should_draw_frame(scene)) {
         scene->skipped_frames++;
         if (scene->skipped_frames > 1) {
             return;
@@ -475,7 +512,16 @@ draw_frame(struct scene *scene) {
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
     struct scene_object *object;
-    wl_list_for_each (object, &scene->objects, link) {
+    wl_list_for_each (object, &scene->objects.unsorted_text, link) {
+        text_render(object);
+    }
+    wl_list_for_each (object, &scene->objects.unsorted_mirrors, link) {
+        mirror_render(object);
+    }
+    wl_list_for_each (object, &scene->objects.unsorted_images, link) {
+        image_render(object);
+    }
+    wl_list_for_each (object, &scene->objects.sorted, link) {
         if (object->depth < 0) {
             glEnable(GL_STENCIL_TEST);
         }
@@ -743,7 +789,10 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
     scene->on_gl_frame.notify = on_gl_frame;
     wl_signal_add(&gl->events.frame, &scene->on_gl_frame);
 
-    wl_list_init(&scene->objects);
+    wl_list_init(&scene->objects.sorted);
+    wl_list_init(&scene->objects.unsorted_images);
+    wl_list_init(&scene->objects.unsorted_mirrors);
+    wl_list_init(&scene->objects.unsorted_text);
 
     return scene;
 
@@ -755,13 +804,10 @@ fail_compile_texture_copy:
 
 void
 scene_destroy(struct scene *scene) {
-    struct scene_object *object, *tmp;
-    wl_list_for_each_safe (object, tmp, &scene->objects, link) {
-        wl_list_remove(&object->link);
-        wl_list_init(&object->link);
-
-        object_release(object);
-    }
+    object_list_destroy(&scene->objects.sorted);
+    object_list_destroy(&scene->objects.unsorted_images);
+    object_list_destroy(&scene->objects.unsorted_mirrors);
+    object_list_destroy(&scene->objects.unsorted_text);
 
     server_gl_with(scene->gl, false) {
         for (size_t i = 0; i < scene->shaders.count; i++) {

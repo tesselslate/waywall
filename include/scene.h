@@ -38,7 +38,13 @@ struct scene {
         uint32_t equal_frames;
     } prev_frame;
 
-    struct wl_list objects; // scene_object.link
+    struct {
+        struct wl_list sorted; // scene_object.link
+
+        struct wl_list unsorted_images;  // scene_object.link
+        struct wl_list unsorted_mirrors; // scene_object.link
+        struct wl_list unsorted_text;    // scene_object.link
+    } objects;
 
     int skipped_frames;
 
