@@ -365,6 +365,38 @@ static void
 draw_stencil(struct scene *scene) {
     // The OpenGL context must be current.
 
+    int32_t width, height;
+    GLuint tex = server_gl_get_capture(scene->gl);
+    if (tex == 0) {
+        return;
+    }
+    server_gl_get_capture_size(scene->gl, &width, &height);
+
+    // It would be possible to listen for resizes instead of checking whether the stencil buffer
+    // needs an update every frame, but that would be more complicated and there is also no event
+    // for the game being resized (as of writing this comment, at least.)
+    //
+    // TODO: Is it possible to avoid the frame of leeway? Would also be nice to avoid it in
+    // draw_frame. This stuff really should be synchronized with the surface content. Might be worth
+    // always doing compositing if scene objects are visible but I'm not very happy with that
+    // solution.
+    bool stencil_equal = scene->ui->width == scene->prev_frame.width &&
+                         scene->ui->height == scene->prev_frame.height &&
+                         width == scene->prev_frame.tex_width &&
+                         height == scene->prev_frame.tex_height;
+    if (stencil_equal) {
+        scene->prev_frame.equal_frames++;
+        if (scene->prev_frame.equal_frames > 1) {
+            return;
+        }
+    }
+
+    scene->prev_frame.width = scene->ui->width;
+    scene->prev_frame.height = scene->ui->height;
+    scene->prev_frame.tex_width = width;
+    scene->prev_frame.tex_height = height;
+    scene->prev_frame.equal_frames = 0;
+
     glClearStencil(0);
     glStencilMask(0xFF);
     glClear(GL_STENCIL_BUFFER_BIT);
@@ -374,15 +406,6 @@ draw_stencil(struct scene *scene) {
     glEnable(GL_STENCIL_TEST);
     glStencilFunc(GL_ALWAYS, 1, 0xFF);
     glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
-
-    glViewport(0, 0, scene->ui->width, scene->ui->height);
-
-    int32_t width, height;
-    GLuint tex = server_gl_get_capture(scene->gl);
-    if (tex == 0) {
-        return;
-    }
-    server_gl_get_capture_size(scene->gl, &width, &height);
 
     struct box dst = {
         .x = (scene->ui->width / 2) - (width / 2),
@@ -430,8 +453,6 @@ static void
 draw_frame(struct scene *scene) {
     // The OpenGL context must be current.
 
-    draw_stencil(scene);
-
     glClearColor(0, 0, 0, 0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -449,6 +470,7 @@ draw_frame(struct scene *scene) {
         scene->skipped_frames = 0;
     }
 
+    draw_stencil(scene);
     glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 

@@ -32,6 +32,12 @@ struct scene {
         unsigned int font_tex;
     } buffers;
 
+    struct {
+        int32_t width, height;
+        int32_t tex_width, tex_height;
+        uint32_t equal_frames;
+    } prev_frame;
+
     struct wl_list objects; // scene_object.link
 
     int skipped_frames;
