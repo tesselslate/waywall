@@ -27,6 +27,8 @@ struct scene {
         unsigned int debug;
         size_t debug_vtxcount;
 
+        unsigned int stencil_rect;
+
         unsigned int font_tex;
     } buffers;
 

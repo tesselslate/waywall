@@ -362,6 +362,51 @@ object_sort(struct scene *scene, struct scene_object *object) {
 }
 
 static void
+draw_stencil(struct scene *scene) {
+    // The OpenGL context must be current.
+
+    glClearStencil(0);
+    glStencilMask(0xFF);
+    glClear(GL_STENCIL_BUFFER_BIT);
+
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
+
+    glViewport(0, 0, scene->ui->width, scene->ui->height);
+
+    int32_t width, height;
+    GLuint tex = server_gl_get_capture(scene->gl);
+    if (tex == 0) {
+        return;
+    }
+    server_gl_get_capture_size(scene->gl, &width, &height);
+
+    struct box dst = {
+        .x = (scene->ui->width / 2) - (width / 2),
+        .y = (scene->ui->height / 2) - (height / 2),
+        .width = width,
+        .height = height,
+    };
+
+    struct vtx_shader buf[6];
+    rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){0}, (float[4]){0});
+    gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.stencil_rect) {
+        gl_using_texture(GL_TEXTURE_2D, tex) {
+            glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_DRAW);
+            server_gl_shader_use(scene->shaders.data[0].shader);
+            draw_vertex_list(&scene->shaders.data[0], 6);
+        }
+    }
+
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    glDisable(GL_STENCIL_TEST);
+}
+
+static void
 draw_debug_text(struct scene *scene) {
     // The OpenGL context must be current,
     server_gl_shader_use(scene->shaders.data[0].shader);
@@ -385,10 +430,14 @@ static void
 draw_frame(struct scene *scene) {
     // The OpenGL context must be current.
 
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    draw_stencil(scene);
+
     glClearColor(0, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     glViewport(0, 0, scene->ui->width, scene->ui->height);
 
     if (!util_debug_enabled && wl_list_empty(&scene->objects)) {
@@ -400,9 +449,17 @@ draw_frame(struct scene *scene) {
         scene->skipped_frames = 0;
     }
 
+    glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+
     struct scene_object *object;
     wl_list_for_each (object, &scene->objects, link) {
+        if (object->depth < 0) {
+            glEnable(GL_STENCIL_TEST);
+        }
+
         object_render(object);
+        glDisable(GL_STENCIL_TEST);
     }
 
     if (util_debug_enabled) {
@@ -627,6 +684,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
 
         // Initialize vertex buffers.
         glGenBuffers(1, &scene->buffers.debug);
+        glGenBuffers(1, &scene->buffers.stencil_rect);
 
         // Initialize the font texture atlas.
         glGenTextures(1, &scene->buffers.font_tex);
@@ -689,7 +747,7 @@ scene_destroy(struct scene *scene) {
             free(scene->shaders.data[i].name);
         }
 
-        glDeleteBuffers(1, &scene->buffers.debug);
+        glDeleteBuffers(2, (GLuint[]){scene->buffers.debug, scene->buffers.stencil_rect});
         glDeleteTextures(1, &scene->buffers.font_tex);
     }
     free(scene->shaders.data);
