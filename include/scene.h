@@ -55,6 +55,7 @@ struct scene_shader {
 struct scene_image_options {
     struct box dst;
 
+    int32_t depth;
     char *shader_name;
 };
 
@@ -63,6 +64,7 @@ struct scene_mirror_options {
     float src_rgba[4];
     float dst_rgba[4];
 
+    int32_t depth;
     char *shader_name;
 };
 
@@ -73,6 +75,7 @@ struct scene_text_options {
     float rgba[4];
     int32_t size_multiplier;
 
+    int32_t depth;
     char *shader_name;
 };
 

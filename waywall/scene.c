@@ -798,6 +798,7 @@ scene_add_image(struct scene *scene, const struct scene_image_options *options, 
     // Build a vertex buffer containing the data for this image.
     image_build(image, scene, options, image->width, image->height);
 
+    image->object.depth = options->depth;
     object_add(scene, (struct scene_object *)image, SCENE_OBJECT_IMAGE);
 
     return image;
@@ -816,6 +817,7 @@ scene_add_mirror(struct scene *scene, const struct scene_mirror_options *options
 
     mirror_build(mirror, options, scene);
 
+    mirror->object.depth = options->depth;
     object_add(scene, (struct scene_object *)mirror, SCENE_OBJECT_MIRROR);
 
     return mirror;
@@ -839,6 +841,7 @@ scene_add_text(struct scene *scene, const char *data, const struct scene_text_op
         text->vtxcount = text_build(text->vbo, scene, data, options);
     }
 
+    text->object.depth = options->depth;
     object_add(scene, (struct scene_object *)text, SCENE_OBJECT_TEXT);
 
     return text;

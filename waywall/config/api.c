@@ -80,6 +80,8 @@ static const struct {
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
+#define DEFAULT_DEPTH 0
+
 struct waker_sleep {
     struct ww_timer_entry *timer;
     struct config_vm_waker *vm;
@@ -459,6 +461,15 @@ l_image(lua_State *L) {
     }
     lua_pop(L, 1);
 
+    lua_pushstring(L, "depth");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.depth = lua_tointeger(L, -1);
+    } else {
+        options.depth = DEFAULT_DEPTH;
+    }
+    lua_pop(L, 1);
+
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
         free(options.shader_name);
@@ -524,6 +535,15 @@ l_mirror(lua_State *L) {
     lua_rawget(L, ARG_OPTIONS);
     if (lua_type(L, -1) == LUA_TSTRING) {
         options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "depth");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.depth = lua_tointeger(L, -1);
+    } else {
+        options.depth = DEFAULT_DEPTH;
     }
     lua_pop(L, 1);
 
@@ -1019,6 +1039,7 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
         .y = y,
         .rgba = {rgba[0], rgba[1], rgba[2], rgba[3]},
         .size_multiplier = size,
+        .depth = DEFAULT_DEPTH,
         .shader_name = shader_name,
     };
 
@@ -1108,6 +1129,15 @@ l_text(lua_State *L) {
     lua_rawget(L, ARG_OPTIONS);
     if (lua_type(L, -1) == LUA_TSTRING) {
         options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "depth");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.depth = lua_tointeger(L, -1);
+    } else {
+        options.depth = DEFAULT_DEPTH;
     }
     lua_pop(L, 1);
 
