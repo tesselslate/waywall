@@ -470,26 +470,6 @@ l_image(lua_State *L) {
     }
     lua_pop(L, 1);
 
-    int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        free(options.shader_name);
-        return luaL_error(L, "failed to open PNG at '%s': %s", path, strerror(errno));
-    }
-
-    struct stat stat;
-    if (fstat(fd, &stat) != 0) {
-        close(fd);
-        free(options.shader_name);
-        return luaL_error(L, "failed to stat PNG at '%s': %s", path, strerror(errno));
-    }
-
-    void *buf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (buf == MAP_FAILED) {
-        close(fd);
-        free(options.shader_name);
-        return luaL_error(L, "failed to mmap PNG at '%s': %s", path, strerror(errno));
-    }
-
     // Body
     struct scene_image **image = lua_newuserdata(L, sizeof(*image));
     check_alloc(image);
@@ -497,16 +477,11 @@ l_image(lua_State *L) {
     luaL_getmetatable(L, METATABLE_IMAGE);
     lua_setmetatable(L, -2);
 
-    *image = scene_add_image(wrap->scene, &options, buf, stat.st_size);
+    *image = scene_add_image(wrap->scene, &options, path);
     free(options.shader_name);
     if (!*image) {
-        ww_assert(munmap(buf, stat.st_size) == 0);
-        close(fd);
-        return luaL_error(L, "failed to create image");
+        return luaL_error(L, "failed to create image from PNG at '%s'", path);
     }
-
-    ww_assert(munmap(buf, stat.st_size) == 0);
-    close(fd);
 
     // Epilogue. The userdata (image) was already pushed to the stack by the above code.
     return 1;

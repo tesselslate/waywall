@@ -31,6 +31,7 @@ waywall_src = files(
   'server/xwm.c',
   'util/debug.c',
   'util/log.c',
+  'util/png.c',
   'util/prelude.c',
   'util/str.c',
   'util/syscall.c',

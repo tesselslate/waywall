@@ -8,6 +8,7 @@
 #include "util/debug.h"
 #include "util/font.h"
 #include "util/log.h"
+#include "util/png.h"
 #include "util/prelude.h"
 #include <GLES2/gl2.h>
 #include <spng.h>
@@ -625,74 +626,28 @@ scene_text_from_object(struct scene_object *object) {
 }
 
 static bool
-image_load(struct scene_image *out, struct scene *scene, void *pngbuf, size_t pngbuf_size) {
-    int err;
-
-    struct spng_ctx *ctx = spng_ctx_new(0);
-    if (!ctx) {
-        ww_log(LOG_ERROR, "failed to create spng context");
+image_load(struct scene_image *out, struct scene *scene, const char *path) {
+    struct util_png png = util_png_decode(path, scene->image_max_size);
+    if (!png.data) {
         return false;
     }
-    spng_set_image_limits(ctx, scene->image_max_size, scene->image_max_size);
 
-    // Decode the PNG.
-    err = spng_set_png_buffer(ctx, pngbuf, pngbuf_size);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to set png buffer: %s\n", spng_strerror(err));
-        goto fail_spng_set_png_buffer;
-    }
-
-    struct spng_ihdr ihdr;
-    err = spng_get_ihdr(ctx, &ihdr);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to get image header: %s\n", spng_strerror(err));
-        goto fail_spng_get_ihdr;
-    }
-
-    size_t decode_size;
-    err = spng_decoded_image_size(ctx, SPNG_FMT_RGBA8, &decode_size);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to get image size: %s\n", spng_strerror(err));
-        goto fail_spng_decoded_image_size;
-    }
-
-    char *decode_buf = malloc(decode_size);
-    check_alloc(decode_buf);
-
-    err = spng_decode_image(ctx, decode_buf, decode_size, SPNG_FMT_RGBA8, SPNG_DECODE_TRNS);
-    if (err != 0) {
-        ww_log(LOG_ERROR, "failed to decode image: %s\n", spng_strerror(err));
-        goto fail_spng_decode_image;
-    }
-
-    out->width = ihdr.width;
-    out->height = ihdr.height;
+    out->width = png.width;
+    out->height = png.height;
 
     // Upload the decoded image data to a new OpenGL texture.
     server_gl_with(scene->gl, false) {
         glGenTextures(1, &out->tex);
         gl_using_texture(GL_TEXTURE_2D, out->tex) {
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, ihdr.width, ihdr.height, 0, GL_RGBA,
-                         GL_UNSIGNED_BYTE, decode_buf);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, png.width, png.height, 0, GL_RGBA,
+                         GL_UNSIGNED_BYTE, png.data);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
     }
 
-    free(decode_buf);
-    spng_ctx_free(ctx);
-
+    free(png.data);
     return true;
-
-fail_spng_decode_image:
-    free(decode_buf);
-
-fail_spng_decoded_image_size:
-fail_spng_get_ihdr:
-fail_spng_set_png_buffer:
-    spng_ctx_free(ctx);
-
-    return false;
 }
 
 static int
@@ -835,14 +790,13 @@ scene_destroy(struct scene *scene) {
 }
 
 struct scene_image *
-scene_add_image(struct scene *scene, const struct scene_image_options *options, void *pngbuf,
-                size_t pngbuf_size) {
+scene_add_image(struct scene *scene, const struct scene_image_options *options, const char *path) {
     struct scene_image *image = zalloc(1, sizeof(*image));
 
     image->parent = scene;
 
     // Load the PNG into an OpenGL texture.
-    if (!image_load(image, scene, pngbuf, pngbuf_size)) {
+    if (!image_load(image, scene, path)) {
         free(image);
         return NULL;
     }
