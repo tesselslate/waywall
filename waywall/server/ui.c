@@ -6,20 +6,134 @@
 #include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
+#include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/debug.h"
 #include "util/log.h"
+#include "util/png.h"
 #include "util/prelude.h"
+#include "util/syscall.h"
 #include "viewporter-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <linux/memfd.h>
 #include <stdlib.h>
+#include <sys/mman.h>
+#include <unistd.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
 #define DEFAULT_WIDTH 640
 #define DEFAULT_HEIGHT 480
+
+#define COLOR_BLEND(c, a) (COLOR_MULT(((c) * (a)) / UINT8_MAX))
+#define COLOR_MULT(c) ((uint32_t)(((uint64_t)(c) * UINT32_MAX) / UINT8_MAX))
+
+struct bg_buffer {
+    int fd;
+};
+
+static char *
+bg_buffer_alloc(struct bg_buffer *buffer, size_t size) {
+    buffer->fd = memfd_create("waywall-shm", MFD_CLOEXEC);
+    if (buffer->fd == -1) {
+        ww_log_errno(LOG_ERROR, "failed to create memfd for background buffer");
+        return NULL;
+    }
+
+    if (ftruncate(buffer->fd, size) == -1) {
+        ww_log_errno(LOG_ERROR, "failed to truncate memfd for background buffer");
+        goto fail;
+    }
+
+    char *buf = mmap(NULL, size, PROT_WRITE, MAP_SHARED, buffer->fd, 0);
+    if (buf == MAP_FAILED) {
+        ww_log_errno(LOG_ERROR, "failed to mmap memfd for background buffer");
+        goto fail;
+    }
+
+    return buf;
+
+fail:
+    close(buffer->fd);
+    buffer->fd = -1;
+    return NULL;
+}
+
+static struct wl_buffer *
+bg_buffer_create(struct server *server, struct bg_buffer *data, int32_t width, int32_t height) {
+    size_t size = (size_t)width * (size_t)height * 4;
+
+    struct wl_shm_pool *pool = wl_shm_create_pool(server->backend->shm, data->fd, size);
+    struct wl_buffer *buffer =
+        wl_shm_pool_create_buffer(pool, 0, width, height, width * 4, WL_SHM_FORMAT_ARGB8888);
+    wl_buffer_set_user_data(buffer, data);
+    wl_shm_pool_destroy(pool);
+
+    return buffer;
+}
+
+static void
+bg_buffer_destroy(struct wl_buffer *buffer) {
+    struct bg_buffer *data = wl_buffer_get_user_data(buffer);
+    wl_buffer_destroy(buffer);
+
+    if (!data) {
+        return;
+    }
+
+    if (close(data->fd) != 0) {
+        ww_log_errno(LOG_ERROR, "failed to close memfd for background buffer");
+    }
+
+    free(data);
+}
+
+static struct wl_buffer *
+color_buffer_new(struct server *server, const uint8_t color[static 4]) {
+    if (server->backend->single_pixel_buffer_manager) {
+        return wp_single_pixel_buffer_manager_v1_create_u32_rgba_buffer(
+            server->backend->single_pixel_buffer_manager, COLOR_BLEND(color[0], color[3]),
+            COLOR_BLEND(color[1], color[3]), COLOR_BLEND(color[2], color[3]), COLOR_MULT(color[3]));
+    }
+
+    struct bg_buffer *data = zalloc(1, sizeof(*data));
+    char *buf = bg_buffer_alloc(data, 4);
+    if (!buf) {
+        free(data);
+        return NULL;
+    }
+
+    // Reorder bytes to ARGB and do alpha premultiplication.
+    buf[0] = (uint32_t)(color[2] * color[3]) / UINT8_MAX;
+    buf[1] = (uint32_t)(color[1] * color[3]) / UINT8_MAX;
+    buf[2] = (uint32_t)(color[0] * color[3]) / UINT8_MAX;
+    buf[3] = color[3];
+
+    return bg_buffer_create(server, data, 1, 1);
+}
+
+static struct wl_buffer *
+image_buffer_new(struct server *server, const char *path) {
+    struct util_png png = util_png_decode(path, 16384); // arbitrary max size
+    if (!png.data) {
+        return NULL;
+    }
+
+    struct bg_buffer *data = zalloc(1, sizeof(*data));
+    char *buf = bg_buffer_alloc(data, png.size);
+    if (!buf) {
+        free(png.data);
+        free(data);
+        return NULL;
+    }
+
+    memcpy(buf, png.data, png.size);
+    free(png.data);
+
+    return bg_buffer_create(server, data, png.width, png.height);
+}
 
 static void
 layout_centered(struct server_view *view) {
@@ -270,7 +384,7 @@ fail_config:
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
     wl_surface_destroy(ui->tree.surface);
-    remote_buffer_deref(ui->tree.buffer);
+    bg_buffer_destroy(ui->tree.buffer);
     wp_viewport_destroy(ui->root.viewport);
     wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
@@ -293,7 +407,7 @@ server_ui_destroy(struct server_ui *ui) {
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
     wl_surface_destroy(ui->tree.surface);
-    remote_buffer_deref(ui->tree.buffer);
+    bg_buffer_destroy(ui->tree.buffer);
     wp_viewport_destroy(ui->root.viewport);
     wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
@@ -373,17 +487,15 @@ struct server_ui_config *
 server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     struct server_ui_config *config = zalloc(1, sizeof(*config));
 
-    if (strcmp(cfg->theme.background_path, "") != 0) {
-        config->background =
-            remote_buffer_manager_png(ui->server->remote_buf, cfg->theme.background_path);
+    if (*cfg->theme.background_path) {
+        config->background = image_buffer_new(ui->server, cfg->theme.background_path);
     } else {
-        config->background =
-            remote_buffer_manager_color(ui->server->remote_buf, cfg->theme.background);
+        config->background = color_buffer_new(ui->server, cfg->theme.background);
     }
+
     if (!config->background) {
-        ww_log(LOG_ERROR, "failed to create root buffer");
-        free(config);
-        return NULL;
+        ww_log(LOG_ERROR, "failed to create background buffer");
+        goto fail;
     }
 
     config->tearing = cfg->experimental.tearing;
@@ -391,11 +503,15 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     config->ninb_opacity = cfg->theme.ninb_opacity * UINT32_MAX;
 
     return config;
+
+fail:
+    free(config);
+    return NULL;
 }
 
 void
 server_ui_config_destroy(struct server_ui_config *config) {
-    remote_buffer_deref(config->background);
+    bg_buffer_destroy(config->background);
     free(config);
 }
 
