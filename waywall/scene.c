@@ -512,6 +512,18 @@ draw_frame(struct scene *scene) {
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
     struct scene_object *object;
+    struct wl_list *positive_depth = NULL;
+    glEnable(GL_STENCIL_TEST);
+    wl_list_for_each (object, &scene->objects.sorted, link) {
+        if (object->depth >= 0) {
+            positive_depth = object->link.prev;
+            break;
+        }
+
+        object_render(object);
+    }
+    glDisable(GL_STENCIL_TEST);
+
     wl_list_for_each (object, &scene->objects.unsorted_text, link) {
         text_render(object);
     }
@@ -521,13 +533,10 @@ draw_frame(struct scene *scene) {
     wl_list_for_each (object, &scene->objects.unsorted_images, link) {
         image_render(object);
     }
-    wl_list_for_each (object, &scene->objects.sorted, link) {
-        if (object->depth < 0) {
-            glEnable(GL_STENCIL_TEST);
+    if (positive_depth) {
+        wl_list_for_each (object, positive_depth, link) {
+            object_render(object);
         }
-
-        object_render(object);
-        glDisable(GL_STENCIL_TEST);
     }
 
     if (util_debug_enabled) {
