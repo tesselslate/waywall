@@ -28,11 +28,10 @@ Dependencies:
 
 Setup:
 
-- Install pacur containers for **archlinux** **fedora-42** and **debian-trixie**
-- Download build-packages.sh from https://github.com/tesselslate/waywall
-- Create a folder anywhere and copy build-packages.sh in the folder
-- Run build-packages.sh inside the folder
-- Enjoy (Your builds will be placed inside the folder)
+- Clone waywall repository (git clone https://github.com/tesselslate/waywall)
+- Install pacur containers for **archlinux** **fedora-42** and **debian-trixie**, ensure they are installed for your user, not root, remove sudo on build.sh /docker/
+- Run build-packages.sh inside waywall folder
+- Enjoy
 
 ## Building from source
 
