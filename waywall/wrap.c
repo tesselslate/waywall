@@ -303,8 +303,22 @@ static void
 on_resize(struct wl_listener *listener, void *data) {
     struct wrap *wrap = wl_container_of(listener, wrap, on_resize);
 
-    int32_t new_width = wrap->server->ui->width;
-    int32_t new_height = wrap->server->ui->height;
+    int32_t targetScale = 1;
+    int32_t clientScale = 1;
+    if (wrap->view && wrap->view->surface && wrap->view->surface->remote) {
+        targetScale = wrap->view->surface->preferred_buffer_scale;
+        clientScale = wrap->view->surface->client_buffer_scale;
+        if (targetScale <= 0) targetScale = 1; // Ensure valid scale
+        if (clientScale <= 0) clientScale = 1; // Ensure valid scale
+    }
+
+    wl_surface_set_buffer_scale(wrap->view->surface->remote, targetScale);
+
+    // we need to find a way to scale it up, only if the client doesnt support client-side scaling (ie mc)
+    // this way apps like kitty can still use their own scaling
+    int32_t serverSideScale = targetScale / clientScale;
+    int32_t new_width = wrap->server->ui->width * serverSideScale;
+    int32_t new_height = wrap->server->ui->height * serverSideScale;
 
     if (new_width == wrap->width && new_height == wrap->height) {
         return;
@@ -368,6 +382,13 @@ on_view_create(struct wl_listener *listener, void *data) {
 
     wrap->server->ui->width = width;
     wrap->server->ui->height = height;
+
+    int32_t targetScale = 1;
+    if (wrap->view && wrap->view->surface && wrap->view->surface->remote) {
+        targetScale = wrap->view->surface->preferred_buffer_scale;
+        if (targetScale <= 0) targetScale = 1; // Ensure valid scale
+    }
+    wl_surface_set_buffer_scale(wrap->view->surface->remote, targetScale);
 
     server_set_input_focus(wrap->server, wrap->view);
     server_ui_show(wrap->server->ui);
