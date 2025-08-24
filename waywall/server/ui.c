@@ -3,7 +3,6 @@
 #include "config/config.h"
 #include "server/backend.h"
 #include "server/buffer.h"
-#include "server/remote_buffer.h"
 #include "server/server.h"
 #include "server/wl_compositor.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
@@ -323,8 +322,7 @@ server_ui_create(struct server *server, struct config *cfg) {
         check_alloc(ui->root.tearing_control);
     }
 
-    ui->tree.buffer =
-        remote_buffer_manager_color(server->remote_buf, (const uint8_t[4]){0, 0, 0, 0});
+    ui->tree.buffer = color_buffer_new(server, (const uint8_t[4]){0, 0, 0, 0});
     ww_assert(ui->tree.buffer);
 
     ui->tree.surface = wl_compositor_create_surface(server->backend->compositor);

@@ -2,7 +2,6 @@
 #include "config/config.h"
 #include "server/backend.h"
 #include "server/cursor.h"
-#include "server/remote_buffer.h"
 #include "server/ui.h"
 #include "server/wl_compositor.h"
 #include "server/wl_data_device_manager.h"
@@ -206,11 +205,6 @@ server_create(struct config *cfg) {
     check_alloc(server->backend_source);
     wl_event_source_check(server->backend_source);
 
-    server->remote_buf = remote_buffer_manager_create(server);
-    if (!server->remote_buf) {
-        goto fail_remote_buf;
-    }
-
     // These globals are required by other globals, so they must be made first.
     server->compositor = server_compositor_create(server);
     if (!server->compositor) {
@@ -298,9 +292,6 @@ fail_ui:
 
 fail_cursor:
 fail_globals:
-    remote_buffer_manager_destroy(server->remote_buf);
-
-fail_remote_buf:
     wl_event_source_remove(server->backend_source);
     wl_display_destroy(server->display);
     wl_list_remove(&server->on_client_created.link);
@@ -323,7 +314,6 @@ server_destroy(struct server *server) {
     ww_assert(wl_list_empty(&server->clients));
 
     server_ui_destroy(server->ui);
-    remote_buffer_manager_destroy(server->remote_buf);
     server_cursor_destroy(server->cursor);
     server_backend_destroy(server->backend);
 
