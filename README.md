@@ -16,7 +16,22 @@ the AUR.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
 
-Users on other distributions must build waywall from source.
+Users on other distributions must build waywall from source or use bundled build-packages.sh.
+
+## Building from build-packages.sh (Debian, Fedora and Arch)
+
+Dependencies: 
+- `podman`
+- `git`
+- `pacur fedora42, arch and debian-trixie containers` (from https://github.com/pacur/pacur)
+- `docker`
+
+Setup:
+
+- Clone waywall repository (git clone https://github.com/tesselslate/waywall)
+- Install pacur containers for **archlinux** **fedora-42** and **debian-trixie**, ensure they are installed for your user, not root, remove sudo on build.sh /docker/
+- Run build-packages.sh inside waywall folder
+- Enjoy
 
 ## Building from source
 

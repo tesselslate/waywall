@@ -1,0 +1,13 @@
+Source: waywall
+Section: games
+Priority: optional
+Maintainer: esensats <tesselslate>
+Build-Depends: debhelper-compat (= 13), wayland-protocols, meson, build-essential, git, libspng-dev, libluajit-5.1-dev, libwayland-dev, libxkbcommon-dev, xwayland, cmake, wayland-protocols, wayland-scanner++,
+Standards-Version: 4.6.2
+Homepage: https://github.com/tesselslate/waywall
+
+Package: waywall
+Architecture: amd64
+Depends: libegl1, libgles2, luajit, libspng0, libwayland-client0, libwayland-cursor0, libwayland-egl1, libwayland-server0, libxcb1, libxcb-composite0, libxcb-res0, libxcb-xtest0, xwayland, libxkbcommon0
+Description: Wayland compositor for Minecraft speedrunning
+ Waywall is a Wayland compositor designed for Minecraft speedrunning.
