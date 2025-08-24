@@ -65,7 +65,7 @@ struct scene_text_options {
     float rgba[4];
     int32_t size_multiplier;
 
-    const char *shader_name;
+    char *shader_name;
 };
 
 struct scene *scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui);

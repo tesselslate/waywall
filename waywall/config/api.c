@@ -938,7 +938,7 @@ l_state(lua_State *L) {
 }
 
 static int
-l_text(lua_State *L) {
+l_text_legacy(lua_State *L, struct wrap *wrap) {
     static const int ARG_TEXT = 1;
     static const int ARG_X = 2;
     static const int ARG_Y = 3;
@@ -946,12 +946,7 @@ l_text(lua_State *L) {
     static const int ARG_SIZE = 5;
     static const int ARG_SHADER = 6;
 
-    // Prologue
-    struct config_vm *vm = config_vm_from(L);
-    struct wrap *wrap = config_vm_get_wrap(vm);
-    if (!wrap) {
-        return luaL_error(L, STARTUP_ERRMSG("text"));
-    }
+    ww_log(LOG_WARN, "using legacy text creation code path - update your configuration");
 
     const char *data = luaL_checkstring(L, ARG_TEXT);
     int x = luaL_checkinteger(L, ARG_X);
@@ -977,9 +972,9 @@ l_text(lua_State *L) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
 
-    const char *shader_name = NULL;
+    char *shader_name = NULL;
     if (lua_gettop(L) >= ARG_SHADER) {
-        shader_name = luaL_checkstring(L, ARG_SHADER);
+        shader_name = strdup(luaL_checkstring(L, ARG_SHADER));
     }
     lua_settop(L, ARG_SHADER);
 
@@ -999,6 +994,96 @@ l_text(lua_State *L) {
     lua_setmetatable(L, -2);
 
     *text = scene_add_text(wrap->scene, data, &options);
+    free(options.shader_name);
+    if (!*text) {
+        return luaL_error(L, "failed to create text");
+    }
+
+    // Epilogue. The userdata (text) was already pushed to the stack by the above code.
+    return 1;
+}
+
+static int
+l_text(lua_State *L) {
+    static const int ARG_TEXT = 1;
+    static const int ARG_OPTIONS = 2;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("text"));
+    }
+
+    const char *data = luaL_checkstring(L, ARG_TEXT);
+
+    if (!lua_istable(L, ARG_OPTIONS)) {
+        return l_text_legacy(L, wrap);
+    }
+    lua_settop(L, ARG_OPTIONS);
+
+    struct scene_text_options options = {0};
+
+    lua_pushstring(L, "x");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) != LUA_TNUMBER) {
+        return luaL_error(L, "expected 'x' to be of type 'number', was '%s'", luaL_typename(L, -1));
+    }
+    options.x = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "y");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) != LUA_TNUMBER) {
+        return luaL_error(L, "expected 'y' to be of type 'number', was '%s'", luaL_typename(L, -1));
+    }
+    options.y = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "color");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        const char *raw_color = lua_tostring(L, -1);
+
+        uint8_t u8_rgba[4] = {0};
+        if (config_parse_hex(u8_rgba, raw_color) != 0) {
+            return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
+        }
+
+        options.rgba[0] = (float)u8_rgba[0] / UINT8_MAX;
+        options.rgba[1] = (float)u8_rgba[1] / UINT8_MAX;
+        options.rgba[2] = (float)u8_rgba[2] / UINT8_MAX;
+        options.rgba[3] = (float)u8_rgba[3] / UINT8_MAX;
+    } else {
+        options.rgba[0] = options.rgba[1] = options.rgba[2] = options.rgba[3] = 1;
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "size");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.size_multiplier = lua_tointeger(L, -1);
+    } else {
+        options.size_multiplier = 1;
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "shader");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+
+    // Body
+    struct scene_text **text = lua_newuserdata(L, sizeof(*text));
+    check_alloc(text);
+
+    luaL_getmetatable(L, METATABLE_TEXT);
+    lua_setmetatable(L, -2);
+
+    *text = scene_add_text(wrap->scene, data, &options);
+    free(options.shader_name);
     if (!*text) {
         return luaL_error(L, "failed to create text");
     }
