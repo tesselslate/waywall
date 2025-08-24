@@ -18,6 +18,9 @@ non-optional:
     size = 1,
 
     -- optional
+    depth = 0,
+
+    -- optional
     shader = "shader_name"
 }
 ```
