@@ -91,7 +91,7 @@ struct scene *scene_create(struct config *cfg, struct server_gl *gl, struct serv
 void scene_destroy(struct scene *scene);
 
 struct scene_image *scene_add_image(struct scene *scene, const struct scene_image_options *options,
-                                    void *pngbuf, size_t pngbuf_size);
+                                    const char *path);
 struct scene_mirror *scene_add_mirror(struct scene *scene,
                                       const struct scene_mirror_options *options);
 struct scene_text *scene_add_text(struct scene *scene, const char *data,
