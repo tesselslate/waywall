@@ -32,6 +32,9 @@ The `options` table can have the following options, although only `src` and
     },
 
     -- optional
+    depth = 0,
+
+    -- optional
     shader = "shader_name",
 }
 ```

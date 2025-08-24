@@ -17,6 +17,9 @@ required:
     },
 
     -- optional
+    depth = 0,
+
+    -- optional
     shader = "shader_name"
 }
 ```
