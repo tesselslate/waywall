@@ -25,15 +25,6 @@ non-optional:
 }
 ```
 
-## Text object
-
-This function will return an object which can be used to remove the text from
-the waywall window at a later point. The only method made available by the
-returned text object is `close`.
-
-If this object is not stored in a permanent location, the text may randomly
-disappear when it gets garbage collected.
-
 ### Arguments
 
   - `text`: string
@@ -41,6 +32,8 @@ disappear when it gets garbage collected.
 
 ### Return values
 
-  - `text`: table
+  - `text`: [text object]
 
 > This function cannot be called during startup.
+
+[text object]: 02_type_text.md
