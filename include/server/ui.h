@@ -32,6 +32,7 @@ struct server_ui {
         struct wl_surface *surface;
         struct xdg_toplevel *top_level;
         bool is_focused;
+        bool window_opened;
         int32_t width;
         int32_t height;
     } ninbot;

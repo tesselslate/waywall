@@ -69,7 +69,11 @@ layout_floating(struct server_view *view) {
                            wl_fixed_from_int(-1), wl_fixed_from_int(-1));
     wp_viewport_set_destination(view->viewport, -1, -1);
 
-    wl_surface_commit(view->ui->tree.surface);
+    if (view->ui->ninbot.surface == NULL) {
+        wl_surface_commit(view->ui->tree.surface);
+    } else {
+        wl_surface_commit(view->ui->ninbot.surface);
+    }
 }
 
 static void
@@ -414,6 +418,7 @@ void ninbot_toplevel_show(struct server_ui *ui) {
 
     xdg_toplevel_set_title(ui->ninbot.top_level, "NinjabrainBot Wrapper");
     xdg_toplevel_set_app_id(ui->ninbot.top_level, "NinjabrainBot Wrapper");
+    ui->ninbot.window_opened = true;
 }
 
 void
@@ -519,7 +524,7 @@ server_view_commit(struct server_view *view) {
     if (visibility_changed && view->current.visible) {
         ww_assert(!view->subsurface);
 
-        if (view->current.centered) {
+        if (view->current.centered || view->ui->ninbot.surface == NULL) {
             view->subsurface =
             wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor,
                                             view->surface->remote, view->ui->tree.surface);

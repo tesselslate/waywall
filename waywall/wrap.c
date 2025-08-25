@@ -223,7 +223,9 @@ floating_view_create(struct wrap *wrap, struct server_view *view) {
         server_view_set_centered(view, false);
         floating_update_anchored(wrap);
         if (wrap->cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
-            ninbot_toplevel_show(wrap->server->ui);
+            if (!wrap->server->ui->ninbot.window_opened) {
+                ninbot_toplevel_show(wrap->server->ui);
+            }
             floating_set_visible(wrap, true);
         }
     }
