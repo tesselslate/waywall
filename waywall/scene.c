@@ -693,7 +693,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
         glGetIntegerv(GL_MAX_TEXTURE_SIZE, &tex_size);
 
         scene->image_max_size = (uint32_t)tex_size;
-        ww_log(LOG_INFO, "max image size: %" PRIu32 "x%" PRIu32 "\n", scene->image_max_size,
+        ww_log(LOG_INFO, "max image size: %" PRIu32 "x%" PRIu32, scene->image_max_size,
                scene->image_max_size);
 
         scene->shaders.count = cfg->shaders.count + 1;
