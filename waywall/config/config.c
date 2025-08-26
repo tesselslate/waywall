@@ -772,7 +772,7 @@ load_config(struct config *cfg) {
     int type = lua_type(cfg->vm->L, ARG_CONFIG);
     if (type != LUA_TTABLE) {
         ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
-               lua_typename(cfg->vm->L, ARG_CONFIG));
+               luaL_typename(cfg->vm->L, ARG_CONFIG));
         goto fail_table;
     }
 
