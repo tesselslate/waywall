@@ -461,7 +461,7 @@ draw_stencil(struct scene *scene) {
 
 static void
 draw_debug_text(struct scene *scene) {
-    // The OpenGL context must be current,
+    // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[0].shader);
     glUniform2f(scene->shaders.data[0].shader_u_dst_size, scene->ui->width, scene->ui->height);
     glUniform2f(scene->shaders.data[0].shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);

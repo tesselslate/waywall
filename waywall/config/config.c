@@ -494,7 +494,7 @@ process_config_input_remaps(struct config *cfg) {
     lua_pushnil(cfg->vm->L); // stack: 4 (IDX_REMAP_KEY)
     while (lua_next(cfg->vm->L, IDX_REMAPS)) {
         // stack state
-        // 5 (IDX_REMAP_VAL) : config.input.remaps[key] (should be a string)
+        // 5 (IDX_REMAP_VAL)  : config.input.remaps[key] (should be a string)
         // 4 (IDX_REMAP_KEY)  : key (should be a string)
         // 3 (IDX_REMAPS)     : config.input.remaps
         // 2                  : config.input
