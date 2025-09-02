@@ -141,35 +141,40 @@ layout_centered(struct server_view *view) {
     int32_t width, height;
     server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
 
+    int32_t scale = view->surface->preferred_buffer_scale;
+
     // Center the view in the window.
-    int32_t x = (view->ui->width / 2) - (width / 2);
-    int32_t y = (view->ui->height / 2) - (height / 2);
+    int32_t x = (view->ui->width / 2) - (width / (2 * scale));
+    int32_t y = (view->ui->height / 2) - (height / (2 * scale));
 
     if (x >= 0 && y >= 0) {
         // If the centered view is entirely inside the window, it can be shown as normal.
         wl_subsurface_set_position(view->subsurface, x, y);
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                                wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-        wp_viewport_set_destination(view->viewport, -1, -1);
+        wp_viewport_set_destination(view->viewport, width / scale, height / scale);
+
+        view->current.x = x;
+        view->current.y = y;
     } else {
         // If the centered view is partially outside the window, it must be cropped.
-        int32_t crop_width = (x >= 0) ? width : view->ui->width;
-        int32_t crop_height = (y >= 0) ? height : view->ui->height;
+        int32_t crop_width = (x >= 0) ? width / scale : view->ui->width;
+        int32_t crop_height = (y >= 0) ? height / scale : view->ui->height;
 
-        int32_t crop_x = (width / 2) - (crop_width / 2);
-        int32_t crop_y = (height / 2) - (crop_height / 2);
+        int32_t crop_x = (width / (2 * scale)) - (crop_width / 2);
+        int32_t crop_y = (height / (2 * scale)) - (crop_height / 2);
 
+        view->current.x = x;
+        view->current.y = y;
         x = x >= 0 ? x : 0;
         y = y >= 0 ? y : 0;
 
         wl_subsurface_set_position(view->subsurface, x, y);
-        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x), wl_fixed_from_int(crop_y),
-                               wl_fixed_from_int(crop_width), wl_fixed_from_int(crop_height));
-        wp_viewport_set_destination(view->viewport, crop_width, crop_height);
+        wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x * scale), wl_fixed_from_int(crop_y * scale),
+                               wl_fixed_from_int(crop_width * scale), wl_fixed_from_int(crop_height * scale));
+        wp_viewport_set_destination(view->viewport, view->ui->width, view->ui->height);
     }
 
-    view->current.x = x;
-    view->current.y = y;
     wl_surface_commit(view->ui->tree.surface);
 }
 
@@ -177,10 +182,17 @@ static void
 layout_floating(struct server_view *view) {
     ww_assert(view->subsurface);
 
+    int32_t width, height;
+    server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
+    int32_t scale = view->surface->preferred_buffer_scale;
+
+    ww_log(LOG_WARN, "Floating view %p at %d,%d with size %dx%d, scale %d",
+           view, view->current.x, view->current.y, width, height, scale);
+
     wl_subsurface_set_position(view->subsurface, view->current.x, view->current.y);
     wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                            wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-    wp_viewport_set_destination(view->viewport, -1, -1);
+    wp_viewport_set_destination(view->viewport, width / scale, height / scale);
 
     wl_surface_commit(view->ui->tree.surface);
 }
@@ -296,8 +308,9 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         }
     }
 
-    if (view->subsurface && view->current.centered) {
+    if (view->subsurface && (view->current.centered ||view->surface->handled)) {
         layout_centered(view);
+        view->surface->handled = true;
     }
 }
 

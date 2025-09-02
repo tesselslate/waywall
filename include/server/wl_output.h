@@ -9,6 +9,8 @@ struct server_output {
     struct wl_global *global;
     struct wl_list objects; // wl_resource link
 
+    struct parent_output *parent_wl_output;
+
     struct server_ui *ui;
 
     struct wl_listener on_resize;
