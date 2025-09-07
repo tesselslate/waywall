@@ -525,14 +525,14 @@ draw_frame(struct scene *scene) {
     }
     glDisable(GL_STENCIL_TEST);
 
-    wl_list_for_each (object, &scene->objects.unsorted_text, link) {
-        text_render(object);
-    }
     wl_list_for_each (object, &scene->objects.unsorted_mirrors, link) {
         mirror_render(object);
     }
     wl_list_for_each (object, &scene->objects.unsorted_images, link) {
         image_render(object);
+    }
+    wl_list_for_each (object, &scene->objects.unsorted_text, link) {
+        text_render(object);
     }
     if (positive_depth) {
         wl_list_for_each (object, positive_depth, link) {
