@@ -128,7 +128,14 @@ image_buffer_new(struct server *server, const char *path) {
         return NULL;
     }
 
-    memcpy(buf, png.data, png.size);
+    size_t pixels = png.width * png.height;
+    for (size_t i = 0; i < pixels; i++) {
+        buf[i * 4 + 0] = png.data[i * 4 + 2];
+        buf[i * 4 + 1] = png.data[i * 4 + 1];
+        buf[i * 4 + 2] = png.data[i * 4 + 0];
+        buf[i * 4 + 3] = png.data[i * 4 + 3];
+    }
+
     free(png.data);
 
     return bg_buffer_create(server, data, png.width, png.height);
