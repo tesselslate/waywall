@@ -57,7 +57,7 @@ struct server_ui {
 struct server_ui_config {
     struct wl_buffer *background;
     bool tearing;
-
+    bool xwayland_toplevel;
     uint32_t ninb_opacity;
 };
 
