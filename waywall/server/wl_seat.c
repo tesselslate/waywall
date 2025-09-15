@@ -273,7 +273,7 @@ send_keyboard_leave(struct server_seat *seat) {
     }
 }
 
-static void
+void
 send_keyboard_modifiers(struct server_seat *seat) {
     if (!seat->input_focus) {
         return;
