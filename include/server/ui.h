@@ -110,7 +110,7 @@ void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen);
 void server_ui_show(struct server_ui *ui);
-void ninbot_toplevel_show(struct server_ui *ui);
+void xwayland_toplevel_show(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 
 struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);
@@ -126,6 +126,9 @@ void server_view_set_centered(struct server_view *view, bool centered);
 void server_view_set_pos(struct server_view *view, uint32_t x, uint32_t y);
 void server_view_set_size(struct server_view *view, uint32_t width, uint32_t height);
 void server_view_set_visible(struct server_view *view, bool visible);
+
+void xwayland_server_view_attach(struct server_view *view);
+void xwayland_server_view_detach(struct server_view *view);
 
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,
                                        const struct server_view_impl *impl, void *impl_data);

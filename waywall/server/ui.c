@@ -412,7 +412,7 @@ server_ui_show(struct server_ui *ui) {
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
 }
 
-void ninbot_toplevel_show(struct server_ui *ui) {
+void xwayland_toplevel_show(struct server_ui *ui) {
     struct wl_display *display = ui->server->backend->display;
 
     wl_surface_attach(ui->ninbot.surface, NULL, 0, 0);
@@ -544,15 +544,9 @@ server_view_commit(struct server_view *view) {
         ww_assert(!view->subsurface);
 
         if (view->current.centered || view->ui->ninbot.surface == NULL) {
-            view->subsurface =
-            wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor,
-                                            view->surface->remote, view->ui->tree.surface);
-            check_alloc(view->subsurface);
+            xwayland_server_view_detach(view);
         } else {
-            view->subsurface =
-            wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor, view->surface->remote, view->ui->ninbot.surface);
-            check_alloc(view->subsurface);
-            wl_surface_commit(view->ui->ninbot.surface);
+            xwayland_server_view_attach(view);
         }
 
         wl_subsurface_set_desync(view->subsurface);
@@ -572,6 +566,21 @@ server_view_commit(struct server_view *view) {
     }
 
     view_state_reset(&view->pending);
+}
+
+void
+xwayland_server_view_attach(struct server_view *view) {
+    view->subsurface = 
+    wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor, view->surface->remote, view->ui->ninbot.surface);
+    check_alloc(view->subsurface);
+    wl_surface_commit(view->ui->ninbot.surface);
+}
+
+void
+xwayland_server_view_detach(struct server_view *view) {
+    view->subsurface =
+    wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor, view->surface->remote, view->ui->tree.surface);
+    check_alloc(view->subsurface);
 }
 
 void

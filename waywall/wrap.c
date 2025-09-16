@@ -224,7 +224,7 @@ floating_view_create(struct wrap *wrap, struct server_view *view) {
         floating_update_anchored(wrap);
         if (wrap->cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
             if (!wrap->server->ui->ninbot.window_opened) {
-                ninbot_toplevel_show(wrap->server->ui);
+                xwayland_toplevel_show(wrap->server->ui);
             }
             floating_set_visible(wrap, true);
         }
@@ -643,6 +643,24 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
     config_vm_set_wrap(cfg->vm, wrap);
 
     wrap->cfg = cfg;
+
+    if (wrap->cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
+        struct floating_view *fview;
+        wl_list_for_each(fview, &wrap->floating.views, link) {
+            wl_subsurface_destroy(fview->view->subsurface);
+            xwayland_server_view_attach(fview->view);
+        }
+        if (wl_list_length(&wrap->floating.views) > 0) {
+            xwayland_toplevel_show(wrap->server->ui);
+        }
+    } else {
+        struct floating_view *fview;
+        wl_list_for_each(fview, &wrap->floating.views, link) {
+            wl_subsurface_destroy(fview->view->subsurface);
+            xwayland_server_view_detach(fview->view);
+        }
+    }
+
     if (wrap->cfg->theme.ninb_anchor == ANCHOR_NONE) {
         // If anchoring has been disabled, ensure there is no anchored view.
         if (wrap->floating.anchored) {
