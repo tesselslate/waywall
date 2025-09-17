@@ -242,19 +242,21 @@ void xwayland_toplevel_create(struct server_ui *ui) {
     ui->ninbot.surface = wl_compositor_create_surface(ui->server->backend->compositor);
     check_alloc(ui->ninbot.surface);
 
-    struct xdg_surface *xdg_ninbot = xdg_wm_base_get_xdg_surface(ui->server->backend->xdg_wm_base, ui->ninbot.surface);
-    check_alloc(xdg_ninbot);
-    xdg_surface_add_listener(xdg_ninbot, &ninbot_surface_listener, ui);
+    ui->ninbot.xdg_surface = xdg_wm_base_get_xdg_surface(ui->server->backend->xdg_wm_base, ui->ninbot.surface);
+    check_alloc(ui->ninbot.xdg_surface);
+    xdg_surface_add_listener(ui->ninbot.xdg_surface, &ninbot_surface_listener, ui);
 
-    ui->ninbot.top_level = xdg_surface_get_toplevel(xdg_ninbot);
+    ui->ninbot.top_level = xdg_surface_get_toplevel(ui->ninbot.xdg_surface);
     check_alloc(ui->ninbot.top_level);
     xdg_toplevel_add_listener(ui->ninbot.top_level, &ninbot_toplevel_listener, ui);
 }
 
 void xwayland_toplevel_destroy(struct server_ui *ui) {
     xdg_toplevel_destroy(ui->ninbot.top_level);
+    xdg_surface_destroy(ui->ninbot.xdg_surface);
     wl_surface_destroy(ui->ninbot.surface);
     ui->ninbot.top_level = NULL;
+    ui->ninbot.xdg_surface = NULL;
     ui->ninbot.surface = NULL;
 }
 

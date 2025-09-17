@@ -31,6 +31,7 @@ struct server_ui {
     struct {
         struct wl_surface *surface;
         struct xdg_toplevel *top_level;
+        struct xdg_surface *xdg_surface;
         bool is_focused;
         bool window_opened;
         int32_t width;
