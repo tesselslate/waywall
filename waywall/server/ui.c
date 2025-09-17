@@ -163,8 +163,15 @@ void ninbot_toplevel_close_handler
     struct xdg_toplevel *xdg_toplevel
 ) {
     struct server_ui *ui = data;
-    // TODO: only close ninbot and other floating windows
-    wl_signal_emit_mutable(&ui->events.close, NULL);
+
+    struct server_view *view;
+    struct server_view *tmp_view;
+    wl_list_for_each_safe(view, tmp_view, &ui->views, link) {
+        // Can we nest native Wayland apps except Minecraft? If so this is problematic
+        if (strcmp(view->impl->name, "xwayland") == 0) {
+            server_view_destroy(view);
+        }
+    }
 }
 
 static const struct xdg_toplevel_listener ninbot_toplevel_listener = {
