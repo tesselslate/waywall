@@ -157,6 +157,13 @@ void ninbot_toplevel_configure_handler
     ui->ninbot.height = height;
 }
 
+void xwayland_toplevel_hide(struct server_ui *ui) {
+    wl_surface_attach(ui->ninbot.surface, NULL, 0, 0);
+    wl_surface_commit(ui->ninbot.surface);
+    ui->ninbot.window_opened = false;
+}
+
+
 void ninbot_toplevel_close_handler
 (
     void *data,
@@ -172,6 +179,7 @@ void ninbot_toplevel_close_handler
             server_view_destroy(view);
         }
     }
+    xwayland_toplevel_hide(ui);
 }
 
 static const struct xdg_toplevel_listener ninbot_toplevel_listener = {
@@ -258,6 +266,7 @@ void xwayland_toplevel_destroy(struct server_ui *ui) {
     ui->ninbot.top_level = NULL;
     ui->ninbot.xdg_surface = NULL;
     ui->ninbot.surface = NULL;
+    ui->ninbot.window_opened = false;
 }
 
 struct server_ui *
