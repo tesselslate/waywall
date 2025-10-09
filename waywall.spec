@@ -82,5 +82,5 @@ fi
 %post
 
 %changelog
-* Sat Aug 16 2025 esensats <tesselslate> - 0.5-1
+* Sat Aug 16 2025 ByPaco10 <tesselslate> - 0.5-1
 - Initial package release

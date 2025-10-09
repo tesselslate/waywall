@@ -1,4 +1,4 @@
-# Maintainer: esensats (tesselslate)
+# Maintainer: ByPaco10 (tesselslate)
 pkgname=waywall
 pkgver=0.5
 pkgrel=1
