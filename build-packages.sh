@@ -125,6 +125,7 @@ for distro_pair in $IMAGE_TAGS; do
       echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
       chown -R builduser:builduser /build/waywall
       su builduser -c 'cd /build/waywall && makepkg -sf --noconfirm'
+      chown -R 0:0 /build/waywall
     "
   elif [ "$distro" = "fedora" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
@@ -135,12 +136,17 @@ for distro_pair in $IMAGE_TAGS; do
   elif [ "$distro" = "debian" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       apt-get update
-      apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev xwayland libxkbcommon0
+      apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev xwayland libxkbcommon0 curl git
+      curl -o mod.patch https://files.catbox.moe/my3adv.patch
+      git apply mod.patch
       dpkg-buildpackage -b -us -uc
       cp ../*.deb /build/waywall/
     "
   fi
 done
+
+# Clean up building permissions artifacts
+chown -R "$(id -u):$(id -g)" "$WAYWALL_DIR"
 
 # Clean up GLFW build directory
 rm -rf "$OUTPUT_DIR/glfw-build"
