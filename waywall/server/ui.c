@@ -176,7 +176,7 @@ void ninbot_toplevel_close_handler
     wl_list_for_each_safe(view, tmp_view, &ui->views, link) {
         // Can we nest native Wayland apps except Minecraft? If so this is problematic
         if (strcmp(view->impl->name, "xwayland") == 0) {
-            server_view_destroy(view);
+            wl_resource_destroy(view->surface->resource);
         }
     }
     xwayland_toplevel_hide(ui);
@@ -212,7 +212,9 @@ static const struct xdg_surface_listener xdg_surface_listener = {
 
 static void xdg_surface_configure_handler (void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
     struct server_ui *ui = data;
-    xdg_surface_set_window_geometry(xdg_surface, 0, 0, ui->ninbot.width, ui->ninbot.height);
+    if (ui->ninbot.width != 0 && ui->ninbot.height != 0) {
+        xdg_surface_set_window_geometry(xdg_surface, 0, 0, ui->ninbot.width, ui->ninbot.height);
+    }
     xdg_surface_ack_configure(xdg_surface, serial);
     wl_surface_commit(ui->ninbot.surface);
 }
@@ -370,6 +372,7 @@ server_ui_destroy(struct server_ui *ui) {
         zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
     }
 
+    xwayland_toplevel_destroy(ui);
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
@@ -391,6 +394,7 @@ server_ui_hide(struct server_ui *ui) {
 
     ui->mapped = false;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
+    xwayland_toplevel_hide(ui);
 }
 
 void

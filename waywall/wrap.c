@@ -262,6 +262,14 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
             floating_find_anchored(wrap);
             floating_update_anchored(wrap);
         }
+
+        if (wl_list_length(&wrap->floating.views) == 0 && view->ui->ninbot.window_opened) {
+            xwayland_toplevel_hide(view->ui);
+            if (view->ui->ninbot.is_focused) {
+                server_set_input_focus(wrap->server, wrap->view);
+                view->ui->ninbot.is_focused = false;
+            }
+        }
         return;
     }
 

@@ -112,6 +112,7 @@ void server_ui_hide(struct server_ui *ui);
 void server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen);
 void server_ui_show(struct server_ui *ui);
 void xwayland_toplevel_show(struct server_ui *ui);
+void xwayland_toplevel_hide(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 
 struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);
