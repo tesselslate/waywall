@@ -33,7 +33,7 @@ This script includes the patched GLFW, it will always be located on ```/usr/loca
 
 - Clone waywall repository ```git clone https://github.com/tesselslate/waywall```
 - Install pacur containers for **archlinux** **fedora-42** and **debian-trixie**, ensure they are installed for your user, not root, remove sudo on build.sh /docker/
-- Run ```./build-packages.sh``` inside waywall folder and select the distro family you want to build for (1 for arch, 2 for fedora, 3 for debian, 4 for done)
+- Run ```./build-packages.sh``` inside waywall folder and select the distro family you want to build for (1 for arch, 2 for fedora, 3 for debian, 4 for done) or use the provided script flags for building (for example ```./build-packages.sh --debian``` ```./build-packages.sh --fedora --arch```)
 - Enjoy
 
 ### Steps for installing pacur containers:
