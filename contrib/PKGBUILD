@@ -11,18 +11,18 @@ makedepends=(wayland-protocols meson git)
 source=()
 
 build() {
-  cd ..
-  meson setup build --prefix=/usr
+  cd ../../
+  meson setup --wipe build --prefix=/usr
   ninja -C build
 }
 
 check() {
-  cd ..
+  cd ../../
   ninja -C build test || true
 }
 
 package() {
-  cd ..
+  cd ../../
   #WAYWALL
   install -Dm755 build/waywall/waywall "$pkgdir/usr/bin/waywall"
   #WAYWALLL-LICENSE
@@ -34,11 +34,11 @@ package() {
   fi
   #GLFW
   mkdir -p "$pkgdir/usr/local/lib64/waywall-glfw"
-  install -m644 glfw/libglfw.so "$pkgdir/usr/local/lib64/waywall-glfw/"
-  install -m644 glfw/libglfw.so.3 "$pkgdir/usr/local/lib64/waywall-glfw/"
-  install -m644 glfw/libglfw.so.3.4 "$pkgdir/usr/local/lib64/waywall-glfw/"
+  install -m644 waywall-build/glfw/libglfw.so "$pkgdir/usr/local/lib64/waywall-glfw/"
+  install -m644 waywall-build/glfw/libglfw.so.3 "$pkgdir/usr/local/lib64/waywall-glfw/"
+  install -m644 waywall-build/glfw/libglfw.so.3.4 "$pkgdir/usr/local/lib64/waywall-glfw/"
   #GLFW-DOCS
-  install -m644 glfw/LICENSE.md "$pkgdir/usr/share/doc/$pkgname/glfw-LICENSE.md"
-  install -m644 glfw/CONTRIBUTORS.md "$pkgdir/usr/share/doc/$pkgname/glfw-CONTRIBUTORS.md"
-  install -m644 glfw/MAINTAINERS.md "$pkgdir/usr/share/doc/$pkgname/glfw-MAINTAINERS.md"
+  install -m644 waywall-build/glfw/LICENSE.md "$pkgdir/usr/share/doc/$pkgname/glfw-LICENSE.md"
+  install -m644 waywall-build/glfw/CONTRIBUTORS.md "$pkgdir/usr/share/doc/$pkgname/glfw-CONTRIBUTORS.md"
+  install -m644 waywall-build/glfw/MAINTAINERS.md "$pkgdir/usr/share/doc/$pkgname/glfw-MAINTAINERS.md"
 }

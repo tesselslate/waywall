@@ -4,7 +4,7 @@
 	dh $@ --buildsystem=meson
 
 override_dh_auto_configure:
-	dh_auto_configure -- --prefix=/usr
+	dh_auto_configure -- --wipe --prefix=/usr
 
 override_dh_auto_install:
 	dh_testdir
@@ -17,12 +17,12 @@ override_dh_auto_install:
 	install -m 644 LICENSE $(CURDIR)/debian/waywall/usr/share/licenses/waywall/LICENSE
 	if [ -d doc ]; then cp -r doc $(CURDIR)/debian/waywall/usr/share/doc/waywall/; fi
 	install -d $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw
-	install -m644 glfw/libglfw.so $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
-	install -m644 glfw/libglfw.so.3 $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
-	install -m644 glfw/libglfw.so.3.4 $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
-	install -m644 glfw/LICENSE.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-LICENSE.md
-	install -m644 glfw/CONTRIBUTORS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-CONTRIBUTORS.md
-	install -m644 glfw/MAINTAINERS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-MAINTAINERS.md
+	install -m644 waywall-build/glfw/libglfw.so $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
+	install -m644 waywall-build/glfw/libglfw.so.3 $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
+	install -m644 waywall-build/glfw/libglfw.so.3.4 $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw/
+	install -m644 waywall-build/glfw/LICENSE.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-LICENSE.md
+	install -m644 waywall-build/glfw/CONTRIBUTORS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-CONTRIBUTORS.md
+	install -m644 waywall-build/glfw/MAINTAINERS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-MAINTAINERS.md
 
 
     # Ensure the directories are created

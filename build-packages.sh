@@ -2,23 +2,97 @@
 
 set -e  # Exit on errors
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WAYWALL_DIR="$SCRIPT_DIR"
-OUTPUT_DIR="${WAYWALL_OUTPUT_DIR:-$(realpath "$WAYWALL_DIR/../waywall-build")}"
-if [ -z "$1" ]; then
-  echo "No output directory specified. Using default: $OUTPUT_DIR"
-else
-  OUTPUT_DIR="$(realpath "$1")"
-fi
-
+WAYWALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+OUTPUT_DIR="${WAYWALL_OUTPUT_DIR:-$(realpath "$WAYWALL_DIR/waywall-build")}"
 mkdir -p "$OUTPUT_DIR"
 
 DISTROS="archlinux fedora debian"
 IMAGE_TAGS="archlinux:archlinux fedora:fedora-42 debian:debian-trixie"
 
+# Parse arguments to determine which distros to build
+build_distros=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --arch)
+      build_distros+=("archlinux")
+      shift
+      ;;
+    --fedora)
+      build_distros+=("fedora")
+      shift
+      ;;
+    --debian)
+      build_distros+=("debian")
+      shift
+      ;;
+    *)
+      echo "Unknown option: $1"
+      echo "Usage: $0 [--arch] [--fedora] [--debian]"
+      exit 1
+      ;;
+  esac
+done
+
+# If no distros specified, prompt for multi-selection
+if [ ${#build_distros[@]} -eq 0 ]; then
+  echo "Select distros to build for (select one at a time, then choose 'done' to finish):"
+  while true; do
+    select distro in $DISTROS done; do
+      if [ "$distro" = "done" ]; then
+        break 2  # Exit both the select and the while loop
+      elif [[ -n "$distro" ]] && [[ ! " ${build_distros[*]} " =~ " $distro " ]]; then
+        build_distros+=("$distro")
+        echo "Added $distro (current selections: ${build_distros[*]})"
+        break  # Back to while loop for next selection
+      elif [[ -n "$distro" ]]; then
+        echo "Already selected: $distro. Choose another or 'done'."
+        break
+      else
+        echo "Invalid selection. Please try again."
+        break
+      fi
+    done
+  done
+fi
+
+if [ ${#build_distros[@]} -eq 0 ]; then
+  echo "No distros selected. Exiting."
+  exit 1
+fi
+
+
+# Define cleanup and copy function
+cleanup_and_copy() {
+  echo "Running cleanup and copy..."
+  # Clean up building permissions artifacts
+  chown -R "$(id -u):$(id -g)" "$WAYWALL_DIR" || true
+
+  # Clean up GLFW build directory
+  rm -rf "$OUTPUT_DIR/glfw-build" || true
+
+  # Clean up building folders from all distros
+  rm -rf "$WAYWALL_DIR"/contrib/x86_64/ || true
+  rm -rf "$WAYWALL_DIR"/contrib/pkg/ || true
+  rm -rf "$WAYWALL_DIR"/contrib/src/ || true
+  rm -rf "$WAYWALL_DIR"/contrib/obj-x86_64-linux-gnu/ || true
+
+  # Copy the built packages to the output directory (if any)
+  cp -v "$WAYWALL_DIR"/contrib/*.pkg.tar.zst "$OUTPUT_DIR" || true
+  cp -v "$WAYWALL_DIR"/contrib/*.rpm "$OUTPUT_DIR" || true
+  cp -v "$WAYWALL_DIR"/contrib/*.deb "$OUTPUT_DIR" || true
+
+  # Remove the built packages from the waywall directory
+  rm -f "$WAYWALL_DIR"/contrib/*.pkg.tar.zst || true
+  rm -f "$WAYWALL_DIR"/contrib/*.rpm || true
+  rm -f "$WAYWALL_DIR"/contrib/*.deb || true
+}
+
+# Set trap to run cleanup on error or exit
+trap cleanup_and_copy ERR EXIT
+
 # Check if GLFW files already exist
 GLFW_SKIP=true
-for file in "$WAYWALL_DIR/glfw/MAINTAINERS.md" "$WAYWALL_DIR/glfw/CONTRIBUTORS.md" "$WAYWALL_DIR/glfw/LICENSE.md" "$WAYWALL_DIR/glfw/libglfw.so" "$WAYWALL_DIR/glfw/libglfw.so.3" "$WAYWALL_DIR/glfw/libglfw.so.3.4"; do
+for file in "$OUTPUT_DIR/glfw/MAINTAINERS.md" "$OUTPUT_DIR/glfw/CONTRIBUTORS.md" "$OUTPUT_DIR/glfw/LICENSE.md" "$OUTPUT_DIR/glfw/libglfw.so" "$OUTPUT_DIR/glfw/libglfw.so.3" "$OUTPUT_DIR/glfw/libglfw.so.3.4"; do
   if [ ! -f "$file" ]; then
     GLFW_SKIP=false
     break
@@ -26,9 +100,9 @@ for file in "$WAYWALL_DIR/glfw/MAINTAINERS.md" "$WAYWALL_DIR/glfw/CONTRIBUTORS.m
 done
 
 if $GLFW_SKIP; then
-  echo "GLFW files already exist in $WAYWALL_DIR/glfw/"
+  echo "GLFW files already exist in $OUTPUT_DIR/glfw/"
   echo "Skipping GLFW build and copy."
-  echo "If you want to rebuild GLFW, please remove the existing files in $WAYWALL_DIR/glfw/."
+  echo "If you want to rebuild GLFW, please remove the existing files in $OUTPUT_DIR/glfw/."
 else
   # Step 1: Build the patched GLFW and prepare license/contributors/maintainers
   echo "Building patched GLFW for Minecraft..."
@@ -90,76 +164,71 @@ EOF
   echo "Maintainers: $GLFW_MAINTAINERS"
   echo "Waywall source: $WAYWALL_DIR"
 
-  # Step 2: Copy GLFW files to waywall/glfw/ directory
-  echo "Copying GLFW files to $WAYWALL_DIR/glfw/..."
-  mkdir -p "$WAYWALL_DIR/glfw"
+  # Step 2: Copy GLFW files to output directory
+  echo "Copying GLFW files to $OUTPUT_DIR/glfw/..."
+  mkdir -p "$OUTPUT_DIR/glfw"
   for file in "${GLFW_FILES[@]}"; do
-    cp "$file" "$WAYWALL_DIR/glfw/$(basename "$file")"
+    cp "$file" "$OUTPUT_DIR/glfw/$(basename "$file")"
   done
-  cp "$GLFW_LICENSE" "$WAYWALL_DIR/glfw/LICENSE.md"
-  cp "$GLFW_CONTRIBUTORS" "$WAYWALL_DIR/glfw/CONTRIBUTORS.md"
-  cp "$GLFW_MAINTAINERS" "$WAYWALL_DIR/glfw/MAINTAINERS.md"
+  cp "$GLFW_LICENSE" "$OUTPUT_DIR/glfw/LICENSE.md"
+  cp "$GLFW_CONTRIBUTORS" "$OUTPUT_DIR/glfw/CONTRIBUTORS.md"
+  cp "$GLFW_MAINTAINERS" "$OUTPUT_DIR/glfw/MAINTAINERS.md"
 
   # Verify copied files
-  for file in "$WAYWALL_DIR/glfw/libglfw.so" "$WAYWALL_DIR/glfw/libglfw.so.3" "$WAYWALL_DIR/glfw/libglfw.so.3.4" \
-              "$WAYWALL_DIR/glfw/LICENSE.md" "$WAYWALL_DIR/glfw/CONTRIBUTORS.md" "$WAYWALL_DIR/glfw/MAINTAINERS.md"; do
+  for file in "$OUTPUT_DIR/glfw/libglfw.so" "$OUTPUT_DIR/glfw/libglfw.so.3" "$OUTPUT_DIR/glfw/libglfw.so.3.4" \
+              "$OUTPUT_DIR/glfw/LICENSE.md" "$OUTPUT_DIR/glfw/CONTRIBUTORS.md" "$OUTPUT_DIR/glfw/MAINTAINERS.md"; do
     if [ ! -f "$file" ]; then
       echo "Error: Failed to copy $file"
       exit 1
     fi
   done
-  echo "GLFW files copied successfully to $WAYWALL_DIR/glfw/"
+  echo "GLFW files copied successfully to $OUTPUT_DIR/glfw/"
 fi
 
 # Step 3: Build waywall for each distro
-for distro_pair in $IMAGE_TAGS; do
-  distro=${distro_pair%%:*}
-  image_tag=${distro_pair#*:}
+for distro in "${build_distros[@]}"; do
+  # Find the corresponding image tag
+  image_tag=""
+  for distro_pair in $IMAGE_TAGS; do
+    if [[ $distro_pair == "$distro:"* ]]; then
+      image_tag=${distro_pair#*:}
+      break
+    fi
+  done
+  if [[ -z "$image_tag" ]]; then
+    echo "Error: No image tag found for distro '$distro'"
+    continue
+  fi
   echo "Building waywall for $distro..."
 
   if [ "$distro" = "archlinux" ]; then
-    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
+    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       pacman -Syu --noconfirm
       pacman -S --noconfirm ninja meson wayland-protocols libegl libgles luajit libspng libxcb libxkbcommon xorg-xwayland
-      useradd -m -u 1000 builduser
-      echo 'builduser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-      chown -R builduser:builduser /build/waywall
-      su builduser -c 'cd /build/waywall && makepkg -sf --noconfirm'
+      chown -R 65534:65534 /build/waywall
+      runuser -u nobody -- sh -c 'makepkg -sf --noconfirm'
       chown -R 0:0 /build/waywall
     "
   elif [ "$distro" = "fedora" ]; then
-    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
+    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       dnf install -y libspng-devel cmake meson mesa-libEGL-devel luajit-devel libwayland-client libwayland-server libwayland-cursor libxkbcommon-devel xorg-x11-server-Xwayland-devel wayland-protocols-devel wayland-scanner
       rpmbuild -ba --define '_sourcedir /build/waywall' --define '_srcrpmdir /build/waywall' --define '_rpmdir /build/waywall' --define '_builddir /build/waywall/build' /build/waywall/waywall.spec
       cp /build/waywall/x86_64/*.rpm /build/waywall/
     "
   elif [ "$distro" = "debian" ]; then
-    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
+    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       apt-get update
-      apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev xwayland libxkbcommon0 curl git
-      curl -o mod.patch https://files.catbox.moe/my3adv.patch
-      git apply mod.patch
+      apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
+      curl -o contrib/mod.patch 'https://files.catbox.moe/my3adv.patch'
+      git apply contrib/mod.patch
       dpkg-buildpackage -b -us -uc
       cp ../*.deb /build/waywall/
     "
   fi
 done
 
-# Clean up building permissions artifacts
-chown -R "$(id -u):$(id -g)" "$WAYWALL_DIR"
+# Normal exit: Run cleanup
+cleanup_and_copy
 
-# Clean up GLFW build directory
-rm -rf "$OUTPUT_DIR/glfw-build"
-
-# Copy the built packages to the output directory
-cp -v "$WAYWALL_DIR"/*.pkg.tar.zst "$OUTPUT_DIR" || true
-cp -v "$WAYWALL_DIR"/*.rpm "$OUTPUT_DIR" || true
-cp -v "$WAYWALL_DIR"/*.deb "$OUTPUT_DIR" || true
-
-# Remove the built packages from the waywall directory
-rm -f "$WAYWALL_DIR"/*.pkg.tar.zst
-rm -f "$WAYWALL_DIR"/*.rpm
-rm -f "$WAYWALL_DIR"/*.deb
-
-echo "Build process completed successfully for all distros."
+echo "Build process completed successfully for all selected distros."
 echo "Build artifacts are located in: $OUTPUT_DIR"

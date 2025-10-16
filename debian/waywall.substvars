@@ -1,3 +1,0 @@
-shlibs:Depends=libc6 (>= 2.34), libegl1, libgles2, libluajit-5.1-2 (>= 2.0.4) | libluajit-5.1-2 (>= 2.1.0+openresty), libspng0 (>= 0.7.3), libwayland-client0 (>= 1.23.0), libwayland-cursor0 (>= 1.0.2), libwayland-egl1 (>= 1.15.0), libwayland-server0 (>= 1.23.0), libxcb-composite0, libxcb-res0 (>= 1.10), libxcb-xtest0, libxcb1, libxkbcommon0 (>= 0.5.0)
-misc:Depends=
-misc:Pre-Depends=
