@@ -63,32 +63,61 @@ fi
 
 # Define cleanup and copy function
 cleanup_and_copy() {
+  local is_error=${1:-false}
+
   echo "Running cleanup and copy..."
-  # Clean up building permissions artifacts
+  # Clean up building permissions artifacts (arch specific)
   chown -R "$(id -u):$(id -g)" "$WAYWALL_DIR" || true
 
-  # Clean up GLFW build directory
+  # Clean up GLFW build directory (if any)
   rm -rf "$OUTPUT_DIR/glfw-build" || true
 
-  # Clean up building folders from all distros
+  # Copy the built packages to the output directory (if any) - quiet if no matches
+  shopt -s nullglob
+  for f in "$WAYWALL_DIR"/contrib/*.pkg.tar.zst; do
+    cp -v "$f" "$OUTPUT_DIR"
+  done
+  for f in "$WAYWALL_DIR"/contrib/x86_64/*.rpm; do
+    cp -v "$f" "$OUTPUT_DIR"
+  done
+  for f in "$WAYWALL_DIR"/contrib/*.rpm; do
+    cp -v "$f" "$OUTPUT_DIR"
+  done
+  for f in "$WAYWALL_DIR"/contrib/*.deb; do
+    cp -v "$f" "$OUTPUT_DIR"
+  done
+  shopt -u nullglob
+
+  # Clean up building folders from all distros (if any)
   rm -rf "$WAYWALL_DIR"/contrib/x86_64/ || true
   rm -rf "$WAYWALL_DIR"/contrib/pkg/ || true
   rm -rf "$WAYWALL_DIR"/contrib/src/ || true
-  rm -rf "$WAYWALL_DIR"/contrib/obj-x86_64-linux-gnu/ || true
+  rm -rf "$WAYWALL_DIR"/obj-x86_64-linux-gnu/ || true
 
-  # Copy the built packages to the output directory (if any)
-  cp -v "$WAYWALL_DIR"/contrib/*.pkg.tar.zst "$OUTPUT_DIR" || true
-  cp -v "$WAYWALL_DIR"/contrib/*.rpm "$OUTPUT_DIR" || true
-  cp -v "$WAYWALL_DIR"/contrib/*.deb "$OUTPUT_DIR" || true
+  # Remove the built packages from the waywall directory (if any)
+  rm -f  "$WAYWALL_DIR"/contrib/*.pkg.tar.zst || true
+  rm -f  "$WAYWALL_DIR"/contrib/*.rpm || true
+  rm -f  "$WAYWALL_DIR"/contrib/*.deb || true
+  rm -rf "$WAYWALL_DIR"/debian/ || true
+  rm -f  "$WAYWALL_DIR"/debian-build.patch || true
 
-  # Remove the built packages from the waywall directory
-  rm -f "$WAYWALL_DIR"/contrib/*.pkg.tar.zst || true
-  rm -f "$WAYWALL_DIR"/contrib/*.rpm || true
-  rm -f "$WAYWALL_DIR"/contrib/*.deb || true
+  if [[ $is_error == 1 ]]; then
+    echo ""
+    echo "====================================== BUILD ERROR ======================================"
+    echo "The script encountered an error. To help fix it, please create a GitHub issue at https://github.com/tesselslate/waywall/issues"
+    echo "Include: this full log output, your distro selection, and host OS details."
+    echo "========================================================================================="
+    echo ""
+  else
+    echo "Build process completed successfully for all selected distros."
+    echo "Build artifacts are located in: $OUTPUT_DIR"
+  fi
 }
 
-# Set trap to run cleanup on error or exit
-trap cleanup_and_copy ERR EXIT
+# Set traps to run cleanup on error or exit
+ERROR_FLAG=0
+trap 'ERROR_FLAG=1' ERR
+trap 'cleanup_and_copy $ERROR_FLAG' EXIT
 
 # Check if GLFW files already exist
 GLFW_SKIP=true
@@ -212,23 +241,18 @@ for distro in "${build_distros[@]}"; do
   elif [ "$distro" = "fedora" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       dnf install -y libspng-devel cmake meson mesa-libEGL-devel luajit-devel libwayland-client libwayland-server libwayland-cursor libxkbcommon-devel xorg-x11-server-Xwayland-devel wayland-protocols-devel wayland-scanner
-      rpmbuild -ba --define '_sourcedir /build/waywall' --define '_srcrpmdir /build/waywall' --define '_rpmdir /build/waywall' --define '_builddir /build/waywall/build' /build/waywall/waywall.spec
-      cp /build/waywall/x86_64/*.rpm /build/waywall/
+      rpmbuild -ba --define '_sourcedir /build/waywall' --define '_srcrpmdir /build/waywall/contrib' --define '_rpmdir /build/waywall/contrib' --define '_builddir /build/waywall/build' /build/waywall/contrib/waywall.spec
     "
   elif [ "$distro" = "debian" ]; then
-    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
+    podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       apt-get update
       apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
-      curl -o contrib/mod.patch 'https://files.catbox.moe/my3adv.patch'
-      git apply contrib/mod.patch
+      cp -r /build/waywall/contrib/debian /build/waywall/
+      cp /build/waywall/contrib/debian-build.patch /build/waywall/
+      git apply debian-build.patch
       dpkg-buildpackage -b -us -uc
-      cp ../*.deb /build/waywall/
+      git apply -R debian-build.patch
+      cp ../*.deb /build/waywall/contrib/
     "
   fi
 done
-
-# Normal exit: Run cleanup
-cleanup_and_copy
-
-echo "Build process completed successfully for all selected distros."
-echo "Build artifacts are located in: $OUTPUT_DIR"

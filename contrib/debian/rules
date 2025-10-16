@@ -23,7 +23,7 @@ override_dh_auto_install:
 	install -m644 waywall-build/glfw/LICENSE.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-LICENSE.md
 	install -m644 waywall-build/glfw/CONTRIBUTORS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-CONTRIBUTORS.md
 	install -m644 waywall-build/glfw/MAINTAINERS.md $(CURDIR)/debian/waywall/usr/share/doc/waywall/glfw-MAINTAINERS.md
-
+	
 
     # Ensure the directories are created
 	ls -la $(CURDIR)/debian/waywall/usr/local/lib64/waywall-glfw || true
@@ -35,4 +35,3 @@ override_dh_usrlocal:
 	:
 override_dh_auto_clean:
 	dh_auto_clean
-	rm -rf build obj-x86_64-linux-gnu
