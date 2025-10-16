@@ -97,3 +97,7 @@ files.
 waywall bundles a version of the [Terminus Font](https://terminus-font.sourceforge.net/),
 which is licensed under the Open Font License. See `include/util/font.h` for
 more information.
+
+waywall bundles a patched version of [GLFW](https://github.com/glfw/glfw) *if built
+with the included building script*, GLFW is licensed under the ZLib License. See `/usr/share/doc/waywall/glfw-LICENSE.md`
+& `usr/share/doc/waywall/glfw-MAINTAINERS.md` for more information.
