@@ -17,20 +17,14 @@ required:
     },
 
     -- optional
+    depth = 0,
+
+    -- optional
     shader = "shader_name"
 }
 ```
 
 For more information on custom shaders, see [Shaders].
-
-## Image object
-
-This function will return an object which can be used to remove the image from
-the waywall window at a later point. The only method made available by the
-returned image object is `close`.
-
-If this object is not stored in a permanent location, the image may randomly
-disappear when it gets garbage collected.
 
 ### Arguments
 
@@ -39,8 +33,9 @@ disappear when it gets garbage collected.
 
 ### Return values
 
-  - `image`: table
+  - `image`: [image object]
 
 > This function cannot be called during startup.
 
 [Shaders]: 01_options_shaders.md
+[image object]: 02_type_image.md

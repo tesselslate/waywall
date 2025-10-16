@@ -27,11 +27,11 @@ The following table lists all valid names for modifiers:
 |---------------|---------|-----------|------------|
 | **Shift**     | `shift` |           |            |
 | **Control**   | `ctrl`  | `control` |            |
-| **Alt**       | `alt`   | `mod1`    |            |
-| **Super**     | `mod4`  | `super`   | `win`      |
 | **Caps Lock** | `caps`  | `lock`    | `capslock` |
-| **Mod2**      | `mod2`  |           |            |
+| **Alt**       | `mod1`  | `alt`     |            |
+| **Num Lock**  | `mod2`  | `num`     | `numlock`  |
 | **Mod3**      | `mod3`  |           |            |
+| **Super**     | `mod4`  | `super`   | `win`      |
 | **Mod5**      | `mod5`  |           |            |
 
 ## Mouse buttons

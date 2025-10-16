@@ -44,6 +44,11 @@
     - [ingame_only](02_helpers_ingame_only.md)
     - [toggle_floating](02_helpers_toggle_floating.md)
     - [toggle_res](02_helpers_toggle_res.md)
+  - [Object types](02_type.md)
+    - [Scene objects](02_type_scene_object.md)
+    - [image](02_type_image.md)
+    - [mirror](02_type_mirror.md)
+    - [text](02_type_text.md)
 
 # Appendix
 

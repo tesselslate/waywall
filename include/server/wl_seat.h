@@ -14,10 +14,10 @@ enum kb_modifier {
     KB_MOD_SHIFT = (1 << 0),
     KB_MOD_CAPS = (1 << 1),
     KB_MOD_CTRL = (1 << 2),
-    KB_MOD_ALT = (1 << 3),
+    KB_MOD_MOD1 = (1 << 3),
     KB_MOD_MOD2 = (1 << 4),
     KB_MOD_MOD3 = (1 << 5),
-    KB_MOD_LOGO = (1 << 6),
+    KB_MOD_MOD4 = (1 << 6),
     KB_MOD_MOD5 = (1 << 7),
 };
 

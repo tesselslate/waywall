@@ -34,10 +34,8 @@ struct key_update {
 };
 
 static const char *mod_names[] = {
-    XKB_MOD_NAME_SHIFT, XKB_MOD_NAME_CAPS,
-    XKB_MOD_NAME_CTRL,  XKB_MOD_NAME_ALT,
-    XKB_MOD_NAME_NUM,   "Mod3",
-    XKB_MOD_NAME_LOGO,  "Mod5",
+    XKB_MOD_NAME_SHIFT, XKB_MOD_NAME_CAPS, XKB_MOD_NAME_CTRL, XKB_MOD_NAME_MOD1,
+    XKB_MOD_NAME_MOD2,  XKB_MOD_NAME_MOD3, XKB_MOD_NAME_MOD4, XKB_MOD_NAME_MOD5,
 };
 
 static void

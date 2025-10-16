@@ -32,6 +32,9 @@ The `options` table can have the following options, although only `src` and
     },
 
     -- optional
+    depth = 0,
+
+    -- optional
     shader = "shader_name",
 }
 ```
@@ -42,23 +45,15 @@ the `output` color.
 
 For more information on custom shaders, see [Shaders].
 
-## Mirror object
-
-This function will return an object which can be used to remove the mirror from
-the waywall window at a later point. The only method made available by the
-returned mirror object is `close`.
-
-If this object is not stored in a permanent location, the mirror may randomly
-disappear when it gets garbage collected.
-
 ### Arguments
 
   - `options`: table
 
 ### Return values
 
-  - `mirror`: table
+  - `mirror`: [mirror object]
 
 > This function cannot be called during startup.
 
 [Shaders]: 01_options_shaders.md
+[mirror object]: 02_type_mirror.md

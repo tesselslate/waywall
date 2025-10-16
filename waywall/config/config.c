@@ -73,9 +73,10 @@ static const struct {
 } modifier_mappings[] = {
     {"shift", KB_MOD_SHIFT},   {"caps", KB_MOD_CAPS},    {"lock", KB_MOD_CAPS},
     {"capslock", KB_MOD_CAPS}, {"control", KB_MOD_CTRL}, {"ctrl", KB_MOD_CTRL},
-    {"alt", KB_MOD_ALT},       {"mod1", KB_MOD_ALT},     {"mod2", KB_MOD_MOD2},
-    {"mod3", KB_MOD_MOD3},     {"super", KB_MOD_LOGO},   {"win", KB_MOD_LOGO},
-    {"mod4", KB_MOD_LOGO},     {"mod5", KB_MOD_MOD5},
+    {"alt", KB_MOD_MOD1},      {"mod1", KB_MOD_MOD1},    {"num", KB_MOD_MOD2},
+    {"numlock", KB_MOD_MOD2},  {"mod2", KB_MOD_MOD2},    {"mod3", KB_MOD_MOD3},
+    {"super", KB_MOD_MOD4},    {"win", KB_MOD_MOD4},     {"mod4", KB_MOD_MOD4},
+    {"mod5", KB_MOD_MOD5},
 };
 
 static int
@@ -493,7 +494,7 @@ process_config_input_remaps(struct config *cfg) {
     lua_pushnil(cfg->vm->L); // stack: 4 (IDX_REMAP_KEY)
     while (lua_next(cfg->vm->L, IDX_REMAPS)) {
         // stack state
-        // 5 (IDX_REMAP_VAL) : config.input.remaps[key] (should be a string)
+        // 5 (IDX_REMAP_VAL)  : config.input.remaps[key] (should be a string)
         // 4 (IDX_REMAP_KEY)  : key (should be a string)
         // 3 (IDX_REMAPS)     : config.input.remaps
         // 2                  : config.input
@@ -771,7 +772,7 @@ load_config(struct config *cfg) {
     int type = lua_type(cfg->vm->L, ARG_CONFIG);
     if (type != LUA_TTABLE) {
         ww_log(LOG_ERROR, "expected config value to be of type 'table', got '%s'",
-               lua_typename(cfg->vm->L, ARG_CONFIG));
+               luaL_typename(cfg->vm->L, ARG_CONFIG));
         goto fail_table;
     }
 
@@ -871,16 +872,31 @@ config_find_action(struct config *cfg, const struct config_action *action) {
             continue;
         }
 
+        // People often run into issues with Num Lock (and more rarely, Caps Lock) preventing
+        // keybinds from triggering since they are counted as modifiers by XKB.
+        //
+        // If the keybind does not require Num Lock and/or Caps Lock, then they should be ignored
+        // when matching modifiers.
+        uint32_t effective_modifiers = action->modifiers;
+
+        bool use_caps = match->modifiers & KB_MOD_CAPS;
+        bool use_num = match->modifiers & KB_MOD_MOD2;
+        if (!use_caps) {
+            effective_modifiers &= ~KB_MOD_CAPS;
+        }
+        if (!use_num) {
+            effective_modifiers &= ~KB_MOD_MOD2;
+        }
+
+        // If there is a modifier wildcard, match->modifiers must be a subset of
+        // effective_modifiers. Otherwise, they must be exactly equal.
         if (match->wildcard_modifiers) {
-            // If there is a modifier wildcard, match->modifiers must be a subset of
-            // action->modifiers.
             uint32_t mods = match->modifiers & action->modifiers;
             if (mods != match->modifiers) {
                 continue;
             }
         } else {
-            // If there is no modifier wildcard, the modifiers should match exactly.
-            if (match->modifiers != action->modifiers) {
+            if (match->modifiers != effective_modifiers) {
                 continue;
             }
         }

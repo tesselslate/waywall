@@ -5,6 +5,7 @@
 #include "linux-drm-syncobj-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
+#include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/log.h"
@@ -27,6 +28,7 @@
 #define USE_RELATIVE_POINTER_MANAGER_VERSION 1
 #define USE_SEAT_VERSION 5
 #define USE_SHM_VERSION 1
+#define USE_SINGLE_PIXEL_BUFFER_VERSION 1
 #define USE_SUBCOMPOSITOR_VERSION 1
 #define USE_TEARING_CONTROL_VERSION 1
 #define USE_VIEWPORTER_VERSION 1
@@ -224,6 +226,17 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
 
         wl_shm_add_listener(backend->shm, &shm_listener, backend);
         wl_display_roundtrip(backend->display);
+    } else if (strcmp(iface, wp_single_pixel_buffer_manager_v1_interface.name) == 0) {
+        if (version < USE_SINGLE_PIXEL_BUFFER_VERSION) {
+            ww_log(LOG_INFO,
+                   "host compositor provides outdated wp_single_pixel_buffer_manager (%d < %d)",
+                   version, USE_SINGLE_PIXEL_BUFFER_VERSION);
+            return;
+        }
+
+        backend->single_pixel_buffer_manager =
+            wl_registry_bind(wl, name, &wp_single_pixel_buffer_manager_v1_interface,
+                             USE_SINGLE_PIXEL_BUFFER_VERSION);
     } else if (strcmp(iface, wl_subcompositor_interface.name) == 0) {
         if (version < USE_SUBCOMPOSITOR_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_subcompositor (%d < %d)",
@@ -350,6 +363,9 @@ server_backend_create() {
     if (!backend->linux_drm_syncobj_manager) {
         ww_log(LOG_INFO, "host compositor does not provide wp_linux_drm_syncobj_manager");
     }
+    if (!backend->single_pixel_buffer_manager) {
+        ww_log(LOG_INFO, "host compositor does not provide wp_single_pixel_buffer_manager");
+    }
     if (!backend->tearing_control) {
         ww_log(LOG_INFO, "host compositor does not provide wp_tearing_control_manager");
     }
@@ -410,6 +426,9 @@ server_backend_destroy(struct server_backend *backend) {
     }
     if (backend->linux_drm_syncobj_manager) {
         wp_linux_drm_syncobj_manager_v1_destroy(backend->linux_drm_syncobj_manager);
+    }
+    if (backend->single_pixel_buffer_manager) {
+        wp_single_pixel_buffer_manager_v1_destroy(backend->single_pixel_buffer_manager);
     }
     if (backend->tearing_control) {
         wp_tearing_control_manager_v1_destroy(backend->tearing_control);

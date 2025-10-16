@@ -80,10 +80,36 @@ static const struct {
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 
+#define DEFAULT_DEPTH 0
+
 struct waker_sleep {
     struct ww_timer_entry *timer;
     struct config_vm_waker *vm;
 };
+
+static int
+object_get_depth(lua_State *L) {
+    struct scene_object **object = lua_touserdata(L, -1);
+    if (!*object) {
+        return luaL_error(L, "object already closed");
+    }
+
+    lua_pushinteger(L, scene_object_get_depth(*object));
+    return 1;
+}
+
+static int
+object_set_depth(lua_State *L) {
+    struct scene_object **object = lua_touserdata(L, 1);
+    if (!*object) {
+        return luaL_error(L, "object already closed");
+    }
+
+    int depth = luaL_checkint(L, 2);
+
+    scene_object_set_depth(*object, depth);
+    return 0;
+}
 
 static int
 image_close(lua_State *L) {
@@ -93,7 +119,7 @@ image_close(lua_State *L) {
         return luaL_error(L, "cannot close image more than once");
     }
 
-    scene_image_destroy(*image);
+    scene_object_destroy((struct scene_object *)*image);
     *image = NULL;
 
     return 0;
@@ -105,6 +131,10 @@ image_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, image_close);
+    } else if (strcmp(key, "get_depth") == 0) {
+        lua_pushcfunction(L, object_get_depth);
+    } else if (strcmp(key, "set_depth") == 0) {
+        lua_pushcfunction(L, object_set_depth);
     } else {
         lua_pushnil(L);
     }
@@ -117,7 +147,7 @@ image_gc(lua_State *L) {
     struct scene_image **image = lua_touserdata(L, 1);
 
     if (*image) {
-        scene_image_destroy(*image);
+        scene_object_destroy((struct scene_object *)*image);
     }
     *image = NULL;
 
@@ -132,7 +162,7 @@ mirror_close(lua_State *L) {
         return luaL_error(L, "cannot close mirror more than once");
     }
 
-    scene_mirror_destroy(*mirror);
+    scene_object_destroy((struct scene_object *)*mirror);
     *mirror = NULL;
 
     return 0;
@@ -144,6 +174,10 @@ mirror_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, mirror_close);
+    } else if (strcmp(key, "get_depth") == 0) {
+        lua_pushcfunction(L, object_get_depth);
+    } else if (strcmp(key, "set_depth") == 0) {
+        lua_pushcfunction(L, object_set_depth);
     } else {
         lua_pushnil(L);
     }
@@ -156,7 +190,7 @@ mirror_gc(lua_State *L) {
     struct scene_mirror **mirror = lua_touserdata(L, 1);
 
     if (*mirror) {
-        scene_mirror_destroy(*mirror);
+        scene_object_destroy((struct scene_object *)*mirror);
     }
     *mirror = NULL;
 
@@ -171,7 +205,7 @@ text_close(lua_State *L) {
         return luaL_error(L, "cannot close text more than once");
     }
 
-    scene_text_destroy(*text);
+    scene_object_destroy((struct scene_object *)*text);
     *text = NULL;
 
     return 0;
@@ -183,6 +217,10 @@ text_index(lua_State *L) {
 
     if (strcmp(key, "close") == 0) {
         lua_pushcfunction(L, text_close);
+    } else if (strcmp(key, "get_depth") == 0) {
+        lua_pushcfunction(L, object_get_depth);
+    } else if (strcmp(key, "set_depth") == 0) {
+        lua_pushcfunction(L, object_set_depth);
     } else {
         lua_pushnil(L);
     }
@@ -195,7 +233,7 @@ text_gc(lua_State *L) {
     struct scene_text **text = lua_touserdata(L, 1);
 
     if (*text) {
-        scene_text_destroy(*text);
+        scene_object_destroy((struct scene_object *)*text);
     }
     *text = NULL;
 
@@ -220,8 +258,8 @@ waker_sleep_timer_destroy(void *data) {
     // This function is called if the timer entry is destroyed (which should only happen if the
     // global timer manager is destroyed.)
     //
-    // Remove the reference to the timer entry so that when the VM attempts to destroy the waker we
-    // do not attempt to destroy the timer entry a 2nd time.
+    // Remove the reference to the timer entry so that when the VM attempts to destroy the waker
+    // we do not attempt to destroy the timer entry a 2nd time.
     waker->timer = NULL;
 }
 
@@ -349,8 +387,8 @@ l_exec(lua_State *L) {
 
     lua_settop(L, ARG_COMMAND);
 
-    // Body. Duplicate the string from the Lua VM so that it can be modified for in-place argument
-    // parsing.
+    // Body. Duplicate the string from the Lua VM so that it can be modified for in-place
+    // argument parsing.
     char *cmd_str = strdup(lua_str);
     check_alloc(cmd_str);
 
@@ -423,25 +461,14 @@ l_image(lua_State *L) {
     }
     lua_pop(L, 1);
 
-    int fd = open(path, O_RDONLY);
-    if (fd == -1) {
-        free(options.shader_name);
-        return luaL_error(L, "failed to open PNG at '%s': %s", path, strerror(errno));
+    lua_pushstring(L, "depth");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.depth = lua_tointeger(L, -1);
+    } else {
+        options.depth = DEFAULT_DEPTH;
     }
-
-    struct stat stat;
-    if (fstat(fd, &stat) != 0) {
-        close(fd);
-        free(options.shader_name);
-        return luaL_error(L, "failed to stat PNG at '%s': %s", path, strerror(errno));
-    }
-
-    void *buf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (buf == MAP_FAILED) {
-        close(fd);
-        free(options.shader_name);
-        return luaL_error(L, "failed to mmap PNG at '%s': %s", path, strerror(errno));
-    }
+    lua_pop(L, 1);
 
     // Body
     struct scene_image **image = lua_newuserdata(L, sizeof(*image));
@@ -450,16 +477,11 @@ l_image(lua_State *L) {
     luaL_getmetatable(L, METATABLE_IMAGE);
     lua_setmetatable(L, -2);
 
-    *image = scene_add_image(wrap->scene, &options, buf, stat.st_size);
+    *image = scene_add_image(wrap->scene, &options, path);
     free(options.shader_name);
     if (!*image) {
-        ww_assert(munmap(buf, stat.st_size) == 0);
-        close(fd);
-        return luaL_error(L, "failed to create image");
+        return luaL_error(L, "failed to create image from PNG at '%s'", path);
     }
-
-    ww_assert(munmap(buf, stat.st_size) == 0);
-    close(fd);
 
     // Epilogue. The userdata (image) was already pushed to the stack by the above code.
     return 1;
@@ -488,6 +510,15 @@ l_mirror(lua_State *L) {
     lua_rawget(L, ARG_OPTIONS);
     if (lua_type(L, -1) == LUA_TSTRING) {
         options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "depth");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.depth = lua_tointeger(L, -1);
+    } else {
+        options.depth = DEFAULT_DEPTH;
     }
     lua_pop(L, 1);
 
@@ -714,15 +745,15 @@ l_set_remaps(lua_State *L) {
         }
         config_add_remap(&remaps, remap);
 
-        // Pop the value from the top of the stack. The previous key will be left at the top of the
-        // stack for the next call to `lua_next`.
+        // Pop the value from the top of the stack. The previous key will be left at the top of
+        // the stack for the next call to `lua_next`.
         lua_pop(L, 1); // stack: 2 (IDX_REMAP_KEY)
         ww_assert(lua_gettop(L) == IDX_REMAP_KEY);
     }
 
-    // The remaps table has been fully processed, so we can now set the remaps on the server seat.
-    // It's not worth the effort to calculate how many of each kind of remap there are. The number
-    // of remaps a user might reasonably have is quite small.
+    // The remaps table has been fully processed, so we can now set the remaps on the server
+    // seat. It's not worth the effort to calculate how many of each kind of remap there are.
+    // The number of remaps a user might reasonably have is quite small.
     struct server_seat_remaps *seat_remaps = &wrap->server->seat->config->remaps;
     seat_remaps->keys = realloc(seat_remaps->keys, remaps.count * sizeof(*seat_remaps->keys));
     if (remaps.count != 0)
@@ -938,7 +969,7 @@ l_state(lua_State *L) {
 }
 
 static int
-l_text(lua_State *L) {
+l_text_legacy(lua_State *L, struct wrap *wrap) {
     static const int ARG_TEXT = 1;
     static const int ARG_X = 2;
     static const int ARG_Y = 3;
@@ -946,12 +977,7 @@ l_text(lua_State *L) {
     static const int ARG_SIZE = 5;
     static const int ARG_SHADER = 6;
 
-    // Prologue
-    struct config_vm *vm = config_vm_from(L);
-    struct wrap *wrap = config_vm_get_wrap(vm);
-    if (!wrap) {
-        return luaL_error(L, STARTUP_ERRMSG("text"));
-    }
+    ww_log(LOG_WARN, "using legacy text creation code path - update your configuration");
 
     const char *data = luaL_checkstring(L, ARG_TEXT);
     int x = luaL_checkinteger(L, ARG_X);
@@ -977,9 +1003,9 @@ l_text(lua_State *L) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
 
-    const char *shader_name = NULL;
+    char *shader_name = NULL;
     if (lua_gettop(L) >= ARG_SHADER) {
-        shader_name = luaL_checkstring(L, ARG_SHADER);
+        shader_name = strdup(luaL_checkstring(L, ARG_SHADER));
     }
     lua_settop(L, ARG_SHADER);
 
@@ -988,6 +1014,7 @@ l_text(lua_State *L) {
         .y = y,
         .rgba = {rgba[0], rgba[1], rgba[2], rgba[3]},
         .size_multiplier = size,
+        .depth = DEFAULT_DEPTH,
         .shader_name = shader_name,
     };
 
@@ -999,6 +1026,105 @@ l_text(lua_State *L) {
     lua_setmetatable(L, -2);
 
     *text = scene_add_text(wrap->scene, data, &options);
+    free(options.shader_name);
+    if (!*text) {
+        return luaL_error(L, "failed to create text");
+    }
+
+    // Epilogue. The userdata (text) was already pushed to the stack by the above code.
+    return 1;
+}
+
+static int
+l_text(lua_State *L) {
+    static const int ARG_TEXT = 1;
+    static const int ARG_OPTIONS = 2;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("text"));
+    }
+
+    const char *data = luaL_checkstring(L, ARG_TEXT);
+
+    if (!lua_istable(L, ARG_OPTIONS)) {
+        return l_text_legacy(L, wrap);
+    }
+    lua_settop(L, ARG_OPTIONS);
+
+    struct scene_text_options options = {0};
+
+    lua_pushstring(L, "x");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) != LUA_TNUMBER) {
+        return luaL_error(L, "expected 'x' to be of type 'number', was '%s'", luaL_typename(L, -1));
+    }
+    options.x = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "y");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) != LUA_TNUMBER) {
+        return luaL_error(L, "expected 'y' to be of type 'number', was '%s'", luaL_typename(L, -1));
+    }
+    options.y = lua_tointeger(L, -1);
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "color");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        const char *raw_color = lua_tostring(L, -1);
+
+        uint8_t u8_rgba[4] = {0};
+        if (config_parse_hex(u8_rgba, raw_color) != 0) {
+            return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
+        }
+
+        options.rgba[0] = (float)u8_rgba[0] / UINT8_MAX;
+        options.rgba[1] = (float)u8_rgba[1] / UINT8_MAX;
+        options.rgba[2] = (float)u8_rgba[2] / UINT8_MAX;
+        options.rgba[3] = (float)u8_rgba[3] / UINT8_MAX;
+    } else {
+        options.rgba[0] = options.rgba[1] = options.rgba[2] = options.rgba[3] = 1;
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "size");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.size_multiplier = lua_tointeger(L, -1);
+    } else {
+        options.size_multiplier = 1;
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "shader");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TSTRING) {
+        options.shader_name = strdup(lua_tostring(L, -1));
+    }
+    lua_pop(L, 1);
+
+    lua_pushstring(L, "depth");
+    lua_rawget(L, ARG_OPTIONS);
+    if (lua_type(L, -1) == LUA_TNUMBER) {
+        options.depth = lua_tointeger(L, -1);
+    } else {
+        options.depth = DEFAULT_DEPTH;
+    }
+    lua_pop(L, 1);
+
+    // Body
+    struct scene_text **text = lua_newuserdata(L, sizeof(*text));
+    check_alloc(text);
+
+    luaL_getmetatable(L, METATABLE_TEXT);
+    lua_setmetatable(L, -2);
+
+    *text = scene_add_text(wrap->scene, data, &options);
+    free(options.shader_name);
     if (!*text) {
         return luaL_error(L, "failed to create text");
     }

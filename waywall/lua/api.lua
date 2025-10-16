@@ -143,11 +143,7 @@ M.sleep = priv.sleep
 M.state = priv.state
 
 --- Creates a "text" object which displays arbitrary text.
--- @param text The text to display.
--- @param x The X coordinate to display the text at.
--- @param y The Y coordinate to display the text at.
--- @param color The color to display the text with.
--- @param size The size multiplier for the text.
+-- @param options The options to create the text with.
 -- @return text The text object.
 M.text = priv.text
 

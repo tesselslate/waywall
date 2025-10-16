@@ -46,7 +46,8 @@ The full lists of keysyms, mouse buttons, and modifiers can be found in the
 
 An action will only trigger if your pressed modifiers exactly match those
 specified. For example, an action for `"T"` will only trigger if you press T
-while Shift, Control, etc. are not pressed.
+while Shift, Control, etc. are not pressed. However, Caps Lock and Num Lock
+(mod2) will be ignored unless the action explicitly requires them.
 
 The `*` modifier acts as a wildcard, allowing the action to run while other
 modifier keys are pressed. An action for `"*-T"` will trigger if you press T,
