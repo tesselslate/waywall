@@ -1,7 +1,7 @@
 waywall (0.5-1) unstable; urgency=medium
 
   * Initial release.
-    - Upstream development by tessellate (@tesselslate).
+    - Upstream development by tesselslate (@tesselslate).
     - Debian packaging by ByPaco10.
 
  -- ByPaco10 <example@example.com>  Wed, 16 Oct 2025 10:40:00 +0000
