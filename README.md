@@ -27,7 +27,6 @@ This script includes the patched GLFW, it will always be located on ```/usr/loca
 - `git`
 - `pacur fedora-42, arch and debian-trixie containers` (from https://github.com/pacur/pacur)
 - `docker`
-- `go`
 
 ### Setup:
 
@@ -39,11 +38,10 @@ This script includes the patched GLFW, it will always be located on ```/usr/loca
 
 ### Steps for installing pacur containers:
 
-- ```go install github.com/pacur/pacur@latest```
-- ```cd ~/go/pkg/mod/github.com/pacur/pacur@(version)/docker/``` (You can check the version doing ```ls  ~/go/pkg/mod/github.com/pacur/``` or from a file manager)
-- ```sudo find . -maxdepth 1 -type d \( ! -name "archlinux" ! -name "debian-trixie" ! -name "fedora-42" \) -exec rm -rf {} +```
-- open the build.sh file and remove any ```su``` or ```sudo``` from the file to build containers as **user** (Use ```sudo nano build.sh``` for editing the file or ```sudo vim build.sh```) 
-- ```./build.sh```
+- ```git clone https://github.com/pacur/pacur```
+- ```cd pacur/docker```
+- ```find . -maxdepth 1 -type d \( ! -name "archlinux" ! -name "debian-trixie" ! -name "fedora-42" \) -exec rm -rf {} +```
+- ```for dir in */ ; do podman build --rm -t "pacur/${dir::-1}" "$dir"; done```
 - Done, containers should now be installed, if it still doesn't build do a reboot
 
 ### Steps for installing the built waywall:
