@@ -101,4 +101,4 @@ more information.
 
 waywall bundles a patched version of [GLFW](https://github.com/glfw/glfw) *if built
 with the included building script*, GLFW is licensed under the ZLib License. See `/usr/share/doc/waywall/glfw-LICENSE.md`
-& `usr/share/doc/waywall/glfw-MAINTAINERS.md` for more information.
+& `/usr/share/doc/waywall/glfw-MAINTAINERS.md` for more information.
