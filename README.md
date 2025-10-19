@@ -48,7 +48,7 @@ This script includes the patched GLFW, it will always be located on ```/usr/loca
 
 ### Steps for installing the built waywall:
 
-- The script will output where the build is located (for example ```Build artifacts are located in: ~/waywall/waywall-build``` depending on the distro you are currently you can either just double-click the file or install it from terminal
+- The script will output where the build is located (for example ```Build artifacts are located in: ~/waywall/waywall-build```) depending on the distro you are currently you can either just double-click the file or install it from terminal
 
 ### Example commands for installing waywall:
 
