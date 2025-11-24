@@ -10,7 +10,6 @@
 #include "util/syscall.h"
 #include "util/sysinfo.h"
 #include "wrap.h"
-#include <bits/types/struct_sched_param.h>
 #include <errno.h>
 #include <sched.h>
 #include <signal.h>
