@@ -42,6 +42,8 @@
     - [toggle_fullscreen](02_waywall_toggle_fullscreen.md)
   - [waywall.helpers](02_helpers.md)
     - [ingame_only](02_helpers_ingame_only.md)
+    - [res_image](02_helpers_res_image.md)
+    - [res_mirror](02_helpers_res_mirror.md)
     - [toggle_floating](02_helpers_toggle_floating.md)
     - [toggle_res](02_helpers_toggle_res.md)
   - [Object types](02_type.md)
