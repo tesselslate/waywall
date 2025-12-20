@@ -13,17 +13,14 @@ methods of their own.
 Scene objects will disappear either when they are explicitly [closed](#close) or
 when they are garbage collected by the Lua virtual machine.
 
-<div class="warning">
-
-Because scene objects disappear when garbage collected, you should make sure to
-store a reachable reference to any objects you create, such as in a local
-variable at the top level of your configuration.
-
-Additionally, reloading your configuration will cause all live scene objects to
-be destroyed (since they are garbage collected when the Lua virtual machine is
-destroyed and recreated for your new configuration.)
-
-</div>
+> [!TIP]
+> Because scene objects disappear when garbage collected, you should make sure
+> to store a reachable reference to any objects you create, such as in a local
+> variable at the top level of your configuration.
+>
+> Additionally, reloading your configuration will cause all live scene objects
+> to be destroyed (since they are garbage collected when the Lua virtual machine
+> is destroyed and recreated for your new configuration.)
 
 ## Depth
 

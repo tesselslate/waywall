@@ -41,13 +41,10 @@ distribution's package repositories:
   - `xwayland`
   - `xkbcommon`
 
-<div class="warning">
-
-Many distributions, such as Fedora and Debian, split the "development files"
-(e.g. pkg-config data and C headers) into separate `-dev` or `-devel` packages.
-Make sure to find and install these in addition to the normal versions.
-
-</div>
+> [!IMPORTANT]
+> Many distributions, such as Fedora and Debian, split the "development files"
+> (e.g. pkg-config data and C headers) into separate `-dev` or `-devel` packages.
+> Make sure to find and install these in addition to the normal versions.
 
 ### Compiling
 

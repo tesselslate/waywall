@@ -47,13 +47,10 @@ GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled.
 
 ![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
 
-<div class="warning">
-
-Make sure you configure the instance to use patched GLFW correctly! If the
-instance still uses the default version of GLFW, waywall will not do anything
-when the game launches, since the game will still be running under Xwayland.
-
-</div>
+> [!IMPORTANT]
+> Make sure you configure the instance to use patched GLFW correctly! If the
+> instance still uses the default version of GLFW, waywall will not do anything
+> when the game launches, since the game will still be running under Xwayland.
 
 <br/>
 

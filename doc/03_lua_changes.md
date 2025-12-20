@@ -15,12 +15,9 @@ configurations from hard-locking waywall.
 If this limit is exceeded, an error will be thrown, causing Lua execution to
 stop. This error cannot be caught with `pcall` or `xpcall`.
 
-<div class="warning">
-
-[Enabling the JIT] may cause the instruction limit to behave inconsistently. If
-your configuration has infinite loops, waywall may freeze permanently.
-
-</div>
+> [!WARNING]
+> [Enabling the JIT] may cause the instruction limit to behave inconsistently.
+> If your configuration has infinite loops, waywall may freeze permanently.
 
 ## Standard library changes
 

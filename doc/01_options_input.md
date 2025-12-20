@@ -81,14 +81,11 @@ held down before it will start repeating.
 By default, both options are set to a value of `-1`, which means they will use
 the same values as your main Wayland session.
 
-<div class="warning">
-
-If you use a short `repeat_delay` and set `repeat_rate` to more than 20 Hz, you
-may experience issues with switching hotbar slots. This is due to a bug in how
-the game handles certain keybinds and can be avoided by either using a longer
-`repeat_delay` or using a `repeat_rate` no greater than 20 Hz.
-
-</div>
+> [!WARNING]
+> If you use a short `repeat_delay` and set `repeat_rate` to more than 20 Hz,
+> you may experience issues with switching hotbar slots. This is due to a bug in
+> how the game handles certain keybinds and can be avoided by either using a
+> longer `repeat_delay` or using a `repeat_rate` no greater than 20 Hz.
 
 ## Mouse sensitivity
 
@@ -97,12 +94,9 @@ while aiming with the camera ingame. The default value of `1.0` results in
 no change, while `2.0` would make it twice as fast and `0.5` would make it
 half as fast.
 
-<div class="warning">
-
-This option only affects your camera movement, *not* your mouse movement in
-menus. Additionally, it only takes effect **when Raw Input is disabled ingame.**
-
-</div>
+> [!IMPORTANT]
+> This option only affects your camera movement, *not* your mouse movement in
+> menus. Additionally, it only takes effect **when Raw Input is disabled ingame.**
 
 ## Pointer confinement
 

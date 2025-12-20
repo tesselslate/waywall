@@ -27,16 +27,13 @@ Ninjabrain Bot is treated as a floating window, which are hidden by default. To
 make it visible, you can create another action which uses
 [`waywall.show_floating`] or [`helpers.toggle_floating`].
 
-<div class="warning">
-
-If Ninjabrain Bot displays a blank window after opening, try launching it with a
-version of Java newer than Java 8 (i.e. Java 17).
-
-If you are using NixOS and Ninjabrain Bot fails to launch, try adding
-`-Dswing.defaultlaf=javax.swing.plaf.metal.MetalLookAndFeel` to your arguments
-when launching Ninjabrain Bot.
-
-</div>
+> [!TIP]
+> If Ninjabrain Bot displays a blank window after opening, try launching it with a
+> version of Java newer than Java 8 (i.e. Java 17).
+>
+> If you are using NixOS and Ninjabrain Bot fails to launch, try adding
+> `-Dswing.defaultlaf=javax.swing.plaf.metal.MetalLookAndFeel` to your arguments
+> when launching Ninjabrain Bot.
 
 [`waywall.show_floating`]: 02_waywall_show_floating.md
 [`helpers.toggle_floating`]: 02_helpers_toggle_floating.md

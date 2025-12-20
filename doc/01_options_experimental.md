@@ -33,12 +33,9 @@ disabled due to limitations with the Lua `debug` package. If your configuration
 contains a lot of compute-heavy Lua code, you may experience better performance
 by setting the `jit` option to `true`.
 
-<div class="warning">
-
-Enabling the JIT may cause the [instruction limit] to behave inconsistently. If
-your configuration has infinite loops, waywall may freeze permanently.
-
-</div>
+> [!WARNING]
+> Enabling the JIT may cause the [instruction limit] to behave inconsistently.
+> If your configuration has infinite loops, waywall may freeze permanently.
 
 ## Tearing
 

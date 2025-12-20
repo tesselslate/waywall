@@ -4,14 +4,11 @@ The `shaders` section of the configuration table allows you to load custom
 OpenGL shaders to further customize the appearance of various scene objects
 (mirrors, images, text).
 
-<div class="warning">
-
-This option is intended for more advanced users who are able to write shaders
-to do what they want. A tutorial on how to write OpenGL shaders is outside of
-the scope of this documentation (and I am not particularly qualified to write
-one anyway.)
-
-</div>
+> [!WARNING]
+> This option is intended for more advanced users who are able to write shaders
+> to do what they want. A tutorial on how to write OpenGL shaders is outside of
+> the scope of this documentation (and I am not particularly qualified to write
+> one anyway.)
 
 ## Default values
 

@@ -13,14 +13,11 @@ If you *are* familiar with Lua, it is worth noting that waywall uses LuaJIT and
 makes some small changes to the behavior and standard library of Lua. See
 [Lua changes] for more information.
 
-<div class="warning">
-
-Lua code executed by waywall is allowed to interact with the host operating
-system in various ways, such as spawning subprocesses and modifying files on
-disk. Read other people's code and do not blindly copy paste it into your own
-configuration.
-
-</div>
+> [!CAUTION]
+> Lua code executed by waywall is allowed to interact with the host operating
+> system in various ways, such as spawning subprocesses and modifying files on
+> disk. Read other people's code and do not blindly copy and paste it into your
+> own configuration.
 
 # Profiles
 
