@@ -16,13 +16,21 @@ the AUR.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
 
-Users on other distributions must build waywall from source or use bundled build-packages.sh.
+Users on other distributions must [build waywall from source](#building-from-source),
+download a prebuilt package from the [Releases](https://github.com/tesselslate/waywall/releases)
+page, or [use the `build-packages.sh` script](#building-with-build-packagessh) to build their own.
 
-## Building from build-packages.sh (Debian, Fedora and Arch, includes patched GLFW)
+## Building with `build-packages.sh`
 
-This script includes the patched GLFW, it will always be located on ```/usr/local/lib64/waywall-glfw/libglfw.so```
+> [!IMPORTANT]
+> This script only builds packages for **Arch Linux**, **Debian**, and
+> **Fedora**. If you use another distribution, you will have to
+> [build waywall from source](#building-from-source).
 
-### Dependencies: 
+This script automatically builds both the main waywall binary and the mandatory
+patched version of GLFW, which is located at `/usr/local/lib64/waywall-glfw/libglfw.so`.
+
+### Dependencies:
 - `podman`
 - `git`
 - `pacur fedora-42, arch and debian-trixie containers` (from https://github.com/pacur/pacur)
@@ -30,29 +38,35 @@ This script includes the patched GLFW, it will always be located on ```/usr/loca
 
 ### Setup:
 
-- Clone waywall repository ```git clone https://github.com/tesselslate/waywall```
-- Make the main script executable ```chmod u+x build-packages.sh```
-- Install pacur containers for **archlinux** **fedora-42** and **debian-trixie**, ensure they are installed for your user, not root, remove sudo on build.sh /docker/
-- Run ```./build-packages.sh``` inside waywall folder and select the distro family you want to build for (1 for arch, 2 for fedora, 3 for debian, 4 for done) or use the provided script flags for building (for example ```./build-packages.sh --debian``` ```./build-packages.sh --fedora --arch```)
+- Clone waywall repository `git clone https://github.com/tesselslate/waywall`
+- Make the main script executable `chmod u+x build-packages.sh`
+- [Install pacur containers](#steps-for-installing-pacur-containers) for `archlinux`, `fedora-42`, and `debian-trixie`
+- Run `./build-packages.sh` inside the waywall directory and select which distributions to build for
+  - Within the script: 1 for Arch, 2 for Fedora, 3 for Debian, 4 for done
+  - Or, use the provided script flags for building (for example `./build-packages.sh --debian` or `./build-packages.sh --fedora --arch`)
 - Enjoy
 
 ### Steps for installing pacur containers:
 
-- ```git clone https://github.com/pacur/pacur```
-- ```cd pacur/docker```
-- ```find . -maxdepth 1 -type d \( ! -name "archlinux" ! -name "debian-trixie" ! -name "fedora-42" \) -exec rm -rf {} +```
-- ```for dir in */ ; do podman build --rm -t "pacur/${dir::-1}" "$dir"; done```
-- Done, containers should now be installed, if it still doesn't build do a reboot
+```sh
+git clone https://github.com/pacur/pacur
+cd pacur/docker
+find . -maxdepth 1 -type d \( ! -name "archlinux" ! -name "debian-trixie" ! -name "fedora-42" \) -exec rm -rf {} +
+for dir in */ ; do podman build --rm -t "pacur/${dir::-1}" "$dir"; done
+```
+
+The containers should now be installed. If the build fails, try rebooting your machine.
 
 ### Steps for installing the built waywall:
 
-- The script will output where the build is located (for example ```Build artifacts are located in: ~/waywall/waywall-build```) depending on the distro you are currently you can either just double-click the file or install it from terminal
+The script will output where the build artifacts are located (for example `Build artifacts are located in: ~/waywall/waywall-build`).
+On some distributions, you can double-click the correct built package in your
+graphical file manager of choice. Otherwise, install it from the terminal with
+one of the following commands:
 
-### Example commands for installing waywall:
-
-- ArchLinux: ```sudo pacman -U ~/waywall/waywall-build/waywall-0.5-1-x86_64.pkg.tar.zst```
-- Fedora: ```sudo dnf localinstall ~/waywall/waywall-build/waywall-0.5-1.fc42.x86_64.rpm```
-- Debian: ```sudo dpkg -i ~/waywall/waywall-build/waywall_0.5-1_amd64.deb```
+- ArchLinux: `sudo pacman -U ~/waywall/waywall-build/waywall-0.5-1-x86_64.pkg.tar.zst`
+- Fedora: `sudo dnf localinstall ~/waywall/waywall-build/waywall-0.5-1.fc42.x86_64.rpm`
+- Debian: `sudo dpkg -i ~/waywall/waywall-build/waywall_0.5-1_amd64.deb`
 
 ## Building from source
 
