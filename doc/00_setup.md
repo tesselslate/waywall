@@ -11,6 +11,11 @@ receive keyboard and mouse input. Unfortunately, the version shipped by default
 does not work with waywall, so you will need to compile a patched version of
 GLFW.
 
+> [!TIP]
+> If you used a [prebuilt package] or built your own with the package building
+> script, then you already have the correct version of GLFW available! It can be
+> found at `/usr/local/lib64/waywall-glfw/libglfw.so`.
+
 You can compile the patched version of GLFW with the following commands:
 
 ```sh
@@ -98,6 +103,7 @@ variables` submenu.
 This environment variable fixes a startup crash (`GLFW error 65544`) and also
 ensures that preemptive navigation works correctly.
 
+[prebuilt package]: https://github.com/tesselslate/waywall/releases
 [Prism Launcher]: https://prismlauncher.org
 [MultiMC]: https://multimc.org
 [GLFW]: https://github.com/glfw/glfw

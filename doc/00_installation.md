@@ -5,7 +5,17 @@ the AUR.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
 
-Users on other distributions must build waywall from source.
+Users on other distributions must download a prebuilt package from the
+[Releases](https://github.com/tesselslate/waywall/releases) page or build
+waywall from source.
+
+## Building with the packaging script
+
+The package building script is able to create binary packages for Arch Linux,
+Debian 13, and Fedora 42.
+
+Refer to the instructions within the [README](https://github.com/tesselslate/waywall/#building-with-build-packagessh)
+for more information on how to use the packaging script.
 
 ## Building from source
 
