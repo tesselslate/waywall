@@ -79,6 +79,12 @@ static const struct {
 #define METATABLE_TEXT "waywall.text"
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
+#define CHECK_OBJECT(object)                                                                       \
+    if (!(object)) {                                                                               \
+        return luaL_error(L, "object method was called as a function");                            \
+    } else if (!*(object)) {                                                                       \
+        return luaL_error(L, "object already closed");                                             \
+    }
 
 #define DEFAULT_DEPTH 0
 
@@ -90,9 +96,7 @@ struct waker_sleep {
 static int
 object_get_depth(lua_State *L) {
     struct scene_object **object = lua_touserdata(L, -1);
-    if (!*object) {
-        return luaL_error(L, "object already closed");
-    }
+    CHECK_OBJECT(object);
 
     lua_pushinteger(L, scene_object_get_depth(*object));
     return 1;
@@ -101,9 +105,7 @@ object_get_depth(lua_State *L) {
 static int
 object_set_depth(lua_State *L) {
     struct scene_object **object = lua_touserdata(L, 1);
-    if (!*object) {
-        return luaL_error(L, "object already closed");
-    }
+    CHECK_OBJECT(object);
 
     int depth = luaL_checkint(L, 2);
 
@@ -114,10 +116,7 @@ object_set_depth(lua_State *L) {
 static int
 image_close(lua_State *L) {
     struct scene_image **image = lua_touserdata(L, 1);
-
-    if (!*image) {
-        return luaL_error(L, "cannot close image more than once");
-    }
+    CHECK_OBJECT(image);
 
     scene_object_destroy((struct scene_object *)*image);
     *image = NULL;
@@ -157,10 +156,7 @@ image_gc(lua_State *L) {
 static int
 mirror_close(lua_State *L) {
     struct scene_mirror **mirror = lua_touserdata(L, 1);
-
-    if (!*mirror) {
-        return luaL_error(L, "cannot close mirror more than once");
-    }
+    CHECK_OBJECT(mirror);
 
     scene_object_destroy((struct scene_object *)*mirror);
     *mirror = NULL;
@@ -200,10 +196,7 @@ mirror_gc(lua_State *L) {
 static int
 text_close(lua_State *L) {
     struct scene_text **text = lua_touserdata(L, 1);
-
-    if (!*text) {
-        return luaL_error(L, "cannot close text more than once");
-    }
+    CHECK_OBJECT(text);
 
     scene_object_destroy((struct scene_object *)*text);
     *text = NULL;
