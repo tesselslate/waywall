@@ -95,7 +95,7 @@ struct waker_sleep {
 
 static int
 object_get_depth(lua_State *L) {
-    struct scene_object **object = lua_touserdata(L, -1);
+    struct scene_object **object = lua_touserdata(L, 1);
     CHECK_OBJECT(object);
 
     lua_pushinteger(L, scene_object_get_depth(*object));
