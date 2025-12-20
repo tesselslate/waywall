@@ -103,6 +103,26 @@ variables` submenu.
 This environment variable fixes a startup crash (`GLFW error 65544`) and also
 ensures that preemptive navigation works correctly.
 
+### Dual-GPU systems
+
+If you have a system with an Nvidia GPU and an integrated GPU (quite common
+in laptops), then you are likely to run into issues with waywall.
+
+  - If you're on Arch, make sure that the `nvidia-prime` package is installed.
+  - Otherwise, create a script called `prime-run` on your PATH with the following content:
+
+```sh
+#!/usr/bin/env bash
+__NV_PRIME_RENDER_OFFLOAD=1 __VK_LAYER_NV_optimus=NVIDIA_only __GLX_VENDOR_LIBRARY_NAME=nvidia "$@"
+```
+
+> [!IMPORTANT]
+> If you're creating the script yourself (i.e. you are not on Arch), make sure
+> to mark it as executable with `chmod +x`!
+
+After that, change your wrapper command to `waywall wrap -- prime-run` and
+waywall should work correctly.
+
 [prebuilt package]: https://github.com/tesselslate/waywall/releases
 [Prism Launcher]: https://prismlauncher.org
 [MultiMC]: https://multimc.org
