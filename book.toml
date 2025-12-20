@@ -4,5 +4,4 @@ authors = ["tesselslate"]
 description = "Documentation for waywall"
 
 language = "en"
-multilingual = false
 src = "doc"
