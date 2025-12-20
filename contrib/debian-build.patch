@@ -1,0 +1,21 @@
+diff --git a/waywall/server/wl_seat.c b/waywall/server/wl_seat.c
+index 64fe24a..b44cbb1 100644
+--- a/waywall/server/wl_seat.c
++++ b/waywall/server/wl_seat.c
+@@ -34,8 +34,14 @@ struct key_update {
+ };
+ 
+ static const char *mod_names[] = {
+-    XKB_MOD_NAME_SHIFT, XKB_MOD_NAME_CAPS, XKB_MOD_NAME_CTRL, XKB_MOD_NAME_MOD1,
+-    XKB_MOD_NAME_MOD2,  XKB_MOD_NAME_MOD3, XKB_MOD_NAME_MOD4, XKB_MOD_NAME_MOD5,
++    XKB_MOD_NAME_SHIFT,
++    XKB_MOD_NAME_CAPS,
++    XKB_MOD_NAME_CTRL,
++    "Mod1",
++    "Mod2",
++    "Mod3",
++    "Mod4",
++    "Mod5",
+ };
+ 
+ static void
