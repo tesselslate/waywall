@@ -38,6 +38,10 @@ After running these commands, the new patched version of GLFW will be located at
 `glfw/build/src/libglfw.so` (or `src/libglfw.so` from the `build` directory.)
 You can copy it to a safer location like `~/.local/lib64`.
 
+> [!IMPORTANT]
+> If you move the GLFW library to another location, make sure to copy the
+> symlinks (`libglfw.so.3` and `libglfw.so.3.4`) as well.
+
 ## Instance setup
 
 First, configure your instance to use the patched version of GLFW by opening its
