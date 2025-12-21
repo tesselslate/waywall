@@ -72,7 +72,7 @@ handle_signal(int signal, void *data) {
 }
 
 static int
-cmd_wrap(const char *profile, char **argv) {
+cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
     char logname[32] = {0};
     ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wrap-%jd", (intmax_t)getpid());
     ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
@@ -116,7 +116,7 @@ cmd_wrap(const char *profile, char **argv) {
 
     ww.timer = ww_timer_create(ww.server);
 
-    ww.wrap = wrap_create(ww.server, ww.inotify, ww.timer, ww.cfg);
+    ww.wrap = wrap_create(ww.server, ww.inotify, ww.timer, ww.cfg, allow_mc_x11);
     if (!ww.wrap) {
         goto fail_wrap;
     }
@@ -205,6 +205,8 @@ print_help(const char *argv0) {
         "\twaywall wrap -- CMD      Run the specified command in a new waywall instance",
         "\nOptions:",
         "\t--profile PROFILE        Run waywall with the given configuration profile",
+        "\t--allow-mc-x11           Allows Minecraft to run under X11. This will result",
+        "\t                         in a degraded experience.",
         "",
     };
 
@@ -242,6 +244,7 @@ main(int argc, char **argv) {
     char **subcommand = NULL;
 
     bool expect_profile = false;
+    bool allow_mc_x11 = false;
     for (int i = 2; i < argc; i++) {
         const char *arg = argv[i];
 
@@ -256,9 +259,14 @@ main(int argc, char **argv) {
                         return 1;
                     }
                     expect_profile = true;
+                } else if (strcmp(arg, "--allow-mc-x11") == 0) {
+                    allow_mc_x11 = true;
                 } else if (strcmp(arg, "--") == 0) {
                     subcommand = argv + i + 1;
                     break;
+                } else {
+                    print_help(argv[0]);
+                    return 1;
                 }
             } else {
                 print_help(argv[0]);
@@ -278,7 +286,7 @@ main(int argc, char **argv) {
         }
 
         set_realtime();
-        return cmd_wrap(profile, subcommand);
+        return cmd_wrap(profile, allow_mc_x11, subcommand);
     } else {
         print_help(argv[0]);
         return 1;

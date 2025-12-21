@@ -19,6 +19,7 @@ struct wrap {
 
     int32_t width, height;
     bool is_fullscreen;
+    bool allow_mc_x11;
 
     struct server_view *view;
     struct instance *instance;
@@ -52,7 +53,7 @@ struct wrap {
 };
 
 struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-                         struct config *cfg);
+                         struct config *cfg, bool allow_mc_x11);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 

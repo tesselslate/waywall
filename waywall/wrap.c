@@ -20,6 +20,7 @@
 #include "util/prelude.h"
 #include "xdg-shell-client-protocol.h"
 #include <linux/input-event-codes.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -341,6 +342,33 @@ on_view_create(struct wl_listener *listener, void *data) {
         return;
     }
 
+    if (strcmp(view->impl->name, "xwayland") == 0) {
+        if (wrap->allow_mc_x11) {
+            ww_log(LOG_WARN, "X11 minecraft instance detected but allowed");
+        } else {
+            // clang-format off
+            ww_log(LOG_ERROR,
+                   "X11 minecraft detected\n\n"
+                   "=============================================================================================\n"
+                   "Running Minecraft under X11 is disallowed by default, as you will have a degraded experience.\n"
+                   "If you are **sure** that you want to use X11 (i.e. you are playing a pre-LWJGL3 version), use\n"
+                   "the --allow-mc-x11 argument. Otherwise, check that you are using Wayland GLFW and your GLFW\n"
+                   "path is correct.\n"
+                   "=============================================================================================\n");
+            // clang-format on
+
+            pid_t pid = server_view_get_pid(view);
+            if (pid > 1) {
+                if (kill(pid, SIGKILL) == -1) {
+                    ww_log_errno(LOG_WARN, "failed to kill subprocess");
+                }
+            }
+
+            floating_view_create(wrap, view);
+            return;
+        }
+    }
+
     wrap->view = view;
     wrap->instance = instance_create(view, wrap->inotify);
     if (wrap->instance) {
@@ -535,8 +563,9 @@ static const struct server_seat_listener seat_listener = {
 
 struct wrap *
 wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-            struct config *cfg) {
+            struct config *cfg, bool allow_mc_x11) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
+    wrap->allow_mc_x11 = allow_mc_x11;
 
     wrap->gl = server_gl_create(server);
     if (!wrap->gl) {
