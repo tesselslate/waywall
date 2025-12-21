@@ -33,6 +33,27 @@ struct key_update {
     bool changed_modifiers;
 };
 
+// Required to build on Debian 13 (which ships libxkbcompat 1.7.0)
+#ifndef XKB_MOD_NAME_MOD1
+#define XKB_MOD_NAME_MOD1 XKB_MOD_NAME_ALT
+#endif
+
+#ifndef XKB_MOD_NAME_MOD2
+#define XKB_MOD_NAME_MOD2 XKB_MOD_NAME_NUM
+#endif
+
+#ifndef XKB_MOD_NAME_MOD3
+#define XKB_MOD_NAME_MOD3 "Mod3"
+#endif
+
+#ifndef XKB_MOD_NAME_MOD4
+#define XKB_MOD_NAME_MOD4 XKB_MOD_NAME_LOGO
+#endif
+
+#ifndef XKB_MOD_NAME_MOD5
+#define XKB_MOD_NAME_MOD5 "Mod5"
+#endif
+
 static const char *mod_names[] = {
     XKB_MOD_NAME_SHIFT, XKB_MOD_NAME_CAPS, XKB_MOD_NAME_CTRL, XKB_MOD_NAME_MOD1,
     XKB_MOD_NAME_MOD2,  XKB_MOD_NAME_MOD3, XKB_MOD_NAME_MOD4, XKB_MOD_NAME_MOD5,
