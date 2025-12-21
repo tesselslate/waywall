@@ -99,7 +99,6 @@ cleanup_and_copy() {
   rm -f  "$WAYWALL_DIR"/contrib/*.rpm || true
   rm -f  "$WAYWALL_DIR"/contrib/*.deb || true
   rm -rf "$WAYWALL_DIR"/debian/ || true
-  rm -f  "$WAYWALL_DIR"/debian-build.patch || true
 
   if [[ $is_error == 1 ]]; then
     echo ""
@@ -248,10 +247,7 @@ for distro in "${build_distros[@]}"; do
       apt-get update
       apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
       cp -r /build/waywall/contrib/debian /build/waywall/
-      cp /build/waywall/contrib/debian-build.patch /build/waywall/
-      git apply debian-build.patch
       dpkg-buildpackage -b -us -uc
-      git apply -R debian-build.patch
       cp ../*.deb /build/waywall/contrib/
     "
   fi

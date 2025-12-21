@@ -33,7 +33,7 @@ struct key_update {
     bool changed_modifiers;
 };
 
-// Required to build on Debian 13 (which ships libxkbcompat 1.7.0)
+// Required to build on Debian 13 (which ships libxkbcommon 1.7.0)
 #ifndef XKB_MOD_NAME_MOD1
 #define XKB_MOD_NAME_MOD1 XKB_MOD_NAME_ALT
 #endif
