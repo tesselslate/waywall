@@ -55,10 +55,13 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
     }
 
     if (version >= WL_OUTPUT_NAME_SINCE_VERSION) {
-        wl_output_send_name(resource, "waywall output");
+        // The monitor name must not have spaces or else older versions of the game using LWJGL2
+        // will fail to boot, since LWJGL2 gets monitor information from parsing the output of
+        // `xrandr -q` and does not handle spaces correctly.
+        wl_output_send_name(resource, "waywall-output");
     }
     if (version >= WL_OUTPUT_DESCRIPTION_SINCE_VERSION) {
-        wl_output_send_description(resource, "waywall output");
+        wl_output_send_description(resource, "waywall-output");
     }
 
     if (version >= WL_OUTPUT_DONE_SINCE_VERSION) {
