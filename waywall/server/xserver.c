@@ -328,7 +328,7 @@ unlink_display(int display) {
 }
 
 static void
-xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[static 2]) {
+xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     // This function should only ever be run in the context of the child process created from
     // `xserver_start`.
 
@@ -336,8 +336,8 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[stati
     const int fds[] = {
         srv->fd_xwm[1],
         srv->fd_wl[1],
-        x_sockets[0],
-        x_sockets[1],
+        srv->x_sockets[0],
+        srv->x_sockets[1],
     };
 
     for (size_t i = 0; i < STATIC_ARRLEN(fds); i++) {
@@ -357,8 +357,8 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd, int x_sockets[stati
     size_t i = 0;
 
     char listenfd0[16], listenfd1[16], displayfd[16], wmfd[16];
-    snprintf(listenfd0, STATIC_ARRLEN(listenfd0), "%d", x_sockets[0]);
-    snprintf(listenfd1, STATIC_ARRLEN(listenfd1), "%d", x_sockets[1]);
+    snprintf(listenfd0, STATIC_ARRLEN(listenfd0), "%d", srv->x_sockets[0]);
+    snprintf(listenfd1, STATIC_ARRLEN(listenfd1), "%d", srv->x_sockets[1]);
     snprintf(displayfd, STATIC_ARRLEN(displayfd), "%d", notify_fd);
     snprintf(wmfd, STATIC_ARRLEN(wmfd), "%d", srv->fd_xwm[1]);
 
@@ -454,22 +454,11 @@ xserver_start(struct xserver *srv) {
         goto fail_log;
     }
 
-    // Attempt to acquire an X11 display.
-    int x_sockets[2] = {0};
-    srv->display = get_display(x_sockets);
-    if (srv->display == -1) {
-        ww_log(LOG_ERROR, "failed to open an X11 display");
-        goto fail_sockets;
-    }
-
-    snprintf(srv->display_name, STATIC_ARRLEN(srv->display_name), ":%d", srv->display);
-    setenv("DISPLAY", srv->display_name, true);
-
     // Spawn the child process.
     srv->pid = fork();
     if (srv->pid == 0) {
         // Child process
-        xserver_exec(srv, notify_fd[1], log_fd, x_sockets);
+        xserver_exec(srv, notify_fd[1], log_fd);
         exit(EXIT_FAILURE);
     } else if (srv->pid == -1) {
         // Parent process (error)
@@ -481,15 +470,15 @@ xserver_start(struct xserver *srv) {
     // the other halves of the Wayland/XWM socket pairs, and the other half of the displayfd pipe.
     // Close them since they are no longer needed.
     close(log_fd);
-    close(x_sockets[0]);
-    close(x_sockets[1]);
+    close(srv->x_sockets[0]);
+    close(srv->x_sockets[1]);
     close(srv->fd_wl[1]);
     close(srv->fd_xwm[1]);
     close(notify_fd[1]);
 
     log_fd = -1;
-    x_sockets[0] = -1;
-    x_sockets[1] = -1;
+    srv->x_sockets[0] = -1;
+    srv->x_sockets[1] = -1;
     srv->fd_wl[1] = -1;
     srv->fd_xwm[1] = -1;
     notify_fd[1] = -1;
@@ -515,11 +504,11 @@ xserver_start(struct xserver *srv) {
 
 fail_pidfd:
 fail_fork:
-    safe_close(x_sockets[1]);
-    safe_close(x_sockets[0]);
-    unlink_display(srv->display);
+    safe_close(srv->x_sockets[0]);
+    safe_close(srv->x_sockets[1]);
+    srv->x_sockets[0] = srv->x_sockets[1] = -1;
 
-fail_sockets:
+    unlink_display(srv->display);
     safe_close(log_fd);
 
 fail_log:
@@ -537,6 +526,7 @@ xserver_create(struct server_xwayland *xwl) {
     struct xserver *srv = zalloc(1, sizeof(*srv));
     srv->wl_display = xwl->server->display;
 
+    srv->x_sockets[0] = srv->x_sockets[1] = -1;
     srv->fd_xwm[0] = srv->fd_xwm[1] = -1;
     srv->fd_wl[0] = srv->fd_wl[1] = -1;
 
@@ -551,6 +541,16 @@ xserver_create(struct server_xwayland *xwl) {
         ww_log_errno(LOG_ERROR, "failed to create xwm socket pair");
         goto fail;
     }
+
+    // Acquire and lock an X11 display immediately so that the DISPLAY environment variable can be
+    // set before any child processes are launched.
+    srv->display = get_display(srv->x_sockets);
+    if (srv->display == -1) {
+        ww_log(LOG_ERROR, "failed to acquire an X11 display");
+        goto fail;
+    }
+    snprintf(srv->display_name, STATIC_ARRLEN(srv->display_name), ":%d", srv->display);
+    setenv("DISPLAY", srv->display_name, true);
 
     // Register an idle source to start the Xwayland server.
     srv->src_idle =
@@ -583,6 +583,8 @@ xserver_destroy(struct xserver *srv) {
         wl_event_source_remove(srv->src_pipe);
     }
 
+    safe_close(srv->x_sockets[0]);
+    safe_close(srv->x_sockets[1]);
     safe_close(srv->fd_xwm[0]);
     safe_close(srv->fd_xwm[1]);
     safe_close(srv->fd_wl[0]);
