@@ -274,7 +274,7 @@ server_create(struct config *cfg) {
         goto fail_ui;
     }
 
-    server->output = server_output_create(server, server->ui);
+    server->output = server_output_create(server);
     if (!server->output) {
         ww_log(LOG_ERROR, "failed to initialize server_output");
         goto fail_output;

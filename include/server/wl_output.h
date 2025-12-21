@@ -9,11 +9,11 @@ struct server_output {
     struct wl_global *global;
     struct wl_list objects; // wl_resource link
 
-    struct server_ui *ui;
+    struct server *server;
 
     struct wl_listener on_display_destroy;
 };
 
-struct server_output *server_output_create(struct server *server, struct server_ui *ui);
+struct server_output *server_output_create(struct server *server);
 
 #endif
