@@ -182,6 +182,7 @@ static const char *atom_names[] = {
     [WL_SURFACE_ID] = "WL_SURFACE_ID",
     [WL_SURFACE_SERIAL] = "WL_SURFACE_SERIAL",
     [WM_DELETE_WINDOW] = "WM_DELETE_WINDOW",
+    [WM_PROTOCOLS] = "WM_PROTOCOLS",
     [WM_S0] = "WM_S0",
 };
 
@@ -196,6 +197,7 @@ xwayland_view_close(void *data) {
     event.data.data32[0] = xsurface->xwm->atoms[WM_DELETE_WINDOW];
     event.data.data32[1] = XCB_CURRENT_TIME;
     event.window = xsurface->window;
+    event.type = xsurface->xwm->atoms[WM_PROTOCOLS];
 
     xcb_send_event(xsurface->xwm->conn, true, xsurface->window, XCB_EVENT_MASK_NO_EVENT,
                    (char *)&event);

@@ -16,6 +16,7 @@ enum xwm_atom {
     WL_SURFACE_ID,
     WL_SURFACE_SERIAL,
     WM_DELETE_WINDOW,
+    WM_PROTOCOLS,
     WM_S0,
 
     ATOM_COUNT,
