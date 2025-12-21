@@ -343,7 +343,7 @@ config_parse_remap(const char *src, const char *dst, struct config_remap *remap)
         return 1;
     }
     if (parse_remap_half(dst, &remap->dst_data, &remap->dst_type) != 0) {
-        ww_log(LOG_ERROR, "unknown output '%s' for remapping", src);
+        ww_log(LOG_ERROR, "unknown output '%s' for remapping", dst);
         return 1;
     }
 
