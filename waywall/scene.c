@@ -500,8 +500,18 @@ draw_frame(struct scene *scene) {
     glViewport(0, 0, scene->ui->width, scene->ui->height);
 
     if (!should_draw_frame(scene)) {
+        // TODO: Scene rendering could potentially be synchronized with the game subsurface (or
+        // waywall could implement basic compositing) to avoid the need for this. Committing the
+        // scene subsurface and game subsurface at separate times tends to break VRR, so not
+        // committing new blank frames to the scene subsurface when there is nothing to draw is an
+        // easy workaround to get VRR to work most of the time.
+        //
+        // HACK: It should only be necessary to draw and commit one blank frame before pausing the
+        // drawing of new frames. However, in some unknown circumstances, Hyprland seems to never
+        // render the last blank frame that gets committed, leaving the last drawn frame of the
+        // scene visible. Rendering two blank frames appears to solve the issue.
         scene->skipped_frames++;
-        if (scene->skipped_frames > 1) {
+        if (scene->skipped_frames > 2) {
             return;
         }
     } else {
