@@ -43,6 +43,7 @@ struct xwm {
 
     struct wl_event_source *src_x11;
 
+    struct wl_listener on_input_focus;
     struct wl_listener on_new_wl_surface;
     struct wl_listener on_new_xwayland_surface;
 

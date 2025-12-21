@@ -473,6 +473,19 @@ on_xwayland_surface_set_serial(struct wl_listener *listener, void *data) {
 }
 
 static void
+on_input_focus(struct wl_listener *listener, void *data) {
+    struct xwm *xwm = wl_container_of(listener, xwm, on_input_focus);
+    struct server_view *view = data;
+
+    xcb_window_t target = XCB_WINDOW_NONE;
+    if (view && strcmp(view->impl->name, "xwayland") == 0) {
+        target = xwm_window_from_view(view);
+    }
+
+    xcb_set_input_focus(xwm->conn, XCB_INPUT_FOCUS_NONE, target, XCB_CURRENT_TIME);
+}
+
+static void
 on_new_wl_surface(struct wl_listener *listener, void *data) {
     struct xwm *xwm = wl_container_of(listener, xwm, on_new_wl_surface);
     struct server_surface *surface = data;
@@ -1008,6 +1021,9 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
 
     xcb_flush(xwm->conn);
 
+    xwm->on_input_focus.notify = on_input_focus;
+    wl_signal_add(&xwl->server->events.input_focus, &xwm->on_input_focus);
+
     xwm->on_new_wl_surface.notify = on_new_wl_surface;
     wl_signal_add(&xwl->server->compositor->events.new_surface, &xwm->on_new_wl_surface);
 
@@ -1038,6 +1054,7 @@ xwm_destroy(struct xwm *xwm) {
         wl_event_source_remove(xwm->src_x11);
     }
 
+    wl_list_remove(&xwm->on_input_focus.link);
     wl_list_remove(&xwm->on_new_wl_surface.link);
     wl_list_remove(&xwm->on_new_xwayland_surface.link);
 
