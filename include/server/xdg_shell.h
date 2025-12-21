@@ -40,6 +40,7 @@ struct server_xdg_toplevel {
     struct server_xdg_surface *parent;
     char *title;
     uint32_t width, height;
+    bool do_fullscreen_resize;
 
     struct server_view *view;
 

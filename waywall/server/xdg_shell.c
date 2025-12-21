@@ -18,12 +18,17 @@
 #define SRV_XDG_WM_BASE_VERSION 5
 
 static void
-send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
+send_toplevel_configure_sized(struct server_xdg_toplevel *xdg_toplevel, int32_t width,
+                              int32_t height) {
     struct wl_array states;
     wl_array_init(&states);
-    xdg_toplevel_send_configure(xdg_toplevel->resource, xdg_toplevel->width, xdg_toplevel->height,
-                                &states);
+    xdg_toplevel_send_configure(xdg_toplevel->resource, width, height, &states);
     wl_array_release(&states);
+}
+
+static void
+send_toplevel_configure(struct server_xdg_toplevel *xdg_toplevel) {
+    send_toplevel_configure_sized(xdg_toplevel, xdg_toplevel->width, xdg_toplevel->height);
 }
 
 static void
@@ -125,6 +130,15 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
             server_view_create(xdg_surface->xdg_wm_base->server->ui, xdg_surface->parent,
                                &xdg_toplevel_view_impl, xdg_toplevel);
     }
+
+    // If we just dealt with a set_fullscreen request, resize the window back to
+    // the actual correct size.
+    if (xdg_toplevel->do_fullscreen_resize) {
+        xdg_toplevel->do_fullscreen_resize = false;
+
+        send_toplevel_configure(xdg_toplevel);
+        server_xdg_surface_send_configure(xdg_surface);
+    }
 }
 
 static void
@@ -189,9 +203,16 @@ xdg_toplevel_set_fullscreen(struct wl_client *client, struct wl_resource *resour
                             struct wl_resource *output_resource) {
     struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
 
-    // This is a no-op, but we need to send a configure anyway.
-    send_toplevel_configure(xdg_toplevel);
+    // HACK: Minecraft's fullscreen code is terrible and is unfortunately the reason this garbage
+    // needs to exist. GLFW obliges when we tell it not to update the window size; however, it only
+    // gives Minecraft the new framebuffer size and does *not* send it a new window size (and
+    // Minecraft already assumes the fullscreen size change will go through as soon as it makes it.)
+    // So, we have to resize the window to a different size, wait for GLFW to commit the surface,
+    // and then resize it back to the actual size.
+    send_toplevel_configure_sized(xdg_toplevel, 1, 1);
     server_xdg_surface_send_configure(xdg_toplevel->parent);
+
+    xdg_toplevel->do_fullscreen_resize = true;
 }
 
 static void
