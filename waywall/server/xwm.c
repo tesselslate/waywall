@@ -176,6 +176,7 @@ static const char *atom_names[] = {
     [NET_SUPPORTED] = "_NET_SUPPORTED",
     [NET_SUPPORTING_WM_CHECK] = "_NET_SUPPORTING_WM_CHECK",
     [NET_WM_NAME] = "_NET_WM_NAME",
+    [NET_WM_STATE_FULLSCREEN] = "_NET_WM_STATE_FULLSCREEN",
     [TARGETS] = "TARGETS",
     [UTF8_STRING] = "UTF8_STRING",
     [WL_SURFACE_ID] = "WL_SURFACE_ID",
@@ -957,8 +958,13 @@ init_ewmh(struct xwm *xwm) {
                         xwm->atoms[NET_SUPPORTING_WM_CHECK], XCB_ATOM_WINDOW, 32, 1,
                         &xwm->ewmh_window);
 
+    xcb_atom_t supported[] = {
+        xwm->atoms[NET_WM_STATE_FULLSCREEN],
+    };
+
     xcb_change_property(xwm->conn, XCB_PROP_MODE_REPLACE, xwm->screen->root,
-                        xwm->atoms[NET_SUPPORTED], XCB_ATOM_ATOM, 32, 0, NULL);
+                        xwm->atoms[NET_SUPPORTED], XCB_ATOM_ATOM, 32, STATIC_ARRLEN(supported),
+                        supported);
 
     xcb_set_selection_owner(xwm->conn, xwm->ewmh_window, xwm->atoms[WM_S0], XCB_CURRENT_TIME);
 }
