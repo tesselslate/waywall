@@ -68,6 +68,24 @@ get_pointer_offset(struct server_seat *seat, double *x, double *y) {
 
     *x = seat->pointer.x - (double)seat->input_focus->current.x;
     *y = seat->pointer.y - (double)seat->input_focus->current.y;
+
+    // If the view is centered, then its X and Y coordinates as stored in server_view_state will be
+    // inbounds, but its actual X and Y coordinates are offscreen in the negatives. This needs to be
+    // accounted for when sending pointer motion.
+    //
+    // TODO: This is a bit stupid, maybe it can be improved at some point when I improve surface
+    // management logic
+    if (seat->input_focus->current.centered) {
+        uint32_t width = seat->input_focus->current.width;
+        uint32_t height = seat->input_focus->current.height;
+
+        if ((int32_t)width > seat->server->ui->width) {
+            *x += (double)(width - seat->server->ui->width) / 2;
+        }
+        if ((int32_t)height > seat->server->ui->height) {
+            *y += (double)(height - seat->server->ui->height) / 2;
+        }
+    }
 }
 
 static int
