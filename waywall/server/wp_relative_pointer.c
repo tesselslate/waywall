@@ -66,7 +66,9 @@ static void
 process_pointer(struct server_relative_pointer *relative_pointer, struct wl_pointer *pointer) {
     if (relative_pointer->remote_pointer) {
         zwp_relative_pointer_v1_destroy(relative_pointer->remote_pointer);
+        relative_pointer->remote_pointer = NULL;
     }
+
     if (pointer) {
         relative_pointer->remote_pointer =
             zwp_relative_pointer_manager_v1_get_relative_pointer(relative_pointer->remote, pointer);

@@ -113,21 +113,29 @@ fail_get_cursor:
 
 static void
 hide_cursor(struct server_cursor *cursor) {
-    wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter, NULL, 0, 0);
+    struct wl_pointer *pointer = server_get_wl_pointer(cursor->server);
+    if (pointer) {
+        wl_pointer_set_cursor(pointer, cursor->last_enter, NULL, 0, 0);
+    }
 }
 
 static void
 show_cursor(struct server_cursor *cursor) {
     switch (cursor->config->type) {
-    case SERVER_CURSOR_CONFIG_TYPE_XCURSOR:
-        wl_pointer_set_cursor(server_get_wl_pointer(cursor->server), cursor->last_enter,
-                              cursor->surface, cursor->config->data.xcursor.image->hotspot_x,
-                              cursor->config->data.xcursor.image->hotspot_y);
+    case SERVER_CURSOR_CONFIG_TYPE_XCURSOR: {
+        struct wl_pointer *pointer = server_get_wl_pointer(cursor->server);
+        if (pointer) {
+            wl_pointer_set_cursor(pointer, cursor->last_enter, cursor->surface,
+                                  cursor->config->data.xcursor.image->hotspot_x,
+                                  cursor->config->data.xcursor.image->hotspot_y);
+        }
         break;
+    }
     case SERVER_CURSOR_CONFIG_TYPE_SHAPE:
-        ww_assert(cursor->shape_device);
-        wp_cursor_shape_device_v1_set_shape(cursor->shape_device, cursor->last_enter,
-                                            cursor->config->data.shape);
+        if (cursor->shape_device) {
+            wp_cursor_shape_device_v1_set_shape(cursor->shape_device, cursor->last_enter,
+                                                cursor->config->data.shape);
+        }
         break;
     }
 }
@@ -138,9 +146,14 @@ on_pointer(struct wl_listener *listener, void *data) {
 
     if (cursor->shape_device) {
         wp_cursor_shape_device_v1_destroy(cursor->shape_device);
-        cursor->shape_device = wp_cursor_shape_manager_v1_get_pointer(
-            cursor->server->backend->cursor_shape_manager, server_get_wl_pointer(cursor->server));
-        check_alloc(cursor->shape_device);
+        cursor->shape_device = NULL;
+
+        struct wl_pointer *pointer = server_get_wl_pointer(cursor->server);
+        if (pointer) {
+            cursor->shape_device = wp_cursor_shape_manager_v1_get_pointer(
+                cursor->server->backend->cursor_shape_manager, pointer);
+            check_alloc(cursor->shape_device);
+        }
     }
 }
 
@@ -167,9 +180,12 @@ server_cursor_create(struct server *server, struct config *cfg) {
     check_alloc(cursor->surface);
 
     if (server->backend->cursor_shape_manager) {
-        cursor->shape_device = wp_cursor_shape_manager_v1_get_pointer(
-            server->backend->cursor_shape_manager, server_get_wl_pointer(server));
-        check_alloc(cursor->shape_device);
+        struct wl_pointer *pointer = server_get_wl_pointer(server);
+        if (pointer) {
+            cursor->shape_device = wp_cursor_shape_manager_v1_get_pointer(
+                server->backend->cursor_shape_manager, pointer);
+            check_alloc(cursor->shape_device);
+        }
     }
 
     cursor->on_pointer.notify = on_pointer;
