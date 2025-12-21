@@ -11,7 +11,6 @@ struct server_output {
 
     struct server_ui *ui;
 
-    struct wl_listener on_resize;
     struct wl_listener on_display_destroy;
 };
 

@@ -35,7 +35,7 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
 
     wl_output_send_geometry(resource, 0, 0, 0, 0, WL_OUTPUT_SUBPIXEL_UNKNOWN, "waywall", "waywall",
                             WL_OUTPUT_TRANSFORM_NORMAL);
-    wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT, output->ui->width, output->ui->height, 0);
+    wl_output_send_mode(resource, WL_OUTPUT_MODE_CURRENT, 1, 1, 0);
 
     if (version >= WL_OUTPUT_NAME_SINCE_VERSION) {
         wl_output_send_name(resource, "waywall output");
@@ -44,22 +44,11 @@ on_global_bind(struct wl_client *client, void *data, uint32_t version, uint32_t 
         wl_output_send_description(resource, "waywall output");
     }
 
-    wl_list_insert(&output->objects, wl_resource_get_link(resource));
-}
-
-static void
-on_resize(struct wl_listener *listener, void *data) {
-    struct server_output *output = wl_container_of(listener, output, on_resize);
-
-    struct wl_resource *output_resource, *tmp;
-    wl_resource_for_each_safe(output_resource, tmp, &output->objects) {
-        wl_output_send_mode(output_resource, WL_OUTPUT_MODE_CURRENT, output->ui->width,
-                            output->ui->height, 0);
-
-        if (wl_resource_get_version(output_resource) >= WL_OUTPUT_DONE_SINCE_VERSION) {
-            wl_output_send_done(output_resource);
-        }
+    if (version >= WL_OUTPUT_DONE_SINCE_VERSION) {
+        wl_output_send_done(resource);
     }
+
+    wl_list_insert(&output->objects, wl_resource_get_link(resource));
 }
 
 static void
@@ -68,7 +57,6 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_global_destroy(output->global);
 
-    wl_list_remove(&output->on_resize.link);
     wl_list_remove(&output->on_display_destroy.link);
 
     free(output);
@@ -84,9 +72,6 @@ server_output_create(struct server *server, struct server_ui *ui) {
 
     wl_list_init(&output->objects);
     output->ui = ui;
-
-    output->on_resize.notify = on_resize;
-    wl_signal_add(&ui->events.resize, &output->on_resize);
 
     output->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &output->on_display_destroy);
