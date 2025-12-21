@@ -719,14 +719,18 @@ l_set_remaps(lua_State *L) {
         // 1 (IDX_REMAPS)     : remaps
 
         if (!lua_isstring(L, IDX_REMAP_KEY)) {
-            ww_log(LOG_ERROR, "non-string key '%s' found in remaps table",
-                   lua_tostring(L, IDX_REMAP_KEY));
-            return 1;
+            if (remaps.data) {
+                free(remaps.data);
+            }
+            return luaL_error(L, "non-string key '%s' found in remaps table",
+                              lua_tostring(L, IDX_REMAP_KEY));
         }
         if (!lua_isstring(L, IDX_REMAP_VAL)) {
-            ww_log(LOG_ERROR, "non-string value for key '%s' found in remaps table",
-                   lua_tostring(L, IDX_REMAP_KEY));
-            return 1;
+            if (remaps.data) {
+                free(remaps.data);
+            }
+            return luaL_error(L, "non-string value for key '%s' found in remaps table",
+                              lua_tostring(L, IDX_REMAP_KEY));
         }
 
         const char *src_input = lua_tostring(L, IDX_REMAP_KEY);
@@ -734,7 +738,10 @@ l_set_remaps(lua_State *L) {
 
         struct config_remap remap = {0};
         if (config_parse_remap(src_input, dst_input, &remap) != 0) {
-            return 1;
+            if (remaps.data) {
+                free(remaps.data);
+            }
+            return luaL_error(L, "failed to parse remap");
         }
         config_add_remap(&remaps, remap);
 
@@ -778,8 +785,9 @@ l_set_remaps(lua_State *L) {
         dst->type = remap->dst_type;
     }
 
-    if (remaps.data)
+    if (remaps.data) {
         free(remaps.data);
+    }
 
     // Epilogue
     return 0;
