@@ -134,13 +134,14 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
     }
     setenv("WAYLAND_DISPLAY", socket_name, true);
 
+    env_passthrough_set("WAYLAND_DISPLAY", socket_name);
+    env_passthrough_set("DISPLAY", getenv("DISPLAY"));
+
     char **env = env_passthrough_get();
     ww.child = fork();
 
     if (ww.child == 0) {
         if (env) {
-            env_passthrough_add_display(env);
-
             ww_log(LOG_INFO, "starting child process with passthrough environment");
             util_execvpe(argv[0], argv, env);
         } else {
@@ -173,6 +174,7 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
         }
     }
 
+    env_passthrough_destroy();
     wl_event_source_remove(ww.src_pidfd);
     close(pidfd);
     reload_destroy(ww.reload);
@@ -188,6 +190,8 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
 
 fail_pidfd:
 fail_fork:
+    env_passthrough_destroy();
+
 fail_socket:
     reload_destroy(ww.reload);
 

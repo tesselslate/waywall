@@ -1,7 +1,9 @@
 #include "env_reexec.h"
 #include "util/alloc.h"
+#include "util/list.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/str.h"
 #include "util/syscall.h"
 #include <fcntl.h>
 #include <limits.h>
@@ -18,95 +20,139 @@
 
 extern char **environ;
 
+struct envvar {
+    char *name;
+    char *value;
+};
+
+LIST_DEFINE(struct envvar, list_envvar);
+LIST_DEFINE_IMPL(struct envvar, list_envvar);
+
+static struct list_envvar passthrough_env;
+static char **passthrough_envlist;
+static bool used_passthrough = false;
+
 static void
-add_env(char **env, char *new) {
-    char **ptr = env;
-    while (*ptr) {
-        ptr++;
+envlist_destroy(char **envlist) {
+    for (char **var = envlist; *var; var++) {
+        free(*var);
     }
-
-    *ptr = strdup(new);
-    check_alloc(*ptr);
-
-    ww_assert(!(*(++ptr)));
+    free(envlist);
 }
 
 static char **
-read_env(char *buf, bool skip_displays) {
-    static const char *SKIP_ENV[] = {"WAYLAND_DISPLAY", "DISPLAY"};
+penv_to_envlist(struct list_envvar *penv) {
+    char **envlist = zalloc(penv->len + 1, sizeof(*envlist));
+    for (ssize_t i = 0; i < penv->len; i++) {
+        str s = str_new();
+        str_append(&s, penv->data[i].name);
+        str_append(&s, "=");
+        str_append(&s, penv->data[i].value);
 
-    size_t count = 0;
+        envlist[i] = strdup(s);
+        check_alloc(envlist[i]);
+        str_free(s);
+    }
+
+    return envlist;
+}
+
+static void
+penv_destroy(struct list_envvar *penv) {
+    for (ssize_t i = 0; i < penv->len; i++) {
+        free(penv->data[i].name);
+        free(penv->data[i].value);
+    }
+
+    list_envvar_destroy(penv);
+}
+
+static ssize_t
+penv_find(struct list_envvar *penv, const char *name) {
+    for (ssize_t i = 0; i < penv->len; i++) {
+        if (strcmp(penv->data[i].name, name) == 0) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+static void
+penv_set(struct list_envvar *penv, const char *name, const char *value) {
+    char *dup_value = strdup(value);
+    check_alloc(dup_value);
+
+    ssize_t idx = penv_find(penv, name);
+    if (idx >= 0) {
+        free(penv->data[idx].value);
+        penv->data[idx].value = dup_value;
+        return;
+    }
+
+    char *dup_name = strdup(name);
+    check_alloc(dup_name);
+    list_envvar_append(penv, (struct envvar){dup_name, dup_value});
+}
+
+static bool
+penv_unset(struct list_envvar *penv, const char *name) {
+    for (ssize_t i = 0; i < penv->len; i++) {
+        if (strcmp(penv->data[i].name, name) == 0) {
+            free(penv->data[i].name);
+            free(penv->data[i].value);
+            list_envvar_remove(penv, i);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static struct list_envvar
+penv_read(char *buf) {
+    struct list_envvar penv = list_envvar_create();
+
     char *ptr = buf;
     while (*ptr) {
-        count += 1;
-        ptr = strchr(ptr, '\0') + 1;
-    }
-
-    char **env = zalloc(count + EXTRA_ENV_SIZE + 1, sizeof(*env));
-
-    ptr = buf;
-    for (size_t i = 0; i < count; i++) {
-        if (skip_displays) {
-            for (size_t j = 0; j < STATIC_ARRLEN(SKIP_ENV); j++) {
-                size_t len = strlen(SKIP_ENV[j]);
-                if (strncmp(ptr, SKIP_ENV[j], len) == 0 && *(ptr + len) == '=') {
-                    i--;
-                    count--;
-                    goto next;
-                }
-            }
+        char *split = strchr(ptr, '=');
+        if (!split) {
+            ww_log(LOG_ERROR, "failed to parse environment text");
+            goto fail;
         }
+        char *delim = strchr(split, '\0');
+        ww_assert(delim);
 
-        env[i] = strdup(ptr);
-        check_alloc(env[i]);
+        char *name = strndup(ptr, split - ptr);
+        check_alloc(name);
+        char *value = strndup(split + 1, delim - split + 1);
+        check_alloc(value);
 
-    next:
-        ptr = strchr(ptr, '\0') + 1;
+        list_envvar_append(&penv, (struct envvar){name, value});
+
+        ptr = delim + 1;
     }
 
-    return env;
+    return penv;
+
+fail:
+    penv_destroy(&penv);
+    return penv;
 }
 
-void
-env_passthrough_add_display(char **env_passthrough) {
-    char *wayland_display = getenv("WAYLAND_DISPLAY");
-    char *x11_display = getenv("DISPLAY");
-    ww_assert(wayland_display && x11_display);
-
-    char buf[256] = {0};
-    ssize_t n = snprintf(buf, STATIC_ARRLEN(buf), "WAYLAND_DISPLAY=%s", wayland_display);
-    ww_assert(n < (ssize_t)STATIC_ARRLEN(buf));
-    add_env(env_passthrough, buf);
-
-    n = snprintf(buf, STATIC_ARRLEN(buf), "DISPLAY=%s", x11_display);
-    ww_assert(n < (ssize_t)STATIC_ARRLEN(buf));
-    add_env(env_passthrough, buf);
-
-    ww_log(LOG_INFO, "added WAYLAND_DISPLAY=%s to passthrough environment", wayland_display);
-    ww_log(LOG_INFO, "added DISPLAY=%s to passthrough environment", x11_display);
-}
-
-void
-env_passthrough_destroy(char **env_passthrough) {
-    for (char **var = env_passthrough; *var; var++) {
-        free(*var);
-    }
-    free(env_passthrough);
-}
-
-char **
-env_passthrough_get() {
+static bool
+read_passthrough_fd() {
     char *passthrough_fd_env = getenv(PASSTHROUGH_FD_ENV);
     if (!passthrough_fd_env) {
         ww_log(LOG_INFO, "no environment passthrough fd");
-        return NULL;
+        return false;
     }
     unsetenv(PASSTHROUGH_FD_ENV);
 
     int fd = atoi(passthrough_fd_env);
     if (fd <= 0) {
         ww_log(LOG_ERROR, "failed to parse passthrough fd '%s' from env", passthrough_fd_env);
-        return NULL;
+        return true;
     }
 
     ssize_t len = lseek(fd, 0, SEEK_END);
@@ -121,43 +167,81 @@ env_passthrough_get() {
         goto fail_mmap;
     }
 
-    char **env = read_env(buf, true);
-
+    passthrough_env = penv_read(buf);
     ww_assert(munmap(buf, len) == 0);
     close(fd);
 
-    return env;
+    return true;
 
 fail_mmap:
 fail_seek:
     close(fd);
-    return NULL;
+    return true;
 }
 
-// HACK: PrismLauncher provides several options which modify the environment variables the game is
-// started with:
+void
+env_passthrough_set(const char *name, const char *value) {
+    if (used_passthrough) {
+        return;
+    }
+
+    penv_set(&passthrough_env, name, value);
+    ww_log(LOG_INFO, "passthrough env: set %s=%s", name, value);
+}
+
+void
+env_passthrough_unset(const char *name) {
+    if (used_passthrough) {
+        return;
+    }
+
+    penv_unset(&passthrough_env, name);
+}
+
+void
+env_passthrough_destroy() {
+    used_passthrough = true;
+
+    if (passthrough_envlist) {
+        envlist_destroy(passthrough_envlist);
+    }
+    penv_destroy(&passthrough_env);
+}
+
+char **
+env_passthrough_get() {
+    ww_assert(!used_passthrough && !passthrough_envlist);
+
+    used_passthrough = true;
+    passthrough_envlist = penv_to_envlist(&passthrough_env);
+
+    return passthrough_envlist;
+}
+
+// HACK: PrismLauncher provides several options which modify the environment variables the game
+// is started with:
 //
 //  - "Enable MangoHud"     Modifies LD_PRELOAD to include shared objects from MangoHud
 //  - "Use discrete GPU"    Sets environment variables for Nvidia PRIME
 //  - "Use Zink"            Sets environment variables to configure Mesa to use Zink
 //
 // However, since waywall is run as a wrapper command, waywall also gets these environment
-// variables. This is probably not what the user intends, and in the case of "Use discrete GPU" is
-// often actively harmful, since only the game should use the discrete GPU.
+// variables. This is probably not what the user intends, and in the case of "Use discrete GPU"
+// is often actively harmful, since only the game should use the discrete GPU.
 //
 // So, this function copies the current environment into a memfd, re-executes waywall with the
-// environment of the parent process, and then the restarted waywall process starts the Minecraft
-// instance with the environment passed to it via the memfd. This ensures that waywall does not
-// inherit any of the environment changes made by PrismLauncher.
+// environment of the parent process, and then the restarted waywall process starts the
+// Minecraft instance with the environment passed to it via the memfd. This ensures that waywall
+// does not inherit any of the environment changes made by PrismLauncher.
 //
 // If the user doesn't want this behavior, it can be turned off via a flag.
 int
 env_reexec(char **argv) {
     static const int ENV_SIZE = 1048576;
 
-    // Check whether waywall was already restarted or if doing the environment passthrough restart
-    // is unnecessary.
-    if (getenv(PASSTHROUGH_FD_ENV)) {
+    // Check for the __WAYWALL_ENV_PASSTHROUGH_FD variable. If present, read it into the passthrough
+    // environment and then let execution continue normally since we already restarted.
+    if (read_passthrough_fd()) {
         ww_log(LOG_INFO, "skipping env_reexec (got passthrough fd)");
         return 0;
     }
@@ -192,8 +276,8 @@ env_reexec(char **argv) {
     }
 
     // Create a memfd which will be passed to the restarted waywall process via an environment
-    // variable. This memfd will store all of the environment variables which should be set for the
-    // game.
+    // variable. This memfd will store all of the environment variables which should be set for
+    // the game.
     int passthrough_fd = memfd_create("waywall_env_reexec", 0);
     if (passthrough_fd == -1) {
         ww_log(LOG_ERROR, "failed to create environ passthrough fd");
@@ -213,21 +297,24 @@ env_reexec(char **argv) {
         goto fail_write_passthrough;
     }
 
-    // Create a new environment array storing the parent environment, to be passed to execvpe. Add
-    // the passthrough fd to this environment so that we don't enter an infinite loop of reexecuting
-    // with a fresh environment.
-    char **penv = read_env(penvbuf, false);
+    // Read the parent environment into a new list to be passed to execvpe. Add the passthrough fd
+    // to this environment so that we don't enter an infinite loop of reexecuting with a fresh
+    // environment.
+    struct list_envvar penv = penv_read(penvbuf);
 
-    char fd_env[256] = {0};
-    snprintf(fd_env, STATIC_ARRLEN(fd_env), "%s=%d", PASSTHROUGH_FD_ENV, passthrough_fd);
-    add_env(penv, fd_env);
+    char fd_env[16] = {0};
+    snprintf(fd_env, STATIC_ARRLEN(fd_env), "%d", passthrough_fd);
+    penv_set(&penv, PASSTHROUGH_FD_ENV, fd_env);
+
+    char **envlist = penv_to_envlist(&penv);
 
     ww_log(LOG_INFO, "set passthrough environment fd to %d, restarting", passthrough_fd);
-    util_execvpe(argv[0], argv, penv);
+    util_execvpe(argv[0], argv, envlist);
 
-    // There's no need to duplicate the error handling cases. If execvpe failed then it's fine to
-    // just run through all of the error handling labels to cleanup.
-    env_passthrough_destroy(penv);
+    // There's no need to duplicate the error handling cases. If execvpe failed then it's fine
+    // to just run through all of the error handling labels to cleanup.
+    envlist_destroy(envlist);
+    penv_destroy(&penv);
     ww_log_errno(LOG_ERROR, "env_reexec failed");
 
 fail_write_passthrough:

@@ -4,6 +4,7 @@
 #include "config/config.h"
 #include "config/internal.h"
 #include "config/vm.h"
+#include "env_reexec.h"
 #include "instance.h"
 #include "scene.h"
 #include "server/server.h"
@@ -1191,8 +1192,10 @@ l_setenv(lua_State *L) {
     // Body
     if (value) {
         setenv(name, value, 1);
+        env_passthrough_set(name, value);
     } else {
         unsetenv(name);
+        env_passthrough_unset(name);
     }
 
     // Epilogue
