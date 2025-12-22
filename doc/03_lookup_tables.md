@@ -6,6 +6,10 @@ case insensitive.
 
 ## Keycodes
 
+> [!IMPORTANT]
+> Keycodes are used for [remapping keys and buttons](01_options_input.md)
+> in your configuration and for [pressing keys in actions](02_waywall_press_key.md).
+
 The list of valid keycodes can be found in waywall's source code
 [here](https://github.com/tesselslate/waywall/blob/main/include/util/keycodes.h).
 
@@ -14,6 +18,10 @@ as you expect. waywall follows the names defined by the `input-event-codes.h`
 header from Linux.
 
 ## Keysyms
+
+> [!IMPORTANT]
+> Keysyms are used for adding [actions](01_options_actions.md) to your
+> configuration.
 
 The list of valid keysyms comes from libxkbcommon. The [`xkbcommon-keysyms.h`]
 header contains all of the valid keysym names. Each keysym's name is prefixed
