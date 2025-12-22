@@ -1,4 +1,5 @@
 #include "config/config.h"
+#include "env_reexec.h"
 #include "inotify.h"
 #include "reload.h"
 #include "server/server.h"
@@ -133,10 +134,20 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
     }
     setenv("WAYLAND_DISPLAY", socket_name, true);
 
+    char **env = env_passthrough_get();
     ww.child = fork();
+
     if (ww.child == 0) {
-        // Child process
-        execvp(argv[0], argv);
+        if (env) {
+            env_passthrough_add_display(env);
+
+            ww_log(LOG_INFO, "starting child process with passthrough environment");
+            util_execvpe(argv[0], argv, env);
+        } else {
+            ww_log(LOG_INFO, "starting child process with normal environment");
+            execvp(argv[0], argv);
+        }
+
         ww_log_errno(LOG_ERROR, "failed to exec '%s' in child process", argv[0]);
         exit(EXIT_FAILURE);
     } else if (ww.child == -1) {
@@ -207,6 +218,8 @@ print_help(const char *argv0) {
         "\t--profile PROFILE        Run waywall with the given configuration profile",
         "\t--allow-mc-x11           Allows Minecraft to run under X11. This will result",
         "\t                         in a degraded experience.",
+        "\t--no-env-reexec          Disable re-executing waywall with the parent process'",
+        "\t                         environment",
         "",
     };
 
@@ -239,6 +252,10 @@ main(int argc, char **argv) {
         return 1;
     }
 
+    if (env_reexec(argv) != 0) {
+        ww_log(LOG_WARN, "env_reexec failed");
+    }
+
     const char *action = argv[1];
     const char *profile = NULL;
     char **subcommand = NULL;
@@ -261,6 +278,9 @@ main(int argc, char **argv) {
                     expect_profile = true;
                 } else if (strcmp(arg, "--allow-mc-x11") == 0) {
                     allow_mc_x11 = true;
+                } else if (strcmp(arg, "--no-env-reexec") == 0) {
+                    // This flag is processed by env_reexec(), but it must be ignored here instead
+                    // of printing the help message.
                 } else if (strcmp(arg, "--") == 0) {
                     subcommand = argv + i + 1;
                     break;
