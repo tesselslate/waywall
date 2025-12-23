@@ -189,7 +189,11 @@ layout_floating(struct server_view *view) {
                            wl_fixed_from_int(-1), wl_fixed_from_int(-1));
     wp_viewport_set_destination(view->viewport, -1, -1);
 
-    wl_surface_commit(view->ui->tree.surface);
+    if (view->ui->ninbot.surface == NULL) {
+        wl_surface_commit(view->ui->tree.surface);
+    } else {
+        wl_surface_commit(view->ui->ninbot.surface);
+    }
 }
 
 static void
@@ -260,6 +264,49 @@ static const struct xdg_toplevel_listener xdg_toplevel_listener = {
     .wm_capabilities = on_xdg_toplevel_wm_capabilities,
 };
 
+void ninbot_toplevel_configure_handler
+(
+    void *data,
+    struct xdg_toplevel *xdg_toplevel,
+    int32_t width,
+    int32_t height,
+    struct wl_array *states
+) {
+    struct server_ui *ui = data;
+    ui->ninbot.width = width;
+    ui->ninbot.height = height;
+}
+
+void xwayland_toplevel_hide(struct server_ui *ui) {
+    wl_surface_attach(ui->ninbot.surface, NULL, 0, 0);
+    wl_surface_commit(ui->ninbot.surface);
+    ui->ninbot.window_opened = false;
+}
+
+
+void ninbot_toplevel_close_handler
+(
+    void *data,
+    struct xdg_toplevel *xdg_toplevel
+) {
+    struct server_ui *ui = data;
+
+    struct server_view *view;
+    struct server_view *tmp_view;
+    wl_list_for_each_safe(view, tmp_view, &ui->views, link) {
+        // Can we nest native Wayland apps except Minecraft? If so this is problematic
+        if (strcmp(view->impl->name, "xwayland") == 0) {
+            wl_resource_destroy(view->surface->resource);
+        }
+    }
+    xwayland_toplevel_hide(ui);
+}
+
+static const struct xdg_toplevel_listener ninbot_toplevel_listener = {
+    .configure = ninbot_toplevel_configure_handler,
+    .close = ninbot_toplevel_close_handler
+};
+
 static void
 on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
     struct server_ui *ui = data;
@@ -281,6 +328,19 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
 
 static const struct xdg_surface_listener xdg_surface_listener = {
     .configure = on_xdg_surface_configure,
+};
+
+static void xdg_surface_configure_handler (void *data, struct xdg_surface *xdg_surface, uint32_t serial) {
+    struct server_ui *ui = data;
+    if (ui->ninbot.width != 0 && ui->ninbot.height != 0) {
+        xdg_surface_set_window_geometry(xdg_surface, 0, 0, ui->ninbot.width, ui->ninbot.height);
+    }
+    xdg_surface_ack_configure(xdg_surface, serial);
+    wl_surface_commit(ui->ninbot.surface);
+}
+
+static const struct xdg_surface_listener ninbot_surface_listener = {
+    .configure = xdg_surface_configure_handler,
 };
 
 static void
@@ -306,6 +366,29 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
     if (view->subsurface && view->current.centered) {
         layout_centered(view);
     }
+}
+
+void xwayland_toplevel_create(struct server_ui *ui) {
+    ui->ninbot.surface = wl_compositor_create_surface(ui->server->backend->compositor);
+    check_alloc(ui->ninbot.surface);
+
+    ui->ninbot.xdg_surface = xdg_wm_base_get_xdg_surface(ui->server->backend->xdg_wm_base, ui->ninbot.surface);
+    check_alloc(ui->ninbot.xdg_surface);
+    xdg_surface_add_listener(ui->ninbot.xdg_surface, &ninbot_surface_listener, ui);
+
+    ui->ninbot.top_level = xdg_surface_get_toplevel(ui->ninbot.xdg_surface);
+    check_alloc(ui->ninbot.top_level);
+    xdg_toplevel_add_listener(ui->ninbot.top_level, &ninbot_toplevel_listener, ui);
+}
+
+void xwayland_toplevel_destroy(struct server_ui *ui) {
+    xdg_toplevel_destroy(ui->ninbot.top_level);
+    xdg_surface_destroy(ui->ninbot.xdg_surface);
+    wl_surface_destroy(ui->ninbot.surface);
+    ui->ninbot.top_level = NULL;
+    ui->ninbot.xdg_surface = NULL;
+    ui->ninbot.surface = NULL;
+    ui->ninbot.window_opened = false;
 }
 
 struct server_ui *
@@ -408,6 +491,7 @@ server_ui_destroy(struct server_ui *ui) {
         zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
     }
 
+    xwayland_toplevel_destroy(ui);
     xdg_toplevel_destroy(ui->xdg_toplevel);
     xdg_surface_destroy(ui->xdg_surface);
     wl_subsurface_destroy(ui->tree.subsurface);
@@ -429,6 +513,7 @@ server_ui_hide(struct server_ui *ui) {
 
     ui->mapped = false;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
+    xwayland_toplevel_hide(ui);
 }
 
 void
@@ -468,6 +553,22 @@ server_ui_show(struct server_ui *ui) {
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
 }
 
+void xwayland_toplevel_show(struct server_ui *ui) {
+    struct wl_display *display = ui->server->backend->display;
+
+    wl_surface_attach(ui->ninbot.surface, NULL, 0, 0);
+    wl_surface_commit(ui->ninbot.surface);
+    wl_display_roundtrip(display);
+
+    wl_surface_attach(ui->ninbot.surface, ui->config->background, 0, 0);
+    wl_surface_commit(ui->ninbot.surface);
+    wl_display_roundtrip(display);
+
+    xdg_toplevel_set_title(ui->ninbot.top_level, "NinjabrainBot Wrapper");
+    xdg_toplevel_set_app_id(ui->ninbot.top_level, "NinjabrainBot Wrapper");
+    ui->ninbot.window_opened = true;
+}
+
 void
 server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
     if (ui->config) {
@@ -486,6 +587,12 @@ server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
         wl_surface_damage_buffer(ui->root.surface, 0, 0, INT32_MAX, INT32_MAX);
         wl_surface_commit(ui->root.surface);
     }
+
+    if (config->xwayland_toplevel && ui->ninbot.surface == NULL) {
+        xwayland_toplevel_create(ui);
+    }else if (ui->ninbot.surface != NULL && !config->xwayland_toplevel) {
+        xwayland_toplevel_destroy(ui);
+    }
 }
 
 struct server_ui_config *
@@ -501,6 +608,12 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     if (!config->background) {
         ww_log(LOG_ERROR, "failed to create background buffer");
         goto fail;
+    }
+
+    if (cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
+        config->xwayland_toplevel = true;
+    } else {
+        config->xwayland_toplevel = false;
     }
 
     config->tearing = cfg->experimental.tearing;
@@ -573,10 +686,11 @@ server_view_commit(struct server_view *view) {
     if (visibility_changed && view->current.visible) {
         ww_assert(!view->subsurface);
 
-        view->subsurface =
-            wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor,
-                                            view->surface->remote, view->ui->tree.surface);
-        check_alloc(view->subsurface);
+        if (view->current.centered || view->ui->ninbot.surface == NULL) {
+            xwayland_server_view_detach(view);
+        } else {
+            xwayland_server_view_attach(view);
+        }
 
         wl_subsurface_set_desync(view->subsurface);
     } else if (visibility_changed && !view->current.visible) {
@@ -595,6 +709,21 @@ server_view_commit(struct server_view *view) {
     }
 
     view_state_reset(&view->pending);
+}
+
+void
+xwayland_server_view_attach(struct server_view *view) {
+    view->subsurface = 
+    wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor, view->surface->remote, view->ui->ninbot.surface);
+    check_alloc(view->subsurface);
+    wl_surface_commit(view->ui->ninbot.surface);
+}
+
+void
+xwayland_server_view_detach(struct server_view *view) {
+    view->subsurface =
+    wl_subcompositor_get_subsurface(view->ui->server->backend->subcompositor, view->surface->remote, view->ui->tree.surface);
+    check_alloc(view->subsurface);
 }
 
 void
