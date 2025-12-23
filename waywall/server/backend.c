@@ -54,6 +54,7 @@ on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
             backend->seat.keyboard = NULL;
         }
 
+        ww_log(LOG_INFO, "seat updated (keyboard: %s)", has_kb ? "true" : "false");
         wl_signal_emit_mutable(&backend->events.seat_keyboard, NULL);
     }
 
@@ -65,6 +66,7 @@ on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
             backend->seat.pointer = NULL;
         }
 
+        ww_log(LOG_INFO, "seat updated (pointer: %s)", has_ptr ? "true" : "false");
         wl_signal_emit_mutable(&backend->events.seat_pointer, NULL);
     }
 }
