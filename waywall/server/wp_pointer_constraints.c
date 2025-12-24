@@ -11,43 +11,92 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/*
+ * This module essentially implements a state machine where the pointer is either locked or
+ * unlocked. The pointer is only locked when a client (i.e. Minecraft) has a valid locked pointer
+ * object and has input focus. Otherwise, the pointer is unlocked.
+ *
+ * If the user has the input.confine_pointer option enabled in their configuration, then the pointer
+ * should be confined to the waywall window whenever the pointer is unlocked.
+ *
+ * Finally, the remote wl_pointer which is being locked/confined may disappear or change at any
+ * point due to changes in seat capabilities. This means that active confined_pointer/locked_pointer
+ * objects must be destroyed and recreated whenever the available wl_pointer changes. As a result,
+ * server_pointer_constraints.locked can be true even while locked_pointer is NULL. Both
+ * locked_pointer and confined_pointer may also be NULL at the same time.
+ */
+
 #define SRV_POINTER_CONSTRAINTS_VERSION 1
 
-static void
-lock_pointer(struct server_pointer_constraints *pointer_constraints) {
-    if (pointer_constraints->config.confine) {
-        if (pointer_constraints->confined_pointer) {
-            zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
-            pointer_constraints->confined_pointer = NULL;
+#define resource_eq(a, b) ((a) == (b))
+
+struct constraint_data {
+    struct server_pointer_constraints *parent;
+    struct wl_resource *surface;
+};
+
+static bool
+constraint_exists(struct server_pointer_constraints *pointer_constraints,
+                  struct wl_resource *surface_resource) {
+    struct wl_resource *resource;
+    wl_list_for_each (resource, &pointer_constraints->obj_locked, link) {
+        struct constraint_data *data = wl_resource_get_user_data(resource);
+        if (resource_eq(data->surface, surface_resource)) {
+            return true;
         }
     }
 
-    pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
-        pointer_constraints->remote, pointer_constraints->server->ui->root.surface,
-        server_get_wl_pointer(pointer_constraints->server), NULL,
-        ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-    check_alloc(pointer_constraints->locked_pointer);
-
-    wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, NULL);
+    return false;
 }
 
 static void
-unlock_pointer(struct server_pointer_constraints *pointer_constraints) {
-    zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
-    pointer_constraints->locked_pointer = NULL;
-
-    wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
-
-    if (pointer_constraints->config.confine) {
-        struct wl_pointer *pointer = server_get_wl_pointer(pointer_constraints->server);
-
-        if (pointer) {
-            pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-                pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
-                NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            check_alloc(pointer_constraints->confined_pointer);
-        }
+lock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl_pointer *pointer) {
+    if (pointer_constraints->confined_pointer) {
+        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
+        pointer_constraints->confined_pointer = NULL;
+        wl_surface_commit(pointer_constraints->server->ui->root.surface);
     }
+
+    if (pointer && !pointer_constraints->locked_pointer) {
+        pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
+            pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
+            NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        check_alloc(pointer_constraints->locked_pointer);
+
+        zwp_locked_pointer_v1_set_cursor_position_hint(
+            pointer_constraints->locked_pointer, wl_fixed_from_double(pointer_constraints->hint.x),
+            wl_fixed_from_double(pointer_constraints->hint.y));
+        wl_surface_commit(pointer_constraints->server->ui->root.surface);
+    }
+
+    if (!pointer_constraints->locked) {
+        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, NULL);
+    }
+    pointer_constraints->locked = true;
+}
+
+static void
+unlock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl_pointer *pointer) {
+    if (pointer_constraints->locked_pointer) {
+        zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
+        pointer_constraints->locked_pointer = NULL;
+        wl_surface_commit(pointer_constraints->server->ui->root.surface);
+    }
+
+    bool should_confine =
+        pointer_constraints->config.confine && pointer && !pointer_constraints->confined_pointer;
+    if (should_confine) {
+        pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
+            pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
+            NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+        check_alloc(pointer_constraints->confined_pointer);
+        wl_surface_commit(pointer_constraints->server->ui->root.surface);
+    }
+
+    if (pointer_constraints->locked) {
+        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
+    }
+    pointer_constraints->locked = false;
 }
 
 static void
@@ -73,21 +122,25 @@ static const struct zwp_confined_pointer_v1_interface confined_pointer_impl = {
 
 static void
 locked_pointer_resource_destroy(struct wl_resource *resource) {
-    struct server_pointer_constraints *pointer_constraints = wl_resource_get_user_data(resource);
+    struct constraint_data *constraint_data = wl_resource_get_user_data(resource);
+    struct server_pointer_constraints *pointer_constraints = constraint_data->parent;
+    struct wl_resource *surface_resource = constraint_data->surface;
 
     wl_list_remove(wl_resource_get_link(resource));
+    free(constraint_data);
 
+    // Check if the destroyed locked_pointer object belonged to the view with input focus. If so,
+    // the pointer should be unlocked.
     if (!pointer_constraints->input_focus) {
-        ww_assert(!pointer_constraints->locked_pointer);
+        ww_assert(!pointer_constraints->locked);
         return;
     }
 
-    if (pointer_constraints->locked_pointer) {
-        struct wl_client *focus_client =
-            wl_resource_get_client(pointer_constraints->input_focus->surface->resource);
-        if (wl_resource_get_client(resource) == focus_client) {
-            unlock_pointer(pointer_constraints);
-        }
+    bool should_unlock =
+        pointer_constraints->locked && pointer_constraints->input_focus &&
+        resource_eq(pointer_constraints->input_focus->surface->resource, surface_resource);
+    if (should_unlock) {
+        unlock_pointer(pointer_constraints, server_get_wl_pointer(pointer_constraints->server));
     }
 }
 
@@ -128,6 +181,15 @@ pointer_constraints_confine_pointer(struct wl_client *client, struct wl_resource
     // we do need to at least create the confined pointer resource.
     struct server_pointer_constraints *pointer_constraints = wl_resource_get_user_data(resource);
 
+    if (constraint_exists(pointer_constraints, surface_resource)) {
+        wl_resource_post_error(resource, ZWP_POINTER_CONSTRAINTS_V1_ERROR_ALREADY_CONSTRAINED,
+                               "surface already has pointer constraint");
+        return;
+    }
+
+    // TODO: confined_pointer objects should also count for whether or not constraints exist, but we
+    // don't really care about them at all.
+
     struct wl_resource *confined_pointer_resource = wl_resource_create(
         client, &zwp_confined_pointer_v1_interface, wl_resource_get_version(resource), id);
     check_alloc(confined_pointer_resource);
@@ -147,23 +209,32 @@ pointer_constraints_lock_pointer(struct wl_client *client, struct wl_resource *r
                                  struct wl_resource *region_resource, uint32_t lifetime) {
     struct server_pointer_constraints *pointer_constraints = wl_resource_get_user_data(resource);
 
+    if (constraint_exists(pointer_constraints, surface_resource)) {
+        wl_resource_post_error(resource, ZWP_POINTER_CONSTRAINTS_V1_ERROR_ALREADY_CONSTRAINED,
+                               "surface already has pointer constraint");
+        return;
+    }
+
+    struct constraint_data *data = zalloc(1, sizeof(*data));
+    data->parent = pointer_constraints;
+    data->surface = surface_resource;
+
     struct wl_resource *locked_pointer_resource = wl_resource_create(
         client, &zwp_locked_pointer_v1_interface, wl_resource_get_version(resource), id);
     check_alloc(locked_pointer_resource);
-    wl_resource_set_implementation(locked_pointer_resource, &locked_pointer_impl,
-                                   pointer_constraints, locked_pointer_resource_destroy);
+    wl_resource_set_implementation(locked_pointer_resource, &locked_pointer_impl, data,
+                                   locked_pointer_resource_destroy);
 
-    if (pointer_constraints->input_focus) {
-        struct wl_client *focus_client =
-            wl_resource_get_client(pointer_constraints->input_focus->surface->resource);
-        if (client == focus_client) {
-            if (!pointer_constraints->locked_pointer) {
-                lock_pointer(pointer_constraints);
-            }
-        }
+    // Check if the new pointer lock belongs to the view with input focus. If so, the pointer should
+    // be locked.
+    bool should_lock =
+        pointer_constraints->input_focus &&
+        resource_eq(surface_resource, pointer_constraints->input_focus->surface->resource);
+    if (should_lock) {
+        lock_pointer(pointer_constraints, server_get_wl_pointer(pointer_constraints->server));
     }
 
-    wl_list_insert(&pointer_constraints->objects, wl_resource_get_link(locked_pointer_resource));
+    wl_list_insert(&pointer_constraints->obj_locked, wl_resource_get_link(locked_pointer_resource));
 }
 
 static const struct zwp_pointer_constraints_v1_interface pointer_constraints_impl = {
@@ -190,57 +261,28 @@ on_input_focus(struct wl_listener *listener, void *data) {
     struct server_pointer_constraints *pointer_constraints =
         wl_container_of(listener, pointer_constraints, on_input_focus);
     struct server_view *view = data;
-
-    bool was_locked = !!pointer_constraints->locked_pointer;
-    bool is_locked = false;
-
-    if (view) {
-        struct wl_client *focus_client = wl_resource_get_client(view->surface->resource);
-
-        struct wl_resource *resource;
-        wl_resource_for_each(resource, &pointer_constraints->objects) {
-            if (wl_resource_get_client(resource) != focus_client) {
-                continue;
-            }
-
-            is_locked = true;
-            break;
-        }
-    }
-
-    if (was_locked && !is_locked) {
-        ww_assert(pointer_constraints->locked_pointer);
-
-        unlock_pointer(pointer_constraints);
-    } else if (!was_locked && is_locked) {
-        ww_assert(!pointer_constraints->locked_pointer);
-
-        lock_pointer(pointer_constraints);
-    }
+    struct wl_pointer *pointer = server_get_wl_pointer(pointer_constraints->server);
 
     pointer_constraints->input_focus = view;
-}
 
-static void
-on_map_status(struct wl_listener *listener, void *data) {
-    struct server_pointer_constraints *pointer_constraints =
-        wl_container_of(listener, pointer_constraints, on_map_status);
+    // If there is no focused view then there can be no active pointer lock.
+    if (!view) {
+        unlock_pointer(pointer_constraints, pointer);
+        return;
+    }
 
-    bool mapped = *(bool *)data;
-
-    if (mapped) {
-        server_pointer_constraints_set_confine(pointer_constraints,
-                                               pointer_constraints->config.confine);
-    } else {
-        if (pointer_constraints->confined_pointer) {
-            zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
-            pointer_constraints->confined_pointer = NULL;
-        }
-        if (pointer_constraints->locked_pointer) {
-            zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
-            pointer_constraints->locked_pointer = NULL;
+    struct wl_resource *target_surface = pointer_constraints->input_focus->surface->resource;
+    struct wl_resource *resource;
+    wl_resource_for_each(resource, &pointer_constraints->obj_locked) {
+        struct constraint_data *constraint_data = wl_resource_get_user_data(resource);
+        if (resource_eq(constraint_data->surface, target_surface)) {
+            lock_pointer(pointer_constraints, pointer);
+            return;
         }
     }
+
+    // If the newly focused view doesn't have a pointer lock then the pointer should be unlocked.
+    unlock_pointer(pointer_constraints, pointer);
 }
 
 static void
@@ -249,26 +291,10 @@ on_pointer(struct wl_listener *listener, void *data) {
         wl_container_of(listener, pointer_constraints, on_pointer);
     struct wl_pointer *pointer = server_get_wl_pointer(pointer_constraints->server);
 
-    if (pointer_constraints->locked_pointer) {
-        zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
-        pointer_constraints->locked_pointer = NULL;
-
-        if (pointer) {
-            pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
-                pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
-                NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            check_alloc(pointer_constraints->locked_pointer);
-        }
-    } else if (pointer_constraints->confined_pointer) {
-        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
-        pointer_constraints->confined_pointer = NULL;
-
-        if (pointer) {
-            pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-                pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
-                NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            check_alloc(pointer_constraints->confined_pointer);
-        }
+    if (pointer_constraints->locked) {
+        lock_pointer(pointer_constraints, pointer);
+    } else {
+        unlock_pointer(pointer_constraints, pointer);
     }
 }
 
@@ -287,7 +313,6 @@ on_display_destroy(struct wl_listener *listener, void *data) {
     }
 
     wl_list_remove(&pointer_constraints->on_input_focus.link);
-    wl_list_remove(&pointer_constraints->on_map_status.link);
     wl_list_remove(&pointer_constraints->on_pointer.link);
     wl_list_remove(&pointer_constraints->on_display_destroy.link);
 
@@ -306,15 +331,12 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
                          SRV_POINTER_CONSTRAINTS_VERSION, pointer_constraints, on_global_bind);
     check_alloc(pointer_constraints->global);
 
-    wl_list_init(&pointer_constraints->objects);
+    wl_list_init(&pointer_constraints->obj_locked);
 
     pointer_constraints->remote = server->backend->pointer_constraints;
 
     pointer_constraints->on_input_focus.notify = on_input_focus;
     wl_signal_add(&server->events.input_focus, &pointer_constraints->on_input_focus);
-
-    pointer_constraints->on_map_status.notify = on_map_status;
-    wl_signal_add(&server->events.map_status, &pointer_constraints->on_map_status);
 
     pointer_constraints->on_pointer.notify = on_pointer;
     wl_signal_add(&server->backend->events.seat_pointer, &pointer_constraints->on_pointer);
@@ -329,31 +351,20 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
 void
 server_pointer_constraints_set_confine(struct server_pointer_constraints *pointer_constraints,
                                        bool confine) {
-    bool confined = !!pointer_constraints->confined_pointer;
-    bool locked = !!pointer_constraints->locked_pointer;
-
-    if (!confine && confined) {
-        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
-        pointer_constraints->confined_pointer = NULL;
-    } else if (confine && (!confined && !locked)) {
-        struct wl_pointer *pointer = server_get_wl_pointer(pointer_constraints->server);
-
-        if (pointer) {
-            pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
-                pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
-                NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
-            check_alloc(pointer_constraints->confined_pointer);
-        }
-    }
-
     pointer_constraints->config.confine = confine;
+    if (!pointer_constraints->locked) {
+        unlock_pointer(pointer_constraints, server_get_wl_pointer(pointer_constraints->server));
+    }
 }
 
 void
 server_pointer_constraints_set_hint(struct server_pointer_constraints *pointer_constraints,
                                     double x, double y) {
-    ww_assert(pointer_constraints->locked_pointer);
+    if (pointer_constraints->locked_pointer) {
+        zwp_locked_pointer_v1_set_cursor_position_hint(
+            pointer_constraints->locked_pointer, wl_fixed_from_double(x), wl_fixed_from_double(y));
+    }
 
-    zwp_locked_pointer_v1_set_cursor_position_hint(
-        pointer_constraints->locked_pointer, wl_fixed_from_double(x), wl_fixed_from_double(y));
+    pointer_constraints->hint.x = x;
+    pointer_constraints->hint.y = y;
 }

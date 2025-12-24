@@ -8,11 +8,16 @@
 
 struct server_pointer_constraints {
     struct wl_global *global;
-    struct wl_list objects; // wl_resource (zwp_locked_pointer_v1 object) link
+    struct wl_list obj_locked; // wl_resource (zwp_locked_pointer_v1 object) link
 
     struct {
         bool confine;
     } config;
+
+    bool locked;
+    struct {
+        double x, y;
+    } hint;
 
     struct server *server;
     struct server_view *input_focus;
@@ -22,7 +27,6 @@ struct server_pointer_constraints {
     struct zwp_locked_pointer_v1 *locked_pointer;
 
     struct wl_listener on_input_focus;
-    struct wl_listener on_map_status;
     struct wl_listener on_pointer;
 
     struct wl_listener on_display_destroy;

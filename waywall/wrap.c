@@ -289,8 +289,6 @@ on_pointer_lock(struct wl_listener *listener, void *data) {
     struct wrap *wrap = wl_container_of(listener, wrap, on_pointer_lock);
     server_cursor_hide(wrap->server->cursor);
     wrap->input.pointer_locked = true;
-
-    server_set_pointer_pos(wrap->server, wrap->width / 2.0, wrap->height / 2.0);
 }
 
 static void
@@ -327,9 +325,7 @@ on_resize(struct wl_listener *listener, void *data) {
         floating_update_anchored(wrap);
     }
 
-    if (wrap->input.pointer_locked) {
-        server_set_pointer_pos(wrap->server, wrap->width / 2.0, wrap->height / 2.0);
-    }
+    server_set_pointer_pos(wrap->server, wrap->width / 2.0, wrap->height / 2.0);
 }
 
 static void
