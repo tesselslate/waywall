@@ -301,6 +301,9 @@ env_reexec(char **argv) {
     // to this environment so that we don't enter an infinite loop of reexecuting with a fresh
     // environment.
     struct list_envvar penv = penv_read(penvbuf);
+    if (!penv.data) {
+        goto fail_penv_read;
+    }
 
     char fd_env[16] = {0};
     snprintf(fd_env, STATIC_ARRLEN(fd_env), "%d", passthrough_fd);
@@ -317,6 +320,7 @@ env_reexec(char **argv) {
     penv_destroy(&penv);
     ww_log_errno(LOG_ERROR, "env_reexec failed");
 
+fail_penv_read:
 fail_write_passthrough:
     close(passthrough_fd);
 
