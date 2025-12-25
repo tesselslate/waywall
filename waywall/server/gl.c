@@ -740,7 +740,8 @@ server_gl_get_capture_size(struct server_gl *gl, int32_t *width, int32_t *height
 void
 server_gl_set_capture(struct server_gl *gl, struct server_surface *surface) {
     if (gl->capture.surface) {
-        ww_panic("cannot overwrite capture surface");
+        // TODO: Check that this is the result of LWJGL2 fullscreen (see wrap.legacy)
+        ww_log(LOG_WARN, "overwrote capture surface");
     }
 
     gl->capture.surface = surface;

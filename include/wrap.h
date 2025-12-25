@@ -19,7 +19,6 @@ struct wrap {
 
     int32_t width, height;
     bool is_fullscreen;
-    bool allow_mc_x11;
 
     struct server_view *view;
     struct instance *instance;
@@ -44,6 +43,13 @@ struct wrap {
         double x, y;
     } input;
 
+    struct {
+        struct wl_event_loop *loop;
+        struct wl_event_source *fullscreen_timeout;
+
+        bool allow_x11, is_x11;
+    } legacy; // LWJGL2 quarantine
+
     struct wl_listener on_close;
     struct wl_listener on_pointer_lock;
     struct wl_listener on_pointer_unlock;
@@ -52,8 +58,8 @@ struct wrap {
     struct wl_listener on_view_destroy;
 };
 
-struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-                         struct config *cfg, bool allow_mc_x11);
+struct wrap *wrap_create(struct wl_event_loop *loop, struct server *server, struct inotify *inotify,
+                         struct ww_timer *timer, struct config *cfg, bool allow_mc_x11);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 

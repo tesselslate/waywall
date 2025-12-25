@@ -30,6 +30,8 @@
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
 
+#define X11_FS_TIMEOUT 100
+
 #define IS_ANCHORED(wrap, view) (wrap->floating.anchored == view)
 #define SHOULD_ANCHOR(wrap) (wrap->cfg->theme.ninb_anchor != ANCHOR_NONE)
 
@@ -266,6 +268,23 @@ process_state_update(int wd, uint32_t mask, const char *name, void *data) {
     config_vm_signal_event(wrap->cfg->vm, "state");
 }
 
+static int
+on_fullscreen_timeout(void *data) {
+    struct wrap *wrap = data;
+
+    // If the fullscreen timeout expires and there is still no new view to take the previous one's
+    // place, shut down.
+    if (!wrap->view) {
+        server_ui_hide(wrap->server->ui);
+        server_shutdown(wrap->server);
+    }
+
+    wl_event_source_remove(wrap->legacy.fullscreen_timeout);
+    wrap->legacy.fullscreen_timeout = NULL;
+
+    return 0;
+}
+
 static void
 on_anchored_resize(struct wl_listener *listener, void *data) {
     struct wrap_floating *wrap_floating =
@@ -338,8 +357,9 @@ on_view_create(struct wl_listener *listener, void *data) {
         return;
     }
 
-    if (strcmp(view->impl->name, "xwayland") == 0) {
-        if (wrap->allow_mc_x11) {
+    if (!wrap->legacy.is_x11 && strcmp(view->impl->name, "xwayland") == 0) {
+        if (wrap->legacy.allow_x11) {
+            wrap->legacy.is_x11 = true;
             ww_log(LOG_WARN, "X11 minecraft instance detected but allowed");
         } else {
             // clang-format off
@@ -394,7 +414,11 @@ on_view_create(struct wl_listener *listener, void *data) {
     wrap->server->ui->height = height;
 
     server_set_input_focus(wrap->server, wrap->view);
-    server_ui_show(wrap->server->ui);
+
+    // HACK: Due to LWJGL2 fullscreen shenanigans, the UI may already be visible.
+    if (!wrap->server->ui->mapped) {
+        server_ui_show(wrap->server->ui);
+    }
 
     ww_assert(wrap->width > 0 && wrap->height > 0);
     ww_assert(wrap->view);
@@ -426,9 +450,29 @@ on_view_destroy(struct wl_listener *listener, void *data) {
         wrap->instance = NULL;
     }
 
+    // HACK: For SOME REASON, the LWJGL2 developers decided that the best course of action to take
+    // when (un)fullscreening a window is to delete it and make a new one. So, if the user might be
+    // running an older instance, we should wait for a short timeout to see if a new window is
+    // created right after the main instance was destroyed. Otherwise, waywall can shut down
+    // immediately when the Minecraft window closes.
     wrap->view = NULL;
-    server_ui_hide(wrap->server->ui);
-    server_shutdown(wrap->server);
+
+    if (!wrap->legacy.is_x11) {
+        server_ui_hide(wrap->server->ui);
+        server_shutdown(wrap->server);
+        return;
+    }
+
+    ww_assert(!wrap->legacy.fullscreen_timeout);
+    wrap->legacy.fullscreen_timeout =
+        wl_event_loop_add_timer(wrap->legacy.loop, on_fullscreen_timeout, wrap);
+    check_alloc(wrap->legacy.fullscreen_timeout);
+
+    if (wl_event_source_timer_update(wrap->legacy.fullscreen_timeout, X11_FS_TIMEOUT) == -1) {
+        ww_log(LOG_ERROR, "failed to start X11 fullscreen timeout timer");
+        server_ui_hide(wrap->server->ui);
+        server_shutdown(wrap->server);
+    }
 }
 
 static bool
@@ -558,10 +602,12 @@ static const struct server_seat_listener seat_listener = {
 };
 
 struct wrap *
-wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-            struct config *cfg, bool allow_mc_x11) {
+wrap_create(struct wl_event_loop *loop, struct server *server, struct inotify *inotify,
+            struct ww_timer *timer, struct config *cfg, bool allow_mc_x11) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
-    wrap->allow_mc_x11 = allow_mc_x11;
+
+    wrap->legacy.loop = loop;
+    wrap->legacy.allow_x11 = allow_mc_x11;
 
     wrap->gl = server_gl_create(server);
     if (!wrap->gl) {
@@ -618,6 +664,10 @@ fail_gl:
 
 void
 wrap_destroy(struct wrap *wrap) {
+    if (wrap->legacy.fullscreen_timeout) {
+        wl_event_source_remove(wrap->legacy.fullscreen_timeout);
+    }
+
     if (wrap->instance) {
         instance_destroy(wrap->instance);
     }

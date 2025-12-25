@@ -117,7 +117,7 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
 
     ww.timer = ww_timer_create(ww.server);
 
-    ww.wrap = wrap_create(ww.server, ww.inotify, ww.timer, ww.cfg, allow_mc_x11);
+    ww.wrap = wrap_create(loop, ww.server, ww.inotify, ww.timer, ww.cfg, allow_mc_x11);
     if (!ww.wrap) {
         goto fail_wrap;
     }
