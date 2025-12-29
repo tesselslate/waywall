@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_XWAYLAND_SHELL_H
-#define WAYWALL_SERVER_XWAYLAND_SHELL_H
+#pragma once
 
 #include "server/server.h"
 #include <stdbool.h>
@@ -36,5 +35,3 @@ struct server_xwayland_surface {
 };
 
 struct server_xwayland_shell *server_xwayland_shell_create(struct server *server);
-
-#endif

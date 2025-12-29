@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_UI_H
-#define WAYWALL_SERVER_UI_H
+#pragma once
 
 #include "config/config.h"
 #include "util/box.h"
@@ -120,5 +119,3 @@ void server_view_set_visible(struct server_view *view, bool visible);
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,
                                        const struct server_view_impl *impl, void *impl_data);
 void server_view_destroy(struct server_view *view);
-
-#endif

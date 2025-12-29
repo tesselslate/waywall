@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_PNG_H
-#define WAYWALL_UTIL_PNG_H
+#pragma once
 
 #include <stddef.h>
 #include <stdint.h>
@@ -12,5 +11,3 @@ struct util_png {
 };
 
 struct util_png util_png_decode(const char *path, int max_size);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_DEBUG_H
-#define WAYWALL_UTIL_DEBUG_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -45,5 +44,3 @@ extern struct util_debug {
 
 bool util_debug_init();
 const char *util_debug_str();
-
-#endif

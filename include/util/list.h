@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_LIST_H
-#define WAYWALL_UTIL_LIST_H
+#pragma once
 
 #include "util/alloc.h"
 #include "util/prelude.h"
@@ -52,5 +51,3 @@ LIST_DEFINE(int, list_int);
 
 LIST_DEFINE_IMPL(uint32_t, list_uint32);
 LIST_DEFINE_IMPL(int, list_int);
-
-#endif

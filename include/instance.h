@@ -1,5 +1,4 @@
-#ifndef WAYWALL_INSTANCE_H
-#define WAYWALL_INSTANCE_H
+#pragma once
 
 #include "inotify.h"
 #include "util/str.h"
@@ -38,5 +37,3 @@ struct instance *instance_create(struct server_view *view, struct inotify *inoti
 void instance_destroy(struct instance *instance);
 str instance_get_state_path(struct instance *instance);
 void instance_state_update(struct instance *instance);
-
-#endif

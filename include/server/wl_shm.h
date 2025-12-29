@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WL_SHM_H
-#define WAYWALL_SERVER_WL_SHM_H
+#pragma once
 
 #include "server/server.h"
 #include <stdint.h>
@@ -26,5 +25,3 @@ struct server_shm_pool {
 };
 
 struct server_shm *server_shm_create(struct server *server);
-
-#endif

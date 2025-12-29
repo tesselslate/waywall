@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_XDG_SHELL_H
-#define WAYWALL_SERVER_XDG_SHELL_H
+#pragma once
 
 #include "util/serial.h"
 #include <stdbool.h>
@@ -53,5 +52,3 @@ struct server_xdg_wm_base *server_xdg_wm_base_create(struct server *server);
 void server_xdg_surface_send_configure(struct server_xdg_surface *xdg_surface);
 struct server_xdg_surface *server_xdg_surface_from_resource(struct wl_resource *resource);
 struct server_xdg_toplevel *server_xdg_toplevel_from_resource(struct wl_resource *resource);
-
-#endif

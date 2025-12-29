@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_BUFFER_H
-#define WAYWALL_SERVER_BUFFER_H
+#pragma once
 
 #include "util/prelude.h"
 #include <stdbool.h>
@@ -40,5 +39,3 @@ void server_buffer_lock(struct server_buffer *buffer);
 struct server_buffer *server_buffer_ref(struct server_buffer *buffer);
 void server_buffer_unlock(struct server_buffer *buffer);
 void server_buffer_unref(struct server_buffer *buffer);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_XSERVER_H
-#define WAYWALL_SERVER_XSERVER_H
+#pragma once
 
 #include "server/xwayland.h"
 #include <sys/types.h>
@@ -32,5 +31,3 @@ struct xserver {
 
 struct xserver *xserver_create(struct server_xwayland *xwl);
 void xserver_destroy(struct xserver *srv);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_SERVER_H
-#define WAYWALL_SERVER_SERVER_H
+#pragma once
 
 #include "config/config.h"
 #include <stdbool.h>
@@ -70,5 +69,3 @@ void server_set_input_focus(struct server *server, struct server_view *view);
 void server_shutdown(struct server *server);
 
 bool server_view_has_focus(struct server_view *view);
-
-#endif

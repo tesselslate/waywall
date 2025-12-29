@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WL_DATA_DEVICE_MANAGER_H
-#define WAYWALL_SERVER_WL_DATA_DEVICE_MANAGER_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -75,5 +74,3 @@ struct server_data_source {
 };
 
 struct server_data_device_manager *server_data_device_manager_create(struct server *server);
-
-#endif

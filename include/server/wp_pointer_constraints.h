@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WP_POINTER_CONSTRAINTS_H
-#define WAYWALL_SERVER_WP_POINTER_CONSTRAINTS_H
+#pragma once
 
 #include "config/config.h"
 #include <stdbool.h>
@@ -38,5 +37,3 @@ void server_pointer_constraints_set_confine(struct server_pointer_constraints *p
                                             bool confine);
 void server_pointer_constraints_set_hint(struct server_pointer_constraints *pointer_constraints,
                                          double x, double y);
-
-#endif

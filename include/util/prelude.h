@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_PRELUDE_H
-#define WAYWALL_UTIL_PRELUDE_H
+#pragma once
 
 #include <stdbool.h>
 #include <stdnoreturn.h>
@@ -30,5 +29,3 @@
     } while (0)
 
 noreturn void util_panic(const char *fmt, ...) WW_PRINTF(1, 2);
-
-#endif

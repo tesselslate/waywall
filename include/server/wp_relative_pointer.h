@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WP_RELATIVE_POINTER_H
-#define WAYWALL_SERVER_WP_RELATIVE_POINTER_H
+#pragma once
 
 #include "config/config.h"
 #include <wayland-server-core.h>
@@ -32,5 +31,3 @@ struct server_relative_pointer *server_relative_pointer_create(struct server *se
                                                                struct config *cfg);
 void server_relative_pointer_set_sens(struct server_relative_pointer *relative_pointer,
                                       double sens);
-
-#endif

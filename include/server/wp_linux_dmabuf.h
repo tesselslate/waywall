@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WP_LINUX_DMABUF_H
-#define WAYWALL_SERVER_WP_LINUX_DMABUF_H
+#pragma once
 
 #include "server/server.h"
 #include <stdbool.h>
@@ -57,5 +56,3 @@ struct server_dmabuf_data {
 };
 
 struct server_linux_dmabuf *server_linux_dmabuf_create(struct server *server);
-
-#endif

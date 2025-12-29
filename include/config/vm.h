@@ -1,5 +1,4 @@
-#ifndef WAYWALL_CONFIG_VM_H
-#define WAYWALL_CONFIG_VM_H
+#pragma once
 
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
@@ -40,5 +39,3 @@ void config_vm_register_lib(struct config_vm *vm, const struct luaL_Reg *lib, co
 void config_vm_resume(struct config_vm_waker *waker);
 void config_vm_signal_event(struct config_vm *vm, const char *name);
 bool config_vm_try_action(struct config_vm *vm, size_t index);
-
-#endif

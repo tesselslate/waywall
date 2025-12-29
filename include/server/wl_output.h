@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WL_OUTPUT_H
-#define WAYWALL_SERVER_WL_OUTPUT_H
+#pragma once
 
 #include "server/server.h"
 #include <wayland-server-core.h>
@@ -15,5 +14,3 @@ struct server_output {
 };
 
 struct server_output *server_output_create(struct server *server);
-
-#endif

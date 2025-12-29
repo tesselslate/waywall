@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_LOG_H
-#define WAYWALL_UTIL_LOG_H
+#pragma once
 
 #include "util/prelude.h"
 #include <errno.h>
@@ -23,5 +22,3 @@ void util_log_va(enum ww_log_level, const char *fmt, va_list args, bool newline)
 int util_log_create_file(const char *name, bool cloexec);
 void util_log_init();
 void util_log_set_file(int fd);
-
-#endif

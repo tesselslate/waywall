@@ -1,5 +1,4 @@
-#ifndef WAYWALL_TIMER_H
-#define WAYWALL_TIMER_H
+#pragma once
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -30,5 +29,3 @@ struct ww_timer_entry *ww_timer_add_entry(struct ww_timer *timer, struct timespe
                                           void *data);
 void ww_timer_entry_destroy(struct ww_timer_entry *entry);
 int ww_timer_entry_set_duration(struct ww_timer_entry *entry, struct timespec duration);
-
-#endif

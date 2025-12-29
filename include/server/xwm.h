@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_XWM_H
-#define WAYWALL_SERVER_XWM_H
+#pragma once
 
 #include "server/xwayland.h"
 #include <wayland-server-core.h>
@@ -60,5 +59,3 @@ void xwm_destroy(struct xwm *xwm);
 
 void xwm_set_clipboard(struct xwm *xwm, const char *content);
 xcb_window_t xwm_window_from_view(struct server_view *view);
-
-#endif

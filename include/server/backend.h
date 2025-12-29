@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_BACKEND_H
-#define WAYWALL_SERVER_BACKEND_H
+#pragma once
 
 #include <stdint.h>
 #include <wayland-server-core.h>
@@ -50,5 +49,3 @@ struct server_backend {
 
 struct server_backend *server_backend_create();
 void server_backend_destroy(struct server_backend *backend);
-
-#endif

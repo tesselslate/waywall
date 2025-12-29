@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_GL_H
-#define WAYWALL_SERVER_GL_H
+#pragma once
 
 #include "util/box.h"
 #include <EGL/egl.h>
@@ -78,5 +77,3 @@ void server_gl_swap_buffers(struct server_gl *gl);
 
 void server_gl_shader_destroy(struct server_gl_shader *shader);
 void server_gl_shader_use(struct server_gl_shader *shader);
-
-#endif
