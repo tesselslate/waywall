@@ -1,6 +1,3 @@
-#include "glsl/texcopy.frag.h"
-#include "glsl/texcopy.vert.h"
-
 #include "scene.h"
 #include "server/gl.h"
 #include "server/ui.h"
@@ -23,15 +20,16 @@ static constexpr int CHAR_HEIGHT = 16;
 static constexpr int CHARS_PER_ROW = (ATLAS_WIDTH / CHAR_WIDTH);
 
 static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
-
-// clang-format off
-// There appears to be a bug in clang-format which causes it to remove the space after some
-// of these asterisks
-
 static_assert(PACKED_ATLAS_WIDTH * PACKED_ATLAS_HEIGHT == ATLAS_WIDTH * ATLAS_HEIGHT);
 static_assert(ATLAS_WIDTH * ATLAS_HEIGHT == PACKED_ATLAS_SIZE * 8);
 
-// clang-format on
+static constexpr char SHADER_FRAG_TEXCOPY[] = {
+#embed "glsl/texcopy.frag"
+    , 0};
+
+static constexpr char SHADER_VERT_TEXCOPY[] = {
+#embed "glsl/texcopy.vert"
+    , 0};
 
 struct vtx_shader {
     float src_pos[2];
@@ -678,8 +676,8 @@ static bool
 shader_create(struct server_gl *gl, struct scene_shader *data, char *name, const char *vertex,
               const char *fragment) {
     data->name = name;
-    data->shader = server_gl_compile(gl, vertex ? vertex : WAYWALL_GLSL_TEXCOPY_VERT_H,
-                                     fragment ? fragment : WAYWALL_GLSL_TEXCOPY_FRAG_H);
+    data->shader = server_gl_compile(gl, vertex ? vertex : SHADER_VERT_TEXCOPY,
+                                     fragment ? fragment : SHADER_FRAG_TEXCOPY);
     if (!data->shader) {
         return false;
     }
