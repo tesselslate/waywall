@@ -94,9 +94,8 @@
  *  SOFTWARE.
  */
 
-#define DRM_FORMAT_MOD_INVALID 0xFFFFFFFFFFFFFFFull
-
-#define MAX_CACHED_DMABUF 2
+static constexpr uint64_t DRM_FORMAT_MOD_INVALID = 0xFFFFFFFFFFFFFFF;
+static constexpr int MAX_CACHED_DMABUF = 2;
 
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())

@@ -11,7 +11,7 @@
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
 
-#define SRV_COMPOSITOR_VERSION 5
+static constexpr int SRV_COMPOSITOR_VERSION = 5;
 
 struct server_surface_damage {
     int32_t x, y, width, height;

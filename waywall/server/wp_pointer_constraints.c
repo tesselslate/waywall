@@ -26,7 +26,7 @@
  * locked_pointer and confined_pointer may also be NULL at the same time.
  */
 
-#define SRV_POINTER_CONSTRAINTS_VERSION 1
+static constexpr int SRV_POINTER_CONSTRAINTS_VERSION = 1;
 
 #define resource_eq(a, b) ((a) == (b))
 

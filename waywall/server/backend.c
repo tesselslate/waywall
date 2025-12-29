@@ -18,22 +18,22 @@
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
-#define USE_ALPHA_MODIFIER_VERSION 1
-#define USE_COMPOSITOR_VERSION 5
-#define USE_CURSOR_SHAPE_VERSION 1
-#define USE_DATA_DEVICE_MANAGER_VERSION 2
-#define USE_LINUX_DMABUF_VERSION 4
-#define USE_LINUX_DRM_SYNCOBJ_VERSION 1
-#define USE_POINTER_CONSTRAINTS_VERSION 1
-#define USE_RELATIVE_POINTER_MANAGER_VERSION 1
-#define USE_SEAT_VERSION 5
-#define USE_SHM_VERSION 1
-#define USE_SINGLE_PIXEL_BUFFER_VERSION 1
-#define USE_SUBCOMPOSITOR_VERSION 1
-#define USE_TEARING_CONTROL_VERSION 1
-#define USE_VIEWPORTER_VERSION 1
-#define USE_XDG_DECORATION_VERSION 1
-#define USE_XDG_WM_BASE_VERSION 1
+static constexpr int USE_ALPHA_MODIFIER_VERSION = 1;
+static constexpr int USE_COMPOSITOR_VERSION = 5;
+static constexpr int USE_CURSOR_SHAPE_VERSION = 1;
+static constexpr int USE_DATA_DEVICE_MANAGER_VERSION = 2;
+static constexpr int USE_LINUX_DMABUF_VERSION = 4;
+static constexpr int USE_LINUX_DRM_SYNCOBJ_VERSION = 1;
+static constexpr int USE_POINTER_CONSTRAINTS_VERSION = 1;
+static constexpr int USE_RELATIVE_POINTER_MANAGER_VERSION = 1;
+static constexpr int USE_SEAT_VERSION = 5;
+static constexpr int USE_SHM_VERSION = 1;
+static constexpr int USE_SINGLE_PIXEL_BUFFER_VERSION = 1;
+static constexpr int USE_SUBCOMPOSITOR_VERSION = 1;
+static constexpr int USE_TEARING_CONTROL_VERSION = 1;
+static constexpr int USE_VIEWPORTER_VERSION = 1;
+static constexpr int USE_XDG_DECORATION_VERSION = 1;
+static constexpr int USE_XDG_WM_BASE_VERSION = 1;
 
 struct seat_name {
     struct wl_list link; // server_backend.seat.names

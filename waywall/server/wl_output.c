@@ -14,7 +14,7 @@
 // just trying to ignore it. This would be extremely annoying but would fix some other issues (see
 // the HACK comment in on_global_bind).
 
-#define SRV_OUTPUT_VERSION 4
+static constexpr int SRV_OUTPUT_VERSION = 4;
 
 static void
 output_resource_destroy(struct wl_resource *resource) {

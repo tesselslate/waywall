@@ -15,7 +15,7 @@
  * crash/hang.
  */
 
-#define SRV_XDG_WM_BASE_VERSION 5
+static constexpr int SRV_XDG_WM_BASE_VERSION = 5;
 
 static void
 send_toplevel_configure_sized(struct server_xdg_toplevel *xdg_toplevel, int32_t width,

@@ -29,7 +29,7 @@
 #include <wayland-client-protocol.h>
 #include <wayland-server-core.h>
 
-#define MAX_BUFFER_SIZE 65536
+static constexpr size_t MAX_BUFFER_SIZE = 65536;
 
 struct server_client {
     struct wl_list link; // server.clients

@@ -1,13 +1,14 @@
 #ifndef WAYWALL_SERVER_BUFFER_H
 #define WAYWALL_SERVER_BUFFER_H
 
+#include "util/prelude.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <wayland-server-core.h>
 
-#define SERVER_BUFFER_DMABUF "dmabuf"
-#define SERVER_BUFFER_SHM "shm"
+WW_MAYBE_UNUSED static constexpr char SERVER_BUFFER_DMABUF[] = "dmabuf";
+WW_MAYBE_UNUSED static constexpr char SERVER_BUFFER_SHM[] = "shm";
 
 struct server_buffer {
     struct wl_resource *resource;

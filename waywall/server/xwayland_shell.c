@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#define SRV_XWAYLAND_SHELL_VERSION 1
+static constexpr int SRV_XWAYLAND_SHELL_VERSION = 1;
 
 static void
 xwayland_surface_role_commit(struct wl_resource *role_resource) {

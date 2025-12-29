@@ -15,8 +15,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PASSTHROUGH_FD_ENV "__WAYWALL_ENV_PASSTHROUGH_FD"
-#define EXTRA_ENV_SIZE 2
+static constexpr char PASSTHROUGH_FD_ENV[] = "__WAYWALL_ENV_PASSTHROUGH_FD";
 
 extern char **environ;
 

@@ -13,9 +13,9 @@
 #include <wayland-cursor.h>
 #include <wayland-util.h>
 
-#define DEFAULT_ICON "left_ptr"
-#define DEFAULT_SIZE 16
-#define DEFAULT_THEME "default"
+static constexpr int DEFAULT_SIZE = 16;
+static constexpr char DEFAULT_ICON[] = "left_ptr";
+static constexpr char DEFAULT_THEME[] = "default";
 
 // These are based off what I see in the freedesktop.org draft spec (it's from, uh, 2003...), as
 // well as in the cursor theme I personally use (BreezeX-Dark). If there are better resources to

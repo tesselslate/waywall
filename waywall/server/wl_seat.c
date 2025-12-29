@@ -26,7 +26,7 @@
 #include <xkbcommon/xkbcommon-names.h>
 #include <xkbcommon/xkbcommon.h>
 
-#define SRV_SEAT_VERSION 6
+static constexpr int SRV_SEAT_VERSION = 6;
 
 struct key_update {
     bool changed_keys;

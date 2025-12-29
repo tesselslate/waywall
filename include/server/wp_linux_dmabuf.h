@@ -6,7 +6,7 @@
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
-#define DMABUF_MAX_PLANES 4
+static constexpr int DMABUF_MAX_PLANES = 4;
 
 struct server_linux_dmabuf {
     struct wl_global *global;

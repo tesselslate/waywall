@@ -12,7 +12,8 @@
 #define PREFIX_INFO "[%7lu.%06lu] [INFO] "
 #define PREFIX_WARN "[%7lu.%06lu] [WARN] "
 #define PREFIX_ERR "[%7lu.%06lu]  [ERR] "
-#define LOG_DIRECTORY "/tmp/waywall/"
+
+static constexpr char LOG_DIRECTORY[] = "/tmp/waywall/";
 
 static const char *color_info = "";
 static const char *color_warn = "";

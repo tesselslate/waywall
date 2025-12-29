@@ -75,9 +75,11 @@ static const struct {
     {luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE, "waywall.helpers"},
 };
 
-#define METATABLE_IMAGE "waywall.image"
-#define METATABLE_MIRROR "waywall.mirror"
-#define METATABLE_TEXT "waywall.text"
+static constexpr int DEFAULT_DEPTH = 0;
+
+static constexpr char METATABLE_IMAGE[] = "waywall.image";
+static constexpr char METATABLE_MIRROR[] = "waywall.mirror";
+static constexpr char METATABLE_TEXT[] = "waywall.text";
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 #define CHECK_OBJECT(object)                                                                       \
@@ -86,8 +88,6 @@ static const struct {
     } else if (!*(object)) {                                                                       \
         return luaL_error(L, "object already closed");                                             \
     }
-
-#define DEFAULT_DEPTH 0
 
 struct waker_sleep {
     struct ww_timer_entry *timer;

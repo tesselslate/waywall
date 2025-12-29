@@ -23,8 +23,8 @@
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
-#define DEFAULT_WIDTH 640
-#define DEFAULT_HEIGHT 480
+static constexpr int32_t DEFAULT_WIDTH = 640;
+static constexpr int32_t DEFAULT_HEIGHT = 480;
 
 #define COLOR_BLEND(c, a) (COLOR_MULT(((c) * (a)) / UINT8_MAX))
 #define COLOR_MULT(c) ((uint32_t)(((uint64_t)(c) * UINT32_MAX) / UINT8_MAX))

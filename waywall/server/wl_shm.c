@@ -11,7 +11,7 @@
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
 
-#define SRV_SHM_VERSION 1
+static constexpr int SRV_SHM_VERSION = 1;
 
 struct shm_buffer_data {
     int32_t width, height;

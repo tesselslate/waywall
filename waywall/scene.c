@@ -13,14 +13,14 @@
 #include <GLES2/gl2.h>
 #include <spng.h>
 
-#define PACKED_ATLAS_SIZE 4096
-#define PACKED_ATLAS_WIDTH 2048
-#define PACKED_ATLAS_HEIGHT 16
-#define ATLAS_WIDTH 128
-#define ATLAS_HEIGHT 256
-#define CHAR_WIDTH 8
-#define CHAR_HEIGHT 16
-#define CHARS_PER_ROW (ATLAS_WIDTH / CHAR_WIDTH)
+static constexpr int PACKED_ATLAS_SIZE = 4096;
+static constexpr int PACKED_ATLAS_WIDTH = 2048;
+static constexpr int PACKED_ATLAS_HEIGHT = 16;
+static constexpr int ATLAS_WIDTH = 128;
+static constexpr int ATLAS_HEIGHT = 256;
+static constexpr int CHAR_WIDTH = 8;
+static constexpr int CHAR_HEIGHT = 16;
+static constexpr int CHARS_PER_ROW = (ATLAS_WIDTH / CHAR_WIDTH);
 
 static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
 

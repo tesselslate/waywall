@@ -14,7 +14,7 @@
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
 
-#define SRV_LINUX_DRM_SYNCOBJ_VERSION 1
+static constexpr int SRV_LINUX_DRM_SYNCOBJ_VERSION = 1;
 
 static bool
 syncobj_surface_exists(struct server_drm_syncobj_manager *syncobj_manager,

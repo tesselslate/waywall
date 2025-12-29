@@ -27,7 +27,7 @@ static const struct {
     char wrap;
 } REG_KEYS = {0};
 
-#define MAX_INSTRUCTIONS 50000000
+static constexpr int MAX_INSTRUCTIONS = 50000000;
 
 static void waker_destroy(struct config_vm_waker *waker);
 static struct config_vm_waker *waker_lookup(lua_State *L);

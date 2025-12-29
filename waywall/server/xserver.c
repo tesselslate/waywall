@@ -74,9 +74,9 @@
  *  SOFTWARE.
  */
 
-#define X11_LOCK_FMT "/tmp/.X%d-lock"
-#define X11_SOCKET_DIR "/tmp/.X11-unix"
-#define X11_SOCKET_FMT "/tmp/.X11-unix/X%d"
+static constexpr char X11_LOCK_FMT[] = "/tmp/.X%d-lock";
+static constexpr char X11_SOCKET_DIR[] = "/tmp/.X11-unix";
+static constexpr char X11_SOCKET_FMT[] = "/tmp/.X11-unix/X%d";
 
 static int xserver_start(struct xserver *srv);
 
@@ -268,8 +268,7 @@ get_display(int x_sockets[static 2]) {
         // If the lock file already exists, check to see if the owning process is still alive.
         lock_fd = open(lock_name, O_RDONLY | O_CLOEXEC);
         if (lock_fd == -1) {
-            ww_log_errno(LOG_ERROR, "skipped " X11_LOCK_FMT ": failed to open for reading",
-                         display);
+            ww_log_errno(LOG_ERROR, "skipped %s: failed to open for reading", lock_name);
             continue;
         }
 
@@ -278,25 +277,25 @@ get_display(int x_sockets[static 2]) {
         close(lock_fd);
 
         if (n != STATIC_STRLEN(pidstr)) {
-            ww_log(LOG_INFO, "skipped " X11_LOCK_FMT ": length %zu", display, n);
+            ww_log(LOG_INFO, "skipped %s: length %zu", lock_name, n);
             continue;
         }
 
         long pid = strtol(pidstr, NULL, 10);
         if (pid < 0 || pid > INT32_MAX) {
-            ww_log(LOG_INFO, "skipped " X11_LOCK_FMT ": invalid pid %ld", display, pid);
+            ww_log(LOG_INFO, "skipped %s: invalid pid %ld", lock_name, pid);
             continue;
         }
 
         errno = 0;
         if (kill((pid_t)pid, 0) == 0 || errno != ESRCH) {
-            ww_log(LOG_INFO, "skipped " X11_LOCK_FMT ": process alive (%ld)", display, pid);
+            ww_log(LOG_INFO, "skipped %s: process alive (%ld)", lock_name, pid);
             continue;
         }
 
         // The process is no longer alive. Try to take the display.
         if (unlink(lock_name) != 0) {
-            ww_log_errno(LOG_ERROR, "skipped " X11_LOCK_FMT ": failed to unlink", display);
+            ww_log_errno(LOG_ERROR, "skipped %s: failed to unlink", lock_name);
             continue;
         }
 

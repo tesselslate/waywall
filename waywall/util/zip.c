@@ -9,11 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static const uint32_t MAGIC_EOCD = 0x06054B50;
-static const uint32_t MAGIC_CD = 0x02014B50;
+static constexpr uint32_t MAGIC_EOCD = 0x06054B50;
+static constexpr uint32_t MAGIC_CD = 0x02014B50;
 
-#define SIZE_EOCD 22
-#define SIZE_CD 46
+static constexpr size_t SIZE_EOCD = 22;
+static constexpr size_t SIZE_CD = 46;
 
 struct zip {
     int fd;
