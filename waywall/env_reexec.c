@@ -278,6 +278,8 @@ env_reexec(char **argv) {
     if (read_passthrough_fd()) {
         ww_log(LOG_INFO, "skipping env_reexec (got passthrough fd)");
         return 0;
+    } else {
+        passthrough_env = list_envvar_create();
     }
 
     for (char **arg = argv; *arg; arg++) {
