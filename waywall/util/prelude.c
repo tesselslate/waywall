@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-noreturn void
+[[noreturn]] void
 util_panic(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <stdnoreturn.h>
-
 #ifdef __GNUC__
 #define WW_PRINTF(a, b) __attribute((format(printf, (a), (b))))
 #define WW_MAYBE_UNUSED __attribute((unused))
@@ -26,4 +24,4 @@
         __builtin_unreachable();                                                                   \
     } while (0)
 
-noreturn void util_panic(const char *fmt, ...) WW_PRINTF(1, 2);
+[[noreturn]] void util_panic(const char *fmt, ...) WW_PRINTF(1, 2);
