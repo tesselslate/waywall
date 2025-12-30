@@ -18,7 +18,7 @@ static int
 tick_inotify(int fd, uint32_t mask, void *data) {
     struct inotify *inotify = data;
 
-    char buf[4096] __attribute__((aligned(alignof(struct inotify_event))));
+    alignas(struct inotify_event) char buf[4096];
     const struct inotify_event *event;
 
     for (;;) {
