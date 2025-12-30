@@ -15,8 +15,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define PASSTHROUGH_FD_ENV "__WAYWALL_ENV_PASSTHROUGH_FD"
-#define EXTRA_ENV_SIZE 2
+static constexpr char PASSTHROUGH_FD_ENV[] = "__WAYWALL_ENV_PASSTHROUGH_FD";
 
 extern char **environ;
 
@@ -109,7 +108,7 @@ penv_find(struct list_envvar *penv, const char *name) {
 static char *
 penv_get(struct list_envvar *penv, const char *name) {
     ssize_t idx = penv_find(penv, name);
-    return (idx >= 0) ? penv->data[idx].value : NULL;
+    return (idx >= 0) ? penv->data[idx].value : nullptr;
 }
 
 static void
@@ -195,7 +194,7 @@ read_passthrough_fd() {
         goto fail_seek;
     }
 
-    char *buf = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0);
+    char *buf = mmap(nullptr, len, PROT_READ, MAP_PRIVATE, fd, 0);
     if (buf == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap passthrough fd");
         goto fail_mmap;
@@ -271,7 +270,7 @@ env_passthrough_get() {
 // If the user doesn't want this behavior, it can be turned off via a flag.
 int
 env_reexec(char **argv) {
-    static const int ENV_SIZE = 1048576;
+    static constexpr int ENV_SIZE = 1048576;
 
     // Check for the __WAYWALL_ENV_PASSTHROUGH_FD variable. If present, read it into the passthrough
     // environment and then let execution continue normally since we already restarted.
@@ -341,7 +340,7 @@ env_reexec(char **argv) {
         goto fail_penv_read;
     }
 
-    char fd_env[16] = {0};
+    char fd_env[16] = {};
     snprintf(fd_env, STATIC_ARRLEN(fd_env), "%d", passthrough_fd);
     penv_set(&penv, PASSTHROUGH_FD_ENV, fd_env);
 

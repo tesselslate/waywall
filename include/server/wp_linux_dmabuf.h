@@ -1,12 +1,10 @@
-#ifndef WAYWALL_SERVER_WP_LINUX_DMABUF_H
-#define WAYWALL_SERVER_WP_LINUX_DMABUF_H
+#pragma once
 
 #include "server/server.h"
-#include <stdbool.h>
 #include <wayland-client-core.h>
 #include <wayland-server-core.h>
 
-#define DMABUF_MAX_PLANES 4
+static constexpr int DMABUF_MAX_PLANES = 4;
 
 struct server_linux_dmabuf {
     struct wl_global *global;
@@ -57,5 +55,3 @@ struct server_dmabuf_data {
 };
 
 struct server_linux_dmabuf *server_linux_dmabuf_create(struct server *server);
-
-#endif

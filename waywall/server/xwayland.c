@@ -97,7 +97,7 @@ key_timestamp() {
 static void
 send_key_event(struct server_xwayland *xwl, xcb_window_t window, xcb_keycode_t keycode,
                bool press) {
-    xcb_key_press_event_t event = {0};
+    xcb_key_press_event_t event = {};
     event.response_type = press ? XCB_KEY_PRESS : XCB_KEY_RELEASE;
     event.detail = keycode + 8; // Convert from libinput to XKB
     event.time = key_timestamp();
@@ -146,7 +146,7 @@ server_xwayland_create(struct server *server, struct server_xwayland_shell *shel
     xwl->xserver = xserver_create(xwl);
     if (!xwl->xserver) {
         free(xwl);
-        return NULL;
+        return nullptr;
     }
 
     xwl->on_ready.notify = on_ready;
@@ -178,13 +178,15 @@ xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
     // HACK: Sending an EnterNotify event causes GLFW to update the mouse pointer coordinates, so
     // we don't accidentally click any menu buttons.
 
-    static const uint32_t window_mask = XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
-    static const uint32_t button_mask = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
+    static constexpr uint32_t window_mask =
+        XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
+    static constexpr uint32_t button_mask =
+        XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
 
     xcb_window_t window = xwm_window_from_view(view);
 
     // Send EnterNotify and LeaveNotify.
-    xcb_enter_notify_event_t notify_event = {0};
+    xcb_enter_notify_event_t notify_event = {};
     notify_event.response_type = XCB_ENTER_NOTIFY;
     notify_event.root = window;
     notify_event.event = window;
@@ -195,7 +197,7 @@ xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
     xcb_send_event(xwl->xwm->conn, true, window, window_mask, (char *)&notify_event);
 
     // Send a button press and release.
-    xcb_button_press_event_t button_event = {0};
+    xcb_button_press_event_t button_event = {};
     button_event.response_type = XCB_BUTTON_PRESS;
     button_event.detail = XCB_BUTTON_INDEX_1;
     button_event.root = window;

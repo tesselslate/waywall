@@ -3,7 +3,7 @@ project('waywall', 'c',
   license: 'GPL3',
   meson_version: '>=1.3.0',
   default_options: [
-    'c_std=c11',
+    'c_std=c23',
     'warning_level=2',
   ],
 )

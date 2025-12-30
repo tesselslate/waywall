@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WP_LINUX_DRM_SYNCOBJ_H
-#define WAYWALL_SERVER_WP_LINUX_DRM_SYNCOBJ_H
+#pragma once
 
 #include "server/server.h"
 #include <stdint.h>
@@ -38,5 +37,3 @@ struct server_drm_syncobj_timeline {
 };
 
 struct server_drm_syncobj_manager *server_drm_syncobj_manager_create(struct server *server);
-
-#endif

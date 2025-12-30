@@ -1,8 +1,6 @@
-#ifndef WAYWALL_SERVER_XWAYLAND_SHELL_H
-#define WAYWALL_SERVER_XWAYLAND_SHELL_H
+#pragma once
 
 #include "server/server.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
@@ -30,11 +28,9 @@ struct server_xwayland_surface {
     bool associated;
 
     struct {
-        struct wl_signal destroy;    // data: NULL
+        struct wl_signal destroy;    // data: nullptr
         struct wl_signal set_serial; // data: uint64_t *
     } events;
 };
 
 struct server_xwayland_shell *server_xwayland_shell_create(struct server *server);
-
-#endif

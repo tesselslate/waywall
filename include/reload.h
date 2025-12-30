@@ -1,5 +1,4 @@
-#ifndef WAYWALL_RELOAD_H
-#define WAYWALL_RELOAD_H
+#pragma once
 
 #include "config/config.h"
 #include "util/list.h"
@@ -27,5 +26,3 @@ struct reload *reload_create(struct inotify *inotify, struct ww_timer *timer, co
                              reload_func_t callback, void *data);
 void reload_destroy(struct reload *rl);
 void reload_disable(struct reload *rl);
-
-#endif

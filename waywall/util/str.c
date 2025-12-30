@@ -9,7 +9,7 @@ struct hdr {
     char data[];
 };
 
-#define HDRSZ sizeof(struct hdr)
+static constexpr size_t HDRSZ = sizeof(struct hdr);
 
 #define strhdr(str) ((struct hdr *)((char *)(str) - HDRSZ))
 #define hdrstr(hdr) ((hdr)->data)

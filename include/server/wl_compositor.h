@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_WL_COMPOSITOR_H
-#define WAYWALL_SERVER_WL_COMPOSITOR_H
+#pragma once
 
 #include "server/server.h"
 #include <stdint.h>
@@ -67,5 +66,3 @@ struct server_surface *server_surface_try_from_resource(struct wl_resource *reso
 struct server_buffer *server_surface_next_buffer(struct server_surface *surface);
 int server_surface_set_role(struct server_surface *surface, const struct server_surface_role *role,
                             struct wl_resource *role_resource);
-
-#endif

@@ -1,9 +1,7 @@
-#ifndef WAYWALL_SERVER_UI_H
-#define WAYWALL_SERVER_UI_H
+#pragma once
 
 #include "config/config.h"
 #include "util/box.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <wayland-server-core.h>
@@ -38,8 +36,8 @@ struct server_ui {
     struct wl_list views; // server_view.link
 
     struct {
-        struct wl_signal close;        // data: NULL
-        struct wl_signal resize;       // data: NULL
+        struct wl_signal close;        // data: nullptr
+        struct wl_signal resize;       // data: nullptr
         struct wl_signal view_create;  // data: struct server_view *
         struct wl_signal view_destroy; // data: struct server_view *
     } events;
@@ -82,8 +80,8 @@ struct server_view {
     struct wl_listener on_surface_commit;
 
     struct {
-        struct wl_signal destroy; // data: NULL
-        struct wl_signal resize;  // data: NULL
+        struct wl_signal destroy; // data: nullptr
+        struct wl_signal resize;  // data: nullptr
     } events;
 };
 
@@ -120,5 +118,3 @@ void server_view_set_visible(struct server_view *view, bool visible);
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,
                                        const struct server_view_impl *impl, void *impl_data);
 void server_view_destroy(struct server_view *view);
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_SERIAL_H
-#define WAYWALL_UTIL_SERIAL_H
+#pragma once
 
 #include "util/prelude.h"
 #include <stddef.h>
@@ -38,5 +37,3 @@ static inline uint32_t
 next_serial(struct wl_resource *resource) {
     return wl_display_next_serial(wl_client_get_display(wl_resource_get_client(resource)));
 }
-
-#endif

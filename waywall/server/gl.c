@@ -94,9 +94,8 @@
  *  SOFTWARE.
  */
 
-#define DRM_FORMAT_MOD_INVALID 0xFFFFFFFFFFFFFFFull
-
-#define MAX_CACHED_DMABUF 2
+static constexpr uint64_t DRM_FORMAT_MOD_INVALID = 0xFFFFFFFFFFFFFFF;
+static constexpr int MAX_CACHED_DMABUF = 2;
 
 #define ww_log_egl(lvl, fmt, ...)                                                                  \
     util_log(lvl, "[%s:%d] " fmt ": %s", __FILE__, __LINE__, ##__VA_ARGS__, egl_strerror())
@@ -111,7 +110,7 @@ struct gl_buffer {
 };
 
 // clang-format off
-static const EGLint CONFIG_ATTRIBUTES[] = {
+static constexpr EGLint CONFIG_ATTRIBUTES[] = {
     EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
     EGL_RED_SIZE, 8,
     EGL_GREEN_SIZE, 8,
@@ -122,7 +121,7 @@ static const EGLint CONFIG_ATTRIBUTES[] = {
     EGL_NONE,
 };
 
-static const EGLint CONTEXT_ATTRIBUTES[] = {
+static constexpr EGLint CONTEXT_ATTRIBUTES[] = {
     EGL_CONTEXT_MAJOR_VERSION, 2,
     EGL_NONE,
 };
@@ -186,11 +185,11 @@ static void
 on_surface_commit(struct wl_listener *listener, void *data) {
     struct server_gl *gl = wl_container_of(listener, gl, on_surface_commit);
 
-    wl_signal_emit_mutable(&gl->events.frame, NULL);
+    wl_signal_emit_mutable(&gl->events.frame, nullptr);
 
     struct server_buffer *buffer = server_surface_next_buffer(gl->capture.surface);
     if (!buffer) {
-        gl->capture.current = NULL;
+        gl->capture.current = nullptr;
         return;
     }
 
@@ -206,7 +205,7 @@ on_surface_commit(struct wl_listener *listener, void *data) {
     // If the given wl_buffer has not yet been imported, try to import it.
     gl_buffer = gl_buffer_import(gl, buffer);
     if (!gl_buffer) {
-        gl->capture.current = NULL;
+        gl->capture.current = nullptr;
         return;
     }
 
@@ -226,7 +225,7 @@ static void
 on_surface_destroy(struct wl_listener *listener, void *data) {
     struct server_gl *gl = wl_container_of(listener, gl, on_surface_destroy);
 
-    gl->capture.current = NULL;
+    gl->capture.current = nullptr;
 }
 
 static void
@@ -353,7 +352,7 @@ static struct gl_buffer *
 gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
     if (strcmp(buffer->impl->name, SERVER_BUFFER_DMABUF) != 0) {
         ww_log(LOG_ERROR, "cannot create server_gl_surface for non-DMABUF buffer");
-        return NULL;
+        return nullptr;
     }
 
     struct gl_buffer *gl_buffer = zalloc(1, sizeof(*gl_buffer));
@@ -400,8 +399,9 @@ gl_buffer_import(struct server_gl *gl, struct server_buffer *buffer) {
 
     image_attributes[i++] = EGL_NONE;
 
-    gl_buffer->image = gl_buffer->gl->egl.CreateImageKHR(
-        gl_buffer->gl->egl.display, EGL_NO_CONTEXT, EGL_LINUX_DMA_BUF_EXT, NULL, image_attributes);
+    gl_buffer->image =
+        gl_buffer->gl->egl.CreateImageKHR(gl_buffer->gl->egl.display, EGL_NO_CONTEXT,
+                                          EGL_LINUX_DMA_BUF_EXT, nullptr, image_attributes);
     if (gl_buffer->image == EGL_NO_IMAGE_KHR) {
         ww_log_egl(LOG_ERROR, "failed to create EGLImage for dmabuf");
         goto fail_create_orig;
@@ -441,7 +441,7 @@ fail_create_orig:
     server_buffer_unref(gl_buffer->parent);
     free(gl_buffer);
 
-    return NULL;
+    return nullptr;
 }
 
 static bool
@@ -450,7 +450,7 @@ compile_shader(GLuint *out, GLint type, const char *source) {
     ww_assert(shader != 0);
     *out = shader;
 
-    glShaderSource(shader, 1, &source, NULL);
+    glShaderSource(shader, 1, &source, nullptr);
     glCompileShader(shader);
 
     GLint status;
@@ -459,8 +459,8 @@ compile_shader(GLuint *out, GLint type, const char *source) {
         return true;
     }
 
-    char buf[4096] = {0};
-    glGetShaderInfoLog(shader, STATIC_ARRLEN(buf) - 1, NULL, buf);
+    char buf[4096] = {};
+    glGetShaderInfoLog(shader, STATIC_ARRLEN(buf) - 1, nullptr, buf);
     ww_log(LOG_ERROR, "failed to compile shader (type %d): %s", (int)type, buf);
 
     return false;
@@ -488,8 +488,8 @@ compile_program(GLuint *out, GLuint vert, GLuint frag) {
         return true;
     }
 
-    char buf[4096] = {0};
-    glGetProgramInfoLog(prog, STATIC_ARRLEN(buf) - 1, NULL, buf);
+    char buf[4096] = {};
+    glGetProgramInfoLog(prog, STATIC_ARRLEN(buf) - 1, nullptr, buf);
     ww_log(LOG_ERROR, "failed to link shader program: %s", buf);
 
     return false;
@@ -510,8 +510,8 @@ server_gl_create(struct server *server) {
         goto fail_get_proc;
     }
 
-    gl->egl.display =
-        gl->egl.GetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT, gl->server->backend->display, NULL);
+    gl->egl.display = gl->egl.GetPlatformDisplayEXT(EGL_PLATFORM_WAYLAND_EXT,
+                                                    gl->server->backend->display, nullptr);
     if (gl->egl.display == EGL_NO_DISPLAY) {
         ww_log(LOG_ERROR, "no EGL display available");
         goto fail_get_display;
@@ -595,7 +595,7 @@ server_gl_create(struct server *server) {
     check_alloc(gl->surface.window);
 
     gl->surface.egl = gl->egl.CreatePlatformWindowSurfaceEXT(gl->egl.display, gl->egl.config,
-                                                             gl->surface.window, NULL);
+                                                             gl->surface.window, nullptr);
     if (gl->surface.egl == EGL_NO_SURFACE) {
         ww_log_egl(LOG_ERROR, "failed to create EGL surface");
         goto fail_egl_surface;
@@ -641,7 +641,7 @@ fail_get_display:
 fail_get_proc:
     free(gl);
 
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -719,7 +719,7 @@ fail_frag:
 fail_vert:
     free(shader);
 
-    return NULL;
+    return nullptr;
 }
 
 GLuint

@@ -12,28 +12,27 @@
 #include "viewporter-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
-#define USE_ALPHA_MODIFIER_VERSION 1
-#define USE_COMPOSITOR_VERSION 5
-#define USE_CURSOR_SHAPE_VERSION 1
-#define USE_DATA_DEVICE_MANAGER_VERSION 2
-#define USE_LINUX_DMABUF_VERSION 4
-#define USE_LINUX_DRM_SYNCOBJ_VERSION 1
-#define USE_POINTER_CONSTRAINTS_VERSION 1
-#define USE_RELATIVE_POINTER_MANAGER_VERSION 1
-#define USE_SEAT_VERSION 5
-#define USE_SHM_VERSION 1
-#define USE_SINGLE_PIXEL_BUFFER_VERSION 1
-#define USE_SUBCOMPOSITOR_VERSION 1
-#define USE_TEARING_CONTROL_VERSION 1
-#define USE_VIEWPORTER_VERSION 1
-#define USE_XDG_DECORATION_VERSION 1
-#define USE_XDG_WM_BASE_VERSION 1
+static constexpr int USE_ALPHA_MODIFIER_VERSION = 1;
+static constexpr int USE_COMPOSITOR_VERSION = 5;
+static constexpr int USE_CURSOR_SHAPE_VERSION = 1;
+static constexpr int USE_DATA_DEVICE_MANAGER_VERSION = 2;
+static constexpr int USE_LINUX_DMABUF_VERSION = 4;
+static constexpr int USE_LINUX_DRM_SYNCOBJ_VERSION = 1;
+static constexpr int USE_POINTER_CONSTRAINTS_VERSION = 1;
+static constexpr int USE_RELATIVE_POINTER_MANAGER_VERSION = 1;
+static constexpr int USE_SEAT_VERSION = 5;
+static constexpr int USE_SHM_VERSION = 1;
+static constexpr int USE_SINGLE_PIXEL_BUFFER_VERSION = 1;
+static constexpr int USE_SUBCOMPOSITOR_VERSION = 1;
+static constexpr int USE_TEARING_CONTROL_VERSION = 1;
+static constexpr int USE_VIEWPORTER_VERSION = 1;
+static constexpr int USE_XDG_DECORATION_VERSION = 1;
+static constexpr int USE_XDG_WM_BASE_VERSION = 1;
 
 struct seat_name {
     struct wl_list link; // server_backend.seat.names
@@ -51,11 +50,11 @@ on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
     if (had_kb != has_kb) {
         if (backend->seat.keyboard) {
             wl_keyboard_release(backend->seat.keyboard);
-            backend->seat.keyboard = NULL;
+            backend->seat.keyboard = nullptr;
         }
 
         ww_log(LOG_INFO, "seat updated (keyboard: %s)", has_kb ? "true" : "false");
-        wl_signal_emit_mutable(&backend->events.seat_keyboard, NULL);
+        wl_signal_emit_mutable(&backend->events.seat_keyboard, nullptr);
     }
 
     bool had_ptr = !!backend->seat.pointer;
@@ -63,11 +62,11 @@ on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
     if (had_ptr != has_ptr) {
         if (backend->seat.pointer) {
             wl_pointer_release(backend->seat.pointer);
-            backend->seat.pointer = NULL;
+            backend->seat.pointer = nullptr;
         }
 
         ww_log(LOG_INFO, "seat updated (pointer: %s)", has_ptr ? "true" : "false");
-        wl_signal_emit_mutable(&backend->events.seat_pointer, NULL);
+        wl_signal_emit_mutable(&backend->events.seat_pointer, nullptr);
     }
 }
 
@@ -215,7 +214,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         }
 
         wl_list_insert(&backend->seat.names, &seat_name->link);
-        wl_signal_emit_mutable(&backend->events.seat_data_device, NULL);
+        wl_signal_emit_mutable(&backend->events.seat_data_device, nullptr);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
@@ -316,7 +315,7 @@ server_backend_create() {
     wl_signal_init(&backend->events.seat_pointer);
     wl_signal_init(&backend->events.shm_format);
 
-    backend->display = wl_display_connect(NULL);
+    backend->display = wl_display_connect(nullptr);
     if (!backend->display) {
         ww_log_errno(LOG_ERROR, "wl_display_connect failed");
         goto fail_display;
@@ -384,7 +383,7 @@ fail_registry:
 fail_display:
     wl_array_release(&backend->shm_formats);
     free(backend);
-    return NULL;
+    return nullptr;
 }
 
 void

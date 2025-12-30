@@ -21,7 +21,6 @@
 #include <fcntl.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -75,9 +74,11 @@ static const struct {
     {luaJIT_BC_helpers, luaJIT_BC_helpers_SIZE, "waywall.helpers"},
 };
 
-#define METATABLE_IMAGE "waywall.image"
-#define METATABLE_MIRROR "waywall.mirror"
-#define METATABLE_TEXT "waywall.text"
+static constexpr int DEFAULT_DEPTH = 0;
+
+static constexpr char METATABLE_IMAGE[] = "waywall.image";
+static constexpr char METATABLE_MIRROR[] = "waywall.mirror";
+static constexpr char METATABLE_TEXT[] = "waywall.text";
 
 #define STARTUP_ERRMSG(function) function " cannot be called during startup"
 #define CHECK_OBJECT(object)                                                                       \
@@ -86,8 +87,6 @@ static const struct {
     } else if (!*(object)) {                                                                       \
         return luaL_error(L, "object already closed");                                             \
     }
-
-#define DEFAULT_DEPTH 0
 
 struct waker_sleep {
     struct ww_timer_entry *timer;
@@ -120,7 +119,7 @@ image_close(lua_State *L) {
     CHECK_OBJECT(image);
 
     scene_object_destroy((struct scene_object *)*image);
-    *image = NULL;
+    *image = nullptr;
 
     return 0;
 }
@@ -149,7 +148,7 @@ image_gc(lua_State *L) {
     if (*image) {
         scene_object_destroy((struct scene_object *)*image);
     }
-    *image = NULL;
+    *image = nullptr;
 
     return 0;
 }
@@ -160,7 +159,7 @@ mirror_close(lua_State *L) {
     CHECK_OBJECT(mirror);
 
     scene_object_destroy((struct scene_object *)*mirror);
-    *mirror = NULL;
+    *mirror = nullptr;
 
     return 0;
 }
@@ -189,7 +188,7 @@ mirror_gc(lua_State *L) {
     if (*mirror) {
         scene_object_destroy((struct scene_object *)*mirror);
     }
-    *mirror = NULL;
+    *mirror = nullptr;
 
     return 0;
 }
@@ -200,7 +199,7 @@ text_close(lua_State *L) {
     CHECK_OBJECT(text);
 
     scene_object_destroy((struct scene_object *)*text);
-    *text = NULL;
+    *text = nullptr;
 
     return 0;
 }
@@ -229,7 +228,7 @@ text_gc(lua_State *L) {
     if (*text) {
         scene_object_destroy((struct scene_object *)*text);
     }
-    *text = NULL;
+    *text = nullptr;
 
     return 0;
 }
@@ -254,7 +253,7 @@ waker_sleep_timer_destroy(void *data) {
     //
     // Remove the reference to the timer entry so that when the VM attempts to destroy the waker
     // we do not attempt to destroy the timer entry a 2nd time.
-    waker->timer = NULL;
+    waker->timer = nullptr;
 }
 
 static void
@@ -324,7 +323,7 @@ unmarshal_color(lua_State *L, const char *key, float rgba[static 4]) {
 
     const char *value = lua_tostring(L, -1);
 
-    uint8_t u8_rgba[4] = {0};
+    uint8_t u8_rgba[4] = {};
     if (config_parse_hex(u8_rgba, value) != 0) {
         return luaL_error(L, "expected '%s' to be a valid hex color ('%s')", key, value);
     }
@@ -368,7 +367,7 @@ l_current_time(lua_State *L) {
 
 static int
 l_exec(lua_State *L) {
-    static const int ARG_COMMAND = 1;
+    static constexpr int ARG_COMMAND = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -386,7 +385,7 @@ l_exec(lua_State *L) {
     char *cmd_str = strdup(lua_str);
     check_alloc(cmd_str);
 
-    char *cmd[64] = {0};
+    char *cmd[64] = {};
     char *needle = cmd_str;
     char *elem;
 
@@ -431,8 +430,8 @@ l_floating_shown(lua_State *L) {
 
 static int
 l_image(lua_State *L) {
-    static const int ARG_PATH = 1;
-    static const int ARG_OPTIONS = 2;
+    static constexpr int ARG_PATH = 1;
+    static constexpr int ARG_OPTIONS = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -445,7 +444,7 @@ l_image(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct scene_image_options options = {0};
+    struct scene_image_options options = {};
     unmarshal_box_key(L, "dst", &options.dst);
 
     lua_pushstring(L, "shader");
@@ -483,7 +482,7 @@ l_image(lua_State *L) {
 
 static int
 l_mirror(lua_State *L) {
-    static const int ARG_OPTIONS = 1;
+    static constexpr int ARG_OPTIONS = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -495,7 +494,7 @@ l_mirror(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct scene_mirror_options options = {0};
+    struct scene_mirror_options options = {};
 
     unmarshal_box_key(L, "src", &options.src);
     unmarshal_box_key(L, "dst", &options.dst);
@@ -544,7 +543,7 @@ l_mirror(lua_State *L) {
 
 static int
 l_press_key(lua_State *L) {
-    static const int ARG_KEYNAME = 1;
+    static constexpr int ARG_KEYNAME = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -577,7 +576,7 @@ l_press_key(lua_State *L) {
 
 static int
 l_get_key(lua_State *L) {
-    static const int ARG_KEYNAME = 1;
+    static constexpr int ARG_KEYNAME = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -634,8 +633,8 @@ l_profile(lua_State *L) {
 
 static int
 l_set_keymap(lua_State *L) {
-    static const int ARG_KEYMAP = 1;
-    static const int IDX_VALUE = 2;
+    static constexpr int ARG_KEYMAP = 1;
+    static constexpr int IDX_VALUE = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -649,7 +648,7 @@ l_set_keymap(lua_State *L) {
     lua_settop(L, ARG_KEYMAP);
 
     // Body. Construct an instance of xkb_rule_names from the provided options table.
-    struct xkb_rule_names rule_names = {0};
+    struct xkb_rule_names rule_names = {};
 
     const struct {
         const char *key;
@@ -688,9 +687,9 @@ l_set_keymap(lua_State *L) {
 
 static int
 l_set_remaps(lua_State *L) {
-    static const int ARG_REMAPS = 1;
-    static const int IDX_REMAP_KEY = 2;
-    static const int IDX_REMAP_VAL = 3;
+    static constexpr int ARG_REMAPS = 1;
+    static constexpr int IDX_REMAP_KEY = 2;
+    static constexpr int IDX_REMAP_VAL = 3;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -706,7 +705,7 @@ l_set_remaps(lua_State *L) {
     // Body.
     // A lot of this code is duplicated from process_config_input_remaps and
     // server_seat_config_create, which probably isn't ideal.
-    struct config_remaps remaps = {0};
+    struct config_remaps remaps = {};
 
     // stack state
     // 1 (ARG_REMAPS)     : remaps
@@ -737,7 +736,7 @@ l_set_remaps(lua_State *L) {
         const char *src_input = lua_tostring(L, IDX_REMAP_KEY);
         const char *dst_input = lua_tostring(L, IDX_REMAP_VAL);
 
-        struct config_remap remap = {0};
+        struct config_remap remap = {};
         if (config_parse_remap(src_input, dst_input, &remap) != 0) {
             if (remaps.data) {
                 free(remaps.data);
@@ -769,7 +768,7 @@ l_set_remaps(lua_State *L) {
     for (size_t i = 0; i < remaps.count; i++) {
         struct config_remap *remap = &remaps.data[i];
 
-        struct server_seat_remap *dst = NULL;
+        struct server_seat_remap *dst = nullptr;
         switch (remap->src_type) {
         case CONFIG_REMAP_BUTTON:
             dst = &seat_remaps->buttons[seat_remaps->num_buttons++];
@@ -796,8 +795,8 @@ l_set_remaps(lua_State *L) {
 
 static int
 l_set_resolution(lua_State *L) {
-    static const int ARG_WIDTH = 1;
-    static const int ARG_HEIGHT = 2;
+    static constexpr int ARG_WIDTH = 1;
+    static constexpr int ARG_HEIGHT = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -828,7 +827,7 @@ l_set_resolution(lua_State *L) {
 
 static int
 l_set_sensitivity(lua_State *L) {
-    static const int ARG_SENS = 1;
+    static constexpr int ARG_SENS = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -854,7 +853,7 @@ l_set_sensitivity(lua_State *L) {
 
 static int
 l_show_floating(lua_State *L) {
-    static const int ARG_SHOW = 1;
+    static constexpr int ARG_SHOW = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -878,7 +877,7 @@ l_show_floating(lua_State *L) {
 
 static int
 l_sleep(lua_State *L) {
-    static const int ARG_MS = 1;
+    static constexpr int ARG_MS = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -919,7 +918,7 @@ l_sleep(lua_State *L) {
 
 static int
 l_state(lua_State *L) {
-    static const int IDX_STATE = 1;
+    static constexpr int IDX_STATE = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -972,12 +971,12 @@ l_state(lua_State *L) {
 
 static int
 l_text_legacy(lua_State *L, struct wrap *wrap) {
-    static const int ARG_TEXT = 1;
-    static const int ARG_X = 2;
-    static const int ARG_Y = 3;
-    static const int ARG_COLOR = 4;
-    static const int ARG_SIZE = 5;
-    static const int ARG_SHADER = 6;
+    static constexpr int ARG_TEXT = 1;
+    static constexpr int ARG_X = 2;
+    static constexpr int ARG_Y = 3;
+    static constexpr int ARG_COLOR = 4;
+    static constexpr int ARG_SIZE = 5;
+    static constexpr int ARG_SHADER = 6;
 
     ww_log(LOG_WARN, "using legacy text creation code path - update your configuration");
 
@@ -989,7 +988,7 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
     if (lua_gettop(L) >= ARG_COLOR) {
         const char *raw_color = luaL_checkstring(L, ARG_COLOR);
 
-        uint8_t u8_rgba[4] = {0};
+        uint8_t u8_rgba[4] = {};
         if (config_parse_hex(u8_rgba, raw_color) != 0) {
             return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
         }
@@ -1005,7 +1004,7 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
 
-    char *shader_name = NULL;
+    char *shader_name = nullptr;
     if (lua_gettop(L) >= ARG_SHADER) {
         shader_name = strdup(luaL_checkstring(L, ARG_SHADER));
     }
@@ -1039,8 +1038,8 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
 
 static int
 l_text(lua_State *L) {
-    static const int ARG_TEXT = 1;
-    static const int ARG_OPTIONS = 2;
+    static constexpr int ARG_TEXT = 1;
+    static constexpr int ARG_OPTIONS = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -1056,7 +1055,7 @@ l_text(lua_State *L) {
     }
     lua_settop(L, ARG_OPTIONS);
 
-    struct scene_text_options options = {0};
+    struct scene_text_options options = {};
 
     lua_pushstring(L, "x");
     lua_rawget(L, ARG_OPTIONS);
@@ -1079,7 +1078,7 @@ l_text(lua_State *L) {
     if (lua_type(L, -1) == LUA_TSTRING) {
         const char *raw_color = lua_tostring(L, -1);
 
-        uint8_t u8_rgba[4] = {0};
+        uint8_t u8_rgba[4] = {};
         if (config_parse_hex(u8_rgba, raw_color) != 0) {
             return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
         }
@@ -1149,8 +1148,8 @@ l_log_error(lua_State *L) {
 
 static int
 l_register(lua_State *L) {
-    static const int ARG_SIGNAL = 1;
-    static const int ARG_HANDLER = 2;
+    static constexpr int ARG_SIGNAL = 1;
+    static constexpr int ARG_HANDLER = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -1170,12 +1169,12 @@ l_register(lua_State *L) {
 
 static int
 l_setenv(lua_State *L) {
-    static const int ARG_NAME = 1;
-    static const int ARG_VALUE = 2;
+    static constexpr int ARG_NAME = 1;
+    static constexpr int ARG_VALUE = 2;
 
     // Prologue
     const char *name = luaL_checkstring(L, ARG_NAME);
-    const char *value = NULL;
+    const char *value = nullptr;
     switch (lua_type(L, ARG_VALUE)) {
     case LUA_TSTRING:
         value = lua_tostring(L, ARG_VALUE);
@@ -1240,7 +1239,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"log_error", l_log_error},
     {"register", l_register},
     {"setenv", l_setenv},
-    {NULL, NULL},
+    {nullptr, nullptr},
 };
 
 int

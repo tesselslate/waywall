@@ -36,7 +36,7 @@ static const struct config defaults = {
                     .variant = "",
                     .options = "",
                 },
-            .remaps = {0},
+            .remaps = {},
             .repeat_rate = -1,
             .repeat_delay = -1,
             .sens = 1.0,
@@ -52,7 +52,7 @@ static const struct config defaults = {
             .ninb_anchor = ANCHOR_NONE,
             .ninb_opacity = 1.0,
         },
-    .shaders = {0},
+    .shaders = {},
 };
 
 static const struct {
@@ -390,10 +390,10 @@ compare_action(const void *a_void, const void *b_void) {
 
 static int
 process_config_actions(struct config *cfg) {
-    static const int IDX_ACTIONS = 2;
-    static const int IDX_DUP_TABLE = 3;
-    static const int IDX_ACTION_KEY = 4;
-    static const int IDX_ACTION_VAL = 5;
+    static constexpr int IDX_ACTIONS = 2;
+    static constexpr int IDX_DUP_TABLE = 3;
+    static constexpr int IDX_ACTION_KEY = 4;
+    static constexpr int IDX_ACTION_VAL = 5;
 
     // stack state
     // 2 (IDX_ACTIONS): config.actions
@@ -423,7 +423,7 @@ process_config_actions(struct config *cfg) {
         }
 
         const char *bind = lua_tostring(cfg->vm->L, IDX_ACTION_KEY);
-        struct config_action action = {0};
+        struct config_action action = {};
         if (parse_bind(bind, &action) != 0) {
             return 1;
         }
@@ -481,9 +481,9 @@ process_config_experimental(struct config *cfg) {
 
 static int
 process_config_input_remaps(struct config *cfg) {
-    static const int IDX_REMAPS = 3;
-    static const int IDX_REMAP_KEY = 4;
-    static const int IDX_REMAP_VAL = 5;
+    static constexpr int IDX_REMAPS = 3;
+    static constexpr int IDX_REMAP_KEY = 4;
+    static constexpr int IDX_REMAP_VAL = 5;
 
     // stack state
     // 3 (IDX_REMAPS)     : config.input.remaps
@@ -514,7 +514,7 @@ process_config_input_remaps(struct config *cfg) {
         const char *src_input = lua_tostring(cfg->vm->L, IDX_REMAP_KEY);
         const char *dst_input = lua_tostring(cfg->vm->L, IDX_REMAP_VAL);
 
-        struct config_remap remap = {0};
+        struct config_remap remap = {};
         if (config_parse_remap(src_input, dst_input, &remap) != 0) {
             return 1;
         }
@@ -597,7 +597,7 @@ process_config_theme(struct config *cfg) {
     // 1:   config
     ww_assert(lua_gettop(cfg->vm->L) == 2);
 
-    char *raw_background = NULL;
+    char *raw_background = nullptr;
     if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
         return 1;
     }
@@ -633,7 +633,7 @@ process_config_theme(struct config *cfg) {
         return 1;
     }
 
-    char *ninb_anchor = NULL;
+    char *ninb_anchor = nullptr;
     if (get_string(cfg, "ninb_anchor", &ninb_anchor, "theme.ninb_anchor", false) != 0) {
         return 1;
     }
@@ -676,8 +676,8 @@ process_config_shaders(struct config *cfg) {
     // stack state
     // 2:   config.shaders
     // 1:   config
-    const int IDX_SHADERS = 2;
-    const int IDX_SHADER_KEY = 3;
+    static constexpr int IDX_SHADERS = 2;
+    static constexpr int IDX_SHADER_KEY = 3;
 
     ww_assert(lua_gettop(cfg->vm->L) == IDX_SHADERS);
 
@@ -696,7 +696,7 @@ process_config_shaders(struct config *cfg) {
         }
 
         char *key = strdup(lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
-        char *fragment = NULL, *vertex = NULL;
+        char *fragment = nullptr, *vertex = nullptr;
         if (get_string(cfg, "fragment", &fragment, "shaders[].fragment", false)) {
             free(key);
             return 1;
@@ -755,7 +755,7 @@ process_config(struct config *cfg) {
 
 static int
 load_config(struct config *cfg) {
-    static const int ARG_CONFIG = 1;
+    static constexpr int ARG_CONFIG = 1;
 
     ww_assert(lua_gettop(cfg->vm->L) == 0);
 

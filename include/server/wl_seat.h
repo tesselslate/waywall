@@ -1,9 +1,7 @@
-#ifndef WAYWALL_SERVER_WL_SEAT_H
-#define WAYWALL_SERVER_WL_SEAT_H
+#pragma once
 
 #include "config/config.h"
 #include "util/list.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
@@ -108,5 +106,3 @@ struct server_seat_config *server_seat_config_create(struct server_seat *seat, s
 void server_seat_config_destroy(struct server_seat_config *config);
 
 int server_seat_lua_set_keymap(struct server_seat *seat, const struct xkb_rule_names *rule_names);
-
-#endif

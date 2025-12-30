@@ -1,9 +1,7 @@
-#ifndef WAYWALL_SERVER_CURSOR_H
-#define WAYWALL_SERVER_CURSOR_H
+#pragma once
 
 #include "config/config.h"
 #include "cursor-shape-v1-client-protocol.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
 
@@ -45,5 +43,3 @@ void server_cursor_use_config(struct server_cursor *cursor, struct server_cursor
 struct server_cursor_config *server_cursor_config_create(struct server_cursor *cursor,
                                                          struct config *cfg);
 void server_cursor_config_destroy(struct server_cursor_config *config);
-
-#endif

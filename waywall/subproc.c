@@ -28,10 +28,10 @@ handle_pidfd(int32_t fd, uint32_t mask, void *data) {
     ww_assert(entry_index >= 0);
 
     struct subproc_entry *entry = &subproc->entries.data[entry_index];
-    if (waitpid(entry->pid, NULL, 0) != entry->pid) {
+    if (waitpid(entry->pid, nullptr, 0) != entry->pid) {
         ww_log_errno(LOG_ERROR, "failed to waitpid on child process %jd", (intmax_t)entry->pid);
     }
-    if (pidfd_send_signal(entry->pidfd, SIGKILL, NULL, 0) != 0) {
+    if (pidfd_send_signal(entry->pidfd, SIGKILL, nullptr, 0) != 0) {
         if (errno != ESRCH) {
             ww_log_errno(LOG_ERROR, "failed to kill child process %jd", (intmax_t)entry->pid);
         }
@@ -64,7 +64,7 @@ subproc_destroy(struct subproc *subproc) {
     for (ssize_t i = 0; i < subproc->entries.len; i++) {
         struct subproc_entry *entry = &subproc->entries.data[i];
 
-        if (pidfd_send_signal(entry->pidfd, SIGKILL, NULL, 0) != 0) {
+        if (pidfd_send_signal(entry->pidfd, SIGKILL, nullptr, 0) != 0) {
             if (errno != ESRCH) {
                 ww_log_errno(LOG_ERROR, "failed to kill child process %jd", (intmax_t)entry->pid);
             }
@@ -113,7 +113,7 @@ subproc_exec(struct subproc *subproc, char *cmd[static 64]) {
                              WL_EVENT_READABLE, handle_pidfd, subproc);
     check_alloc(src);
 
-    struct subproc_entry entry = {0};
+    struct subproc_entry entry = {};
 
     entry.pid = pid;
     entry.pidfd = pidfd;

@@ -15,7 +15,7 @@
  * crash/hang.
  */
 
-#define SRV_XDG_WM_BASE_VERSION 5
+static constexpr int SRV_XDG_WM_BASE_VERSION = 5;
 
 static void
 send_toplevel_configure_sized(struct server_xdg_toplevel *xdg_toplevel, int32_t width,
@@ -44,7 +44,7 @@ xdg_toplevel_view_get_pid(void *data) {
     struct wl_client *client = wl_resource_get_client(xdg_toplevel->resource);
 
     pid_t pid;
-    wl_client_get_credentials(client, &pid, NULL, NULL);
+    wl_client_get_credentials(client, &pid, nullptr, nullptr);
     return pid;
 }
 
@@ -55,7 +55,7 @@ xdg_toplevel_view_get_title(void *data) {
     if (xdg_toplevel->title) {
         return strdup(xdg_toplevel->title);
     } else {
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -121,7 +121,7 @@ xdg_surface_role_commit(struct wl_resource *role_resource) {
         ww_assert(xdg_toplevel->view);
 
         server_view_destroy(xdg_toplevel->view);
-        xdg_toplevel->view = NULL;
+        xdg_toplevel->view = nullptr;
     } else if (!had_buffer && has_buffer) {
         // Map the toplevel.
         ww_assert(!xdg_toplevel->view);
@@ -162,9 +162,9 @@ static void
 xdg_toplevel_resource_destroy(struct wl_resource *resource) {
     struct server_xdg_toplevel *xdg_toplevel = wl_resource_get_user_data(resource);
 
-    wl_signal_emit_mutable(&xdg_toplevel->events.destroy, NULL);
+    wl_signal_emit_mutable(&xdg_toplevel->events.destroy, nullptr);
 
-    xdg_toplevel->parent->child = NULL;
+    xdg_toplevel->parent->child = nullptr;
 
     if (xdg_toplevel->title) {
         free(xdg_toplevel->title);
@@ -310,7 +310,7 @@ xdg_surface_resource_destroy(struct wl_resource *resource) {
         wl_resource_destroy(xdg_surface->child->resource);
     }
 
-    server_surface_set_role(xdg_surface->parent, &xdg_surface_role, NULL);
+    server_surface_set_role(xdg_surface->parent, &xdg_surface_role, nullptr);
     wl_list_remove(&xdg_surface->link);
 
     free(xdg_surface);

@@ -11,9 +11,10 @@
 
 #define PATH_SYSCTL "/proc/sys/"
 
-#define PATH_INOTIFY_MAX_QUEUED_EVENTS PATH_SYSCTL "fs/inotify/max_queued_events"
-#define PATH_INOTIFY_MAX_USER_INSTANCES PATH_SYSCTL "fs/inotify/max_user_instances"
-#define PATH_INOTIFY_MAX_USER_WATCHES PATH_SYSCTL "fs/inotify/max_user_watches"
+static constexpr char PATH_INOTIFY_MAX_QUEUED_EVENTS[] = PATH_SYSCTL "fs/inotify/max_queued_events";
+static constexpr char PATH_INOTIFY_MAX_USER_INSTANCES[] =
+    PATH_SYSCTL "fs/inotify/max_user_instances";
+static constexpr char PATH_INOTIFY_MAX_USER_WATCHES[] = PATH_SYSCTL "fs/inotify/max_user_watches";
 
 static long
 number_from_file(const char *path) {

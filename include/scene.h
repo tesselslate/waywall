@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SCENE_H
-#define WAYWALL_SCENE_H
+#pragma once
 
 #include "config/config.h"
 #include "util/box.h"
@@ -7,10 +6,10 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 
-#define SHADER_SRC_POS_ATTRIB_LOC 0
-#define SHADER_DST_POS_ATTRIB_LOC 1
-#define SHADER_SRC_RGBA_ATTRIB_LOC 2
-#define SHADER_DST_RGBA_ATTRIB_LOC 3
+[[maybe_unused]] static constexpr int SHADER_SRC_POS_ATTRIB_LOC = 0;
+[[maybe_unused]] static constexpr int SHADER_DST_POS_ATTRIB_LOC = 1;
+[[maybe_unused]] static constexpr int SHADER_SRC_RGBA_ATTRIB_LOC = 2;
+[[maybe_unused]] static constexpr int SHADER_DST_RGBA_ATTRIB_LOC = 3;
 
 struct scene {
     struct server_gl *gl;
@@ -100,5 +99,3 @@ struct scene_text *scene_add_text(struct scene *scene, const char *data,
 void scene_object_destroy(struct scene_object *object);
 int32_t scene_object_get_depth(struct scene_object *object);
 void scene_object_set_depth(struct scene_object *object, int32_t depth);
-
-#endif

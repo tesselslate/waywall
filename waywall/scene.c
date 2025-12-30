@@ -1,6 +1,3 @@
-#include "glsl/texcopy.frag.h"
-#include "glsl/texcopy.vert.h"
-
 #include "scene.h"
 #include "server/gl.h"
 #include "server/ui.h"
@@ -13,25 +10,26 @@
 #include <GLES2/gl2.h>
 #include <spng.h>
 
-#define PACKED_ATLAS_SIZE 4096
-#define PACKED_ATLAS_WIDTH 2048
-#define PACKED_ATLAS_HEIGHT 16
-#define ATLAS_WIDTH 128
-#define ATLAS_HEIGHT 256
-#define CHAR_WIDTH 8
-#define CHAR_HEIGHT 16
-#define CHARS_PER_ROW (ATLAS_WIDTH / CHAR_WIDTH)
+static constexpr int PACKED_ATLAS_SIZE = 4096;
+static constexpr int PACKED_ATLAS_WIDTH = 2048;
+static constexpr int PACKED_ATLAS_HEIGHT = 16;
+static constexpr int ATLAS_WIDTH = 128;
+static constexpr int ATLAS_HEIGHT = 256;
+static constexpr int CHAR_WIDTH = 8;
+static constexpr int CHAR_HEIGHT = 16;
+static constexpr int CHARS_PER_ROW = (ATLAS_WIDTH / CHAR_WIDTH);
 
 static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
-
-// clang-format off
-// There appears to be a bug in clang-format which causes it to remove the space after some
-// of these asterisks
-
 static_assert(PACKED_ATLAS_WIDTH * PACKED_ATLAS_HEIGHT == ATLAS_WIDTH * ATLAS_HEIGHT);
 static_assert(ATLAS_WIDTH * ATLAS_HEIGHT == PACKED_ATLAS_SIZE * 8);
 
-// clang-format on
+static constexpr char SHADER_FRAG_TEXCOPY[] = {
+#embed "glsl/texcopy.frag"
+    , 0};
+
+static constexpr char SHADER_VERT_TEXCOPY[] = {
+#embed "glsl/texcopy.vert"
+    , 0};
 
 struct vtx_shader {
     float src_pos[2];
@@ -107,7 +105,7 @@ static inline struct scene_text *scene_text_from_object(struct scene_object *obj
 static void
 image_build(struct scene_image *out, struct scene *scene, const struct scene_image_options *options,
             int32_t width, int32_t height) {
-    struct vtx_shader vertices[6] = {0};
+    struct vtx_shader vertices[6] = {};
 
     rect_build(vertices, &(struct box){0, 0, width, height}, &options->dst, (float[4]){0, 0, 0, 0},
                (float[4]){0, 0, 0, 0});
@@ -133,7 +131,7 @@ image_release(struct scene_object *object) {
         }
     }
 
-    image->parent = NULL;
+    image->parent = nullptr;
 }
 
 static void
@@ -159,7 +157,7 @@ image_render(struct scene_object *object) {
 static void
 mirror_build(struct scene_mirror *mirror, const struct scene_mirror_options *options,
              struct scene *scene) {
-    struct vtx_shader vertices[6] = {0};
+    struct vtx_shader vertices[6] = {};
 
     rect_build(vertices, &options->src, &options->dst, options->src_rgba, mirror->dst_rgba);
 
@@ -183,7 +181,7 @@ mirror_release(struct scene_object *object) {
         }
     }
 
-    mirror->parent = NULL;
+    mirror->parent = nullptr;
 }
 
 static void
@@ -276,7 +274,7 @@ text_release(struct scene_object *object) {
         }
     }
 
-    text->parent = NULL;
+    text->parent = nullptr;
 }
 
 static void
@@ -375,7 +373,7 @@ object_sort(struct scene *scene, struct scene_object *object) {
         return;
     }
 
-    struct scene_object *needle = NULL, *prev = NULL;
+    struct scene_object *needle = nullptr, *prev = nullptr;
     wl_list_for_each (needle, &scene->objects.sorted, link) {
         if (needle->depth >= object->depth) {
             break;
@@ -445,7 +443,7 @@ draw_stencil(struct scene *scene) {
     };
 
     struct vtx_shader buf[6];
-    rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){0}, (float[4]){0});
+    rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){}, (float[4]){});
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.stencil_rect) {
         gl_using_texture(GL_TEXTURE_2D, tex) {
             glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_DRAW);
@@ -470,7 +468,7 @@ draw_debug_text(struct scene *scene) {
     scene->buffers.debug_vtxcount = text_build(
         scene->buffers.debug, scene, str,
         &(struct scene_text_options){
-            .x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1, .shader_name = NULL});
+            .x = 8, .y = 8, .rgba = {1, 1, 1, 1}, .size_multiplier = 1, .shader_name = nullptr});
 
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.debug) {
         gl_using_texture(GL_TEXTURE_2D, scene->buffers.font_tex) {
@@ -523,7 +521,7 @@ draw_frame(struct scene *scene) {
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
     struct scene_object *object;
-    struct wl_list *positive_depth = NULL;
+    struct wl_list *positive_depth = nullptr;
     glEnable(GL_STENCIL_TEST);
     wl_list_for_each (object, &scene->objects.sorted, link) {
         if (object->depth >= 0) {
@@ -662,7 +660,7 @@ image_load(struct scene_image *out, struct scene *scene, const char *path) {
 
 static int
 shader_find_index(struct scene *scene, const char *key) {
-    if (key == NULL) {
+    if (key == nullptr) {
         return 0;
     }
     for (size_t i = 1; i < scene->shaders.count; i++) {
@@ -678,8 +676,8 @@ static bool
 shader_create(struct server_gl *gl, struct scene_shader *data, char *name, const char *vertex,
               const char *fragment) {
     data->name = name;
-    data->shader = server_gl_compile(gl, vertex ? vertex : WAYWALL_GLSL_TEXCOPY_VERT_H,
-                                     fragment ? fragment : WAYWALL_GLSL_TEXCOPY_FRAG_H);
+    data->shader = server_gl_compile(gl, vertex ? vertex : SHADER_VERT_TEXCOPY,
+                                     fragment ? fragment : SHADER_FRAG_TEXCOPY);
     if (!data->shader) {
         return false;
     }
@@ -708,7 +706,8 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
 
         scene->shaders.count = cfg->shaders.count + 1;
         scene->shaders.data = malloc(sizeof(struct scene_shader) * scene->shaders.count);
-        if (!shader_create(scene->gl, &scene->shaders.data[0], strdup("default"), NULL, NULL)) {
+        if (!shader_create(scene->gl, &scene->shaders.data[0], strdup("default"), nullptr,
+                           nullptr)) {
             ww_log(LOG_ERROR, "error creating default shader");
             server_gl_exit(scene->gl);
             goto fail_compile_texture_copy;
@@ -773,7 +772,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
 fail_compile_texture_copy:
     free(scene);
 
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -808,7 +807,7 @@ scene_add_image(struct scene *scene, const struct scene_image_options *options, 
     // Load the PNG into an OpenGL texture.
     if (!image_load(image, scene, path)) {
         free(image);
-        return NULL;
+        return nullptr;
     }
 
     // Find correct shader for this image

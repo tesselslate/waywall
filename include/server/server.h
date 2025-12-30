@@ -1,8 +1,6 @@
-#ifndef WAYWALL_SERVER_SERVER_H
-#define WAYWALL_SERVER_SERVER_H
+#pragma once
 
 #include "config/config.h"
-#include <stdbool.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 
@@ -39,8 +37,8 @@ struct server {
     struct {
         struct wl_signal input_focus;    // data: struct server_view *
         struct wl_signal map_status;     // data: bool *
-        struct wl_signal pointer_lock;   // data: NULL
-        struct wl_signal pointer_unlock; // data: NULL
+        struct wl_signal pointer_lock;   // data: nullptr
+        struct wl_signal pointer_unlock; // data: nullptr
     } events;
 };
 
@@ -70,5 +68,3 @@ void server_set_input_focus(struct server *server, struct server_view *view);
 void server_shutdown(struct server *server);
 
 bool server_view_has_focus(struct server_view *view);
-
-#endif

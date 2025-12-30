@@ -43,17 +43,17 @@ ww_timer_add_entry(struct ww_timer *timer, struct timespec duration, ww_timer_fu
     int timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC);
     if (timerfd == -1) {
         ww_log_errno(LOG_ERROR, "failed to create timerfd");
-        return NULL;
+        return nullptr;
     }
 
     struct itimerspec its = {
         .it_value = duration,
-        .it_interval = {0},
+        .it_interval = {},
     };
-    if (timerfd_settime(timerfd, 0, &its, NULL) != 0) {
+    if (timerfd_settime(timerfd, 0, &its, nullptr) != 0) {
         ww_log_errno(LOG_ERROR, "failed to set timerfd");
         goto fail_settime;
-        return NULL;
+        return nullptr;
     }
 
     struct ww_timer_entry *entry = zalloc(1, sizeof(*entry));
@@ -73,7 +73,7 @@ ww_timer_add_entry(struct ww_timer *timer, struct timespec duration, ww_timer_fu
 
 fail_settime:
     close(timerfd);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -89,10 +89,10 @@ int
 ww_timer_entry_set_duration(struct ww_timer_entry *entry, struct timespec duration) {
     struct itimerspec its = {
         .it_value = duration,
-        .it_interval = {0},
+        .it_interval = {},
     };
 
-    if (timerfd_settime(entry->fd, 0, &its, NULL) != 0) {
+    if (timerfd_settime(entry->fd, 0, &its, nullptr) != 0) {
         ww_log_errno(LOG_ERROR, "failed to set timerfd");
         return -1;
     }

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_ALLOC_H
-#define WAYWALL_UTIL_ALLOC_H
+#pragma once
 
 #include "util/prelude.h"
 #include <stddef.h>
@@ -20,5 +19,3 @@ zalloc(size_t nmemb, size_t size) {
     }
     return data;
 }
-
-#endif

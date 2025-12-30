@@ -1,5 +1,4 @@
-#ifndef WAYWALL_INOTIFY_H
-#define WAYWALL_INOTIFY_H
+#pragma once
 
 #include "util/list.h"
 #include <stdint.h>
@@ -27,5 +26,3 @@ void inotify_destroy(struct inotify *inotify);
 int inotify_subscribe(struct inotify *inotify, const char *path, uint32_t mask, inotify_func_t func,
                       void *data);
 void inotify_unsubscribe(struct inotify *inotify, int wd);
-
-#endif

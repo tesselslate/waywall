@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SUBPROC_H
-#define WAYWALL_SUBPROC_H
+#pragma once
 
 #include "util/list.h"
 #include <sys/types.h>
@@ -20,5 +19,3 @@ struct subproc_entry {
 struct subproc *subproc_create(struct server *server);
 void subproc_destroy(struct subproc *subproc);
 void subproc_exec(struct subproc *subproc, char *cmd[static 64]);
-
-#endif

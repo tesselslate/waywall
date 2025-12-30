@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_KEYCODES_H
-#define WAYWALL_UTIL_KEYCODES_H
+#pragma once
 
 #include "util/prelude.h"
 #include <linux/input-event-codes.h>
@@ -7,7 +6,7 @@
 
 #define K(x) {#x, KEY_##x}
 
-WW_MAYBE_UNUSED static const struct {
+[[maybe_unused]] static const struct {
     const char *name;
     uint32_t value;
 } util_keycodes[] = {
@@ -261,5 +260,3 @@ WW_MAYBE_UNUSED static const struct {
 };
 
 #undef K
-
-#endif

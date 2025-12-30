@@ -8,13 +8,12 @@
 #include "util/alloc.h"
 #include "util/prelude.h"
 #include <inttypes.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <wayland-client-protocol.h>
 #include <wayland-server-protocol.h>
 
-#define SRV_LINUX_DRM_SYNCOBJ_VERSION 1
+static constexpr int SRV_LINUX_DRM_SYNCOBJ_VERSION = 1;
 
 static bool
 syncobj_surface_exists(struct server_drm_syncobj_manager *syncobj_manager,
@@ -36,7 +35,7 @@ on_surface_destroy(struct wl_listener *listener, void *data) {
     struct server_drm_syncobj_surface *syncobj_surface =
         wl_container_of(listener, syncobj_surface, on_surface_destroy);
 
-    syncobj_surface->parent = NULL;
+    syncobj_surface->parent = nullptr;
 }
 
 static void

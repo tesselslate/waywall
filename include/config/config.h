@@ -1,8 +1,6 @@
-#ifndef WAYWALL_CONFIG_CONFIG_H
-#define WAYWALL_CONFIG_CONFIG_H
+#pragma once
 
 #include <luajit-2.1/lua.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
@@ -106,5 +104,3 @@ int config_parse_remap(const char *src, const char *dst, struct config_remap *re
 remaps->data must be freed
 */
 void config_add_remap(struct config_remaps *remaps, struct config_remap remap);
-
-#endif

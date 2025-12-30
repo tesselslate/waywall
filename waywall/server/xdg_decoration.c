@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define SRV_XDG_DECORATION_MANAGER_VERSION 1
+static constexpr int SRV_XDG_DECORATION_MANAGER_VERSION = 1;
 
 static void
 on_toplevel_destroy(struct wl_listener *listener, void *data) {

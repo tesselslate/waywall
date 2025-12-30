@@ -5,11 +5,10 @@
 #include "util/prelude.h"
 #include "xwayland-shell-v1-server-protocol.h"
 #include <inttypes.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
-#define SRV_XWAYLAND_SHELL_VERSION 1
+static constexpr int SRV_XWAYLAND_SHELL_VERSION = 1;
 
 static void
 xwayland_surface_role_commit(struct wl_resource *role_resource) {
@@ -40,7 +39,7 @@ static void
 xwayland_surface_resource_destroy(struct wl_resource *resource) {
     struct server_xwayland_surface *xwayland_surface = wl_resource_get_user_data(resource);
 
-    wl_signal_emit_mutable(&xwayland_surface->events.destroy, NULL);
+    wl_signal_emit_mutable(&xwayland_surface->events.destroy, nullptr);
     free(xwayland_surface);
 }
 
@@ -76,7 +75,7 @@ xwayland_shell_resource_destroy(struct wl_resource *resource) {
 
     ww_assert(xwayland_shell->resource == resource);
 
-    xwayland_shell->resource = NULL;
+    xwayland_shell->resource = nullptr;
     xwayland_shell->bound = false;
 }
 

@@ -26,7 +26,7 @@
 #include <xkbcommon/xkbcommon-names.h>
 #include <xkbcommon/xkbcommon.h>
 
-#define SRV_SEAT_VERSION 6
+static constexpr int SRV_SEAT_VERSION = 6;
 
 struct key_update {
     bool changed_keys;
@@ -141,7 +141,7 @@ prepare_local_keymap(struct server_seat *seat, const struct xkb_rule_names *rule
         goto fail_truncate_memfd;
     }
 
-    char *data = mmap(NULL, km->size, PROT_READ | PROT_WRITE, MAP_SHARED, km->fd, 0);
+    char *data = mmap(nullptr, km->size, PROT_READ | PROT_WRITE, MAP_SHARED, km->fd, 0);
     if (data == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to map XKB keymap memfd");
         goto fail_map_memfd;
@@ -215,7 +215,7 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
 
 static struct key_update
 modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
-    struct key_update ret = {0};
+    struct key_update ret = {};
 
     if (state) {
         for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
@@ -557,7 +557,7 @@ on_keyboard_keymap(void *data, struct wl_keyboard *wl, uint32_t format, int32_t 
     }
 
     // Prepare new keymap.
-    char *km_str = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, 0);
+    char *km_str = mmap(nullptr, size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (km_str == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap keymap data");
         close(fd);
@@ -866,8 +866,8 @@ static const struct wl_pointer_listener pointer_listener = {
     .leave = on_pointer_leave,
     .motion = on_pointer_motion,
 
-    .axis_value120 = NULL,           // introduced in v8 (using v5)
-    .axis_relative_direction = NULL, // introduced in v9 (using v5)
+    .axis_value120 = nullptr,           // introduced in v8 (using v5)
+    .axis_relative_direction = nullptr, // introduced in v9 (using v5)
 };
 
 static void
@@ -939,7 +939,7 @@ pointer_set_cursor(struct wl_client *client, struct wl_resource *resource, uint3
     // surfaces with the correct roles anyway.
     struct server_surface *surface = server_surface_from_resource(surface_resource);
 
-    if (server_surface_set_role(surface, &cursor_role, NULL) != 0) {
+    if (server_surface_set_role(surface, &cursor_role, nullptr) != 0) {
         wl_resource_post_error(
             resource, WL_POINTER_ERROR_ROLE,
             "cannot call wl_pointer.set_cursor with a surface that has another role");
@@ -1109,7 +1109,7 @@ fail_config:
 
 fail_xkb_context:
     free(seat);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -1220,7 +1220,7 @@ server_seat_config_create(struct server_seat *seat, struct config *cfg) {
     for (size_t i = 0; i < cfg->input.remaps.count; i++) {
         struct config_remap *remap = &cfg->input.remaps.data[i];
 
-        struct server_seat_remap *dst = NULL;
+        struct server_seat_remap *dst = nullptr;
         switch (remap->src_type) {
         case CONFIG_REMAP_BUTTON:
             dst = &config->remaps.buttons[config->remaps.num_buttons++];
@@ -1241,7 +1241,7 @@ server_seat_config_create(struct server_seat *seat, struct config *cfg) {
 
 fail_keymap:
     free(config);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -1254,7 +1254,7 @@ server_seat_config_destroy(struct server_seat_config *config) {
 
 int
 server_seat_lua_set_keymap(struct server_seat *seat, const struct xkb_rule_names *rule_names) {
-    struct server_seat_keymap keymap = {0};
+    struct server_seat_keymap keymap = {};
 
     if (prepare_local_keymap(seat, rule_names, &keymap) != 0) {
         return 1;

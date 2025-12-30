@@ -1,4 +1,3 @@
-subdir('glsl')
 subdir('lua')
 
 waywall_src = files(
@@ -49,7 +48,6 @@ waywall_src = files(
 
 executable('waywall',
   waywall_src,
-  waywall_glsl,
   waywall_lua,
   protocol_headers,
   protocol_sources,

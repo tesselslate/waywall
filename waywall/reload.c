@@ -12,7 +12,7 @@
 #include <string.h>
 #include <sys/inotify.h>
 
-static const struct timespec RELOAD_DEBOUNCE_TIME = {
+static constexpr struct timespec RELOAD_DEBOUNCE_TIME = {
     .tv_nsec = 100 * 1000000 // 100 milliseconds
 };
 
@@ -33,7 +33,7 @@ static void
 reload_timer_destroy(void *data) {
     struct reload *rl = data;
 
-    rl->timer_entry = NULL;
+    rl->timer_entry = nullptr;
 }
 
 static void
@@ -41,7 +41,7 @@ reload_timer_fire(void *data) {
     struct reload *rl = data;
 
     ww_timer_entry_destroy(rl->timer_entry);
-    rl->timer_entry = NULL;
+    rl->timer_entry = nullptr;
 
     struct config *cfg = config_create();
     if (config_load(cfg, rl->profile) != 0) {
@@ -215,7 +215,7 @@ fail_watchdir:
 fail_path:
     str_free(rl->config_path);
     free(rl);
-    return NULL;
+    return nullptr;
 }
 
 void

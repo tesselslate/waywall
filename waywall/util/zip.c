@@ -9,11 +9,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-static const uint32_t MAGIC_EOCD = 0x06054B50;
-static const uint32_t MAGIC_CD = 0x02014B50;
+static constexpr uint32_t MAGIC_EOCD = 0x06054B50;
+static constexpr uint32_t MAGIC_CD = 0x02014B50;
 
-#define SIZE_EOCD 22
-#define SIZE_CD 46
+static constexpr size_t SIZE_EOCD = 22;
+static constexpr size_t SIZE_CD = 46;
 
 struct zip {
     int fd;
@@ -124,7 +124,7 @@ zip_close(struct zip *zip) {
 const char *
 zip_next(struct zip *zip) {
     if (zip->iter.idx == zip->eocd.cd_records) {
-        return NULL;
+        return nullptr;
     }
 
     if (zip->iter.offset + SIZE_CD >= zip->map.len) {
@@ -140,7 +140,7 @@ zip_next(struct zip *zip) {
         goto fail;
     }
 
-    struct zip_cd cdr = {0};
+    struct zip_cd cdr = {};
     memcpy(&cdr, zip->map.region + zip->iter.offset, SIZE_CD);
 
     // Check the full size of the Central Directory record against the size of the ZIP file.
@@ -166,7 +166,7 @@ zip_next(struct zip *zip) {
 fail:
     // Prevent any further calls to `zip_next` by moving the iterator to the end.
     zip->iter.idx = zip->eocd.cd_records;
-    return NULL;
+    return nullptr;
 }
 
 struct zip *
@@ -179,14 +179,14 @@ zip_open(const char *path) {
         goto fail_open;
     }
 
-    struct stat zipstat = {0};
+    struct stat zipstat = {};
     if (fstat(zip->fd, &zipstat) == -1) {
         ww_log_errno(LOG_ERROR, "failed to stat zip at '%s'", path);
         goto fail_stat;
     }
 
     zip->map.len = zipstat.st_size;
-    zip->map.region = mmap(NULL, zip->map.len, PROT_READ, MAP_SHARED, zip->fd, 0);
+    zip->map.region = mmap(nullptr, zip->map.len, PROT_READ, MAP_SHARED, zip->fd, 0);
     if (zip->map.region == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap zip at '%s'", path);
         goto fail_mmap;
@@ -208,5 +208,5 @@ fail_stat:
 
 fail_open:
     free(zip);
-    return NULL;
+    return nullptr;
 }

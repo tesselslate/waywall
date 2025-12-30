@@ -14,7 +14,7 @@
 #include <wayland-client-protocol.h>
 #include <wayland-util.h>
 
-#define SRV_LINUX_DMABUF_VERSION 4
+static constexpr int SRV_LINUX_DMABUF_VERSION = 4;
 
 static void
 destroy_dmabuf_buffer_data(struct server_dmabuf_data *data) {

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_SERVER_XDG_DECORATION_H
-#define WAYWALL_SERVER_XDG_DECORATION_H
+#pragma once
 
 #include "server/server.h"
 #include <wayland-server-core.h>
@@ -23,5 +22,3 @@ struct server_xdg_toplevel_decoration {
 };
 
 struct server_xdg_decoration_manager *server_xdg_decoration_manager_create(struct server *server);
-
-#endif

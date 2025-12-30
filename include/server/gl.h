@@ -1,12 +1,10 @@
-#ifndef WAYWALL_SERVER_GL_H
-#define WAYWALL_SERVER_GL_H
+#pragma once
 
 #include "util/box.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include <stdbool.h>
 #include <wayland-server-core.h>
 
 #define server_gl_with(gl, surface)                                                                \
@@ -55,7 +53,7 @@ struct server_gl {
     struct wl_listener on_ui_resize;
 
     struct {
-        struct wl_signal frame; // data: NULL
+        struct wl_signal frame; // data: nullptr
     } events;
 };
 
@@ -78,5 +76,3 @@ void server_gl_swap_buffers(struct server_gl *gl);
 
 void server_gl_shader_destroy(struct server_gl_shader *shader);
 void server_gl_shader_use(struct server_gl_shader *shader);
-
-#endif

@@ -25,9 +25,9 @@ static const struct {
 
     char config_vm;
     char wrap;
-} REG_KEYS = {0};
+} REG_KEYS = {};
 
-#define MAX_INSTRUCTIONS 50000000
+static constexpr int MAX_INSTRUCTIONS = 50000000;
 
 static void waker_destroy(struct config_vm_waker *waker);
 static struct config_vm_waker *waker_lookup(lua_State *L);
@@ -178,7 +178,7 @@ config_vm_create() {
 
 fail_newstate:
     free(vm);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -265,7 +265,7 @@ int
 config_vm_pcall(struct config_vm *vm, int nargs, int nresults, int errfunc) {
     lua_sethook(vm->L, on_debug_hook, LUA_MASKCOUNT, MAX_INSTRUCTIONS);
     int ret = lua_pcall(vm->L, nargs, nresults, errfunc);
-    lua_sethook(vm->L, NULL, 0, 0);
+    lua_sethook(vm->L, nullptr, 0, 0);
 
     return ret;
 }
@@ -311,7 +311,7 @@ config_vm_resume(struct config_vm_waker *waker) {
 
     lua_sethook(waker->L, on_debug_hook, LUA_MASKCOUNT, MAX_INSTRUCTIONS);
     int ret = lua_resume(waker->L, 0);
-    lua_sethook(waker->L, NULL, 0, 0);
+    lua_sethook(waker->L, nullptr, 0, 0);
 
     switch (ret) {
     case LUA_YIELD:
@@ -358,7 +358,7 @@ config_vm_try_action(struct config_vm *vm, size_t index) {
     // Create a new coroutine (Lua thread) and place it in the global coroutines table so that
     // it does not get garbage collected.
     lua_State *coro = lua_newthread(vm->L); // stack: 1
-    coro_table_add(coro, NULL);
+    coro_table_add(coro, nullptr);
 
     // Retrieve the given action function from the actions table.
     lua_pushlightuserdata(coro, (void *)&REG_KEYS.actions); // stack: 1

@@ -1,5 +1,4 @@
-#ifndef WAYWALL_UTIL_FONT_H
-#define WAYWALL_UTIL_FONT_H
+#pragma once
 
 /*
  * Copyright (C) 2020 Dimitar Toshkov Zhekov,
@@ -98,7 +97,7 @@
  * OTHER DEALINGS IN THE FONT SOFTWARE.
  */
 
-static const unsigned char UTIL_TERMINUS_FONT[] = {
+static constexpr unsigned char UTIL_TERMINUS_FONT[] = {
     170, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   136, 0,   0,   0,   0,
     0,   0,   16,  0,   16,  0,   16,  0,   0,   0,   36,  0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -316,5 +315,3 @@ static const unsigned char UTIL_TERMINUS_FONT[] = {
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
 };
-
-#endif
