@@ -46,6 +46,6 @@ str_free(str str) {
 
 str
 str_new() {
-    struct hdr *hdr = zalloc(1, sizeof(*hdr));
+    struct hdr *hdr = zalloc(1, sizeof(*hdr) + 1);
     return hdrstr(hdr);
 }
