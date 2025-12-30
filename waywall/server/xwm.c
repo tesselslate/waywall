@@ -302,8 +302,8 @@ upsurface_destroy(struct unpaired_surface *upsurface) {
 static struct xsurface *
 xsurface_create(struct xwm *xwm, xcb_window_t window) {
     // Subscribe to property changes on this window.
-    static const uint32_t mask[] = {XCB_EVENT_MASK_PROPERTY_CHANGE};
-    xcb_change_window_attributes(xwm->conn, window, XCB_CW_EVENT_MASK, mask);
+    static constexpr uint32_t MASK[] = {XCB_EVENT_MASK_PROPERTY_CHANGE};
+    xcb_change_window_attributes(xwm->conn, window, XCB_CW_EVENT_MASK, MASK);
 
     // Create the xsurface object.
     struct xsurface *xsurface = zalloc(1, sizeof(*xsurface));
@@ -616,7 +616,7 @@ handle_xcb_client_message(struct xwm *xwm, xcb_client_message_event_t *event) {
 
 static void
 handle_xcb_configure_request(struct xwm *xwm, xcb_configure_request_event_t *event) {
-    static const uint32_t CONFIGURE_MASK = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
+    static constexpr uint32_t CONFIGURE_MASK = XCB_CONFIG_WINDOW_WIDTH | XCB_CONFIG_WINDOW_HEIGHT;
 
     xcb_configure_window(xwm->conn, event->window, CONFIGURE_MASK,
                          (uint32_t[2]){event->width, event->height});
@@ -936,15 +936,15 @@ init_atoms(struct xwm *xwm) {
 
 static void
 init_wm(struct xwm *xwm) {
-    static const uint32_t mask[] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
-                                    XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
-                                    XCB_EVENT_MASK_PROPERTY_CHANGE};
-    xcb_change_window_attributes(xwm->conn, xwm->screen->root, XCB_CW_EVENT_MASK, mask);
+    static constexpr uint32_t MASK[] = {XCB_EVENT_MASK_SUBSTRUCTURE_REDIRECT |
+                                        XCB_EVENT_MASK_SUBSTRUCTURE_NOTIFY |
+                                        XCB_EVENT_MASK_PROPERTY_CHANGE};
+    xcb_change_window_attributes(xwm->conn, xwm->screen->root, XCB_CW_EVENT_MASK, MASK);
 }
 
 static void
 init_ewmh(struct xwm *xwm) {
-    static const char wm_name[] = "wm";
+    static constexpr char wm_name[] = "wm";
 
     xwm->ewmh_window = xcb_generate_id(xwm->conn);
     xcb_create_window(xwm->conn, XCB_COPY_FROM_PARENT, xwm->ewmh_window, xwm->screen->root, 0, 0, 1,

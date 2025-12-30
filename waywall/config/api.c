@@ -368,7 +368,7 @@ l_current_time(lua_State *L) {
 
 static int
 l_exec(lua_State *L) {
-    static const int ARG_COMMAND = 1;
+    static constexpr int ARG_COMMAND = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -431,8 +431,8 @@ l_floating_shown(lua_State *L) {
 
 static int
 l_image(lua_State *L) {
-    static const int ARG_PATH = 1;
-    static const int ARG_OPTIONS = 2;
+    static constexpr int ARG_PATH = 1;
+    static constexpr int ARG_OPTIONS = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -483,7 +483,7 @@ l_image(lua_State *L) {
 
 static int
 l_mirror(lua_State *L) {
-    static const int ARG_OPTIONS = 1;
+    static constexpr int ARG_OPTIONS = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -544,7 +544,7 @@ l_mirror(lua_State *L) {
 
 static int
 l_press_key(lua_State *L) {
-    static const int ARG_KEYNAME = 1;
+    static constexpr int ARG_KEYNAME = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -577,7 +577,7 @@ l_press_key(lua_State *L) {
 
 static int
 l_get_key(lua_State *L) {
-    static const int ARG_KEYNAME = 1;
+    static constexpr int ARG_KEYNAME = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -634,8 +634,8 @@ l_profile(lua_State *L) {
 
 static int
 l_set_keymap(lua_State *L) {
-    static const int ARG_KEYMAP = 1;
-    static const int IDX_VALUE = 2;
+    static constexpr int ARG_KEYMAP = 1;
+    static constexpr int IDX_VALUE = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -688,9 +688,9 @@ l_set_keymap(lua_State *L) {
 
 static int
 l_set_remaps(lua_State *L) {
-    static const int ARG_REMAPS = 1;
-    static const int IDX_REMAP_KEY = 2;
-    static const int IDX_REMAP_VAL = 3;
+    static constexpr int ARG_REMAPS = 1;
+    static constexpr int IDX_REMAP_KEY = 2;
+    static constexpr int IDX_REMAP_VAL = 3;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -796,8 +796,8 @@ l_set_remaps(lua_State *L) {
 
 static int
 l_set_resolution(lua_State *L) {
-    static const int ARG_WIDTH = 1;
-    static const int ARG_HEIGHT = 2;
+    static constexpr int ARG_WIDTH = 1;
+    static constexpr int ARG_HEIGHT = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -828,7 +828,7 @@ l_set_resolution(lua_State *L) {
 
 static int
 l_set_sensitivity(lua_State *L) {
-    static const int ARG_SENS = 1;
+    static constexpr int ARG_SENS = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -854,7 +854,7 @@ l_set_sensitivity(lua_State *L) {
 
 static int
 l_show_floating(lua_State *L) {
-    static const int ARG_SHOW = 1;
+    static constexpr int ARG_SHOW = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -878,7 +878,7 @@ l_show_floating(lua_State *L) {
 
 static int
 l_sleep(lua_State *L) {
-    static const int ARG_MS = 1;
+    static constexpr int ARG_MS = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -919,7 +919,7 @@ l_sleep(lua_State *L) {
 
 static int
 l_state(lua_State *L) {
-    static const int IDX_STATE = 1;
+    static constexpr int IDX_STATE = 1;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -972,12 +972,12 @@ l_state(lua_State *L) {
 
 static int
 l_text_legacy(lua_State *L, struct wrap *wrap) {
-    static const int ARG_TEXT = 1;
-    static const int ARG_X = 2;
-    static const int ARG_Y = 3;
-    static const int ARG_COLOR = 4;
-    static const int ARG_SIZE = 5;
-    static const int ARG_SHADER = 6;
+    static constexpr int ARG_TEXT = 1;
+    static constexpr int ARG_X = 2;
+    static constexpr int ARG_Y = 3;
+    static constexpr int ARG_COLOR = 4;
+    static constexpr int ARG_SIZE = 5;
+    static constexpr int ARG_SHADER = 6;
 
     ww_log(LOG_WARN, "using legacy text creation code path - update your configuration");
 
@@ -1039,8 +1039,8 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
 
 static int
 l_text(lua_State *L) {
-    static const int ARG_TEXT = 1;
-    static const int ARG_OPTIONS = 2;
+    static constexpr int ARG_TEXT = 1;
+    static constexpr int ARG_OPTIONS = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -1149,8 +1149,8 @@ l_log_error(lua_State *L) {
 
 static int
 l_register(lua_State *L) {
-    static const int ARG_SIGNAL = 1;
-    static const int ARG_HANDLER = 2;
+    static constexpr int ARG_SIGNAL = 1;
+    static constexpr int ARG_HANDLER = 2;
 
     // Prologue
     struct config_vm *vm = config_vm_from(L);
@@ -1170,8 +1170,8 @@ l_register(lua_State *L) {
 
 static int
 l_setenv(lua_State *L) {
-    static const int ARG_NAME = 1;
-    static const int ARG_VALUE = 2;
+    static constexpr int ARG_NAME = 1;
+    static constexpr int ARG_VALUE = 2;
 
     // Prologue
     const char *name = luaL_checkstring(L, ARG_NAME);

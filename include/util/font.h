@@ -98,7 +98,7 @@
  * OTHER DEALINGS IN THE FONT SOFTWARE.
  */
 
-static const unsigned char UTIL_TERMINUS_FONT[] = {
+static constexpr unsigned char UTIL_TERMINUS_FONT[] = {
     170, 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   136, 0,   0,   0,   0,
     0,   0,   16,  0,   16,  0,   16,  0,   0,   0,   36,  0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,

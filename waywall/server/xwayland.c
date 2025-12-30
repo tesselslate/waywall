@@ -178,8 +178,10 @@ xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
     // HACK: Sending an EnterNotify event causes GLFW to update the mouse pointer coordinates, so
     // we don't accidentally click any menu buttons.
 
-    static const uint32_t window_mask = XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
-    static const uint32_t button_mask = XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
+    static constexpr uint32_t window_mask =
+        XCB_EVENT_MASK_ENTER_WINDOW | XCB_EVENT_MASK_LEAVE_WINDOW;
+    static constexpr uint32_t button_mask =
+        XCB_EVENT_MASK_BUTTON_PRESS | XCB_EVENT_MASK_BUTTON_RELEASE;
 
     xcb_window_t window = xwm_window_from_view(view);
 

@@ -270,7 +270,7 @@ env_passthrough_get() {
 // If the user doesn't want this behavior, it can be turned off via a flag.
 int
 env_reexec(char **argv) {
-    static const int ENV_SIZE = 1048576;
+    static constexpr int ENV_SIZE = 1048576;
 
     // Check for the __WAYWALL_ENV_PASSTHROUGH_FD variable. If present, read it into the passthrough
     // environment and then let execution continue normally since we already restarted.

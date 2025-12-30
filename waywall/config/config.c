@@ -390,10 +390,10 @@ compare_action(const void *a_void, const void *b_void) {
 
 static int
 process_config_actions(struct config *cfg) {
-    static const int IDX_ACTIONS = 2;
-    static const int IDX_DUP_TABLE = 3;
-    static const int IDX_ACTION_KEY = 4;
-    static const int IDX_ACTION_VAL = 5;
+    static constexpr int IDX_ACTIONS = 2;
+    static constexpr int IDX_DUP_TABLE = 3;
+    static constexpr int IDX_ACTION_KEY = 4;
+    static constexpr int IDX_ACTION_VAL = 5;
 
     // stack state
     // 2 (IDX_ACTIONS): config.actions
@@ -481,9 +481,9 @@ process_config_experimental(struct config *cfg) {
 
 static int
 process_config_input_remaps(struct config *cfg) {
-    static const int IDX_REMAPS = 3;
-    static const int IDX_REMAP_KEY = 4;
-    static const int IDX_REMAP_VAL = 5;
+    static constexpr int IDX_REMAPS = 3;
+    static constexpr int IDX_REMAP_KEY = 4;
+    static constexpr int IDX_REMAP_VAL = 5;
 
     // stack state
     // 3 (IDX_REMAPS)     : config.input.remaps
@@ -676,8 +676,8 @@ process_config_shaders(struct config *cfg) {
     // stack state
     // 2:   config.shaders
     // 1:   config
-    const int IDX_SHADERS = 2;
-    const int IDX_SHADER_KEY = 3;
+    static constexpr int IDX_SHADERS = 2;
+    static constexpr int IDX_SHADER_KEY = 3;
 
     ww_assert(lua_gettop(cfg->vm->L) == IDX_SHADERS);
 
@@ -755,7 +755,7 @@ process_config(struct config *cfg) {
 
 static int
 load_config(struct config *cfg) {
-    static const int ARG_CONFIG = 1;
+    static constexpr int ARG_CONFIG = 1;
 
     ww_assert(lua_gettop(cfg->vm->L) == 0);
 

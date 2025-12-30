@@ -12,7 +12,7 @@
 #include <string.h>
 #include <sys/inotify.h>
 
-static const struct timespec RELOAD_DEBOUNCE_TIME = {
+static constexpr struct timespec RELOAD_DEBOUNCE_TIME = {
     .tv_nsec = 100 * 1000000 // 100 milliseconds
 };
 

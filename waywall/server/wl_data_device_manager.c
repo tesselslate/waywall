@@ -43,7 +43,7 @@ static void set_selection(struct server_data_device_manager *data_device_manager
 
 static int
 handle_selection_pipe(int32_t fd, uint32_t mask, void *data) {
-    static const int CHUNK_SIZE = 4096;
+    static constexpr int CHUNK_SIZE = 4096;
 
     struct server_data_device_manager *data_device_manager = data;
     ww_assert(fd == data_device_manager->selection_content.fd);
@@ -396,7 +396,7 @@ send_selection_offer(struct server_data_offer *offer) {
 
 static void
 get_utf8_selection(struct server_data_device_manager *data_device_manager) {
-    static const char *UTF8_MIME = "text/plain;charset=utf-8";
+    static constexpr char UTF8_MIME[] = "text/plain;charset=utf-8";
 
     selection_content_destroy(&data_device_manager->selection_content);
 

@@ -110,7 +110,7 @@ struct gl_buffer {
 };
 
 // clang-format off
-static const EGLint CONFIG_ATTRIBUTES[] = {
+static constexpr EGLint CONFIG_ATTRIBUTES[] = {
     EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
     EGL_RED_SIZE, 8,
     EGL_GREEN_SIZE, 8,
@@ -121,7 +121,7 @@ static const EGLint CONFIG_ATTRIBUTES[] = {
     EGL_NONE,
 };
 
-static const EGLint CONTEXT_ATTRIBUTES[] = {
+static constexpr EGLint CONTEXT_ATTRIBUTES[] = {
     EGL_CONTEXT_MAJOR_VERSION, 2,
     EGL_NONE,
 };
