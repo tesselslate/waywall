@@ -459,7 +459,7 @@ compile_shader(GLuint *out, GLint type, const char *source) {
         return true;
     }
 
-    char buf[4096] = {0};
+    char buf[4096] = {};
     glGetShaderInfoLog(shader, STATIC_ARRLEN(buf) - 1, nullptr, buf);
     ww_log(LOG_ERROR, "failed to compile shader (type %d): %s", (int)type, buf);
 
@@ -488,7 +488,7 @@ compile_program(GLuint *out, GLuint vert, GLuint frag) {
         return true;
     }
 
-    char buf[4096] = {0};
+    char buf[4096] = {};
     glGetProgramInfoLog(prog, STATIC_ARRLEN(buf) - 1, nullptr, buf);
     ww_log(LOG_ERROR, "failed to link shader program: %s", buf);
 

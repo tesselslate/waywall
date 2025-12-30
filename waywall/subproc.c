@@ -113,7 +113,7 @@ subproc_exec(struct subproc *subproc, char *cmd[static 64]) {
                              WL_EVENT_READABLE, handle_pidfd, subproc);
     check_alloc(src);
 
-    struct subproc_entry entry = {0};
+    struct subproc_entry entry = {};
 
     entry.pid = pid;
     entry.pidfd = pidfd;

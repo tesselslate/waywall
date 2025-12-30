@@ -323,7 +323,7 @@ unmarshal_color(lua_State *L, const char *key, float rgba[static 4]) {
 
     const char *value = lua_tostring(L, -1);
 
-    uint8_t u8_rgba[4] = {0};
+    uint8_t u8_rgba[4] = {};
     if (config_parse_hex(u8_rgba, value) != 0) {
         return luaL_error(L, "expected '%s' to be a valid hex color ('%s')", key, value);
     }
@@ -385,7 +385,7 @@ l_exec(lua_State *L) {
     char *cmd_str = strdup(lua_str);
     check_alloc(cmd_str);
 
-    char *cmd[64] = {0};
+    char *cmd[64] = {};
     char *needle = cmd_str;
     char *elem;
 
@@ -444,7 +444,7 @@ l_image(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct scene_image_options options = {0};
+    struct scene_image_options options = {};
     unmarshal_box_key(L, "dst", &options.dst);
 
     lua_pushstring(L, "shader");
@@ -494,7 +494,7 @@ l_mirror(lua_State *L) {
     luaL_checktype(L, ARG_OPTIONS, LUA_TTABLE);
     lua_settop(L, ARG_OPTIONS);
 
-    struct scene_mirror_options options = {0};
+    struct scene_mirror_options options = {};
 
     unmarshal_box_key(L, "src", &options.src);
     unmarshal_box_key(L, "dst", &options.dst);
@@ -648,7 +648,7 @@ l_set_keymap(lua_State *L) {
     lua_settop(L, ARG_KEYMAP);
 
     // Body. Construct an instance of xkb_rule_names from the provided options table.
-    struct xkb_rule_names rule_names = {0};
+    struct xkb_rule_names rule_names = {};
 
     const struct {
         const char *key;
@@ -705,7 +705,7 @@ l_set_remaps(lua_State *L) {
     // Body.
     // A lot of this code is duplicated from process_config_input_remaps and
     // server_seat_config_create, which probably isn't ideal.
-    struct config_remaps remaps = {0};
+    struct config_remaps remaps = {};
 
     // stack state
     // 1 (ARG_REMAPS)     : remaps
@@ -736,7 +736,7 @@ l_set_remaps(lua_State *L) {
         const char *src_input = lua_tostring(L, IDX_REMAP_KEY);
         const char *dst_input = lua_tostring(L, IDX_REMAP_VAL);
 
-        struct config_remap remap = {0};
+        struct config_remap remap = {};
         if (config_parse_remap(src_input, dst_input, &remap) != 0) {
             if (remaps.data) {
                 free(remaps.data);
@@ -988,7 +988,7 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
     if (lua_gettop(L) >= ARG_COLOR) {
         const char *raw_color = luaL_checkstring(L, ARG_COLOR);
 
-        uint8_t u8_rgba[4] = {0};
+        uint8_t u8_rgba[4] = {};
         if (config_parse_hex(u8_rgba, raw_color) != 0) {
             return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
         }
@@ -1055,7 +1055,7 @@ l_text(lua_State *L) {
     }
     lua_settop(L, ARG_OPTIONS);
 
-    struct scene_text_options options = {0};
+    struct scene_text_options options = {};
 
     lua_pushstring(L, "x");
     lua_rawget(L, ARG_OPTIONS);
@@ -1078,7 +1078,7 @@ l_text(lua_State *L) {
     if (lua_type(L, -1) == LUA_TSTRING) {
         const char *raw_color = lua_tostring(L, -1);
 
-        uint8_t u8_rgba[4] = {0};
+        uint8_t u8_rgba[4] = {};
         if (config_parse_hex(u8_rgba, raw_color) != 0) {
             return luaL_error(L, "expected a valid hex color, got '%s'", raw_color);
         }

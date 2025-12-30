@@ -194,7 +194,7 @@ layout_floating(struct server_view *view) {
 
 static void
 view_state_reset(struct server_view_state *state) {
-    *state = (struct server_view_state){0};
+    *state = (struct server_view_state){};
 }
 
 static void

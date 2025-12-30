@@ -32,7 +32,7 @@
     }                                                                                              \
                                                                                                    \
     WW_MAYBE_UNUSED static inline struct name name##_create() {                                    \
-        struct name list = {0};                                                                    \
+        struct name list = {};                                                                     \
         list.cap = 8;                                                                              \
         list.data = zalloc(8, sizeof(*list.data));                                                 \
                                                                                                    \

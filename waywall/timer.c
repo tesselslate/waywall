@@ -48,7 +48,7 @@ ww_timer_add_entry(struct ww_timer *timer, struct timespec duration, ww_timer_fu
 
     struct itimerspec its = {
         .it_value = duration,
-        .it_interval = {0},
+        .it_interval = {},
     };
     if (timerfd_settime(timerfd, 0, &its, nullptr) != 0) {
         ww_log_errno(LOG_ERROR, "failed to set timerfd");
@@ -89,7 +89,7 @@ int
 ww_timer_entry_set_duration(struct ww_timer_entry *entry, struct timespec duration) {
     struct itimerspec its = {
         .it_value = duration,
-        .it_interval = {0},
+        .it_interval = {},
     };
 
     if (timerfd_settime(entry->fd, 0, &its, nullptr) != 0) {

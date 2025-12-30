@@ -31,7 +31,7 @@ util_log(enum ww_log_level level, const char *fmt, ...) {
 
 void
 util_log_va(enum ww_log_level level, const char *fmt, va_list args, bool newline) {
-    struct timespec now = {0};
+    struct timespec now = {};
     clock_gettime(CLOCK_MONOTONIC, &now);
     unsigned long sec = now.tv_sec;
     unsigned long usec = now.tv_nsec / 1000;

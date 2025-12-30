@@ -215,7 +215,7 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
 
 static struct key_update
 modify_pressed_keys(struct server_seat *seat, uint32_t keycode, bool state) {
-    struct key_update ret = {0};
+    struct key_update ret = {};
 
     if (state) {
         for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
@@ -1254,7 +1254,7 @@ server_seat_config_destroy(struct server_seat_config *config) {
 
 int
 server_seat_lua_set_keymap(struct server_seat *seat, const struct xkb_rule_names *rule_names) {
-    struct server_seat_keymap keymap = {0};
+    struct server_seat_keymap keymap = {};
 
     if (prepare_local_keymap(seat, rule_names, &keymap) != 0) {
         return 1;

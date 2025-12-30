@@ -190,7 +190,7 @@ xwayland_view_close(void *data) {
     struct xsurface *xsurface = data;
 
     // GLFW suppoorts WM_DELETE_WINDOW, so this is good enough.
-    xcb_client_message_event_t event = {0};
+    xcb_client_message_event_t event = {};
     event.response_type = XCB_CLIENT_MESSAGE;
     event.format = 32;
     event.data.data32[0] = xsurface->xwm->atoms[WM_DELETE_WINDOW];
@@ -243,7 +243,7 @@ static const struct server_view_impl xwayland_view_impl = {
 
 static pid_t
 get_window_pid(struct xwm *xwm, xcb_window_t window) {
-    xcb_res_client_id_spec_t spec = {0};
+    xcb_res_client_id_spec_t spec = {};
     spec.client = window;
     spec.mask = XCB_RES_CLIENT_ID_MASK_LOCAL_CLIENT_PID;
 
@@ -744,7 +744,7 @@ handle_xcb_selection_request(struct xwm *xwm, xcb_selection_request_event_t *eve
                             XCB_ATOM_ATOM, 8, strlen(xwm->paste_content), xwm->paste_content);
     }
 
-    xcb_selection_notify_event_t evt = {0};
+    xcb_selection_notify_event_t evt = {};
     evt.response_type = XCB_SELECTION_NOTIFY;
     evt.sequence = event->sequence;
     evt.requestor = event->requestor;
@@ -907,7 +907,7 @@ init_xtest(struct xwm *xwm) {
 static int
 init_atoms(struct xwm *xwm) {
     // Get all of the required atoms.
-    xcb_intern_atom_cookie_t cookies[ATOM_COUNT] = {0};
+    xcb_intern_atom_cookie_t cookies[ATOM_COUNT] = {};
 
     // Make all of the requests up front and then check them after.
     for (size_t i = 0; i < ATOM_COUNT; i++) {

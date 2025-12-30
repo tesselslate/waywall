@@ -140,7 +140,7 @@ zip_next(struct zip *zip) {
         goto fail;
     }
 
-    struct zip_cd cdr = {0};
+    struct zip_cd cdr = {};
     memcpy(&cdr, zip->map.region + zip->iter.offset, SIZE_CD);
 
     // Check the full size of the Central Directory record against the size of the ZIP file.
@@ -179,7 +179,7 @@ zip_open(const char *path) {
         goto fail_open;
     }
 
-    struct stat zipstat = {0};
+    struct stat zipstat = {};
     if (fstat(zip->fd, &zipstat) == -1) {
         ww_log_errno(LOG_ERROR, "failed to stat zip at '%s'", path);
         goto fail_stat;

@@ -5,9 +5,9 @@
 #include <stdio.h>
 
 bool util_debug_enabled = false;
-struct util_debug util_debug_data = {0};
+struct util_debug util_debug_data = {};
 
-static char debug_buf[524288] = {0};
+static char debug_buf[524288] = {};
 static FILE *debug_file = nullptr;
 
 static void

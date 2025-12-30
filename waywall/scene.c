@@ -107,7 +107,7 @@ static inline struct scene_text *scene_text_from_object(struct scene_object *obj
 static void
 image_build(struct scene_image *out, struct scene *scene, const struct scene_image_options *options,
             int32_t width, int32_t height) {
-    struct vtx_shader vertices[6] = {0};
+    struct vtx_shader vertices[6] = {};
 
     rect_build(vertices, &(struct box){0, 0, width, height}, &options->dst, (float[4]){0, 0, 0, 0},
                (float[4]){0, 0, 0, 0});
@@ -159,7 +159,7 @@ image_render(struct scene_object *object) {
 static void
 mirror_build(struct scene_mirror *mirror, const struct scene_mirror_options *options,
              struct scene *scene) {
-    struct vtx_shader vertices[6] = {0};
+    struct vtx_shader vertices[6] = {};
 
     rect_build(vertices, &options->src, &options->dst, options->src_rgba, mirror->dst_rgba);
 
@@ -445,7 +445,7 @@ draw_stencil(struct scene *scene) {
     };
 
     struct vtx_shader buf[6];
-    rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){0}, (float[4]){0});
+    rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){}, (float[4]){});
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.stencil_rect) {
         gl_using_texture(GL_TEXTURE_2D, tex) {
             glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_DRAW);

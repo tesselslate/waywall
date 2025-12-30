@@ -25,7 +25,7 @@ static const struct {
 
     char config_vm;
     char wrap;
-} REG_KEYS = {0};
+} REG_KEYS = {};
 
 static constexpr int MAX_INSTRUCTIONS = 50000000;
 

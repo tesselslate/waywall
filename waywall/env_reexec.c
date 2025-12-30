@@ -340,7 +340,7 @@ env_reexec(char **argv) {
         goto fail_penv_read;
     }
 
-    char fd_env[16] = {0};
+    char fd_env[16] = {};
     snprintf(fd_env, STATIC_ARRLEN(fd_env), "%d", passthrough_fd);
     penv_set(&penv, PASSTHROUGH_FD_ENV, fd_env);
 

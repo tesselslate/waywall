@@ -11,7 +11,7 @@
 
 struct util_png
 util_png_decode(const char *path, int max_size) {
-    struct util_png result = {0};
+    struct util_png result = {};
 
     int fd = open(path, O_RDONLY);
     if (fd == -1) {

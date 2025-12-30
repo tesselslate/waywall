@@ -424,7 +424,7 @@ get_utf8_selection(struct server_data_device_manager *data_device_manager) {
             return;
         }
 
-        int pipe_fd[2] = {0};
+        int pipe_fd[2] = {};
         if (pipe(pipe_fd) != 0) {
             ww_log_errno(LOG_ERROR, "failed to create pipe for selection content");
             return;
@@ -453,7 +453,7 @@ get_utf8_selection(struct server_data_device_manager *data_device_manager) {
             return;
         }
 
-        int pipe_fd[2] = {0};
+        int pipe_fd[2] = {};
         if (pipe(pipe_fd) != 0) {
             ww_log_errno(LOG_ERROR, "failed to create pipe for selection content");
             return;

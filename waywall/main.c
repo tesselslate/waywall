@@ -73,7 +73,7 @@ handle_signal(int signal, void *data) {
 
 static int
 cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
-    char logname[32] = {0};
+    char logname[32] = {};
     ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wrap-%jd", (intmax_t)getpid());
     ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
 
@@ -89,7 +89,7 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
 
     sysinfo_dump_log();
 
-    struct waywall ww = {0};
+    struct waywall ww = {};
 
     ww.cfg = config_create();
     ww_assert(ww.cfg);

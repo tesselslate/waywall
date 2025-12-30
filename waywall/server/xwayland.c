@@ -97,7 +97,7 @@ key_timestamp() {
 static void
 send_key_event(struct server_xwayland *xwl, xcb_window_t window, xcb_keycode_t keycode,
                bool press) {
-    xcb_key_press_event_t event = {0};
+    xcb_key_press_event_t event = {};
     event.response_type = press ? XCB_KEY_PRESS : XCB_KEY_RELEASE;
     event.detail = keycode + 8; // Convert from libinput to XKB
     event.time = key_timestamp();
@@ -186,7 +186,7 @@ xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
     xcb_window_t window = xwm_window_from_view(view);
 
     // Send EnterNotify and LeaveNotify.
-    xcb_enter_notify_event_t notify_event = {0};
+    xcb_enter_notify_event_t notify_event = {};
     notify_event.response_type = XCB_ENTER_NOTIFY;
     notify_event.root = window;
     notify_event.event = window;
@@ -197,7 +197,7 @@ xwl_send_click(struct server_xwayland *xwl, struct server_view *view) {
     xcb_send_event(xwl->xwm->conn, true, window, window_mask, (char *)&notify_event);
 
     // Send a button press and release.
-    xcb_button_press_event_t button_event = {0};
+    xcb_button_press_event_t button_event = {};
     button_event.response_type = XCB_BUTTON_PRESS;
     button_event.detail = XCB_BUTTON_INDEX_1;
     button_event.root = window;

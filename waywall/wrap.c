@@ -436,7 +436,7 @@ on_button(void *data, uint32_t button, bool pressed) {
 
     // Attempt to match the button press with an action.
     if (pressed) {
-        struct config_action action = {0};
+        struct config_action action = {};
         action.type = CONFIG_ACTION_BUTTON;
         action.data = button;
         action.modifiers = wrap->input.modifiers;
@@ -503,7 +503,7 @@ on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bo
         return false;
     }
 
-    struct config_action action = {0};
+    struct config_action action = {};
     action.type = CONFIG_ACTION_KEY;
     action.modifiers = wrap->input.modifiers;
 

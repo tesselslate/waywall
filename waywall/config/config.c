@@ -36,7 +36,7 @@ static const struct config defaults = {
                     .variant = "",
                     .options = "",
                 },
-            .remaps = {0},
+            .remaps = {},
             .repeat_rate = -1,
             .repeat_delay = -1,
             .sens = 1.0,
@@ -52,7 +52,7 @@ static const struct config defaults = {
             .ninb_anchor = ANCHOR_NONE,
             .ninb_opacity = 1.0,
         },
-    .shaders = {0},
+    .shaders = {},
 };
 
 static const struct {
@@ -423,7 +423,7 @@ process_config_actions(struct config *cfg) {
         }
 
         const char *bind = lua_tostring(cfg->vm->L, IDX_ACTION_KEY);
-        struct config_action action = {0};
+        struct config_action action = {};
         if (parse_bind(bind, &action) != 0) {
             return 1;
         }
@@ -514,7 +514,7 @@ process_config_input_remaps(struct config *cfg) {
         const char *src_input = lua_tostring(cfg->vm->L, IDX_REMAP_KEY);
         const char *dst_input = lua_tostring(cfg->vm->L, IDX_REMAP_VAL);
 
-        struct config_remap remap = {0};
+        struct config_remap remap = {};
         if (config_parse_remap(src_input, dst_input, &remap) != 0) {
             return 1;
         }

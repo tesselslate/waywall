@@ -116,7 +116,7 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
     struct xserver *srv = data;
 
     if (mask & WL_EVENT_READABLE) {
-        char buf[64] = {0};
+        char buf[64] = {};
         ssize_t n = read(fd, buf, STATIC_ARRLEN(buf));
         if (n == -1 && errno != EINTR) {
             ww_log_errno(LOG_ERROR, "failed to read from xwayland displayfd");
@@ -271,7 +271,7 @@ get_display(int x_sockets[static 2]) {
             continue;
         }
 
-        char pidstr[12] = {0};
+        char pidstr[12] = {};
         ssize_t n = read(lock_fd, pidstr, STATIC_STRLEN(pidstr));
         close(lock_fd);
 
@@ -443,7 +443,7 @@ xserver_start(struct xserver *srv) {
         wl_event_loop_add_fd(loop, notify_fd[0], WL_EVENT_READABLE, handle_xserver_ready, srv);
 
     // Create the log file for Xwayland.
-    char logname[32] = {0};
+    char logname[32] = {};
     ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "xwayland-%jd", (intmax_t)getpid());
     ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
 

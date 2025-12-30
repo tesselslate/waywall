@@ -103,7 +103,7 @@ inotify_subscribe(struct inotify *inotify, const char *path, uint32_t mask, inot
     // happen under any circumstances.
     ww_assert(wd == inotify->entries.len);
 
-    struct inotify_entry entry = {0};
+    struct inotify_entry entry = {};
 
     entry.func = func;
     entry.data = data;

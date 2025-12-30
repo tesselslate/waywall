@@ -46,7 +46,7 @@ static void
 surface_state_reset(struct server_surface_state *state) {
     wl_array_release(&state->damage);
     wl_array_release(&state->buffer_damage);
-    *state = (struct server_surface_state){0};
+    *state = (struct server_surface_state){};
 
     wl_array_init(&state->damage);
     wl_array_init(&state->buffer_damage);
