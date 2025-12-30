@@ -1,8 +1,8 @@
 #pragma once
 
-typedef char *str;
+typedef char *strbuf;
 
-void str_append(str *dst, const char *src);
-void str_clear(str str);
-void str_free(str str);
-str str_new();
+void strbuf_append(strbuf *dst, const char *src);
+void strbuf_clear(strbuf buf);
+void strbuf_free(strbuf buf);
+strbuf strbuf_new();

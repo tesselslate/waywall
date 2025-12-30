@@ -71,14 +71,14 @@ static char **
 penv_to_envlist(struct list_envvar *penv) {
     char **envlist = zalloc(penv->len + 1, sizeof(*envlist));
     for (ssize_t i = 0; i < penv->len; i++) {
-        str s = str_new();
-        str_append(&s, penv->data[i].name);
-        str_append(&s, "=");
-        str_append(&s, penv->data[i].value);
+        strbuf s = strbuf_new();
+        strbuf_append(&s, penv->data[i].name);
+        strbuf_append(&s, "=");
+        strbuf_append(&s, penv->data[i].value);
 
         envlist[i] = strdup(s);
         check_alloc(envlist[i]);
-        str_free(s);
+        strbuf_free(s);
     }
 
     return envlist;
@@ -361,7 +361,7 @@ env_reexec(char **argv) {
         char *var_orig = var = strdup(var);
         check_alloc(var_orig);
 
-        str cleaned = str_new();
+        strbuf cleaned = strbuf_new();
         for (;;) {
             char *next = strchr(var, ':');
             if (next) {
@@ -369,8 +369,8 @@ env_reexec(char **argv) {
             }
 
             if (!colon_var_contains(portable_var, var)) {
-                str_append(&cleaned, var);
-                str_append(&cleaned, ":");
+                strbuf_append(&cleaned, var);
+                strbuf_append(&cleaned, ":");
             }
 
             if (!next) {
@@ -382,7 +382,7 @@ env_reexec(char **argv) {
 
         ww_log(LOG_INFO, "cleaned portable variable %s=%s", CLEAN_PORTABLE_VARS[i], cleaned);
 
-        str_free(cleaned);
+        strbuf_free(cleaned);
         free(var_orig);
     }
 

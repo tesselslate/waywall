@@ -103,9 +103,9 @@ process_mod_zip(const char *path, bool *stateoutput) {
 
 static int
 get_mods(const char *dirname, bool *stateoutput) {
-    str dirpath = str_new();
-    str_append(&dirpath, dirname);
-    str_append(&dirpath, "/mods/");
+    strbuf dirpath = strbuf_new();
+    strbuf_append(&dirpath, dirname);
+    strbuf_append(&dirpath, "/mods/");
 
     DIR *dir = opendir(dirpath);
     if (!dir) {
@@ -124,43 +124,43 @@ get_mods(const char *dirname, bool *stateoutput) {
             continue;
         }
 
-        str modpath = str_new();
-        str_append(&modpath, dirpath);
-        str_append(&modpath, dirent->d_name);
+        strbuf modpath = strbuf_new();
+        strbuf_append(&modpath, dirpath);
+        strbuf_append(&modpath, dirent->d_name);
 
         if (process_mod_zip(modpath, stateoutput) != 0) {
-            str_free(modpath);
+            strbuf_free(modpath);
             goto fail_zip;
         }
 
-        str_free(modpath);
+        strbuf_free(modpath);
     }
 
     closedir(dir);
-    str_free(dirpath);
+    strbuf_free(dirpath);
     return 0;
 
 fail_zip:
     closedir(dir);
 
 fail_dir:
-    str_free(dirpath);
+    strbuf_free(dirpath);
     return 1;
 }
 
 static int
 open_state_file(const char *dir) {
-    str path = str_new();
-    str_append(&path, dir);
-    str_append(&path, "/wpstateout.txt");
+    strbuf path = strbuf_new();
+    strbuf_append(&path, dir);
+    strbuf_append(&path, "/wpstateout.txt");
 
     int fd = open(path, O_RDONLY | O_CLOEXEC);
     if (fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to open state file '%s'", path);
-        str_free(path);
+        strbuf_free(path);
         return -1;
     }
-    str_free(path);
+    strbuf_free(path);
 
     return fd;
 }
@@ -228,11 +228,11 @@ instance_destroy(struct instance *instance) {
     free(instance);
 }
 
-str
+strbuf
 instance_get_state_path(struct instance *instance) {
-    str path = str_new();
-    str_append(&path, instance->dir);
-    str_append(&path, "/wpstateout.txt");
+    strbuf path = strbuf_new();
+    strbuf_append(&path, instance->dir);
+    strbuf_append(&path, "/wpstateout.txt");
 
     return path;
 }

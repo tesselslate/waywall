@@ -85,9 +85,9 @@ util_log_create_file(const char *name, bool cloexec) {
         return -1;
     }
 
-    str path = str_new();
-    str_append(&path, LOG_DIRECTORY);
-    str_append(&path, name);
+    strbuf path = strbuf_new();
+    strbuf_append(&path, LOG_DIRECTORY);
+    strbuf_append(&path, name);
 
     int flags = O_CREAT | O_WRONLY;
     if (cloexec) {
@@ -95,7 +95,7 @@ util_log_create_file(const char *name, bool cloexec) {
     }
 
     int fd = open(path, flags, 0644);
-    str_free(path);
+    strbuf_free(path);
 
     return fd;
 }
