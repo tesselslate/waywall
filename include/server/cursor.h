@@ -2,7 +2,6 @@
 
 #include "config/config.h"
 #include "cursor-shape-v1-client-protocol.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
 

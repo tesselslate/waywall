@@ -2,7 +2,6 @@
 
 #include "config/config.h"
 #include "util/list.h"
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>

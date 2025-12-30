@@ -8,7 +8,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/stat.h>

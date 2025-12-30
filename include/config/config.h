@@ -1,7 +1,6 @@
 #pragma once
 
 #include <luajit-2.1/lua.h>
-#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wayland-server-core.h>

@@ -2,7 +2,6 @@
 
 #include "inotify.h"
 #include "util/str.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 

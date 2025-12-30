@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdbool.h>
 #include <stdnoreturn.h>
 
 #ifdef __GNUC__

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "util/box.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
 

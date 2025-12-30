@@ -5,7 +5,6 @@
 #include "util/alloc.h"
 #include "util/prelude.h"
 #include <inttypes.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <wayland-client-protocol.h>

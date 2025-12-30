@@ -3,7 +3,6 @@
 #include "util/prelude.h"
 #include <errno.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <string.h>
 
 #define ww_log(lvl, fmt, ...) util_log(lvl, "[%s:%d] " fmt, __FILE__, __LINE__, ##__VA_ARGS__)

@@ -2,7 +2,6 @@
 
 #include "config/config.h"
 #include "util/box.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <wayland-server-core.h>

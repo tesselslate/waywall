@@ -1,7 +1,6 @@
 #pragma once
 
 #include "server/server.h"
-#include <stdbool.h>
 #include <stdint.h>
 #include <wayland-server-core.h>
 #include <wayland-util.h>

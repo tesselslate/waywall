@@ -21,7 +21,6 @@
 #include <fcntl.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

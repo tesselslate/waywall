@@ -2,7 +2,6 @@
 
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
-#include <stdbool.h>
 #include <wayland-util.h>
 
 struct config_action;

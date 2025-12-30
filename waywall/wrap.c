@@ -21,7 +21,6 @@
 #include "xdg-shell-client-protocol.h"
 #include <linux/input-event-codes.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <sys/inotify.h>

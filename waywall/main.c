@@ -14,7 +14,6 @@
 #include <errno.h>
 #include <sched.h>
 #include <signal.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

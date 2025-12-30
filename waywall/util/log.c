@@ -3,7 +3,6 @@
 #include "util/str.h"
 #include <fcntl.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <sys/stat.h>
 #include <time.h>
