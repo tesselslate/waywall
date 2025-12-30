@@ -112,14 +112,14 @@ add_config_watch(struct reload *rl, const char *name) {
     strbuf_append(&path, rl->config_path);
     strbuf_append(&path, name);
 
-    int wd = inotify_subscribe(rl->inotify, path, IN_CLOSE_WRITE | IN_MODIFY | IN_MASK_CREATE,
+    int wd = inotify_subscribe(rl->inotify, path.data, IN_CLOSE_WRITE | IN_MODIFY | IN_MASK_CREATE,
                                handle_config_file, rl);
     if (wd == -1) {
-        ww_log(LOG_ERROR, "failed to watch config file '%s'", path);
-        strbuf_free(path);
+        ww_log(LOG_ERROR, "failed to watch config file '%s'", path.data);
+        strbuf_free(&path);
         return 1;
     }
-    strbuf_free(path);
+    strbuf_free(&path);
 
     ww_log(LOG_INFO, "added watch for %s (%d)", name, wd);
 
@@ -157,8 +157,8 @@ reload_create(struct inotify *inotify, struct ww_timer *timer, const char *profi
 
     const char *env = getenv("XDG_CONFIG_HOME");
     if (env) {
-        strbuf_append(&rl->config_path, env);
-        strbuf_append(&rl->config_path, "/waywall/");
+        strbuf_append_cstr(&rl->config_path, env);
+        strbuf_append_cstr(&rl->config_path, "/waywall/");
     } else {
         env = getenv("HOME");
         if (!env) {
@@ -166,11 +166,11 @@ reload_create(struct inotify *inotify, struct ww_timer *timer, const char *profi
             goto fail_path;
         }
 
-        strbuf_append(&rl->config_path, env);
-        strbuf_append(&rl->config_path, "/.config/waywall/");
+        strbuf_append_cstr(&rl->config_path, env);
+        strbuf_append_cstr(&rl->config_path, "/.config/waywall/");
     }
 
-    rl->config_dir_wd = inotify_subscribe(rl->inotify, rl->config_path,
+    rl->config_dir_wd = inotify_subscribe(rl->inotify, rl->config_path.data,
                                           IN_CREATE | IN_DELETE_SELF | IN_MOVE_SELF | IN_MOVED_TO,
                                           handle_config_dir, rl);
     if (rl->config_dir_wd == -1) {
@@ -180,9 +180,9 @@ reload_create(struct inotify *inotify, struct ww_timer *timer, const char *profi
 
     rl->config_wd = list_int_create();
 
-    DIR *dir = opendir(rl->config_path);
+    DIR *dir = opendir(rl->config_path.data);
     if (!dir) {
-        ww_log(LOG_ERROR, "failed to open config dir '%s'", rl->config_path);
+        ww_log(LOG_ERROR, "failed to open config dir '%s'", rl->config_path.data);
         goto fail_opendir;
     }
 
@@ -213,7 +213,7 @@ fail_opendir:
 
 fail_watchdir:
 fail_path:
-    strbuf_free(rl->config_path);
+    strbuf_free(&rl->config_path);
     free(rl);
     return nullptr;
 }
@@ -224,7 +224,7 @@ reload_destroy(struct reload *rl) {
         reload_disable(rl);
     }
     list_int_destroy(&rl->config_wd);
-    strbuf_free(rl->config_path);
+    strbuf_free(&rl->config_path);
     free(rl);
 }
 

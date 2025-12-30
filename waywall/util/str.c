@@ -1,58 +1,69 @@
 #include "util/str.h"
 #include "util/alloc.h"
+#include <stdbit.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
-struct hdr {
-    size_t len, cap;
-    char data[];
-};
+static constexpr ssize_t STRBUF_BASE_CAP = 64;
 
-static constexpr size_t HDRSZ = sizeof(struct hdr);
+static inline void
+grow(strbuf *buf, ssize_t cap) {
+    ww_assert(cap > 0);
 
-static inline struct hdr *
-strbuf_hdr(strbuf buf) {
-    return (struct hdr *)((char *)buf - HDRSZ);
-}
-
-static inline strbuf
-hdr_strbuf(struct hdr *hdr) {
-    return hdr->data;
-}
-
-void
-strbuf_append(strbuf *dst, const char *src) {
-    struct hdr *hdst = strbuf_hdr(*dst);
-    size_t srclen = strlen(src);
-
-    size_t need_cap = srclen + hdst->len + 1;
-    if (hdst->cap < need_cap) {
-        hdst = realloc(hdst, HDRSZ + need_cap);
-        check_alloc(hdst);
-        hdst->cap = need_cap;
+    // include space for null terminator
+    if (cap + 1 <= buf->cap) {
+        return;
     }
 
-    memcpy(hdst->data + hdst->len, src, srclen);
-    hdst->len += srclen;
-    hdst->data[hdst->len] = '\0';
-    *dst = hdr_strbuf(hdst);
+    buf->cap = stdc_bit_ceil((size_t)cap);
+    buf->data = realloc(buf->data, buf->cap);
+    check_alloc(buf->data);
+
+    memset(buf->data + buf->len, 0, buf->cap - buf->len);
 }
 
 void
-strbuf_clear(strbuf buf) {
-    struct hdr *hdr = strbuf_hdr(buf);
-    hdr->len = 0;
+strbuf_append_char(strbuf *dst, char src) {
+    grow(dst, dst->len + 1);
+    dst->data[dst->len] = src;
+    dst->len++;
 }
 
 void
-strbuf_free(strbuf buf) {
-    struct hdr *hdr = strbuf_hdr(buf);
-    free(hdr);
+strbuf_append_cstr(strbuf *dst, const char *src) {
+    ssize_t len = strlen(src);
+    grow(dst, dst->len + len);
+
+    memcpy(dst->data + dst->len, src, len);
+    dst->len += len;
+}
+
+void
+strbuf_append_buf(strbuf *dst, strbuf src) {
+    grow(dst, dst->len + src.len);
+
+    memcpy(dst->data + dst->len, src.data, src.len);
+    dst->len += src.len;
+}
+
+void
+strbuf_clear(strbuf *buf) {
+    buf->len = 0;
+}
+
+void
+strbuf_free(strbuf *buf) {
+    free(buf->data);
+
+    *buf = (strbuf){};
 }
 
 strbuf
 strbuf_new() {
-    struct hdr *hdr = zalloc(1, sizeof(*hdr) + 1);
-    return hdr_strbuf(hdr);
+    strbuf buf = {
+        .cap = STRBUF_BASE_CAP,
+        .data = zalloc(STRBUF_BASE_CAP, 1),
+    };
+    return buf;
 }

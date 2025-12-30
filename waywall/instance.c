@@ -107,9 +107,9 @@ get_mods(const char *dirname, bool *stateoutput) {
     strbuf_append(&dirpath, dirname);
     strbuf_append(&dirpath, "/mods/");
 
-    DIR *dir = opendir(dirpath);
+    DIR *dir = opendir(dirpath.data);
     if (!dir) {
-        ww_log_errno(LOG_ERROR, "failed to open instance mods dir '%s'", dirpath);
+        ww_log_errno(LOG_ERROR, "failed to open instance mods dir '%s'", dirpath.data);
         goto fail_dir;
     }
 
@@ -128,23 +128,23 @@ get_mods(const char *dirname, bool *stateoutput) {
         strbuf_append(&modpath, dirpath);
         strbuf_append(&modpath, dirent->d_name);
 
-        if (process_mod_zip(modpath, stateoutput) != 0) {
-            strbuf_free(modpath);
+        if (process_mod_zip(modpath.data, stateoutput) != 0) {
+            strbuf_free(&modpath);
             goto fail_zip;
         }
 
-        strbuf_free(modpath);
+        strbuf_free(&modpath);
     }
 
     closedir(dir);
-    strbuf_free(dirpath);
+    strbuf_free(&dirpath);
     return 0;
 
 fail_zip:
     closedir(dir);
 
 fail_dir:
-    strbuf_free(dirpath);
+    strbuf_free(&dirpath);
     return 1;
 }
 
@@ -154,13 +154,13 @@ open_state_file(const char *dir) {
     strbuf_append(&path, dir);
     strbuf_append(&path, "/wpstateout.txt");
 
-    int fd = open(path, O_RDONLY | O_CLOEXEC);
+    int fd = open(path.data, O_RDONLY | O_CLOEXEC);
     if (fd == -1) {
-        ww_log_errno(LOG_ERROR, "failed to open state file '%s'", path);
-        strbuf_free(path);
+        ww_log_errno(LOG_ERROR, "failed to open state file '%s'", path.data);
+        strbuf_free(&path);
         return -1;
     }
-    strbuf_free(path);
+    strbuf_free(&path);
 
     return fd;
 }

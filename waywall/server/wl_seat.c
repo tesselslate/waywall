@@ -204,11 +204,11 @@ xkb_log(struct xkb_context *ctx, enum xkb_log_level xkb_level, const char *fmt, 
     }
 
     strbuf logline = strbuf_new();
-    strbuf_append(&logline, "[xkb] ");
-    strbuf_append(&logline, fmt);
+    strbuf_append_cstr(&logline, "[xkb] ");
+    strbuf_append_cstr(&logline, fmt);
 
-    util_log_va(level, logline, args, false);
-    strbuf_free(logline);
+    util_log_va(level, logline.data, args, false);
+    strbuf_free(&logline);
 
     va_end(args);
 }

@@ -370,14 +370,14 @@ on_view_create(struct wl_listener *listener, void *data) {
         strbuf path = instance_get_state_path(wrap->instance);
 
         wrap->instance->state_wd =
-            inotify_subscribe(wrap->inotify, path, IN_MODIFY, process_state_update, wrap);
+            inotify_subscribe(wrap->inotify, path.data, IN_MODIFY, process_state_update, wrap);
         if (wrap->instance->state_wd == -1) {
             ww_log(LOG_ERROR, "failed to watch instance state");
             instance_destroy(wrap->instance);
             wrap->instance = nullptr;
         }
 
-        strbuf_free(path);
+        strbuf_free(&path);
     }
 
     // HACK: This is not ideal. We know that the xdg_toplevel view is created as a result of the

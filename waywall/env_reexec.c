@@ -73,12 +73,12 @@ penv_to_envlist(struct list_envvar *penv) {
     for (ssize_t i = 0; i < penv->len; i++) {
         strbuf s = strbuf_new();
         strbuf_append(&s, penv->data[i].name);
-        strbuf_append(&s, "=");
+        strbuf_append(&s, '=');
         strbuf_append(&s, penv->data[i].value);
 
-        envlist[i] = strdup(s);
+        envlist[i] = strdup(s.data);
         check_alloc(envlist[i]);
-        strbuf_free(s);
+        strbuf_free(&s);
     }
 
     return envlist;
@@ -378,11 +378,11 @@ env_reexec(char **argv) {
             }
             var = next + 1;
         }
-        penv_set(&penv, CLEAN_PORTABLE_VARS[i], cleaned);
+        penv_set(&penv, CLEAN_PORTABLE_VARS[i], cleaned.data);
 
-        ww_log(LOG_INFO, "cleaned portable variable %s=%s", CLEAN_PORTABLE_VARS[i], cleaned);
+        ww_log(LOG_INFO, "cleaned portable variable %s=%s", CLEAN_PORTABLE_VARS[i], cleaned.data);
 
-        strbuf_free(cleaned);
+        strbuf_free(&cleaned);
         free(var_orig);
     }
 

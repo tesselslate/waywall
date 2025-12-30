@@ -86,16 +86,16 @@ util_log_create_file(const char *name, bool cloexec) {
     }
 
     strbuf path = strbuf_new();
-    strbuf_append(&path, LOG_DIRECTORY);
-    strbuf_append(&path, name);
+    strbuf_append_cstr(&path, LOG_DIRECTORY);
+    strbuf_append_cstr(&path, name);
 
     int flags = O_CREAT | O_WRONLY;
     if (cloexec) {
         flags |= O_CLOEXEC;
     }
 
-    int fd = open(path, flags, 0644);
-    strbuf_free(path);
+    int fd = open(path.data, flags, 0644);
+    strbuf_free(&path);
 
     return fd;
 }
