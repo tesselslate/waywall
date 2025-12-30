@@ -32,6 +32,34 @@ static struct list_envvar passthrough_env;
 static char **passthrough_envlist;
 static bool used_passthrough = false;
 
+static bool
+colon_var_contains(char *orig_env, char *needle) {
+    char *env = strdup(orig_env);
+    check_alloc(env);
+
+    char *env_orig = env;
+
+    for (;;) {
+        char *next = strchr(env, ':');
+        if (next) {
+            *next = '\0';
+        }
+
+        if (strcmp(needle, env) == 0) {
+            free(env_orig);
+            return true;
+        }
+
+        if (!next) {
+            break;
+        }
+        env = next + 1;
+    }
+
+    free(env_orig);
+    return false;
+}
+
 static void
 envlist_destroy(char **envlist) {
     for (char **var = envlist; *var; var++) {
@@ -76,6 +104,12 @@ penv_find(struct list_envvar *penv, const char *name) {
     }
 
     return -1;
+}
+
+static char *
+penv_get(struct list_envvar *penv, const char *name) {
+    ssize_t idx = penv_find(penv, name);
+    return (idx >= 0) ? penv->data[idx].value : NULL;
 }
 
 static void
@@ -308,6 +342,48 @@ env_reexec(char **argv) {
     char fd_env[16] = {0};
     snprintf(fd_env, STATIC_ARRLEN(fd_env), "%d", passthrough_fd);
     penv_set(&penv, PASSTHROUGH_FD_ENV, fd_env);
+
+    // HACK: Portable PrismLauncher modifies several environment variables (each using the
+    // colon-delimited format) which must be cleaned up.
+    static const char *CLEAN_PORTABLE_VARS[] = {"LD_LIBRARY_PATH", "LD_PRELOAD", "QT_PLUGIN_PATH",
+                                                "QT_FONTPATH"};
+    static const char *PORTABLE_VARS[] = {"LAUNCHER_LD_LIBRARY_PATH", "LAUNCHER_LD_PRELOAD",
+                                          "LAUNCHER_QT_PLUGIN_PATH", "LAUNCHER_QT_FONTPATH"};
+    static_assert(STATIC_ARRLEN(CLEAN_PORTABLE_VARS) == STATIC_ARRLEN(PORTABLE_VARS));
+    for (size_t i = 0; i < STATIC_ARRLEN(PORTABLE_VARS); i++) {
+        char *portable_var = penv_get(&penv, PORTABLE_VARS[i]);
+        char *var = penv_get(&penv, CLEAN_PORTABLE_VARS[i]);
+        if (!portable_var || !var) {
+            continue;
+        }
+
+        char *var_orig = var = strdup(var);
+        check_alloc(var_orig);
+
+        str cleaned = str_new();
+        for (;;) {
+            char *next = strchr(var, ':');
+            if (next) {
+                *next = '\0';
+            }
+
+            if (!colon_var_contains(portable_var, var)) {
+                str_append(&cleaned, var);
+                str_append(&cleaned, ":");
+            }
+
+            if (!next) {
+                break;
+            }
+            var = next + 1;
+        }
+        penv_set(&penv, CLEAN_PORTABLE_VARS[i], cleaned);
+
+        ww_log(LOG_INFO, "cleaned portable variable %s=%s", CLEAN_PORTABLE_VARS[i], cleaned);
+
+        str_free(cleaned);
+        free(var_orig);
+    }
 
     char **envlist = penv_to_envlist(&penv);
 
