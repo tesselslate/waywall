@@ -1,5 +1,7 @@
 #include "util/str.h"
 #include "util/prelude.h"
+#include <stdlib.h>
+#include <string.h>
 
 int
 main() {
@@ -88,4 +90,10 @@ main() {
     ww_assert(strs_index(strs, str_lit(""), 0) == 0);
     ww_assert(strs_index(strs, str_lit(""), 2) == 5);
     strs_free(strs);
+
+    char *cstr = str_clone_cstr(str_lit("1234"));
+    ww_assert(strcmp(cstr, "1234") == 0);
+    ww_assert(str_eq(str_from(cstr), str_lit("1234")));
+    ww_assert(str_eq(str_from("4321"), str_lit("4321")));
+    free(cstr);
 }

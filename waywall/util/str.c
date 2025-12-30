@@ -107,6 +107,13 @@ str_clone(str s) {
     };
 }
 
+char *
+str_clone_cstr(str s) {
+    char *buf = zalloc(s.len + 1, 1);
+    memcpy(buf, s.data, s.len);
+    return buf;
+}
+
 bool
 str_eq(str a, str b) {
     if (a.len != b.len) {
@@ -114,6 +121,12 @@ str_eq(str a, str b) {
     }
 
     return (memcmp(a.data, b.data, a.len) == 0);
+}
+
+str
+str_from(const char *cstr) {
+    ssize_t len = strlen(cstr);
+    return (str){len, cstr};
 }
 
 ssize_t

@@ -6,7 +6,7 @@
 
 typedef struct {
     ssize_t len;
-    char *data;
+    const char *data;
 } str;
 
 typedef struct {
@@ -36,7 +36,9 @@ strbuf strbuf_new();
 str strbuf_view(strbuf buf);
 
 strbuf str_clone(str s);
+char *str_clone_cstr(str s);
 bool str_eq(str a, str b);
+str str_from(const char *cstr);
 ssize_t str_index(str s, char needle, ssize_t start);
 str str_slice(str s, ssize_t start, ssize_t end);
 struct strs str_split(str s, char sep);
