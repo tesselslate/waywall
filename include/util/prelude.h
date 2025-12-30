@@ -12,7 +12,6 @@
 
 #define STATIC_ARRLEN(x) (sizeof((x)) / sizeof((x)[0]))
 #define STATIC_STRLEN(x) (sizeof((x)) - 1)
-#define static_assert(x) _Static_assert(x, #x)
 
 #define ww_assert(x)                                                                               \
     do {                                                                                           \
