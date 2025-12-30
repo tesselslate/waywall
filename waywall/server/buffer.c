@@ -34,8 +34,8 @@ buffer_resource_destroy(struct wl_resource *resource) {
 
     wl_signal_emit_mutable(&buffer->events.resource_destroy, buffer);
 
-    buffer->resource = NULL;
-    buffer->remote = NULL;
+    buffer->resource = nullptr;
+    buffer->remote = nullptr;
 
     server_buffer_unref(buffer);
 }

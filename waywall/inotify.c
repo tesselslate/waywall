@@ -41,7 +41,7 @@ tick_inotify(int fd, uint32_t mask, void *data) {
                     continue;
                 }
 
-                ww_log(LOG_WARN, "received inotify event for NULL listener (wd=%d)", event->wd);
+                ww_log(LOG_WARN, "received inotify event for nullptr listener (wd=%d)", event->wd);
                 continue;
             }
 
@@ -79,7 +79,7 @@ fail_src:
 
 fail_fd:
     free(inotify);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -120,6 +120,6 @@ inotify_unsubscribe(struct inotify *inotify, int wd) {
         ww_log_errno(LOG_ERROR, "failed to remove watch %d", wd);
     }
 
-    inotify->entries.data[wd].func = NULL;
-    inotify->entries.data[wd].data = NULL;
+    inotify->entries.data[wd].func = nullptr;
+    inotify->entries.data[wd].data = nullptr;
 }

@@ -179,10 +179,10 @@ instance_create(struct server_view *view, struct inotify *inotify) {
     n = readlink(buf, dir, STATIC_ARRLEN(dir));
     if (n == -1) {
         ww_log_errno(LOG_ERROR, "failed to readlink instance dir (pid=%d)", (int)pid);
-        return NULL;
+        return nullptr;
     } else if (n >= (ssize_t)STATIC_ARRLEN(dir) - 1) {
         ww_log(LOG_ERROR, "instance dir too long (pid=%d)", (int)pid);
-        return NULL;
+        return nullptr;
     }
     dir[n] = '\0';
 
@@ -190,21 +190,21 @@ instance_create(struct server_view *view, struct inotify *inotify) {
     // guarantee that it is actually an instance, but if you're trying to fool the detection then
     // it's your fault.
     if (check_subdirs(dir) != 0) {
-        return NULL;
+        return nullptr;
     }
 
     bool stateoutput = false;
     if (get_mods(dir, &stateoutput) != 0) {
-        return NULL;
+        return nullptr;
     }
     if (!stateoutput) {
         ww_log(LOG_WARN, "instance does not have state output");
-        return NULL;
+        return nullptr;
     }
 
     int state_fd = open_state_file(dir);
     if (state_fd == -1) {
-        return NULL;
+        return nullptr;
     }
 
     struct instance *instance = zalloc(1, sizeof(*instance));

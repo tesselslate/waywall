@@ -114,13 +114,13 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
     struct server_surface *surface = wl_resource_get_user_data(resource);
     struct server_buffer *buffer = server_buffer_from_resource(buffer_resource);
 
-    // If a NULL buffer (no buffer) is being attached, skip the checks.
+    // If a nullptr buffer (no buffer) is being attached, skip the checks.
     if (!buffer) {
         if (surface->pending.buffer) {
             server_buffer_unref(surface->pending.buffer);
         }
 
-        surface->pending.buffer = NULL;
+        surface->pending.buffer = nullptr;
         surface->pending.present |= SURFACE_STATE_BUFFER;
         return;
     }
@@ -160,7 +160,8 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
 
     if (surface->pending.present & SURFACE_STATE_BUFFER) {
         wl_surface_attach(surface->remote,
-                          surface->pending.buffer ? surface->pending.buffer->remote : NULL, 0, 0);
+                          surface->pending.buffer ? surface->pending.buffer->remote : nullptr, 0,
+                          0);
 
         if (surface->current.buffer) {
             server_buffer_unref(surface->current.buffer);
@@ -229,7 +230,7 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
 
     frame->resource = wl_resource_create(client, &wl_callback_interface, 1, id);
     check_alloc(frame->resource);
-    wl_resource_set_implementation(frame->resource, NULL, frame, surface_frame_resource_destroy);
+    wl_resource_set_implementation(frame->resource, nullptr, frame, surface_frame_resource_destroy);
 
     frame->remote = wl_surface_frame(surface->remote);
     check_alloc(frame->remote);
@@ -416,7 +417,7 @@ server_surface_try_from_resource(struct wl_resource *resource) {
     if (wl_resource_instance_of(resource, &wl_surface_interface, &surface_impl)) {
         return wl_resource_get_user_data(resource);
     }
-    return NULL;
+    return nullptr;
 }
 
 struct server_buffer *

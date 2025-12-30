@@ -22,8 +22,8 @@
  * Finally, the remote wl_pointer which is being locked/confined may disappear or change at any
  * point due to changes in seat capabilities. This means that active confined_pointer/locked_pointer
  * objects must be destroyed and recreated whenever the available wl_pointer changes. As a result,
- * server_pointer_constraints.locked can be true even while locked_pointer is NULL. Both
- * locked_pointer and confined_pointer may also be NULL at the same time.
+ * server_pointer_constraints.locked can be true even while locked_pointer is nullptr. Both
+ * locked_pointer and confined_pointer may also be nullptr at the same time.
  */
 
 static constexpr int SRV_POINTER_CONSTRAINTS_VERSION = 1;
@@ -53,14 +53,14 @@ static void
 lock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl_pointer *pointer) {
     if (pointer_constraints->confined_pointer) {
         zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
-        pointer_constraints->confined_pointer = NULL;
+        pointer_constraints->confined_pointer = nullptr;
         wl_surface_commit(pointer_constraints->server->ui->root.surface);
     }
 
     if (pointer && !pointer_constraints->locked_pointer) {
         pointer_constraints->locked_pointer = zwp_pointer_constraints_v1_lock_pointer(
             pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
-            NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            nullptr, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         check_alloc(pointer_constraints->locked_pointer);
 
         zwp_locked_pointer_v1_set_cursor_position_hint(
@@ -70,7 +70,7 @@ lock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl_p
     }
 
     if (!pointer_constraints->locked) {
-        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, NULL);
+        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_lock, nullptr);
     }
     pointer_constraints->locked = true;
 }
@@ -79,7 +79,7 @@ static void
 unlock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl_pointer *pointer) {
     if (pointer_constraints->locked_pointer) {
         zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
-        pointer_constraints->locked_pointer = NULL;
+        pointer_constraints->locked_pointer = nullptr;
         wl_surface_commit(pointer_constraints->server->ui->root.surface);
     }
 
@@ -88,13 +88,13 @@ unlock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl
     if (should_confine) {
         pointer_constraints->confined_pointer = zwp_pointer_constraints_v1_confine_pointer(
             pointer_constraints->remote, pointer_constraints->server->ui->root.surface, pointer,
-            NULL, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
+            nullptr, ZWP_POINTER_CONSTRAINTS_V1_LIFETIME_PERSISTENT);
         check_alloc(pointer_constraints->confined_pointer);
         wl_surface_commit(pointer_constraints->server->ui->root.surface);
     }
 
     if (pointer_constraints->locked) {
-        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, NULL);
+        wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, nullptr);
     }
     pointer_constraints->locked = false;
 }

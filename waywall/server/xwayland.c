@@ -146,7 +146,7 @@ server_xwayland_create(struct server *server, struct server_xwayland_shell *shel
     xwl->xserver = xserver_create(xwl);
     if (!xwl->xserver) {
         free(xwl);
-        return NULL;
+        return nullptr;
     }
 
     xwl->on_ready.notify = on_ready;

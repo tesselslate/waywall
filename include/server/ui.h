@@ -36,8 +36,8 @@ struct server_ui {
     struct wl_list views; // server_view.link
 
     struct {
-        struct wl_signal close;        // data: NULL
-        struct wl_signal resize;       // data: NULL
+        struct wl_signal close;        // data: nullptr
+        struct wl_signal resize;       // data: nullptr
         struct wl_signal view_create;  // data: struct server_view *
         struct wl_signal view_destroy; // data: struct server_view *
     } events;
@@ -80,8 +80,8 @@ struct server_view {
     struct wl_listener on_surface_commit;
 
     struct {
-        struct wl_signal destroy; // data: NULL
-        struct wl_signal resize;  // data: NULL
+        struct wl_signal destroy; // data: nullptr
+        struct wl_signal resize;  // data: nullptr
     } events;
 };
 

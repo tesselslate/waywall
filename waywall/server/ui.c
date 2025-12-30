@@ -38,7 +38,7 @@ bg_buffer_alloc(struct bg_buffer *buffer, size_t size) {
     buffer->fd = memfd_create("waywall-shm", MFD_CLOEXEC);
     if (buffer->fd == -1) {
         ww_log_errno(LOG_ERROR, "failed to create memfd for background buffer");
-        return NULL;
+        return nullptr;
     }
 
     if (ftruncate(buffer->fd, size) == -1) {
@@ -46,7 +46,7 @@ bg_buffer_alloc(struct bg_buffer *buffer, size_t size) {
         goto fail;
     }
 
-    char *buf = mmap(NULL, size, PROT_WRITE, MAP_SHARED, buffer->fd, 0);
+    char *buf = mmap(nullptr, size, PROT_WRITE, MAP_SHARED, buffer->fd, 0);
     if (buf == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap memfd for background buffer");
         goto fail;
@@ -57,7 +57,7 @@ bg_buffer_alloc(struct bg_buffer *buffer, size_t size) {
 fail:
     close(buffer->fd);
     buffer->fd = -1;
-    return NULL;
+    return nullptr;
 }
 
 static struct wl_buffer *
@@ -101,7 +101,7 @@ color_buffer_new(struct server *server, const uint8_t color[static 4]) {
     char *buf = bg_buffer_alloc(data, 4);
     if (!buf) {
         free(data);
-        return NULL;
+        return nullptr;
     }
 
     // Reorder bytes to ARGB and do alpha premultiplication.
@@ -117,7 +117,7 @@ static struct wl_buffer *
 image_buffer_new(struct server *server, const char *path) {
     struct util_png png = util_png_decode(path, 16384); // arbitrary max size
     if (!png.data) {
-        return NULL;
+        return nullptr;
     }
 
     struct bg_buffer *data = zalloc(1, sizeof(*data));
@@ -125,7 +125,7 @@ image_buffer_new(struct server *server, const char *path) {
     if (!buf) {
         free(png.data);
         free(data);
-        return NULL;
+        return nullptr;
     }
 
     size_t pixels = png.width * png.height;
@@ -206,7 +206,7 @@ on_xdg_toplevel_close(void *data, struct xdg_toplevel *xdg_toplevel) {
         return;
     }
 
-    wl_signal_emit_mutable(&ui->events.close, NULL);
+    wl_signal_emit_mutable(&ui->events.close, nullptr);
 }
 
 static void
@@ -270,7 +270,7 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
     xdg_surface_ack_configure(xdg_surface, serial);
 
     if (ui->resize) {
-        wl_signal_emit_mutable(&ui->events.resize, NULL);
+        wl_signal_emit_mutable(&ui->events.resize, nullptr);
         ui->resize = false;
 
         WW_DEBUG(ui.width, ui->width);
@@ -299,7 +299,7 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
         server_buffer_get_size(view->surface->pending.buffer, &pending_width, &pending_height);
 
         if (prev_width != pending_width || prev_height != pending_height) {
-            wl_signal_emit_mutable(&view->events.resize, NULL);
+            wl_signal_emit_mutable(&view->events.resize, nullptr);
         }
     }
 
@@ -394,7 +394,7 @@ fail_config:
     wl_surface_destroy(ui->root.surface);
     wl_region_destroy(ui->empty_region);
     free(ui);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -424,7 +424,7 @@ void
 server_ui_hide(struct server_ui *ui) {
     ww_assert(ui->mapped);
 
-    wl_surface_attach(ui->root.surface, NULL, 0, 0);
+    wl_surface_attach(ui->root.surface, nullptr, 0, 0);
     wl_surface_commit(ui->root.surface);
 
     ui->mapped = false;
@@ -438,7 +438,7 @@ server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen) {
     }
 
     if (fullscreen) {
-        xdg_toplevel_set_fullscreen(ui->xdg_toplevel, NULL);
+        xdg_toplevel_set_fullscreen(ui->xdg_toplevel, nullptr);
     } else {
         xdg_toplevel_unset_fullscreen(ui->xdg_toplevel);
     }
@@ -453,7 +453,7 @@ server_ui_show(struct server_ui *ui) {
 
     struct wl_display *display = ui->server->backend->display;
 
-    wl_surface_attach(ui->root.surface, NULL, 0, 0);
+    wl_surface_attach(ui->root.surface, nullptr, 0, 0);
     wl_surface_commit(ui->root.surface);
     wl_display_roundtrip(display);
 
@@ -511,7 +511,7 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
 
 fail:
     free(config);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -583,7 +583,7 @@ server_view_commit(struct server_view *view) {
         ww_assert(view->subsurface);
 
         wl_subsurface_destroy(view->subsurface);
-        view->subsurface = NULL;
+        view->subsurface = nullptr;
     }
 
     if (view->subsurface) {
@@ -665,7 +665,7 @@ server_view_create(struct server_ui *ui, struct server_surface *surface,
 
 void
 server_view_destroy(struct server_view *view) {
-    wl_signal_emit_mutable(&view->events.destroy, NULL);
+    wl_signal_emit_mutable(&view->events.destroy, nullptr);
     wl_signal_emit_mutable(&view->ui->events.view_destroy, view);
 
     if (view->alpha_surface) {

@@ -56,7 +56,7 @@ on_client_destroy(struct wl_listener *listener, void *data) {
     struct server_client *client = wl_container_of(listener, client, on_destroy);
 
     pid_t pid;
-    wl_client_get_credentials(client->wl, &pid, NULL, NULL);
+    wl_client_get_credentials(client->wl, &pid, nullptr, nullptr);
     ww_log(LOG_INFO, "connection (%p) from process %d ended", client->wl, (int)pid);
 
     wl_list_remove(&client->on_destroy.link);
@@ -80,7 +80,7 @@ on_client_created(struct wl_listener *listener, void *data) {
     wl_client_add_destroy_listener(wl_client, &client->on_destroy);
 
     pid_t pid;
-    wl_client_get_credentials(wl_client, &pid, NULL, NULL);
+    wl_client_get_credentials(wl_client, &pid, nullptr, nullptr);
     ww_log(LOG_INFO, "new connection (%p) from process %d", wl_client, (int)pid);
 }
 
@@ -88,8 +88,8 @@ static void
 on_view_destroy(struct wl_listener *listener, void *data) {
     struct server *server = wl_container_of(listener, server, on_view_destroy);
 
-    server->input_focus = NULL;
-    wl_signal_emit_mutable(&server->events.input_focus, NULL);
+    server->input_focus = nullptr;
+    wl_signal_emit_mutable(&server->events.input_focus, nullptr);
 
     wl_list_remove(&server->on_view_destroy.link);
 }
@@ -301,7 +301,7 @@ fail_display:
 
 fail_backend:
     free(server);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -368,7 +368,7 @@ fail_seat:
 
 fail_cursor:
     free(config);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -391,7 +391,7 @@ server_get_wl_data_device(struct server *server) {
     }
 
     if (!server->backend->seat.remote) {
-        return NULL;
+        return nullptr;
     }
 
     server->backend->seat.data_device = wl_data_device_manager_get_data_device(
@@ -407,11 +407,11 @@ server_get_wl_keyboard(struct server *server) {
     }
 
     if (!server->backend->seat.remote) {
-        return NULL;
+        return nullptr;
     }
 
     if (!(server->backend->seat.caps & WL_SEAT_CAPABILITY_KEYBOARD)) {
-        return NULL;
+        return nullptr;
     }
 
     server->backend->seat.keyboard = wl_seat_get_keyboard(server->backend->seat.remote);
@@ -426,11 +426,11 @@ server_get_wl_pointer(struct server *server) {
     }
 
     if (!server->backend->seat.remote) {
-        return NULL;
+        return nullptr;
     }
 
     if (!(server->backend->seat.caps & WL_SEAT_CAPABILITY_POINTER)) {
-        return NULL;
+        return nullptr;
     }
 
     server->backend->seat.pointer = wl_seat_get_pointer(server->backend->seat.remote);

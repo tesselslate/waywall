@@ -8,7 +8,7 @@ bool util_debug_enabled = false;
 struct util_debug util_debug_data = {0};
 
 static char debug_buf[524288] = {0};
-static FILE *debug_file = NULL;
+static FILE *debug_file = nullptr;
 
 static void
 dbg_keyboard() {

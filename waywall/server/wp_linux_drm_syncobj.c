@@ -35,7 +35,7 @@ on_surface_destroy(struct wl_listener *listener, void *data) {
     struct server_drm_syncobj_surface *syncobj_surface =
         wl_container_of(listener, syncobj_surface, on_surface_destroy);
 
-    syncobj_surface->parent = NULL;
+    syncobj_surface->parent = nullptr;
 }
 
 static void

@@ -43,7 +43,7 @@
         free(list->data);                                                                          \
         list->len = 0;                                                                             \
         list->cap = 0;                                                                             \
-        list->data = NULL;                                                                         \
+        list->data = nullptr;                                                                      \
     }
 
 LIST_DEFINE(uint32_t, list_uint32);

@@ -54,7 +54,7 @@ static void
 unset_anchored(struct wrap *wrap) {
     ww_assert(!!wrap->floating.anchored);
 
-    wrap->floating.anchored = NULL;
+    wrap->floating.anchored = nullptr;
     wl_list_remove(&wrap->floating.on_anchored_resize.link);
 }
 
@@ -92,7 +92,7 @@ floating_set_visible(struct wrap *wrap, bool visible) {
     if (!visible) {
         // Stop any active grab if floating windows are being hidden.
         if (wrap->floating.grab) {
-            wrap->floating.grab = NULL;
+            wrap->floating.grab = nullptr;
         }
 
         if (!wrap->view) {
@@ -193,7 +193,7 @@ floating_view_at(struct wrap *wrap, double x, double y) {
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
 static void
@@ -233,7 +233,7 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
 
         // If the destroyed view was being interactively moved, then stop the interactive move.
         if (fview == wrap->floating.grab) {
-            wrap->floating.grab = NULL;
+            wrap->floating.grab = nullptr;
         }
 
         // If the destroyed view was focused, then give focus back to the Minecraft instance.
@@ -374,7 +374,7 @@ on_view_create(struct wl_listener *listener, void *data) {
         if (wrap->instance->state_wd == -1) {
             ww_log(LOG_ERROR, "failed to watch instance state");
             instance_destroy(wrap->instance);
-            wrap->instance = NULL;
+            wrap->instance = nullptr;
         }
 
         str_free(path);
@@ -422,10 +422,10 @@ on_view_destroy(struct wl_listener *listener, void *data) {
     if (wrap->instance) {
         inotify_unsubscribe(wrap->inotify, wrap->instance->state_wd);
         instance_destroy(wrap->instance);
-        wrap->instance = NULL;
+        wrap->instance = nullptr;
     }
 
-    wrap->view = NULL;
+    wrap->view = nullptr;
     server_ui_hide(wrap->server->ui);
     server_shutdown(wrap->server);
 }
@@ -452,7 +452,7 @@ on_button(void *data, uint32_t button, bool pressed) {
     // Process the active grab, if any.
     if (wrap->floating.grab) {
         if (button == BTN_LEFT && !pressed) {
-            wrap->floating.grab = NULL;
+            wrap->floating.grab = nullptr;
         }
 
         return true;
@@ -612,7 +612,7 @@ fail_scene:
 fail_gl:
     free(wrap);
 
-    return NULL;
+    return nullptr;
 }
 
 void

@@ -53,7 +53,7 @@ struct server_gl {
     struct wl_listener on_ui_resize;
 
     struct {
-        struct wl_signal frame; // data: NULL
+        struct wl_signal frame; // data: nullptr
     } events;
 };
 

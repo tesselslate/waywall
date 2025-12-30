@@ -39,7 +39,7 @@ static int
 handle_pidfd(int32_t fd, uint32_t mask, void *data) {
     struct waywall *ww = data;
 
-    if (waitpid(ww->child, NULL, 0) != ww->child) {
+    if (waitpid(ww->child, nullptr, 0) != ww->child) {
         ww_log_errno(LOG_ERROR, "failed to waitpid on child process");
         wl_event_source_fd_update(ww->src_pidfd, 0);
     } else {
@@ -167,7 +167,7 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
 
     wl_display_run(ww.server->display);
 
-    if (pidfd_send_signal(pidfd, SIGKILL, NULL, 0) != 0) {
+    if (pidfd_send_signal(pidfd, SIGKILL, nullptr, 0) != 0) {
         if (errno != ESRCH) {
             ww_log_errno(LOG_ERROR, "failed to kill child process (pidfd: %d)", pidfd);
         }
@@ -260,8 +260,8 @@ main(int argc, char **argv) {
     }
 
     const char *action = argv[1];
-    const char *profile = NULL;
-    char **subcommand = NULL;
+    const char *profile = nullptr;
+    char **subcommand = nullptr;
 
     bool expect_profile = false;
     bool allow_mc_x11 = false;

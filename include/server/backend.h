@@ -40,9 +40,9 @@ struct server_backend {
     struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
 
     struct {
-        struct wl_signal seat_data_device; // data: NULL
-        struct wl_signal seat_keyboard;    // data: NULL
-        struct wl_signal seat_pointer;     // data: NULL
+        struct wl_signal seat_data_device; // data: nullptr
+        struct wl_signal seat_keyboard;    // data: nullptr
+        struct wl_signal seat_pointer;     // data: nullptr
         struct wl_signal shm_format;       // data: uint32_t *
     } events;
 };

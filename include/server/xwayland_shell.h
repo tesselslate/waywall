@@ -28,7 +28,7 @@ struct server_xwayland_surface {
     bool associated;
 
     struct {
-        struct wl_signal destroy;    // data: NULL
+        struct wl_signal destroy;    // data: nullptr
         struct wl_signal set_serial; // data: uint64_t *
     } events;
 };

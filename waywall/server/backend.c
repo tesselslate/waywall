@@ -50,11 +50,11 @@ on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
     if (had_kb != has_kb) {
         if (backend->seat.keyboard) {
             wl_keyboard_release(backend->seat.keyboard);
-            backend->seat.keyboard = NULL;
+            backend->seat.keyboard = nullptr;
         }
 
         ww_log(LOG_INFO, "seat updated (keyboard: %s)", has_kb ? "true" : "false");
-        wl_signal_emit_mutable(&backend->events.seat_keyboard, NULL);
+        wl_signal_emit_mutable(&backend->events.seat_keyboard, nullptr);
     }
 
     bool had_ptr = !!backend->seat.pointer;
@@ -62,11 +62,11 @@ on_seat_capabilities(void *data, struct wl_seat *wl, uint32_t caps) {
     if (had_ptr != has_ptr) {
         if (backend->seat.pointer) {
             wl_pointer_release(backend->seat.pointer);
-            backend->seat.pointer = NULL;
+            backend->seat.pointer = nullptr;
         }
 
         ww_log(LOG_INFO, "seat updated (pointer: %s)", has_ptr ? "true" : "false");
-        wl_signal_emit_mutable(&backend->events.seat_pointer, NULL);
+        wl_signal_emit_mutable(&backend->events.seat_pointer, nullptr);
     }
 }
 
@@ -214,7 +214,7 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         }
 
         wl_list_insert(&backend->seat.names, &seat_name->link);
-        wl_signal_emit_mutable(&backend->events.seat_data_device, NULL);
+        wl_signal_emit_mutable(&backend->events.seat_data_device, nullptr);
     } else if (strcmp(iface, wl_shm_interface.name) == 0) {
         if (version < USE_SHM_VERSION) {
             ww_log(LOG_ERROR, "host compositor provides outdated wl_shm (%d < %d)", version,
@@ -315,7 +315,7 @@ server_backend_create() {
     wl_signal_init(&backend->events.seat_pointer);
     wl_signal_init(&backend->events.shm_format);
 
-    backend->display = wl_display_connect(NULL);
+    backend->display = wl_display_connect(nullptr);
     if (!backend->display) {
         ww_log_errno(LOG_ERROR, "wl_display_connect failed");
         goto fail_display;
@@ -383,7 +383,7 @@ fail_registry:
 fail_display:
     wl_array_release(&backend->shm_formats);
     free(backend);
-    return NULL;
+    return nullptr;
 }
 
 void

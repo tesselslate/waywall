@@ -115,7 +115,7 @@ static void
 hide_cursor(struct server_cursor *cursor) {
     struct wl_pointer *pointer = server_get_wl_pointer(cursor->server);
     if (pointer) {
-        wl_pointer_set_cursor(pointer, cursor->last_enter, NULL, 0, 0);
+        wl_pointer_set_cursor(pointer, cursor->last_enter, nullptr, 0, 0);
     }
 }
 
@@ -146,7 +146,7 @@ on_pointer(struct wl_listener *listener, void *data) {
 
     if (cursor->shape_device) {
         wp_cursor_shape_device_v1_destroy(cursor->shape_device);
-        cursor->shape_device = NULL;
+        cursor->shape_device = nullptr;
 
         struct wl_pointer *pointer = server_get_wl_pointer(cursor->server);
         if (pointer) {
@@ -207,7 +207,7 @@ fail_config:
     wl_surface_destroy(cursor->surface);
     wl_list_remove(&cursor->on_pointer_enter.link);
     free(cursor);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -280,8 +280,8 @@ server_cursor_config_create(struct server_cursor *cursor, struct config *cfg) {
     // If no theme or size was provided, attempt to use the cursor-shape protocol if possible.
 
     struct xcursor_options opts = {
-        .theme = NULL,
-        .icon = NULL,
+        .theme = nullptr,
+        .icon = nullptr,
         .size = -1,
     };
 
@@ -367,7 +367,7 @@ server_cursor_config_create(struct server_cursor *cursor, struct config *cfg) {
 
 fail_theme:
     free(config);
-    return NULL;
+    return nullptr;
 }
 
 void

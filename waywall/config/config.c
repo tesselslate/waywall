@@ -597,7 +597,7 @@ process_config_theme(struct config *cfg) {
     // 1:   config
     ww_assert(lua_gettop(cfg->vm->L) == 2);
 
-    char *raw_background = NULL;
+    char *raw_background = nullptr;
     if (get_string(cfg, "background", &raw_background, "theme.background", false) != 0) {
         return 1;
     }
@@ -633,7 +633,7 @@ process_config_theme(struct config *cfg) {
         return 1;
     }
 
-    char *ninb_anchor = NULL;
+    char *ninb_anchor = nullptr;
     if (get_string(cfg, "ninb_anchor", &ninb_anchor, "theme.ninb_anchor", false) != 0) {
         return 1;
     }
@@ -696,7 +696,7 @@ process_config_shaders(struct config *cfg) {
         }
 
         char *key = strdup(lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
-        char *fragment = NULL, *vertex = NULL;
+        char *fragment = nullptr, *vertex = nullptr;
         if (get_string(cfg, "fragment", &fragment, "shaders[].fragment", false)) {
             free(key);
             return 1;

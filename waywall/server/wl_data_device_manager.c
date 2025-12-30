@@ -70,7 +70,7 @@ handle_selection_pipe(int32_t fd, uint32_t mask, void *data) {
         xwl_set_clipboard(data_device_manager->server->xwayland, *str);
 
         wl_event_source_remove(data_device_manager->selection_content.src_pipe);
-        data_device_manager->selection_content.src_pipe = NULL;
+        data_device_manager->selection_content.src_pipe = nullptr;
     }
 
     return 0;
@@ -135,7 +135,7 @@ on_data_device_enter(void *data, struct wl_data_device *data_device, uint32_t se
 
         if (*slot && (*slot)->wl == offer) {
             data_device_manager->remote.dnd_offer = *slot;
-            *slot = NULL;
+            *slot = nullptr;
             return;
         }
     }
@@ -149,7 +149,7 @@ on_data_device_leave(void *data, struct wl_data_device *data_device) {
     ww_assert(data_device_manager->remote.dnd_offer);
 
     remote_offer_destroy(data_device_manager->remote.dnd_offer);
-    data_device_manager->remote.dnd_offer = NULL;
+    data_device_manager->remote.dnd_offer = nullptr;
 }
 
 static void
@@ -172,7 +172,7 @@ on_data_device_selection(void *data, struct wl_data_device *wl_data_device,
 
             if (*slot && (*slot)->wl == offer) {
                 remote_offer_destroy(*slot);
-                *slot = NULL;
+                *slot = nullptr;
                 break;
             }
         }
@@ -185,13 +185,13 @@ on_data_device_selection(void *data, struct wl_data_device *wl_data_device,
         return;
     }
 
-    struct remote_offer *remote_offer = NULL;
+    struct remote_offer *remote_offer = nullptr;
     for (size_t i = 0; i < STATIC_ARRLEN(data_device_manager->remote.pending_offers); i++) {
         struct remote_offer **slot = &data_device_manager->remote.pending_offers[i];
 
         if (*slot && (*slot)->wl == offer) {
             remote_offer = *slot;
-            *slot = NULL;
+            *slot = nullptr;
             break;
         }
     }
@@ -234,7 +234,7 @@ static void
 on_data_source_cancelled(void *data, struct wl_data_source *data_source) {
     struct server_data_device_manager *data_device_manager = data;
     if (data_device_manager->remote.source == data_source) {
-        data_device_manager->remote.source = NULL;
+        data_device_manager->remote.source = nullptr;
     }
 
     wl_data_source_destroy(data_source);
@@ -331,7 +331,7 @@ destroy_previous_selection(struct server_data_device_manager *data_device_manage
         break;
     }
 
-    set_selection(data_device_manager, SELECTION_NONE, NULL);
+    set_selection(data_device_manager, SELECTION_NONE, nullptr);
 }
 
 static void
@@ -352,12 +352,12 @@ static void
 selection_content_destroy(struct server_selection_content *selection_content) {
     if (selection_content->src_pipe) {
         wl_event_source_remove(selection_content->src_pipe);
-        selection_content->src_pipe = NULL;
+        selection_content->src_pipe = nullptr;
     }
 
     if (selection_content->data) {
         free(selection_content->data);
-        selection_content->data = NULL;
+        selection_content->data = nullptr;
     }
 
     if (selection_content->fd >= 0) {
@@ -569,9 +569,9 @@ data_device_set_selection(struct wl_client *client, struct wl_resource *resource
 
     destroy_previous_selection(data_device_manager);
 
-    // A NULL wl_data_source can be provided to unset the selection.
+    // A nullptr wl_data_source can be provided to unset the selection.
     if (!data_source_resource) {
-        wl_data_device_set_selection(data_device_manager->remote.device, NULL,
+        wl_data_device_set_selection(data_device_manager->remote.device, nullptr,
                                      data_device_manager->server->seat->last_serial);
         return;
     }
@@ -648,8 +648,8 @@ data_source_resource_destroy(struct wl_resource *resource) {
 
     if (data_device_manager->selection.type == SELECTION_LOCAL) {
         if (data_device_manager->selection.data.local == data_source) {
-            set_selection(data_device_manager, SELECTION_NONE, NULL);
-            wl_data_device_set_selection(data_device_manager->remote.device, NULL,
+            set_selection(data_device_manager, SELECTION_NONE, nullptr);
+            wl_data_device_set_selection(data_device_manager->remote.device, nullptr,
                                          data_device_manager->server->seat->last_serial);
         }
     }
@@ -761,7 +761,7 @@ on_input_focus(struct wl_listener *listener, void *data) {
 
         switch (data_device_manager->selection.type) {
         case SELECTION_NONE:
-            wl_data_device_send_selection(data_device->resource, NULL);
+            wl_data_device_send_selection(data_device->resource, nullptr);
             break;
         case SELECTION_LOCAL: {
             struct server_data_offer *data_offer =
@@ -786,7 +786,7 @@ on_keyboard_leave(struct wl_listener *listener, void *data) {
 
     if (data_device_manager->selection.type == SELECTION_REMOTE) {
         remote_offer_destroy(data_device_manager->selection.data.remote);
-        set_selection(data_device_manager, SELECTION_NONE, NULL);
+        set_selection(data_device_manager, SELECTION_NONE, nullptr);
     }
 }
 

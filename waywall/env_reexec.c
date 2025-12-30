@@ -108,7 +108,7 @@ penv_find(struct list_envvar *penv, const char *name) {
 static char *
 penv_get(struct list_envvar *penv, const char *name) {
     ssize_t idx = penv_find(penv, name);
-    return (idx >= 0) ? penv->data[idx].value : NULL;
+    return (idx >= 0) ? penv->data[idx].value : nullptr;
 }
 
 static void
@@ -194,7 +194,7 @@ read_passthrough_fd() {
         goto fail_seek;
     }
 
-    char *buf = mmap(NULL, len, PROT_READ, MAP_PRIVATE, fd, 0);
+    char *buf = mmap(nullptr, len, PROT_READ, MAP_PRIVATE, fd, 0);
     if (buf == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap passthrough fd");
         goto fail_mmap;

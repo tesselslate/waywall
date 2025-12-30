@@ -25,7 +25,7 @@ util_png_decode(const char *path, int max_size) {
         goto fail_stat;
     }
 
-    void *buf = mmap(NULL, stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    void *buf = mmap(nullptr, stat.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     if (buf == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap PNG (size %ju)", (uintmax_t)stat.st_size);
         goto fail_mmap;
@@ -90,6 +90,6 @@ fail_mmap:
 fail_stat:
     close(fd);
 
-    result.data = NULL;
+    result.data = nullptr;
     return result;
 }

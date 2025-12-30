@@ -124,7 +124,7 @@ zip_close(struct zip *zip) {
 const char *
 zip_next(struct zip *zip) {
     if (zip->iter.idx == zip->eocd.cd_records) {
-        return NULL;
+        return nullptr;
     }
 
     if (zip->iter.offset + SIZE_CD >= zip->map.len) {
@@ -166,7 +166,7 @@ zip_next(struct zip *zip) {
 fail:
     // Prevent any further calls to `zip_next` by moving the iterator to the end.
     zip->iter.idx = zip->eocd.cd_records;
-    return NULL;
+    return nullptr;
 }
 
 struct zip *
@@ -186,7 +186,7 @@ zip_open(const char *path) {
     }
 
     zip->map.len = zipstat.st_size;
-    zip->map.region = mmap(NULL, zip->map.len, PROT_READ, MAP_SHARED, zip->fd, 0);
+    zip->map.region = mmap(nullptr, zip->map.len, PROT_READ, MAP_SHARED, zip->fd, 0);
     if (zip->map.region == MAP_FAILED) {
         ww_log_errno(LOG_ERROR, "failed to mmap zip at '%s'", path);
         goto fail_mmap;
@@ -208,5 +208,5 @@ fail_stat:
 
 fail_open:
     free(zip);
-    return NULL;
+    return nullptr;
 }

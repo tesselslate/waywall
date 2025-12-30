@@ -84,7 +84,7 @@ on_client_destroy(struct wl_listener *listener, void *data) {
     struct xserver *srv = wl_container_of(listener, srv, on_client_destroy);
 
     wl_list_remove(&srv->on_client_destroy.link);
-    srv->client = NULL;
+    srv->client = nullptr;
 
     ww_log(LOG_INFO, "Xwayland dropped wayland connection");
 }
@@ -92,7 +92,7 @@ on_client_destroy(struct wl_listener *listener, void *data) {
 static void
 handle_idle(void *data) {
     struct xserver *srv = data;
-    srv->src_idle = NULL;
+    srv->src_idle = nullptr;
     xserver_start(srv);
 }
 
@@ -100,12 +100,12 @@ static int
 handle_pidfd(int32_t fd, uint32_t mask, void *data) {
     struct xserver *srv = data;
 
-    if (waitpid(srv->pid, NULL, 0) != srv->pid) {
+    if (waitpid(srv->pid, nullptr, 0) != srv->pid) {
         ww_log_errno(LOG_ERROR, "failed to waitpid on Xwayland");
     }
 
     wl_event_source_remove(srv->src_pidfd);
-    srv->src_pidfd = NULL;
+    srv->src_pidfd = nullptr;
 
     ww_log(LOG_INFO, "Xwayland process died");
     return 0;
@@ -133,14 +133,14 @@ handle_xserver_ready(int32_t fd, uint32_t mask, void *data) {
     }
 
     wl_event_source_remove(srv->src_pipe);
-    srv->src_pipe = NULL;
+    srv->src_pipe = nullptr;
 
-    wl_signal_emit_mutable(&srv->events.ready, NULL);
+    wl_signal_emit_mutable(&srv->events.ready, nullptr);
     return 0;
 
 fail:
     wl_event_source_remove(srv->src_pipe);
-    srv->src_pipe = NULL;
+    srv->src_pipe = nullptr;
 
     close(fd);
     return 0;
@@ -280,7 +280,7 @@ get_display(int x_sockets[static 2]) {
             continue;
         }
 
-        long pid = strtol(pidstr, NULL, 10);
+        long pid = strtol(pidstr, nullptr, 10);
         if (pid < 0 || pid > INT32_MAX) {
             ww_log(LOG_INFO, "skipped %s: invalid pid %ld", lock_name, pid);
             continue;
@@ -377,7 +377,7 @@ xserver_exec(struct xserver *srv, int notify_fd, int log_fd) {
     argv[i++] = "-wm";
     argv[i++] = wmfd;
 
-    argv[i++] = NULL;
+    argv[i++] = nullptr;
     ww_assert(i < STATIC_ARRLEN(argv));
 
     // Set WAYLAND_SOCKET so that the X server will connect correctly.
@@ -511,7 +511,7 @@ fail_fork:
 
 fail_log:
     wl_event_source_remove(srv->src_pipe);
-    srv->src_pipe = NULL;
+    srv->src_pipe = nullptr;
 
 fail_cloexec:
     safe_close(notify_fd[0]);
@@ -561,7 +561,7 @@ xserver_create(struct server_xwayland *xwl) {
 
 fail:
     xserver_destroy(srv);
-    return NULL;
+    return nullptr;
 }
 
 void
@@ -589,7 +589,7 @@ xserver_destroy(struct xserver *srv) {
     safe_close(srv->fd_wl[1]);
 
     if (srv->pidfd >= 0) {
-        if (pidfd_send_signal(srv->pidfd, SIGKILL, NULL, 0) != 0) {
+        if (pidfd_send_signal(srv->pidfd, SIGKILL, nullptr, 0) != 0) {
             ww_log_errno(LOG_ERROR, "failed to send SIGKILL to xserver");
         }
         close(srv->pidfd);

@@ -43,7 +43,7 @@ struct server_xdg_toplevel {
     struct server_view *view;
 
     struct {
-        struct wl_signal destroy; // data: NULL
+        struct wl_signal destroy; // data: nullptr
     } events;
 };
 

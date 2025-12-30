@@ -119,7 +119,7 @@ image_close(lua_State *L) {
     CHECK_OBJECT(image);
 
     scene_object_destroy((struct scene_object *)*image);
-    *image = NULL;
+    *image = nullptr;
 
     return 0;
 }
@@ -148,7 +148,7 @@ image_gc(lua_State *L) {
     if (*image) {
         scene_object_destroy((struct scene_object *)*image);
     }
-    *image = NULL;
+    *image = nullptr;
 
     return 0;
 }
@@ -159,7 +159,7 @@ mirror_close(lua_State *L) {
     CHECK_OBJECT(mirror);
 
     scene_object_destroy((struct scene_object *)*mirror);
-    *mirror = NULL;
+    *mirror = nullptr;
 
     return 0;
 }
@@ -188,7 +188,7 @@ mirror_gc(lua_State *L) {
     if (*mirror) {
         scene_object_destroy((struct scene_object *)*mirror);
     }
-    *mirror = NULL;
+    *mirror = nullptr;
 
     return 0;
 }
@@ -199,7 +199,7 @@ text_close(lua_State *L) {
     CHECK_OBJECT(text);
 
     scene_object_destroy((struct scene_object *)*text);
-    *text = NULL;
+    *text = nullptr;
 
     return 0;
 }
@@ -228,7 +228,7 @@ text_gc(lua_State *L) {
     if (*text) {
         scene_object_destroy((struct scene_object *)*text);
     }
-    *text = NULL;
+    *text = nullptr;
 
     return 0;
 }
@@ -253,7 +253,7 @@ waker_sleep_timer_destroy(void *data) {
     //
     // Remove the reference to the timer entry so that when the VM attempts to destroy the waker
     // we do not attempt to destroy the timer entry a 2nd time.
-    waker->timer = NULL;
+    waker->timer = nullptr;
 }
 
 static void
@@ -768,7 +768,7 @@ l_set_remaps(lua_State *L) {
     for (size_t i = 0; i < remaps.count; i++) {
         struct config_remap *remap = &remaps.data[i];
 
-        struct server_seat_remap *dst = NULL;
+        struct server_seat_remap *dst = nullptr;
         switch (remap->src_type) {
         case CONFIG_REMAP_BUTTON:
             dst = &seat_remaps->buttons[seat_remaps->num_buttons++];
@@ -1004,7 +1004,7 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
         size = luaL_checkinteger(L, ARG_SIZE);
     }
 
-    char *shader_name = NULL;
+    char *shader_name = nullptr;
     if (lua_gettop(L) >= ARG_SHADER) {
         shader_name = strdup(luaL_checkstring(L, ARG_SHADER));
     }
@@ -1174,7 +1174,7 @@ l_setenv(lua_State *L) {
 
     // Prologue
     const char *name = luaL_checkstring(L, ARG_NAME);
-    const char *value = NULL;
+    const char *value = nullptr;
     switch (lua_type(L, ARG_VALUE)) {
     case LUA_TSTRING:
         value = lua_tostring(L, ARG_VALUE);
@@ -1239,7 +1239,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"log_error", l_log_error},
     {"register", l_register},
     {"setenv", l_setenv},
-    {NULL, NULL},
+    {nullptr, nullptr},
 };
 
 int

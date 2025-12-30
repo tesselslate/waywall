@@ -30,7 +30,7 @@
  *
  *
  * xwm.surfaces contains a `struct xsurface` for *every* X11 window, paired and unpaired. If a
- * window is paired with a Wayland surface, then `xsurface.parent` will be non-NULL.
+ * window is paired with a Wayland surface, then `xsurface.parent` will be non-nullptr.
  * `xsurface.association` may contain data to indicate an association before it has actually been
  * made, so that other event handlers can look at that data to form the association.
  *
@@ -217,7 +217,7 @@ xwayland_view_get_title(void *data) {
     if (xsurface->title) {
         return strdup(xsurface->title);
     } else {
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -249,7 +249,7 @@ get_window_pid(struct xwm *xwm, xcb_window_t window) {
 
     xcb_res_query_client_ids_cookie_t cookie = xcb_res_query_client_ids(xwm->conn, 1, &spec);
     xcb_res_query_client_ids_reply_t *reply =
-        xcb_res_query_client_ids_reply(xwm->conn, cookie, NULL);
+        xcb_res_query_client_ids_reply(xwm->conn, cookie, nullptr);
     if (!reply) {
         ww_log(LOG_WARN, "failed to query window PID with XRes");
         return -1;
@@ -347,7 +347,7 @@ xsurface_lookup(struct xwm *xwm, xcb_window_t window) {
         }
     }
 
-    return NULL;
+    return nullptr;
 }
 
 static void
@@ -373,7 +373,7 @@ xsurface_unpair(struct xsurface *xsurface) {
     ww_log(LOG_INFO, "deassociated X11 window %" PRIu32 " with server_surface %p",
            (uint32_t)xsurface->window, xsurface->parent);
 
-    xsurface->parent = NULL;
+    xsurface->parent = nullptr;
 
     wl_list_remove(&xsurface->on_surface_commit.link);
     wl_list_remove(&xsurface->on_surface_destroy.link);
@@ -411,7 +411,7 @@ xsurface_update_view(struct xsurface *xsurface, bool commit) {
         ww_assert(xsurface->view);
     } else if (!should_map && xsurface->view) {
         server_view_destroy(xsurface->view);
-        xsurface->view = NULL;
+        xsurface->view = nullptr;
     }
 }
 
@@ -428,7 +428,7 @@ on_surface_destroy(struct wl_listener *listener, void *data) {
 
     if (xsurface->view) {
         server_view_destroy(xsurface->view);
-        xsurface->view = NULL;
+        xsurface->view = nullptr;
     }
     xsurface_unpair(xsurface);
 }
@@ -678,7 +678,7 @@ handle_xcb_property_notify(struct xwm *xwm, xcb_property_notify_event_t *event) 
     // The response size limit of 4KB is arbitrary.
     xcb_get_property_cookie_t cookie =
         xcb_get_property(xwm->conn, 0, xsurface->window, event->atom, XCB_ATOM_ANY, 0, 4096);
-    xcb_get_property_reply_t *reply = xcb_get_property_reply(xwm->conn, cookie, NULL);
+    xcb_get_property_reply_t *reply = xcb_get_property_reply(xwm->conn, cookie, nullptr);
     if (!reply) {
         ww_log(LOG_ERROR, "failed to get property (window: %" PRIu32 ", atom: %" PRIu32 ")",
                (uint32_t)event->window, (uint32_t)event->atom);
@@ -695,7 +695,7 @@ handle_xcb_property_notify(struct xwm *xwm, xcb_property_notify_event_t *event) 
 
     if (xsurface->title) {
         free(xsurface->title);
-        xsurface->title = NULL;
+        xsurface->title = nullptr;
     }
 
     if (len > 0) {
@@ -792,7 +792,7 @@ handle_x11_conn(int32_t fd, uint32_t mask, void *data) {
 
     if (mask & (WL_EVENT_HANGUP | WL_EVENT_ERROR)) {
         wl_event_source_remove(xwm->src_x11);
-        xwm->src_x11 = NULL;
+        xwm->src_x11 = nullptr;
         return 0;
     }
 
@@ -861,7 +861,7 @@ init_xres(struct xwm *xwm) {
 
     xcb_res_query_version_cookie_t cookie =
         xcb_res_query_version(xwm->conn, XCB_RES_MAJOR_VERSION, XCB_RES_MINOR_VERSION);
-    xcb_res_query_version_reply_t *reply = xcb_res_query_version_reply(xwm->conn, cookie, NULL);
+    xcb_res_query_version_reply_t *reply = xcb_res_query_version_reply(xwm->conn, cookie, nullptr);
     if (!reply) {
         ww_log(LOG_WARN, "failed to query XRes extension version");
         return;
@@ -888,7 +888,7 @@ init_xtest(struct xwm *xwm) {
 
     xcb_test_get_version_cookie_t cookie =
         xcb_test_get_version(xwm->conn, XCB_TEST_MAJOR_VERSION, XCB_TEST_MINOR_VERSION);
-    xcb_test_get_version_reply_t *reply = xcb_test_get_version_reply(xwm->conn, cookie, NULL);
+    xcb_test_get_version_reply_t *reply = xcb_test_get_version_reply(xwm->conn, cookie, nullptr);
     if (!reply) {
         ww_log(LOG_WARN, "failed to query XTEST extension version");
         return;
@@ -947,7 +947,7 @@ init_ewmh(struct xwm *xwm) {
 
     xwm->ewmh_window = xcb_generate_id(xwm->conn);
     xcb_create_window(xwm->conn, XCB_COPY_FROM_PARENT, xwm->ewmh_window, xwm->screen->root, 0, 0, 1,
-                      1, 0, XCB_WINDOW_CLASS_INPUT_ONLY, xwm->screen->root_visual, 0, NULL);
+                      1, 0, XCB_WINDOW_CLASS_INPUT_ONLY, xwm->screen->root_visual, 0, nullptr);
 
     xcb_change_property(xwm->conn, XCB_PROP_MODE_REPLACE, xwm->ewmh_window, xwm->atoms[NET_WM_NAME],
                         xwm->atoms[UTF8_STRING], 8, STATIC_STRLEN(wm_name), wm_name);
@@ -982,7 +982,7 @@ xwm_create(struct server_xwayland *xwl, struct server_xwayland_shell *shell, int
     wl_list_init(&xwm->unpaired_shell);
 
     // Setup the XCB connection.
-    xwm->conn = xcb_connect_to_fd(xwm_fd, NULL);
+    xwm->conn = xcb_connect_to_fd(xwm_fd, nullptr);
     int err = xcb_connection_has_error(xwm->conn);
     if (err) {
         ww_log(LOG_ERROR, "xcb connection failed: %d", err);
@@ -1049,7 +1049,7 @@ fail_resources:
 
 fail_xcb_connect:
     free(xwm);
-    return NULL;
+    return nullptr;
 }
 
 void

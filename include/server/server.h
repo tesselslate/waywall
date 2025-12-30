@@ -37,8 +37,8 @@ struct server {
     struct {
         struct wl_signal input_focus;    // data: struct server_view *
         struct wl_signal map_status;     // data: bool *
-        struct wl_signal pointer_lock;   // data: NULL
-        struct wl_signal pointer_unlock; // data: NULL
+        struct wl_signal pointer_lock;   // data: nullptr
+        struct wl_signal pointer_unlock; // data: nullptr
     } events;
 };
 

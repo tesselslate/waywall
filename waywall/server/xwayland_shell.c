@@ -39,7 +39,7 @@ static void
 xwayland_surface_resource_destroy(struct wl_resource *resource) {
     struct server_xwayland_surface *xwayland_surface = wl_resource_get_user_data(resource);
 
-    wl_signal_emit_mutable(&xwayland_surface->events.destroy, NULL);
+    wl_signal_emit_mutable(&xwayland_surface->events.destroy, nullptr);
     free(xwayland_surface);
 }
 
@@ -75,7 +75,7 @@ xwayland_shell_resource_destroy(struct wl_resource *resource) {
 
     ww_assert(xwayland_shell->resource == resource);
 
-    xwayland_shell->resource = NULL;
+    xwayland_shell->resource = nullptr;
     xwayland_shell->bound = false;
 }
 
