@@ -5,8 +5,8 @@
 #include <string.h>
 #include <wayland-server-core.h>
 
-WW_MAYBE_UNUSED static constexpr char SERVER_BUFFER_DMABUF[] = "dmabuf";
-WW_MAYBE_UNUSED static constexpr char SERVER_BUFFER_SHM[] = "shm";
+[[maybe_unused]] static constexpr char SERVER_BUFFER_DMABUF[] = "dmabuf";
+[[maybe_unused]] static constexpr char SERVER_BUFFER_SHM[] = "shm";
 
 struct server_buffer {
     struct wl_resource *resource;

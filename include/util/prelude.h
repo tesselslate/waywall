@@ -2,10 +2,8 @@
 
 #ifdef __GNUC__
 #define WW_PRINTF(a, b) __attribute((format(printf, (a), (b))))
-#define WW_MAYBE_UNUSED __attribute((unused))
 #else
 #define WW_PRINTF(a, b)
-#define WW_MAYBE_UNUSED
 #endif
 
 #define STATIC_ARRLEN(x) (sizeof((x)) / sizeof((x)[0]))

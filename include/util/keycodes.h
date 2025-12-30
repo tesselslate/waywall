@@ -6,7 +6,7 @@
 
 #define K(x) {#x, KEY_##x}
 
-WW_MAYBE_UNUSED static const struct {
+[[maybe_unused]] static const struct {
     const char *name;
     uint32_t value;
 } util_keycodes[] = {

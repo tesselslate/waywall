@@ -6,10 +6,10 @@
 #include <wayland-server-core.h>
 #include <wayland-util.h>
 
-WW_MAYBE_UNUSED static constexpr int SHADER_SRC_POS_ATTRIB_LOC = 0;
-WW_MAYBE_UNUSED static constexpr int SHADER_DST_POS_ATTRIB_LOC = 1;
-WW_MAYBE_UNUSED static constexpr int SHADER_SRC_RGBA_ATTRIB_LOC = 2;
-WW_MAYBE_UNUSED static constexpr int SHADER_DST_RGBA_ATTRIB_LOC = 3;
+[[maybe_unused]] static constexpr int SHADER_SRC_POS_ATTRIB_LOC = 0;
+[[maybe_unused]] static constexpr int SHADER_DST_POS_ATTRIB_LOC = 1;
+[[maybe_unused]] static constexpr int SHADER_SRC_RGBA_ATTRIB_LOC = 2;
+[[maybe_unused]] static constexpr int SHADER_DST_RGBA_ATTRIB_LOC = 3;
 
 struct scene {
     struct server_gl *gl;
