@@ -75,3 +75,4 @@ waywall_deps = [
 
 subdir('protocol')
 subdir('waywall')
+subdir('test')

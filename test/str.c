@@ -1,0 +1,91 @@
+#include "util/str.h"
+#include "util/prelude.h"
+
+int
+main() {
+    strbuf buf = strbuf_new();
+
+    strbuf_append(&buf, '1');
+    strbuf_append(&buf, "2");
+    strbuf_append(&buf, buf);
+    strbuf_append(&buf, str_lit("3"));
+    ww_assert(str_eq(strbuf_view(buf), str_lit("12123")));
+
+    strbuf_clear(&buf);
+    ww_assert(str_eq(strbuf_view(buf), str_lit("")));
+
+    strbuf_append_char(&buf, '1');
+    strbuf_append_cstr(&buf, "2");
+    strbuf_append_buf(&buf, buf);
+    strbuf_append_str(&buf, str_lit("3"));
+    ww_assert(str_eq(strbuf_view(buf), str_lit("12123")));
+
+    strbuf_clear(&buf);
+    ww_assert(str_eq(strbuf_view(buf), str_lit("")));
+
+    strbuf_free(&buf);
+
+    buf = str_clone(str_lit("123456"));
+    strbuf_append(&buf, "7890");
+    ww_assert(str_eq(strbuf_view(buf), str_lit("1234567890")));
+
+    strbuf_free(&buf);
+
+    ww_assert(str_eq(str_lit("1"), str_lit("1")));
+    ww_assert(str_eq(str_lit(""), str_lit("")));
+    ww_assert(!str_eq(str_lit("1"), str_lit("2")));
+    ww_assert(!str_eq(str_lit("1"), str_lit("")));
+
+    ww_assert(str_eq(str_lit("123456"), str_slice(str_lit("123456"), 0, 6)));
+    ww_assert(str_eq(str_lit("12"), str_slice(str_lit("123456"), 0, 2)));
+    ww_assert(str_eq(str_lit("34"), str_slice(str_lit("123456"), 2, 4)));
+    ww_assert(str_eq(str_lit("56"), str_slice(str_lit("123456"), 4, 6)));
+
+    ww_assert(str_index(str_lit("123456"), '3', 0) == 2);
+    ww_assert(str_index(str_lit("123456"), '0', 0) == -1);
+    ww_assert(str_index(str_lit("12341234"), '1', 0) == 0);
+    ww_assert(str_index(str_lit("12341234"), '1', 1) == 4);
+    ww_assert(str_index(str_lit("12341234"), '4', 4) == 7);
+
+    struct strs strs = str_split(str_lit("1:"), ':');
+    ww_assert(strs.len == 2);
+    ww_assert(str_eq(strs.data[0], str_lit("1")));
+    ww_assert(str_eq(strs.data[1], str_lit("")));
+    strs_free(strs);
+
+    strs = str_split(str_lit(":1"), ':');
+    ww_assert(strs.len == 2);
+    ww_assert(str_eq(strs.data[0], str_lit("")));
+    ww_assert(str_eq(strs.data[1], str_lit("1")));
+    strs_free(strs);
+
+    strs = str_split(str_lit("1:1"), ':');
+    ww_assert(strs.len == 2);
+    ww_assert(str_eq(strs.data[0], strs.data[1]));
+    ww_assert(str_eq(strs.data[0], str_lit("1")));
+    strs_free(strs);
+
+    strs = str_split(str_lit(":"), ':');
+    ww_assert(strs.len == 2);
+    ww_assert(str_eq(strs.data[0], strs.data[1]));
+    ww_assert(str_eq(strs.data[0], str_lit("")));
+    strs_free(strs);
+
+    strs = str_split(str_lit("::1:1:1::"), ':');
+    ww_assert(strs.len == 7);
+    ww_assert(str_eq(strs.data[0], strs.data[1]));
+    ww_assert(str_eq(strs.data[1], strs.data[5]));
+    ww_assert(str_eq(strs.data[5], strs.data[6]));
+    ww_assert(str_eq(strs.data[0], str_lit("")));
+
+    ww_assert(str_eq(strs.data[2], strs.data[3]));
+    ww_assert(str_eq(strs.data[3], strs.data[4]));
+    ww_assert(str_eq(strs.data[2], str_lit("1")));
+
+    ww_assert(strs_index(strs, str_lit("1"), 0) == 2);
+    ww_assert(strs_index(strs, str_lit("1"), 2) == 2);
+    ww_assert(strs_index(strs, str_lit("1"), 3) == 3);
+    ww_assert(strs_index(strs, str_lit(""), 0) == 0);
+    ww_assert(strs_index(strs, str_lit(""), 2) == 5);
+    strs_free(strs);
+}
