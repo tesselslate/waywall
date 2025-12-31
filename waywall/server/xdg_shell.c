@@ -53,7 +53,7 @@ xdg_toplevel_view_get_title(void *data) {
     struct server_xdg_toplevel *xdg_toplevel = data;
 
     if (xdg_toplevel->title) {
-        return strdup(xdg_toplevel->title);
+        return ww_strdup(xdg_toplevel->title);
     } else {
         return nullptr;
     }
@@ -255,7 +255,7 @@ xdg_toplevel_set_title(struct wl_client *client, struct wl_resource *resource, c
     if (xdg_toplevel->title) {
         free(xdg_toplevel->title);
     }
-    xdg_toplevel->title = strdup(title);
+    xdg_toplevel->title = ww_strdup(title);
 }
 
 static void

@@ -209,8 +209,7 @@ instance_create(struct server_view *view, struct inotify *inotify) {
 
     struct instance *instance = zalloc(1, sizeof(*instance));
 
-    instance->dir = strdup(dir);
-    check_alloc(instance->dir);
+    instance->dir = ww_strdup(dir);
 
     instance->pid = pid;
     instance->state_fd = state_fd;

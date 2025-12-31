@@ -81,8 +81,7 @@ on_data_offer_offer(void *data, struct wl_data_offer *offer, const char *type_st
     struct remote_offer *remote_offer = data;
 
     struct mime_type *mime_type = zalloc(1, sizeof(*mime_type));
-    mime_type->data = strdup(type_str);
-    check_alloc(mime_type->data);
+    mime_type->data = ww_strdup(type_str);
 
     wl_list_insert(&remote_offer->mime_types, &mime_type->link);
 }
@@ -401,8 +400,7 @@ get_utf8_selection(struct server_data_device_manager *data_device_manager) {
     selection_content_destroy(&data_device_manager->selection_content);
 
     if (data_device_manager->selection.type == SELECTION_NONE) {
-        data_device_manager->selection_content.data = strdup("");
-        check_alloc(data_device_manager->selection_content.data);
+        data_device_manager->selection_content.data = ww_strdup("");
         return;
     }
 
@@ -673,8 +671,7 @@ data_source_offer(struct wl_client *client, struct wl_resource *resource, const 
     }
 
     struct mime_type *mime_type = zalloc(1, sizeof(*mime_type));
-    mime_type->data = strdup(type_str);
-    check_alloc(mime_type->data);
+    mime_type->data = ww_strdup(type_str);
 
     wl_list_insert(&data_source->mime_types, &mime_type->link);
 }

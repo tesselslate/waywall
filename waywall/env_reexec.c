@@ -83,8 +83,7 @@ penv_get(struct list_envvar *penv, const char *name) {
 
 static void
 penv_set(struct list_envvar *penv, const char *name, const char *value) {
-    char *dup_value = strdup(value);
-    check_alloc(dup_value);
+    char *dup_value = ww_strdup(value);
 
     ssize_t idx = penv_find(penv, name);
     if (idx >= 0) {
@@ -93,9 +92,7 @@ penv_set(struct list_envvar *penv, const char *name, const char *value) {
         return;
     }
 
-    char *dup_name = strdup(name);
-    check_alloc(dup_name);
-    list_envvar_append(penv, (struct envvar){dup_name, dup_value});
+    list_envvar_append(penv, (struct envvar){ww_strdup(name), dup_value});
 }
 
 static bool

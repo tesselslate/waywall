@@ -178,8 +178,7 @@ get_string(struct config *cfg, const char *key, char **dst, const char *full_nam
     switch (lua_type(cfg->vm->L, -1)) {
     case LUA_TSTRING:
         free(*dst);
-        *dst = strdup(lua_tostring(cfg->vm->L, -1));
-        check_alloc(*dst);
+        *dst = ww_strdup(lua_tostring(cfg->vm->L, -1));
         break;
     case LUA_TNIL:
         if (required) {
@@ -691,7 +690,7 @@ process_config_shaders(struct config *cfg) {
             return 1;
         }
 
-        char *key = strdup(lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
+        char *key = ww_strdup(lua_tostring(cfg->vm->L, IDX_SHADER_KEY));
         char *fragment = nullptr, *vertex = nullptr;
         if (get_string(cfg, "fragment", &fragment, "shaders[].fragment", false)) {
             free(key);
@@ -814,8 +813,7 @@ config_create() {
     for (size_t i = 0; i < STATIC_ARRLEN(strings); i++) {
         char **storage = strings[i].storage;
 
-        *storage = strdup(*storage);
-        check_alloc(*storage);
+        *storage = ww_strdup(*storage);
     }
 
     return cfg;
