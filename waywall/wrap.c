@@ -153,6 +153,11 @@ floating_update_anchored(struct wrap *wrap) {
         x = 0;
         y = wrap->height - win_height;
         break;
+    case ANCHOR_SEPARATE:
+        x = 0;
+        y = 0;
+        server_view_set_visible(fview->view, true);
+        break;
     case ANCHOR_BOTTOMRIGHT:
         x = wrap->width - win_width;
         y = wrap->height - win_height;
@@ -217,6 +222,12 @@ floating_view_create(struct wrap *wrap, struct server_view *view) {
 
         server_view_set_centered(view, false);
         floating_update_anchored(wrap);
+        if (wrap->cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
+            if (!wrap->server->ui->ninbot.window_opened) {
+                xwayland_toplevel_show(wrap->server->ui);
+            }
+            floating_set_visible(wrap, true);
+        }
     }
 }
 
@@ -250,6 +261,14 @@ floating_view_destroy(struct wrap *wrap, struct server_view *view) {
             unset_anchored(wrap);
             floating_find_anchored(wrap);
             floating_update_anchored(wrap);
+        }
+
+        if (wl_list_length(&wrap->floating.views) == 0 && view->ui->ninbot.window_opened) {
+            xwayland_toplevel_hide(view->ui);
+            if (view->ui->ninbot.is_focused) {
+                server_set_input_focus(wrap->server, wrap->view);
+                view->ui->ninbot.is_focused = false;
+            }
         }
         return;
     }
@@ -471,7 +490,7 @@ on_button(void *data, uint32_t button, bool pressed) {
     // Check to see if the input focus should be changed to a new window. If the user did not click
     // on any floating window, then input focus should be given back to the Minecraft instance.
     struct floating_view *fview = floating_view_at(wrap, wrap->input.x, wrap->input.y);
-    if (!fview) {
+    if (!fview || (wrap->cfg->theme.ninb_anchor == ANCHOR_SEPARATE && !wrap->server->ui->ninbot.is_focused)) {
         ww_assert(wrap->view);
         server_set_input_focus(wrap->server, wrap->view);
         return false;
@@ -656,6 +675,24 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
     config_vm_set_wrap(cfg->vm, wrap);
 
     wrap->cfg = cfg;
+
+    if (wrap->cfg->theme.ninb_anchor == ANCHOR_SEPARATE) {
+        struct floating_view *fview;
+        wl_list_for_each(fview, &wrap->floating.views, link) {
+            wl_subsurface_destroy(fview->view->subsurface);
+            xwayland_server_view_attach(fview->view);
+        }
+        if (wl_list_length(&wrap->floating.views) > 0) {
+            xwayland_toplevel_show(wrap->server->ui);
+        }
+    } else {
+        struct floating_view *fview;
+        wl_list_for_each(fview, &wrap->floating.views, link) {
+            wl_subsurface_destroy(fview->view->subsurface);
+            xwayland_server_view_detach(fview->view);
+        }
+    }
+
     if (wrap->cfg->theme.ninb_anchor == ANCHOR_NONE) {
         // If anchoring has been disabled, ensure there is no anchored view.
         if (wrap->floating.anchored) {

@@ -50,6 +50,7 @@ struct config {
             ANCHOR_RIGHT,
             ANCHOR_BOTTOMLEFT,
             ANCHOR_BOTTOMRIGHT,
+            ANCHOR_SEPARATE,
             ANCHOR_NONE,
         } ninb_anchor;
 

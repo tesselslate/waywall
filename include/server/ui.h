@@ -26,6 +26,16 @@ struct server_ui {
         struct wl_subsurface *subsurface;
     } tree;
 
+    struct {
+        struct wl_surface *surface;
+        struct xdg_toplevel *top_level;
+        struct xdg_surface *xdg_surface;
+        bool is_focused;
+        bool window_opened;
+        int32_t width;
+        int32_t height;
+    } ninbot;
+
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
     struct zxdg_toplevel_decoration_v1 *xdg_decoration;
@@ -46,7 +56,7 @@ struct server_ui {
 struct server_ui_config {
     struct wl_buffer *background;
     bool tearing;
-
+    bool xwayland_toplevel;
     uint32_t ninb_opacity;
 };
 
@@ -99,6 +109,8 @@ void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen);
 void server_ui_show(struct server_ui *ui);
+void xwayland_toplevel_show(struct server_ui *ui);
+void xwayland_toplevel_hide(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 
 struct server_ui_config *server_ui_config_create(struct server_ui *ui, struct config *cfg);
@@ -114,6 +126,9 @@ void server_view_set_centered(struct server_view *view, bool centered);
 void server_view_set_pos(struct server_view *view, uint32_t x, uint32_t y);
 void server_view_set_size(struct server_view *view, uint32_t width, uint32_t height);
 void server_view_set_visible(struct server_view *view, bool visible);
+
+void xwayland_server_view_attach(struct server_view *view);
+void xwayland_server_view_detach(struct server_view *view);
 
 struct server_view *server_view_create(struct server_ui *ui, struct server_surface *surface,
                                        const struct server_view_impl *impl, void *impl_data);
