@@ -67,19 +67,40 @@ package.loaded["os"].setenv = priv.setenv
     Run the user's configuration.
 ]]
 
--- Setup the package path to include the waywall configuration directory.
-local xdg_config_home = os.getenv("XDG_CONFIG_HOME")
-local path = nil
-if xdg_config_home then
-    path = xdg_config_home .. "/waywall/"
-else
-    local home = os.getenv("HOME")
-    if not home then
-        error("no $XDG_CONFIG_HOME or $HOME")
+-- Setup the package path to include any valid waywall configuration
+-- directories.
+local get_config_dirs = function()
+    local paths = {}
+
+    local xdg_config_home = os.getenv("XDG_CONFIG_HOME")
+    if not xdg_config_home or xdg_config_home:sub(1, 1) ~= "/" then
+        local home = os.getenv("HOME")
+        if not home then
+            error("no $HOME or $XDG_CONFIG_HOME")
+        end
+        xdg_config_home = home .. "/.config"
     end
-    path = home .. "/.config/waywall/"
+    table.insert(paths, xdg_config_home)
+
+    local xdg_config_dirs = os.getenv("XDG_CONFIG_DIRS")
+    if not xdg_config_dirs then
+        table.insert(paths, "/etc/xdg")
+        return paths
+    end
+
+    for path in xdg_config_dirs:gmatch("([^:]+)") do
+        if path:sub(1, 1) == "/" then
+            table.insert(paths, path)
+        end
+    end
+
+    return paths
 end
-package.path = package.path .. ";" .. path .. "?.lua"
+
+local config_dirs = get_config_dirs()
+for _, dir in ipairs(config_dirs) do
+    package.path = package.path .. ";" .. dir .. "/waywall/?.lua"
+end
 
 -- Run the user's configuration file.
 local user_config = require(priv.profile() or "init")
