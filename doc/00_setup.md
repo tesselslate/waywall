@@ -115,3 +115,4 @@ in laptops), go to the `Performance` tab and check `Use discrete GPU`.
 [Prism Launcher]: https://prismlauncher.org
 [MultiMC]: https://multimc.org
 [GLFW]: https://github.com/glfw/glfw
+[XDG Base Directory]: https://specifications.freedesktop.org/basedir/latest/
