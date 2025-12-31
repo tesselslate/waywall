@@ -72,6 +72,15 @@ strbuf_clear(strbuf *buf) {
     buf->len = 0;
 }
 
+char *
+strbuf_clone_cstr(strbuf buf) {
+    char *cstr = zalloc(buf.len + 1, 1);
+    if (buf.len) {
+        memcpy(cstr, buf.data, buf.len);
+    }
+    return cstr;
+}
+
 void
 strbuf_free(strbuf *buf) {
     free(buf->data);

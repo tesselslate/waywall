@@ -96,4 +96,21 @@ main() {
     ww_assert(str_eq(str_from(cstr), str_lit("1234")));
     ww_assert(str_eq(str_from("4321"), str_lit("4321")));
     free(cstr);
+
+    buf = (strbuf){};
+    cstr = strbuf_clone_cstr(buf);
+    ww_assert(*cstr == '\0');
+    free(cstr);
+
+    buf = strbuf_new();
+    cstr = strbuf_clone_cstr(buf);
+    ww_assert(*cstr == '\0');
+    free(cstr);
+
+    strbuf_append(&buf, "1234");
+    cstr = strbuf_clone_cstr(buf);
+    ww_assert(strcmp(cstr, "1234") == 0);
+    free(cstr);
+
+    strbuf_free(&buf);
 }
