@@ -673,7 +673,7 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
 }
 
 void
-wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]) {
+wrap_lua_exec(struct wrap *wrap, struct strs cmd) {
     subproc_exec(wrap->subproc, cmd);
 }
 

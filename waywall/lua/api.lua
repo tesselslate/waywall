@@ -73,7 +73,6 @@ M.current_time = priv.current_time
 -- cause waywall to freeze if the configuration is reloaded while a subprocess is
 -- still running.
 --
--- A maximum of 63 arguments may be provided.
 -- @param command The command to run.
 M.exec = priv.exec
 

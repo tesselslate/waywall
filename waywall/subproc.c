@@ -79,7 +79,9 @@ subproc_destroy(struct subproc *subproc) {
 }
 
 void
-subproc_exec(struct subproc *subproc, char *cmd[static 64]) {
+subproc_exec(struct subproc *subproc, struct strs cmd) {
+    ww_assert(cmd.len > 0);
+
     pid_t pid = fork();
     if (pid == 0) {
         // Child process
@@ -93,7 +95,12 @@ subproc_exec(struct subproc *subproc, char *cmd[static 64]) {
             exit(EXIT_FAILURE);
         }
 
-        execvp(cmd[0], cmd);
+        char **arg_list = zalloc(cmd.len, sizeof(*arg_list));
+        for (ssize_t i = 0; i < cmd.len; i++) {
+            arg_list[i] = str_clone_cstr(cmd.data[i]);
+        }
+
+        execvp(arg_list[0], arg_list);
         ww_log_errno(LOG_ERROR, "failed to execvp() in child porcess");
         exit(EXIT_FAILURE);
     } else if (pid == -1) {
