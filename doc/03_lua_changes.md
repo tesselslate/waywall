@@ -4,7 +4,7 @@ waywall makes use of [LuaJIT], an alternative implementation of Lua 5.1 which
 provides better performance and additional functionality. A list of LuaJIT's
 additions is available [here](https://luajit.org/extensions.html).
 
-> Note: The `ffi` and `jit` packages from LuaJIT are not available in waywall.
+> Note: The `jit` package from LuaJIT is not available in waywall.
 
 ## Instruction count limit
 
@@ -35,11 +35,6 @@ waywall makes a few changes and additions to the Lua standard library:
       C's `setenv()`.
     - Calling `os.setenv` with a string and nil will unset the given environment
       variable.
-
-There are also a few breaking changes, which are mostly intended to prevent user
-code from causing problems within waywall's address space:
-
-  - `load`, `loadfile`, and `loadstring` are not available
 
 You can refer to the [startup code] to see all of the changes waywall makes in
 more detail.

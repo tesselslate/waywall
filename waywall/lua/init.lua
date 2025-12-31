@@ -44,13 +44,7 @@ local priv = _G.priv_waywall
 -- User code should not have access to private Lua API functions.
 _G.priv_waywall = nil
 
--- The load* functions can be used to circumvent security measures in LuaJIT.
-_G.load = nil
-_G.loadfile = nil
-_G.loadstring = nil
-
--- Do not load the ffi and jit extensions.
-package.preload["ffi"] = nil
+-- Do not load the jit extension.
 package.loaded["jit"] = nil
 
 -- pcall and xpcall must be overridden to prevent user code from accidentally
