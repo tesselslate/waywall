@@ -160,10 +160,9 @@ local function load_config(autogenerate)
                     .. "')"
             )
 
-            local path = assert(config_dirs[1], "no config dirs")
-                .. "/waywall/"
-                .. profile
-                .. ".lua"
+            local path = assert(config_dirs[1], "no config dirs") .. "/waywall/"
+            os.execute("mkdir -p " .. path)
+            path = path .. profile .. ".lua"
             local file, err = io.open(path, "a+")
             if err then
                 error("failed to auto-generate a configuration file: " .. err)
