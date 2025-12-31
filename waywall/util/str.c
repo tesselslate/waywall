@@ -13,14 +13,12 @@ static constexpr ssize_t STRBUF_BASE_CAP = 64;
 
 static inline void
 grow(strbuf *buf, ssize_t cap) {
-    ww_assert(cap > 0);
-
     // include space for null terminator
     if (cap + 1 <= buf->cap) {
         return;
     }
 
-    buf->cap = stdc_bit_ceil((size_t)cap);
+    buf->cap = stdc_bit_ceil((size_t)cap + 1);
     buf->data = realloc(buf->data, buf->cap);
     check_alloc(buf->data);
 
