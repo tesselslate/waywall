@@ -67,10 +67,10 @@ you compiled earlier.
 
 ## Configuration
 
-waywall will not start up without a configuration file. It will search for one
-in `$XDG_CONFIG_HOME/waywall` (typically `~/.config/waywall/`). You can create
-a file with the following contents at `~/.config/waywall/init.lua` as a starting
-point:
+waywall follows the [XDG Base Directory] specification and will search for a
+configuration file in `$XDG_CONFIG_HOME/waywall` (usually `~/.config/waywall`).
+If no configuration file exists, one will be automatically generated for you.
+You can use the following configuration as a starting point:
 
 ```lua
 local waywall = require("waywall")
