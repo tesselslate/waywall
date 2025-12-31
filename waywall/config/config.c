@@ -7,6 +7,7 @@
 #include "util/keycodes.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/str.h"
 #include <linux/input-event-codes.h>
 #include <luajit-2.1/lauxlib.h>
 #include <luajit-2.1/lua.h>
@@ -225,94 +226,89 @@ get_table(struct config *cfg, const char *key, int (*func)(struct config *), con
 }
 
 static int
-parse_bind(const char *orig, struct config_action *action) {
-    char *bind = strdup(orig);
-    check_alloc(bind);
+parse_bind_element(const char *bind, str elem, struct config_action *action) {
+    char *elem_str = str_clone_cstr(elem);
 
-    char *needle = bind;
-    char *elem;
-
-    bool ok = true;
-    while (ok) {
-        elem = needle;
-
-        while (*needle && *needle != '-') {
-            needle++;
+    if (str_eq(elem, str_lit("*"))) {
+        if (action->wildcard_modifiers) {
+            ww_log(LOG_ERROR, "duplicate wildcard modifier in action '%s'", bind);
+            goto fail;
         }
-        ok = !!*needle;
-        *needle = '\0';
-        needle++;
 
-        if (strcmp(elem, "*") == 0) {
-            if (action->wildcard_modifiers) {
-                ww_log(LOG_ERROR, "duplicate wildcard modifier in keybind '%s'", orig);
+        action->wildcard_modifiers = true;
+        goto ok;
+    }
+
+    xkb_keysym_t sym = xkb_keysym_from_name(elem_str, XKB_KEYSYM_CASE_INSENSITIVE);
+    if (sym != XKB_KEY_NoSymbol) {
+        if (action->type != CONFIG_ACTION_NONE) {
+            ww_log(LOG_ERROR, "action '%s' has multiple keys/buttons", bind);
+            goto fail;
+        }
+
+        action->data = sym;
+        action->type = CONFIG_ACTION_KEY;
+        goto ok;
+    }
+
+    for (size_t j = 0; j < STATIC_ARRLEN(button_mappings); j++) {
+        if (strcasecmp(button_mappings[j].name, elem_str) == 0) {
+            if (action->type != CONFIG_ACTION_NONE) {
+                ww_log(LOG_ERROR, "action '%s' has multiple keys/buttons", bind);
                 goto fail;
             }
 
-            action->wildcard_modifiers = true;
-            continue;
+            action->data = button_mappings[j].value;
+            action->type = CONFIG_ACTION_BUTTON;
+            goto ok;
         }
+    }
 
-        xkb_keysym_t sym = xkb_keysym_from_name(elem, XKB_KEYSYM_CASE_INSENSITIVE);
-        if (sym != XKB_KEY_NoSymbol) {
-            if (action->type == CONFIG_ACTION_BUTTON) {
-                ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button", orig);
+    for (size_t j = 0; j < STATIC_ARRLEN(modifier_mappings); j++) {
+        if (strcasecmp(modifier_mappings[j].name, elem_str) == 0) {
+            uint32_t mask = modifier_mappings[j].value;
+            if (mask & action->modifiers) {
+                ww_log(LOG_ERROR, "duplicate modifier '%s' in action '%s'", elem_str, bind);
                 goto fail;
             }
-            action->data = sym;
-            action->type = CONFIG_ACTION_KEY;
-            continue;
-        }
 
-        bool mod_ok = false;
-        for (size_t i = 0; i < STATIC_ARRLEN(modifier_mappings); i++) {
-            if (strcasecmp(modifier_mappings[i].name, elem) == 0) {
-                uint32_t mask = modifier_mappings[i].value;
-                if (mask & action->modifiers) {
-                    ww_log(LOG_ERROR, "duplicate modifier '%s' in keybind '%s'", elem, orig);
-                    goto fail;
-                }
-                action->modifiers |= mask;
-                mod_ok = true;
-                break;
-            }
+            action->modifiers |= mask;
+            goto ok;
         }
-        if (mod_ok) {
-            continue;
-        }
-
-        bool button_ok = false;
-        for (size_t i = 0; i < STATIC_ARRLEN(button_mappings); i++) {
-            if (strcasecmp(button_mappings[i].name, elem) == 0) {
-                if (action->type == CONFIG_ACTION_KEY) {
-                    ww_log(LOG_ERROR, "keybind '%s' contains both a key and mouse button", orig);
-                    goto fail;
-                }
-                action->data = button_mappings[i].value;
-                action->type = CONFIG_ACTION_BUTTON;
-                button_ok = true;
-                break;
-            }
-        }
-        if (button_ok) {
-            continue;
-        }
-
-        ww_log(LOG_ERROR, "unknown component '%s' of keybind '%s'", elem, orig);
-        goto fail;
     }
 
-    if (action->type == CONFIG_ACTION_NONE) {
-        ww_log(LOG_ERROR, "keybind '%s' has no key or button", orig);
-        goto fail;
-    }
-
-    free(bind);
-    return 0;
+    ww_log(LOG_ERROR, "unknown component '%s' in action '%s'", elem_str, bind);
 
 fail:
-    free(bind);
+    free(elem_str);
     return 1;
+
+ok:
+    free(elem_str);
+    return 0;
+}
+
+static int
+parse_bind(const char *bind, struct config_action *action) {
+    struct strs elements = str_split(str_from(bind), '-');
+
+    for (ssize_t i = 0; i < elements.len; i++) {
+        str elem = elements.data[i];
+
+        if (parse_bind_element(bind, elem, action) != 0) {
+            strs_free(elements);
+            return 1;
+        }
+    }
+
+    strs_free(elements);
+
+    if (action->type == CONFIG_ACTION_NONE) {
+        ww_log(LOG_ERROR, "action '%s' has no key or button", bind);
+        return 1;
+    }
+
+    return 0;
 }
 
 static int
