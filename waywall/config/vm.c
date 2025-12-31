@@ -219,6 +219,8 @@ config_vm_set_profile(struct config_vm *vm, const char *profile) {
 void
 config_vm_set_wrap(struct config_vm *vm, struct wrap *wrap) {
     registry_set(vm->L, &REG_KEYS.wrap, wrap);
+
+    config_vm_signal_event(vm, "load");
 }
 
 struct config_vm_waker *

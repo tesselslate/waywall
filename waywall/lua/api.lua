@@ -35,6 +35,7 @@ local function event_handler(name)
 end
 
 local events = {
+    ["load"] = event_handler("load"),
     ["resolution"] = event_handler("resolution"),
     ["state"] = event_handler("state"),
 }
