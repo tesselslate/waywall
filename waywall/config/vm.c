@@ -213,8 +213,7 @@ config_vm_get_wrap(struct config_vm *vm) {
 
 void
 config_vm_set_profile(struct config_vm *vm, const char *profile) {
-    vm->profile = strdup(profile);
-    check_alloc(vm->profile);
+    vm->profile = ww_strdup(profile);
 }
 
 void

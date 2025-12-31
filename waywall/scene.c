@@ -706,7 +706,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
 
         scene->shaders.count = cfg->shaders.count + 1;
         scene->shaders.data = malloc(sizeof(struct scene_shader) * scene->shaders.count);
-        if (!shader_create(scene->gl, &scene->shaders.data[0], strdup("default"), nullptr,
+        if (!shader_create(scene->gl, &scene->shaders.data[0], ww_strdup("default"), nullptr,
                            nullptr)) {
             ww_log(LOG_ERROR, "error creating default shader");
             server_gl_exit(scene->gl);
@@ -714,7 +714,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
         }
         for (size_t i = 0; i < cfg->shaders.count; i++) {
             if (!shader_create(scene->gl, &scene->shaders.data[i + 1],
-                               strdup(cfg->shaders.data[i].name), cfg->shaders.data[i].vertex,
+                               ww_strdup(cfg->shaders.data[i].name), cfg->shaders.data[i].vertex,
                                cfg->shaders.data[i].fragment)) {
                 ww_log(LOG_ERROR, "error creating %s shader", cfg->shaders.data[i].name);
                 server_gl_exit(scene->gl);

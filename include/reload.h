@@ -15,7 +15,7 @@ struct reload {
     reload_func_t func;
     void *data;
 
-    str config_path;
+    strbuf config_path;
     int config_dir_wd;
     struct list_int config_wd;
 

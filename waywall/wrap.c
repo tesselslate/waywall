@@ -367,17 +367,17 @@ on_view_create(struct wl_listener *listener, void *data) {
     wrap->view = view;
     wrap->instance = instance_create(view, wrap->inotify);
     if (wrap->instance) {
-        str path = instance_get_state_path(wrap->instance);
+        strbuf path = instance_get_state_path(wrap->instance);
 
         wrap->instance->state_wd =
-            inotify_subscribe(wrap->inotify, path, IN_MODIFY, process_state_update, wrap);
+            inotify_subscribe(wrap->inotify, path.data, IN_MODIFY, process_state_update, wrap);
         if (wrap->instance->state_wd == -1) {
             ww_log(LOG_ERROR, "failed to watch instance state");
             instance_destroy(wrap->instance);
             wrap->instance = nullptr;
         }
 
-        str_free(path);
+        strbuf_free(&path);
     }
 
     // HACK: This is not ideal. We know that the xdg_toplevel view is created as a result of the
@@ -673,7 +673,7 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
 }
 
 void
-wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]) {
+wrap_lua_exec(struct wrap *wrap, struct strs cmd) {
     subproc_exec(wrap->subproc, cmd);
 }
 

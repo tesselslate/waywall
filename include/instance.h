@@ -34,5 +34,5 @@ struct instance {
 
 struct instance *instance_create(struct server_view *view, struct inotify *inotify);
 void instance_destroy(struct instance *instance);
-str instance_get_state_path(struct instance *instance);
+strbuf instance_get_state_path(struct instance *instance);
 void instance_state_update(struct instance *instance);

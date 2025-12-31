@@ -8,6 +8,7 @@
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/str.h"
 #include <string.h>
 #include <sys/types.h>
 #include <wayland-server-core.h>
@@ -142,7 +143,7 @@ struct xsurface {
     } association;
 
     struct server_surface *parent;
-    char *title;
+    strbuf title;
     pid_t pid;
     uint32_t width, height;
 
@@ -214,11 +215,7 @@ static char *
 xwayland_view_get_title(void *data) {
     struct xsurface *xsurface = data;
 
-    if (xsurface->title) {
-        return strdup(xsurface->title);
-    } else {
-        return nullptr;
-    }
+    return strbuf_clone_cstr(xsurface->title);
 }
 
 static void
@@ -326,9 +323,7 @@ xsurface_destroy(struct xsurface *xsurface) {
         wl_list_remove(&xsurface->on_surface_destroy.link);
     }
 
-    if (xsurface->title) {
-        free(xsurface->title);
-    }
+    strbuf_free(&xsurface->title);
 
     ww_assert(!xsurface->view);
 
@@ -693,13 +688,9 @@ handle_xcb_property_notify(struct xwm *xwm, xcb_property_notify_event_t *event) 
     size_t len = xcb_get_property_value_length(reply);
     char *title = xcb_get_property_value(reply);
 
-    if (xsurface->title) {
-        free(xsurface->title);
-        xsurface->title = nullptr;
-    }
-
+    strbuf_clear(&xsurface->title);
     if (len > 0) {
-        xsurface->title = strndup(title, len);
+        strbuf_append_str(&xsurface->title, (str){len, title});
     }
 
 done:
@@ -1087,8 +1078,7 @@ xwm_set_clipboard(struct xwm *xwm, const char *content) {
     if (xwm->paste_content) {
         free(xwm->paste_content);
     }
-    xwm->paste_content = strdup(content);
-    check_alloc(xwm->paste_content);
+    xwm->paste_content = ww_strdup(content);
 
     xcb_set_selection_owner(xwm->conn, xwm->ewmh_window, xwm->atoms[CLIPBOARD], XCB_CURRENT_TIME);
 }

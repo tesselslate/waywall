@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/box.h"
+#include "util/str.h"
 #include <stdint.h>
 #include <wayland-server-core.h>
 
@@ -55,7 +56,7 @@ struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct 
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 
-void wrap_lua_exec(struct wrap *wrap, char *cmd[static 64]);
+void wrap_lua_exec(struct wrap *wrap, struct strs cmd);
 void wrap_lua_press_key(struct wrap *wrap, uint32_t keycode);
 int wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height);
 void wrap_lua_show_floating(struct wrap *wrap, bool show);

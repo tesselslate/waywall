@@ -3,6 +3,7 @@
 #include "util/prelude.h"
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 #define check_alloc(data)                                                                          \
     do {                                                                                           \
@@ -10,6 +11,15 @@
             ww_panic("allocation failed");                                                         \
         }                                                                                          \
     } while (0)
+
+static inline char *
+ww_strdup(const char *str) {
+    ww_assert(str);
+
+    char *dup = strdup(str);
+    check_alloc(dup);
+    return dup;
+}
 
 static inline void *
 zalloc(size_t nmemb, size_t size) {

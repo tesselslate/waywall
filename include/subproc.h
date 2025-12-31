@@ -1,6 +1,7 @@
 #pragma once
 
 #include "util/list.h"
+#include "util/str.h"
 #include <sys/types.h>
 
 LIST_DEFINE(struct subproc_entry, list_subproc_entry);
@@ -18,4 +19,4 @@ struct subproc_entry {
 
 struct subproc *subproc_create(struct server *server);
 void subproc_destroy(struct subproc *subproc);
-void subproc_exec(struct subproc *subproc, char *cmd[static 64]);
+void subproc_exec(struct subproc *subproc, struct strs cmd);

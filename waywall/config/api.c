@@ -17,6 +17,7 @@
 #include "util/keycodes.h"
 #include "util/log.h"
 #include "util/prelude.h"
+#include "util/str.h"
 #include "wrap.h"
 #include <fcntl.h>
 #include <luajit-2.1/lauxlib.h>
@@ -380,35 +381,10 @@ l_exec(lua_State *L) {
 
     lua_settop(L, ARG_COMMAND);
 
-    // Body. Duplicate the string from the Lua VM so that it can be modified for in-place
-    // argument parsing.
-    char *cmd_str = strdup(lua_str);
-    check_alloc(cmd_str);
-
-    char *cmd[64] = {};
-    char *needle = cmd_str;
-    char *elem;
-
-    bool ok = true;
-    size_t i = 0;
-    while (ok) {
-        elem = needle;
-        while (*needle && *needle != ' ') {
-            needle++;
-        }
-        ok = !!*needle;
-        *needle = '\0';
-        needle++;
-
-        cmd[i++] = elem;
-        if (ok && i == STATIC_ARRLEN(cmd)) {
-            free(cmd_str);
-            return luaL_error(L, "command '%s' contains more than 63 arguments", lua_str);
-        }
-    }
-
+    // Body
+    struct strs cmd = str_split(str_from(lua_str), ' ');
     wrap_lua_exec(wrap, cmd);
-    free(cmd_str);
+    strs_free(cmd);
 
     // Epilogue
     return 0;
@@ -450,7 +426,7 @@ l_image(lua_State *L) {
     lua_pushstring(L, "shader");
     lua_rawget(L, ARG_OPTIONS);
     if (lua_type(L, -1) == LUA_TSTRING) {
-        options.shader_name = strdup(lua_tostring(L, -1));
+        options.shader_name = ww_strdup(lua_tostring(L, -1));
     }
     lua_pop(L, 1);
 
@@ -502,7 +478,7 @@ l_mirror(lua_State *L) {
     lua_pushstring(L, "shader");
     lua_rawget(L, ARG_OPTIONS);
     if (lua_type(L, -1) == LUA_TSTRING) {
-        options.shader_name = strdup(lua_tostring(L, -1));
+        options.shader_name = ww_strdup(lua_tostring(L, -1));
     }
     lua_pop(L, 1);
 
@@ -1006,7 +982,7 @@ l_text_legacy(lua_State *L, struct wrap *wrap) {
 
     char *shader_name = nullptr;
     if (lua_gettop(L) >= ARG_SHADER) {
-        shader_name = strdup(luaL_checkstring(L, ARG_SHADER));
+        shader_name = ww_strdup(luaL_checkstring(L, ARG_SHADER));
     }
     lua_settop(L, ARG_SHADER);
 
@@ -1104,7 +1080,7 @@ l_text(lua_State *L) {
     lua_pushstring(L, "shader");
     lua_rawget(L, ARG_OPTIONS);
     if (lua_type(L, -1) == LUA_TSTRING) {
-        options.shader_name = strdup(lua_tostring(L, -1));
+        options.shader_name = ww_strdup(lua_tostring(L, -1));
     }
     lua_pop(L, 1);
 

@@ -85,17 +85,17 @@ util_log_create_file(const char *name, bool cloexec) {
         return -1;
     }
 
-    str path = str_new();
-    str_append(&path, LOG_DIRECTORY);
-    str_append(&path, name);
+    strbuf path = strbuf_new();
+    strbuf_append_cstr(&path, LOG_DIRECTORY);
+    strbuf_append_cstr(&path, name);
 
     int flags = O_CREAT | O_WRONLY;
     if (cloexec) {
         flags |= O_CLOEXEC;
     }
 
-    int fd = open(path, flags, 0644);
-    str_free(path);
+    int fd = open(path.data, flags, 0644);
+    strbuf_free(&path);
 
     return fd;
 }

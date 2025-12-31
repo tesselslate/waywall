@@ -31,34 +31,6 @@ static struct list_envvar passthrough_env;
 static char **passthrough_envlist;
 static bool used_passthrough = false;
 
-static bool
-colon_var_contains(char *orig_env, char *needle) {
-    char *env = strdup(orig_env);
-    check_alloc(env);
-
-    char *env_orig = env;
-
-    for (;;) {
-        char *next = strchr(env, ':');
-        if (next) {
-            *next = '\0';
-        }
-
-        if (strcmp(needle, env) == 0) {
-            free(env_orig);
-            return true;
-        }
-
-        if (!next) {
-            break;
-        }
-        env = next + 1;
-    }
-
-    free(env_orig);
-    return false;
-}
-
 static void
 envlist_destroy(char **envlist) {
     for (char **var = envlist; *var; var++) {
@@ -71,14 +43,12 @@ static char **
 penv_to_envlist(struct list_envvar *penv) {
     char **envlist = zalloc(penv->len + 1, sizeof(*envlist));
     for (ssize_t i = 0; i < penv->len; i++) {
-        str s = str_new();
-        str_append(&s, penv->data[i].name);
-        str_append(&s, "=");
-        str_append(&s, penv->data[i].value);
+        strbuf s = strbuf_new();
+        strbuf_append(&s, penv->data[i].name);
+        strbuf_append(&s, '=');
+        strbuf_append(&s, penv->data[i].value);
 
-        envlist[i] = strdup(s);
-        check_alloc(envlist[i]);
-        str_free(s);
+        envlist[i] = s.data;
     }
 
     return envlist;
@@ -113,8 +83,7 @@ penv_get(struct list_envvar *penv, const char *name) {
 
 static void
 penv_set(struct list_envvar *penv, const char *name, const char *value) {
-    char *dup_value = strdup(value);
-    check_alloc(dup_value);
+    char *dup_value = ww_strdup(value);
 
     ssize_t idx = penv_find(penv, name);
     if (idx >= 0) {
@@ -123,9 +92,7 @@ penv_set(struct list_envvar *penv, const char *name, const char *value) {
         return;
     }
 
-    char *dup_name = strdup(name);
-    check_alloc(dup_name);
-    list_envvar_append(penv, (struct envvar){dup_name, dup_value});
+    list_envvar_append(penv, (struct envvar){ww_strdup(name), dup_value});
 }
 
 static bool
@@ -143,32 +110,33 @@ penv_unset(struct list_envvar *penv, const char *name) {
 }
 
 static struct list_envvar
-penv_read(char *buf) {
+penv_read(str env) {
     struct list_envvar penv = list_envvar_create();
 
-    char *ptr = buf;
-    while (*ptr) {
-        char *split = strchr(ptr, '=');
-        if (!split) {
+    struct strs env_vars = str_split(env, '\0');
+    for (ssize_t i = 0; i < env_vars.len; i++) {
+        str var = env_vars.data[i];
+
+        ssize_t j = str_index(var, '=', 0);
+        if (j == -1) {
             ww_log(LOG_ERROR, "failed to parse environment text");
             goto fail;
         }
-        char *delim = strchr(split, '\0');
-        ww_assert(delim);
 
-        char *name = strndup(ptr, split - ptr);
-        check_alloc(name);
-        char *value = strndup(split + 1, delim - split + 1);
-        check_alloc(value);
+        str name = str_slice(var, 0, j);
+        str value = str_slice(var, j + 1, var.len);
 
-        list_envvar_append(&penv, (struct envvar){name, value});
-
-        ptr = delim + 1;
+        list_envvar_append(&penv, (struct envvar){
+                                      .name = str_clone_cstr(name),
+                                      .value = str_clone_cstr(value),
+                                  });
     }
 
+    strs_free(env_vars);
     return penv;
 
 fail:
+    strs_free(env_vars);
     penv_destroy(&penv);
     return penv;
 }
@@ -200,7 +168,8 @@ read_passthrough_fd() {
         goto fail_mmap;
     }
 
-    passthrough_env = penv_read(buf);
+    // Subtract 1 from the size of the buffer to exclude the final null terminator.
+    passthrough_env = penv_read((str){len - 1, buf});
     ww_assert(munmap(buf, len) == 0);
     close(fd);
 
@@ -301,11 +270,11 @@ env_reexec(char **argv) {
     }
 
     char *penvbuf = zalloc(1, ENV_SIZE);
-    n = read(fd, penvbuf, ENV_SIZE);
-    if (n == -1) {
+    ssize_t penvbuf_size = read(fd, penvbuf, ENV_SIZE);
+    if (penvbuf_size == -1) {
         ww_log_errno(LOG_ERROR, "failed to read parent environment");
         goto fail_read;
-    } else if (n >= ENV_SIZE - 2) {
+    } else if (penvbuf_size == ENV_SIZE) {
         ww_log(LOG_WARN, "parent process environment too large, skipping env_reexec");
         goto fail_read;
     }
@@ -327,15 +296,13 @@ env_reexec(char **argv) {
             goto fail_write_passthrough;
         }
     }
-    if (write(passthrough_fd, "", 1) != 1) {
-        ww_log_errno(LOG_ERROR, "failed to terminate environment passthrough fd");
-        goto fail_write_passthrough;
-    }
 
     // Read the parent environment into a new list to be passed to execvpe. Add the passthrough fd
     // to this environment so that we don't enter an infinite loop of reexecuting with a fresh
     // environment.
-    struct list_envvar penv = penv_read(penvbuf);
+    //
+    // Subtract 1 from the size of the buffer to exclude the final null terminator.
+    struct list_envvar penv = penv_read((str){penvbuf_size - 1, penvbuf});
     if (!penv.data) {
         goto fail_penv_read;
     }
@@ -358,32 +325,25 @@ env_reexec(char **argv) {
             continue;
         }
 
-        char *var_orig = var = strdup(var);
-        check_alloc(var_orig);
+        struct strs portable_list = str_split(str_from(portable_var), ':');
+        struct strs list = str_split(str_from(var), ':');
 
-        str cleaned = str_new();
-        for (;;) {
-            char *next = strchr(var, ':');
-            if (next) {
-                *next = '\0';
+        strbuf cleaned = strbuf_new();
+        for (ssize_t i = 0; i < list.len; i++) {
+            if (strs_index(portable_list, list.data[i], 0) != -1) {
+                continue;
             }
 
-            if (!colon_var_contains(portable_var, var)) {
-                str_append(&cleaned, var);
-                str_append(&cleaned, ":");
-            }
-
-            if (!next) {
-                break;
-            }
-            var = next + 1;
+            strbuf_append(&cleaned, list.data[i]);
+            strbuf_append(&cleaned, ':');
         }
-        penv_set(&penv, CLEAN_PORTABLE_VARS[i], cleaned);
+        penv_set(&penv, CLEAN_PORTABLE_VARS[i], cleaned.data);
 
-        ww_log(LOG_INFO, "cleaned portable variable %s=%s", CLEAN_PORTABLE_VARS[i], cleaned);
+        ww_log(LOG_INFO, "cleaned portable variable %s=%s", CLEAN_PORTABLE_VARS[i], cleaned.data);
 
-        str_free(cleaned);
-        free(var_orig);
+        strbuf_free(&cleaned);
+        strs_free(list);
+        strs_free(portable_list);
     }
 
     char **envlist = penv_to_envlist(&penv);
