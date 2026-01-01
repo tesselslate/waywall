@@ -36,8 +36,7 @@ struct server_surface_role {
     void (*destroy)(struct wl_resource *role_resource);
 };
 
-void _server_surface_set_resource_impl(struct server_surface *surface);
-
+struct server_surface *server_surface_create(struct wl_resource *resource);
 struct server_surface *server_surface_from_resource(struct wl_resource *resource);
 struct server_surface *server_surface_try_from_resource(struct wl_resource *resource);
 
