@@ -73,8 +73,8 @@ You can configure your instance to use the patched version of GLFW by opening
 its settings (with the `Edit` button on the right pane) and going to `Settings`.
 Then, go to the `Workarounds` tab and confirm that `Use system installation of
 GLFW` is **disabled**. Finally, return to the `Java` tab and add
-`-Dorg.lwjgl.glfw.libname=PATH`, replacing `PATH` with the path to the patched
-`libglfw.so` you just compiled.
+`-Dorg.lwjgl.glfw.libname=PATH` to your Java arguments, replacing `PATH` with
+the path to the patched `libglfw.so` you just compiled.
 
 ## Configuration
 
