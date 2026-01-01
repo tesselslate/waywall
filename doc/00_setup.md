@@ -1,8 +1,7 @@
 # Setup
 
 After compiling waywall, you will need to configure your instance(s) to use it.
-[Prism Launcher] is the best choice, although any variant of [MultiMC] should
-work.
+[Prism Launcher] is the best choice, although [MultiMC] can also work.
 
 ## GLFW
 
@@ -44,26 +43,38 @@ You can copy it to a safer location like `~/.local/lib64`.
 
 ## Instance setup
 
-First, configure your instance to use the patched version of GLFW by opening its
-settings (with the `Edit` button on the right pane) and going to `Settings` ->
-`Workarounds`. Then, enable `Native libraries` and `Use system installation of
-GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled.
+First, you need to configure your instance to use waywall. Navigate to the
+`Custom commands` submenu and enter `waywall wrap --` into the `Wrapper command`
+textbox. If needed, change `waywall` to point to the waywall executable you
+compiled earlier.
 
-![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
+![The Prism Launcher menu for using waywall](assets/prism-waywall.png)
+
+Secondly, you will need to use the patched version of GLFW. This differs based
+on whether you are on PrismLauncher or MultiMC.
 
 > [!IMPORTANT]
 > Make sure you configure the instance to use patched GLFW correctly! If the
 > instance still uses the default version of GLFW, waywall will not do anything
 > when the game launches, since the game will still be running under Xwayland.
 
-<br/>
+### Prism Launcher
 
-Next, you need to configure your instance to use waywall. Navigate to the
-`Custom commands` submenu and enter `waywall wrap --` into the `Wrapper
-command` textbox. If needed, change `waywall` to point to the waywall executable
-you compiled earlier.
+You can configure your instance to use the patched version of GLFW by opening
+its settings (with the `Edit` button on the right pane) and going to `Settings`
+-> `Workarounds`. Then, enable `Native libraries` and `Use system installation
+of GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled.
 
-![The Prism Launcher menu for using waywall](assets/prism-waywall.png)
+![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
+
+### MultiMC
+
+You can configure your instance to use the patched version of GLFW by opening
+its settings (with the `Edit` button on the right pane) and going to `Settings`.
+Then, go to the `Workarounds` tab and confirm that `Use system installation of
+GLFW` is **disabled**. Finally, return to the `Java` tab and add
+`-Dorg.lwjgl.glfw.libname=PATH`, replacing `PATH` with the path to the patched
+`libglfw.so` you just compiled.
 
 ## Configuration
 
