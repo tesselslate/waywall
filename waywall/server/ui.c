@@ -486,6 +486,13 @@ server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
         wl_surface_damage_buffer(ui->root.surface, 0, 0, INT32_MAX, INT32_MAX);
         wl_surface_commit(ui->root.surface);
     }
+
+    struct server_view *view;
+    wl_list_for_each (view, &ui->views, link) {
+        if (!view->current.centered && view->alpha_surface) {
+            wp_alpha_modifier_surface_v1_set_multiplier(view->alpha_surface, config->ninb_opacity);
+        }
+    }
 }
 
 struct server_ui_config *
