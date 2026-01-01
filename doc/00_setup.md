@@ -53,17 +53,16 @@ compiled earlier.
 Secondly, you will need to use the patched version of GLFW. This differs based
 on whether you are on PrismLauncher or MultiMC.
 
-> [!IMPORTANT]
-> Make sure you configure the instance to use patched GLFW correctly! If the
-> instance still uses the default version of GLFW, waywall will not do anything
-> when the game launches, since the game will still be running under Xwayland.
-
 ### Prism Launcher
 
 You can configure your instance to use the patched version of GLFW by opening
 its settings (with the `Edit` button on the right pane) and going to `Settings`
 -> `Workarounds`. Then, enable `Native libraries` and `Use system installation
 of GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled.
+
+> [!IMPORTANT]
+> Prism Launcher **will not expand** `~`. If your patched GLFW is within your
+> home directory, you need to type out the absolute path.
 
 ![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
 
@@ -75,6 +74,10 @@ Then, go to the `Workarounds` tab and confirm that `Use system installation of
 GLFW` is **disabled**. Finally, return to the `Java` tab and add
 `-Dorg.lwjgl.glfw.libname=PATH` to your Java arguments, replacing `PATH` with
 the path to the patched `libglfw.so` you just compiled.
+
+> [!IMPORTANT]
+> MultiMC **will not expand** `~`. If your patched GLFW is within your home
+> directory, you need to type out the absolute path.
 
 ## Configuration
 
