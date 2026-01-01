@@ -4,7 +4,7 @@
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
-#include "server/wl_compositor.h"
+#include "server/surface.h"
 #include "util/alloc.h"
 #include "util/prelude.h"
 #include <inttypes.h>

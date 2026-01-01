@@ -1,6 +1,7 @@
 #include "server/xwm.h"
 #include "server/server.h"
 #include "server/ui.h"
+#include "server/surface.h"
 #include "server/wl_compositor.h"
 #include "server/xserver.h"
 #include "server/xwayland.h"

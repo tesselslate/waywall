@@ -1,6 +1,6 @@
 #include "server/xdg_decoration.h"
 #include "server/server.h"
-#include "server/wl_compositor.h"
+#include "server/surface.h"
 #include "server/xdg_shell.h"
 #include "util/alloc.h"
 #include "util/prelude.h"

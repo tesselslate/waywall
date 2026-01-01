@@ -2,7 +2,7 @@
 #include "server/backend.h"
 #include "server/server.h"
 #include "server/ui.h"
-#include "server/wl_compositor.h"
+#include "server/surface.h"
 #include "server/wl_seat.h"
 #include "server/xwayland.h"
 #include "util/alloc.h"
