@@ -5,7 +5,7 @@
 #include "server/buffer.h"
 #include "server/server.h"
 #include "server/ui.h"
-#include "server/wl_compositor.h"
+#include "server/surface.h"
 #include "server/wp_linux_dmabuf.h"
 #include "util/alloc.h"
 #include "util/log.h"

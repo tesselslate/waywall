@@ -4,7 +4,7 @@
 #include "server/backend.h"
 #include "server/buffer.h"
 #include "server/server.h"
-#include "server/wl_compositor.h"
+#include "server/surface.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
 #include "util/alloc.h"

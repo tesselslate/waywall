@@ -1,6 +1,6 @@
 #include "server/xwayland_shell.h"
 #include "server/server.h"
-#include "server/wl_compositor.h"
+#include "server/surface.h"
 #include "util/alloc.h"
 #include "util/prelude.h"
 #include "xwayland-shell-v1-server-protocol.h"
