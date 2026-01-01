@@ -39,13 +39,44 @@ static const struct wl_callback_listener surface_frame_listener = {
 };
 
 static void
-surface_state_reset(struct server_surface_state *state) {
-    wl_array_release(&state->damage);
-    wl_array_release(&state->buffer_damage);
+surface_state_clear(struct server_surface_state *state) {
+    struct wl_array damage = state->damage;
+    struct wl_array buffer_damage = state->buffer_damage;
+
+    if (state->buffer) {
+        server_buffer_unref(state->buffer);
+    }
+
     *state = (struct server_surface_state){};
 
+    // Reuse the allocations, if any, from the previous damage arrays.
+    state->damage = damage;
+    state->damage.size = 0;
+
+    state->buffer_damage = buffer_damage;
+    state->buffer_damage.size = 0;
+}
+
+static void
+surface_state_free(struct server_surface_state *state) {
+    surface_state_clear(state);
+
+    wl_array_release(&state->damage);
+    wl_array_release(&state->buffer_damage);
     wl_array_init(&state->damage);
     wl_array_init(&state->buffer_damage);
+}
+
+static void
+surface_state_set_buffer(struct server_surface_state *state, struct server_buffer *buffer) {
+    if (state->buffer) {
+        server_buffer_unref(state->buffer);
+    }
+
+    state->buffer = buffer;
+    if (state->buffer) {
+        server_buffer_ref(state->buffer);
+    }
 }
 
 static void
@@ -58,12 +89,8 @@ surface_resource_destroy(struct wl_resource *resource) {
         surface->role->destroy(surface->role_resource);
     }
 
-    if (surface->pending.buffer) {
-        server_buffer_unref(surface->pending.buffer);
-    }
-    if (surface->current.buffer) {
-        server_buffer_unref(surface->current.buffer);
-    }
+    surface_state_free(&surface->current);
+    surface_state_free(&surface->pending);
 
     wl_surface_destroy(surface->remote);
     free(surface);
@@ -77,11 +104,7 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
 
     // If a nullptr buffer (no buffer) is being attached, skip the checks.
     if (!buffer) {
-        if (surface->pending.buffer) {
-            server_buffer_unref(surface->pending.buffer);
-        }
-
-        surface->pending.buffer = nullptr;
+        surface_state_set_buffer(&surface->pending, nullptr);
         surface->pending.present |= SURFACE_STATE_BUFFER;
         return;
     }
@@ -100,12 +123,7 @@ surface_attach(struct wl_client *client, struct wl_resource *resource,
         }
     }
 
-    if (surface->pending.buffer) {
-        server_buffer_unref(surface->pending.buffer);
-    }
-    server_buffer_ref(buffer);
-
-    surface->pending.buffer = buffer;
+    surface_state_set_buffer(&surface->pending, buffer);
     surface->pending.present |= SURFACE_STATE_BUFFER;
 }
 
@@ -124,11 +142,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
                           surface->pending.buffer ? surface->pending.buffer->remote : nullptr, 0,
                           0);
 
-        if (surface->current.buffer) {
-            server_buffer_unref(surface->current.buffer);
-        }
-        surface->current.buffer = surface->pending.buffer;
-
+        surface_state_set_buffer(&surface->current, surface->pending.buffer);
         server_buffer_lock(surface->current.buffer);
     }
     if (surface->pending.present & SURFACE_STATE_DAMAGE) {
@@ -144,7 +158,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
         }
     }
 
-    surface_state_reset(&surface->pending);
+    surface_state_clear(&surface->pending);
     wl_surface_commit(surface->remote);
 }
 
