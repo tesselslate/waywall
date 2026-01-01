@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <time.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 #include <wayland-server-core.h>
@@ -37,17 +38,6 @@ struct server_client {
     struct wl_client *wl;
     struct wl_listener on_destroy;
 };
-
-static void
-dispatch_pending(struct wl_display *display, int *dispatched) {
-    int ret = wl_display_dispatch_pending(display);
-
-    if (ret == -1) {
-        *dispatched = -1;
-    } else {
-        *dispatched += ret;
-    }
-}
 
 static void
 on_client_destroy(struct wl_listener *listener, void *data) {
@@ -113,31 +103,18 @@ backend_display_tick(int fd, uint32_t mask, void *data) {
         return 0;
     }
 
+    int num_dispatched = 0;
+    if (mask & WL_EVENT_READABLE) {
+        num_dispatched =
+            wl_display_dispatch_timeout(server->backend->display, &(struct timespec){});
+    }
     if (mask & WL_EVENT_WRITABLE) {
         wl_display_flush(server->backend->display);
     }
-
-    int num_dispatched = 0;
-    if (mask & WL_EVENT_READABLE) {
-        while (wl_display_prepare_read(server->backend->display) != 0) {
-            dispatch_pending(server->backend->display, &num_dispatched);
-
-            if (num_dispatched == -1) {
-                ww_log(LOG_ERROR, "failed to dispatch events on remote display");
-                wl_display_terminate(server->display);
-                return 0;
-            }
-        }
-
-        if (wl_display_read_events(server->backend->display) != 0) {
-            ww_log(LOG_ERROR, "failed to read events on remote display");
-            wl_display_terminate(server->display);
-            return 0;
-        }
+    if (mask == 0) {
+        num_dispatched = wl_display_dispatch_pending(server->backend->display);
+        wl_display_flush(server->backend->display);
     }
-
-    dispatch_pending(server->backend->display, &num_dispatched);
-    wl_display_flush(server->backend->display);
 
     if (num_dispatched < 0) {
         ww_log(LOG_ERROR, "failed to dispatch events on remote display");
