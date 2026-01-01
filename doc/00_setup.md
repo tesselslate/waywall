@@ -1,7 +1,15 @@
 # Setup
 
 After compiling waywall, you will need to configure your instance(s) to use it.
-[Prism Launcher] is the best choice, although [MultiMC] can also work.
+It is *highly recommended* that you use [Prism Launcher]. If you already have
+it, [MultiMC] can work, but it lacks some features.
+
+> [!CAUTION]
+> If your Minecraft launcher of choice is installed in some sort of container
+> (e.g. [Flatpak]), then waywall will not work.
+>
+> Consider installing [Prism Launcher] from your distribution's package manager
+> (if available) or from the [Downloads page](https://prismlauncher.org/download/).
 
 ## GLFW
 
@@ -125,6 +133,7 @@ in laptops), go to the `Performance` tab and check `Use discrete GPU`.
 
 ![The Prism Launcher menu for enabling discrete GPU](assets/prism-discrete-gpu.png)
 
+[Flatpak]: https://flatpak.org
 [prebuilt package]: https://github.com/tesselslate/waywall/releases
 [Prism Launcher]: https://prismlauncher.org
 [MultiMC]: https://multimc.org
