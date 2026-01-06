@@ -185,6 +185,12 @@ layout_floating(struct server_view *view) {
     ww_assert(view->subsurface);
 
     wl_subsurface_set_position(view->subsurface, view->current.x, view->current.y);
+
+    // HACK: This is to work around a bug in Smithay
+    // (https://github.com/Smithay/smithay/issues/1894). This can be made better once I rework
+    // surface state.
+    wl_subsurface_set_sync(view->subsurface);
+
     wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                            wl_fixed_from_int(-1), wl_fixed_from_int(-1));
     wp_viewport_set_destination(view->viewport, -1, -1);
