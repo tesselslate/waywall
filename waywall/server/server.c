@@ -30,7 +30,29 @@
 #include <wayland-client-protocol.h>
 #include <wayland-server-core.h>
 
-static constexpr size_t MAX_BUFFER_SIZE = 65536;
+#if WAYLAND_VERSION_MINOR < 23
+
+static void
+wl_display_set_default_max_buffer_size(struct wl_display *display, size_t size) {
+    // This function was added in libwayland 1.23, so this stub is needed to compile and run on
+    // versions before then.
+}
+
+#endif
+
+#if WAYLAND_VERSION_MINOR < 24
+
+static int
+wl_display_dispatch_timeout(struct wl_display *display, const struct timespec *timeout) {
+    // This function was added in libwayland 1.24. This is only ever called with a timeout of zero
+    // to work around an unannounced breaking behavior change in libwayland 1.24, and it is fine to
+    // just call wl_display_dispatch instead on versions of libwayland before 1.24.
+    return wl_display_dispatch(display);
+}
+
+#endif
+
+static constexpr size_t MAX_BUFFER_SIZE = (1 << 20);
 
 struct server_client {
     struct wl_list link; // server.clients
@@ -136,19 +158,6 @@ global_filter(const struct wl_client *client, const struct wl_global *global, vo
     }
 }
 
-static void
-set_default_buffer_size(struct wl_display *display) {
-#if WAYLAND_VERSION_MINOR >= 23
-
-    wl_display_set_default_max_buffer_size(display, MAX_BUFFER_SIZE);
-
-#else
-
-    // The buffer size API was added in libwayland 1.23.
-
-#endif
-}
-
 struct server *
 server_create(struct config *cfg) {
     struct server *server = zalloc(1, sizeof(*server));
@@ -170,7 +179,7 @@ server_create(struct config *cfg) {
         goto fail_display;
     }
 
-    set_default_buffer_size(server->display);
+    wl_display_set_default_max_buffer_size(server->display, MAX_BUFFER_SIZE);
 
     wl_list_init(&server->clients);
     server->on_client_created.notify = on_client_created;
