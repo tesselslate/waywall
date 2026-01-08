@@ -17,6 +17,18 @@
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 
+#if WAYLAND_VERSION_MINOR < 23
+
+static void
+wl_display_set_max_buffer_size(struct wl_display *display, size_t size) {
+    // This function was added in libwayland 1.23, so this stub is needed to compile and run on
+    // versions before then.
+}
+
+#endif
+
+static constexpr size_t MAX_BUFFER_SIZE = (1 << 20);
+
 static constexpr int USE_ALPHA_MODIFIER_VERSION = 1;
 static constexpr int USE_COMPOSITOR_VERSION = 5;
 static constexpr int USE_CURSOR_SHAPE_VERSION = 1;
@@ -320,6 +332,7 @@ server_backend_create() {
         ww_log_errno(LOG_ERROR, "wl_display_connect failed");
         goto fail_display;
     }
+    wl_display_set_max_buffer_size(backend->display, MAX_BUFFER_SIZE);
 
     backend->registry = wl_display_get_registry(backend->display);
     check_alloc(backend->registry);
