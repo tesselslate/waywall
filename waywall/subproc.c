@@ -95,7 +95,7 @@ subproc_exec(struct subproc *subproc, struct strs cmd) {
             exit(EXIT_FAILURE);
         }
 
-        char **arg_list = zalloc(cmd.len, sizeof(*arg_list) + 1);
+        char **arg_list = zalloc(cmd.len + 1, sizeof(*arg_list));
         for (ssize_t i = 0; i < cmd.len; i++) {
             arg_list[i] = str_clone_cstr(cmd.data[i]);
         }
