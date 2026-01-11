@@ -245,9 +245,9 @@ for distro in "${build_distros[@]}"; do
   elif [ "$distro" = "debian" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       apt-get update
-      apt-get install -y libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
+      apt-get install -y clang libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
       cp -r /build/waywall/contrib/debian /build/waywall/
-      dpkg-buildpackage -b -us -uc
+      CC=clang CFLAGS=-gdwarf-4 dpkg-buildpackage -b -us -uc
       cp ../*.deb /build/waywall/contrib/
     "
   fi
