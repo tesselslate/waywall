@@ -7,8 +7,8 @@ waywall.
 
 Ninjabrain Bot's calibration functionality has issues on Linux and does not work
 correctly within waywall. Using boat eye largely eliminates the need to
-calibrate, but if that is not possible; otherwise, you may need to calibrate
-your standard deviation outside of waywall.
+calibrate. If boat eye is not an option, you may need to calibrate your standard
+deviation outside of waywall.
 
 ## waywall freezing in some Nvidia environments
 
