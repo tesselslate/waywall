@@ -10,13 +10,6 @@ correctly within waywall. Using boat eye largely eliminates the need to
 calibrate, but if that is not possible; otherwise, you may need to calibrate
 your standard deviation outside of waywall.
 
-## Ninjabrain Bot in wrong position on Smithay-based compositors
-
-On Smithay-based compositors, such as Niri, Ninjabrain Bot may appear in the
-wrong position after the visibility of floating windows is toggled. This is due
-to [a bug](https://github.com/Smithay/smithay/issues/1894) in Smithay. A
-workaround for this issue may be implemented in the future.
-
 ## waywall freezing in some Nvidia environments
 
 Older versions of the Nvidia driver may cause waywall to freeze until waywall
