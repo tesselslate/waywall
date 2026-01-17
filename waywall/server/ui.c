@@ -358,6 +358,9 @@ server_ui_create(struct server *server, struct config *cfg) {
     check_alloc(ui->xdg_toplevel);
     xdg_toplevel_add_listener(ui->xdg_toplevel, &xdg_toplevel_listener, ui);
 
+    xdg_toplevel_set_title(ui->xdg_toplevel, "waywall");
+    xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
+
     if (server->backend->xdg_decoration_manager) {
         ui->xdg_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
             server->backend->xdg_decoration_manager, ui->xdg_toplevel);
@@ -466,9 +469,6 @@ server_ui_show(struct server_ui *ui) {
     wl_surface_attach(ui->root.surface, ui->config->background, 0, 0);
     wl_surface_commit(ui->root.surface);
     wl_display_roundtrip(display);
-
-    xdg_toplevel_set_title(ui->xdg_toplevel, "waywall");
-    xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
 
     ui->mapped = true;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
