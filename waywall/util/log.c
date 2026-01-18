@@ -13,6 +13,11 @@
 #define PREFIX_WARN "[%7lu.%06lu] [WARN] "
 #define PREFIX_ERR "[%7lu.%06lu]  [ERR] "
 
+static const char *LOG_NAMES[LOG_NAME_COUNT] = {
+    [LOG_NAME_WRAP] = "wrap",
+    [LOG_NAME_XWAYLAND] = "xwayland",
+};
+
 static const char *color_info = "";
 static const char *color_warn = "";
 static const char *color_err = "";
@@ -134,13 +139,14 @@ util_log_va(enum ww_log_level level, const char *fmt, va_list args, bool newline
 }
 
 int
-util_log_create_file(const char *name, bool cloexec) {
+util_log_create_file(enum ww_log_name name, bool cloexec) {
     strbuf log_path = get_log_directory();
     if (make_log_directory(strbuf_view(log_path)) != 0) {
         return -1;
     }
 
-    strbuf_append(&log_path, name);
+    strbuf_append(&log_path, LOG_NAMES[name]);
+    strbuf_append(&log_path, "-0");
 
     int flags = O_CREAT | O_WRONLY;
     if (cloexec) {

@@ -73,15 +73,11 @@ handle_signal(int signal, void *data) {
 
 static int
 cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
-    char logname[32] = {};
-    ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "wrap-%jd", (intmax_t)getpid());
-    ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
-
     if (!util_debug_init()) {
         return 1;
     }
 
-    int log_fd = util_log_create_file(logname, true);
+    int log_fd = util_log_create_file(LOG_NAME_WRAP, true);
     if (log_fd == -1) {
         return 1;
     }

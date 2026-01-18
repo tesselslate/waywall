@@ -15,9 +15,15 @@ enum ww_log_level {
     LOG_ERROR,
 };
 
+enum ww_log_name {
+    LOG_NAME_WRAP,
+    LOG_NAME_XWAYLAND,
+    LOG_NAME_COUNT,
+};
+
 void util_log(enum ww_log_level level, const char *fmt, ...) WW_PRINTF(2, 3);
 void util_log_va(enum ww_log_level, const char *fmt, va_list args, bool newline);
 
-int util_log_create_file(const char *name, bool cloexec);
+int util_log_create_file(enum ww_log_name name, bool cloexec);
 void util_log_init();
 void util_log_set_file(int fd);

@@ -443,11 +443,7 @@ xserver_start(struct xserver *srv) {
         wl_event_loop_add_fd(loop, notify_fd[0], WL_EVENT_READABLE, handle_xserver_ready, srv);
 
     // Create the log file for Xwayland.
-    char logname[32] = {};
-    ssize_t n = snprintf(logname, STATIC_ARRLEN(logname), "xwayland-%jd", (intmax_t)getpid());
-    ww_assert(n < (ssize_t)STATIC_ARRLEN(logname));
-
-    int log_fd = util_log_create_file(logname, false);
+    int log_fd = util_log_create_file(LOG_NAME_XWAYLAND, false);
     if (log_fd == -1) {
         goto fail_log;
     }
