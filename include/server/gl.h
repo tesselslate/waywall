@@ -38,6 +38,7 @@ struct server_gl {
     struct {
         struct wl_surface *remote;
         struct wl_subsurface *subsurface;
+        struct wp_viewport *viewport;
         struct wl_egl_window *window;
         EGLSurface egl;
     } surface;

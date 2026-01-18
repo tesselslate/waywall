@@ -141,8 +141,8 @@ image_render(struct scene_object *object) {
     struct scene *scene = image->parent;
 
     server_gl_shader_use(scene->shaders.data[image->shader_index].shader);
-    glUniform2f(scene->shaders.data[image->shader_index].shader_u_dst_size, scene->ui->width,
-                scene->ui->height);
+    glUniform2f(scene->shaders.data[image->shader_index].shader_u_dst_size, scene->ui->render_width,
+                scene->ui->render_height);
     glUniform2f(scene->shaders.data[image->shader_index].shader_u_src_size, image->width,
                 image->height);
 
@@ -200,8 +200,8 @@ mirror_render(struct scene_object *object) {
     server_gl_get_capture_size(scene->gl, &width, &height);
 
     server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
-    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size, scene->ui->width,
-                scene->ui->height);
+    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size,
+                scene->ui->render_width, scene->ui->render_height);
     glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
 
     gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
@@ -285,8 +285,8 @@ text_render(struct scene_object *object) {
     struct scene *scene = text->parent;
 
     server_gl_shader_use(scene->shaders.data[text->shader_index].shader);
-    glUniform2f(scene->shaders.data[text->shader_index].shader_u_dst_size, scene->ui->width,
-                scene->ui->height);
+    glUniform2f(scene->shaders.data[text->shader_index].shader_u_dst_size, scene->ui->render_width,
+                scene->ui->render_height);
     glUniform2f(scene->shaders.data[text->shader_index].shader_u_src_size, ATLAS_WIDTH,
                 ATLAS_HEIGHT);
 
@@ -408,8 +408,8 @@ draw_stencil(struct scene *scene) {
     // draw_frame. This stuff really should be synchronized with the surface content. Might be worth
     // always doing compositing if scene objects are visible but I'm not very happy with that
     // solution.
-    bool stencil_equal = scene->ui->width == scene->prev_frame.width &&
-                         scene->ui->height == scene->prev_frame.height &&
+    bool stencil_equal = scene->ui->render_width == scene->prev_frame.width &&
+                         scene->ui->render_height == scene->prev_frame.height &&
                          width == scene->prev_frame.tex_width &&
                          height == scene->prev_frame.tex_height;
     if (stencil_equal) {
@@ -419,8 +419,8 @@ draw_stencil(struct scene *scene) {
         }
     }
 
-    scene->prev_frame.width = scene->ui->width;
-    scene->prev_frame.height = scene->ui->height;
+    scene->prev_frame.width = scene->ui->render_width;
+    scene->prev_frame.height = scene->ui->render_height;
     scene->prev_frame.tex_width = width;
     scene->prev_frame.tex_height = height;
     scene->prev_frame.equal_frames = 0;
@@ -436,8 +436,8 @@ draw_stencil(struct scene *scene) {
     glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE);
 
     struct box dst = {
-        .x = (scene->ui->width / 2) - (width / 2),
-        .y = (scene->ui->height / 2) - (height / 2),
+        .x = (scene->ui->render_width / 2) - (width / 2),
+        .y = (scene->ui->render_height / 2) - (height / 2),
         .width = width,
         .height = height,
     };
@@ -461,7 +461,8 @@ static void
 draw_debug_text(struct scene *scene) {
     // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[0].shader);
-    glUniform2f(scene->shaders.data[0].shader_u_dst_size, scene->ui->width, scene->ui->height);
+    glUniform2f(scene->shaders.data[0].shader_u_dst_size, scene->ui->render_width,
+                scene->ui->render_height);
     glUniform2f(scene->shaders.data[0].shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
 
     const char *str = util_debug_str();
@@ -495,7 +496,7 @@ draw_frame(struct scene *scene) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    glViewport(0, 0, scene->ui->width, scene->ui->height);
+    glViewport(0, 0, scene->ui->render_width, scene->ui->render_height);
 
     if (!should_draw_frame(scene)) {
         // TODO: Scene rendering could potentially be synchronized with the game subsurface (or

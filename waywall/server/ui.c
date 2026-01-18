@@ -145,34 +145,43 @@ static void
 layout_centered(struct server_view *view) {
     ww_assert(view->subsurface);
 
-    int32_t width, height;
-    server_buffer_get_size(server_surface_next_buffer(view->surface), &width, &height);
+    int32_t buf_w, buf_h;
+    server_buffer_get_size(server_surface_next_buffer(view->surface), &buf_w, &buf_h);
 
-    // Center the view in the window.
-    int32_t x = (view->ui->width / 2) - (width / 2);
-    int32_t y = (view->ui->height / 2) - (height / 2);
+    double scale_x = (double)view->ui->width / view->ui->render_width;
+    double scale_y = (double)view->ui->height / view->ui->render_height;
+
+    int32_t logical_w = (int32_t)(buf_w * scale_x);
+    int32_t logical_h = (int32_t)(buf_h * scale_y);
+    logical_w = logical_w >= 1 ? logical_w : 1;
+    logical_h = logical_h >= 1 ? logical_h : 1;
+
+    int32_t x = (view->ui->width / 2) - (logical_w / 2);
+    int32_t y = (view->ui->height / 2) - (logical_h / 2);
 
     if (x >= 0 && y >= 0) {
-        // If the centered view is entirely inside the window, it can be shown as normal.
         wl_subsurface_set_position(view->subsurface, x, y);
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(-1), wl_fixed_from_int(-1),
                                wl_fixed_from_int(-1), wl_fixed_from_int(-1));
-        wp_viewport_set_destination(view->viewport, -1, -1);
+        wp_viewport_set_destination(view->viewport, logical_w, logical_h);
     } else {
-        // If the centered view is partially outside the window, it must be cropped.
-        int32_t crop_width = (x >= 0) ? width : view->ui->width;
-        int32_t crop_height = (y >= 0) ? height : view->ui->height;
+        int32_t crop_logical_w = (x >= 0) ? logical_w : view->ui->width;
+        int32_t crop_logical_h = (y >= 0) ? logical_h : view->ui->height;
+        int32_t crop_buf_w = (int32_t)(crop_logical_w / scale_x);
+        int32_t crop_buf_h = (int32_t)(crop_logical_h / scale_y);
+        crop_buf_w = crop_buf_w >= 1 ? crop_buf_w : 1;
+        crop_buf_h = crop_buf_h >= 1 ? crop_buf_h : 1;
 
-        int32_t crop_x = (width / 2) - (crop_width / 2);
-        int32_t crop_y = (height / 2) - (crop_height / 2);
+        int32_t crop_x = (buf_w / 2) - (crop_buf_w / 2);
+        int32_t crop_y = (buf_h / 2) - (crop_buf_h / 2);
 
         x = x >= 0 ? x : 0;
         y = y >= 0 ? y : 0;
 
         wl_subsurface_set_position(view->subsurface, x, y);
         wp_viewport_set_source(view->viewport, wl_fixed_from_int(crop_x), wl_fixed_from_int(crop_y),
-                               wl_fixed_from_int(crop_width), wl_fixed_from_int(crop_height));
-        wp_viewport_set_destination(view->viewport, crop_width, crop_height);
+                               wl_fixed_from_int(crop_buf_w), wl_fixed_from_int(crop_buf_h));
+        wp_viewport_set_destination(view->viewport, crop_logical_w, crop_logical_h);
     }
 
     view->current.x = x;
@@ -244,6 +253,15 @@ on_xdg_toplevel_configure(void *data, struct xdg_toplevel *xdg_toplevel, int32_t
     }
 
     ui->fullscreen = fullscreen;
+
+    if (fullscreen && ui->fullscreen_width > 0 && ui->fullscreen_height > 0) {
+        ui->render_width = ui->fullscreen_width;
+        ui->render_height = ui->fullscreen_height;
+    } else {
+        ui->render_width = ui->width;
+        ui->render_height = ui->height;
+    }
+
     WW_DEBUG(ui.fullscreen, fullscreen);
 }
 
@@ -481,6 +499,9 @@ server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
     }
     ui->config = config;
 
+    ui->fullscreen_width = config->fullscreen_width;
+    ui->fullscreen_height = config->fullscreen_height;
+
     if (ui->root.tearing_control) {
         wp_tearing_control_v1_set_presentation_hint(
             ui->root.tearing_control, config->tearing
@@ -517,6 +538,8 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     }
 
     config->tearing = cfg->experimental.tearing;
+    config->fullscreen_width = cfg->window.fullscreen_width;
+    config->fullscreen_height = cfg->window.fullscreen_height;
 
     config->ninb_opacity = cfg->theme.ninb_opacity * UINT32_MAX;
 
