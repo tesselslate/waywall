@@ -18,6 +18,9 @@ static const char *LOG_NAMES[LOG_NAME_COUNT] = {
     [LOG_NAME_XWAYLAND] = "xwayland",
 };
 
+// Limited to 10 so that the trailing number is a single character for simplicity
+static constexpr int MAX_LOG_FILE_NUM = 10;
+
 static const char *color_info = "";
 static const char *color_warn = "";
 static const char *color_err = "";
@@ -79,6 +82,40 @@ fail:
     strbuf_free(&path);
     strs_free(dirs);
     return 1;
+}
+
+static void
+rotate_logs(enum ww_log_name name) {
+    strbuf path = get_log_directory();
+    strbuf old = strbuf_clone(path);
+    strbuf new = strbuf_clone(path);
+
+    // This logic requires that the number is only a single character.
+    static_assert(MAX_LOG_FILE_NUM <= 10);
+    for (int num = MAX_LOG_FILE_NUM - 2; num >= 0; num--) {
+        old.len = path.len;
+        strbuf_append(&old, '/');
+        strbuf_append(&old, LOG_NAMES[name]);
+        strbuf_append(&old, '-');
+        strbuf_append(&old, '0' + num);
+
+        new.len = path.len;
+        strbuf_append(&new, '/');
+        strbuf_append(&new, LOG_NAMES[name]);
+        strbuf_append(&new, '-');
+        strbuf_append(&new, '0' + num + 1);
+
+        if (rename(old.data, new.data) != 0 && errno != ENOENT) {
+            ww_log_errno(LOG_ERROR, "failed to rotate old log file '%s' -> '%s'", old.data,
+                         new.data);
+            goto cleanup;
+        }
+    }
+
+cleanup:
+    strbuf_free(&path);
+    strbuf_free(&old);
+    strbuf_free(&new);
 }
 
 void
@@ -144,6 +181,8 @@ util_log_create_file(enum ww_log_name name, bool cloexec) {
     if (make_log_directory(strbuf_view(log_path)) != 0) {
         return -1;
     }
+
+    rotate_logs(name);
 
     strbuf_append(&log_path, LOG_NAMES[name]);
     strbuf_append(&log_path, "-0");
