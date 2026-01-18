@@ -31,6 +31,7 @@ void strbuf_append_cstr(strbuf *dst, const char *src);
 void strbuf_append_buf(strbuf *dst, strbuf src);
 void strbuf_append_str(strbuf *dst, str src);
 void strbuf_clear(strbuf *buf);
+strbuf strbuf_clone(strbuf buf);
 char *strbuf_clone_cstr(strbuf buf);
 void strbuf_free(strbuf *buf);
 strbuf strbuf_new();

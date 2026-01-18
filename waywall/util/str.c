@@ -70,6 +70,18 @@ strbuf_clear(strbuf *buf) {
     buf->len = 0;
 }
 
+strbuf
+strbuf_clone(strbuf buf) {
+    char *data = zalloc(buf.cap, 1);
+    memcpy(data, buf.data, buf.len);
+
+    return (strbuf){
+        .cap = buf.cap,
+        .len = buf.len,
+        .data = data,
+    };
+}
+
 char *
 strbuf_clone_cstr(strbuf buf) {
     char *cstr = zalloc(buf.len + 1, 1);

@@ -113,4 +113,15 @@ main() {
     free(cstr);
 
     strbuf_free(&buf);
+
+    buf = strbuf_new();
+    for (size_t i = 0; i < 32; i++) {
+        strbuf_append(&buf, "12341234");
+    }
+
+    strbuf buf2 = strbuf_clone(buf);
+    ww_assert(str_eq(strbuf_view(buf), strbuf_view(buf2)));
+
+    strbuf_free(&buf2);
+    strbuf_free(&buf);
 }
