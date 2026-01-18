@@ -27,6 +27,11 @@ static const struct config defaults = {
             .jit = false,
             .tearing = false,
         },
+    .window =
+        {
+            .fullscreen_width = 0,
+            .fullscreen_height = 0,
+        },
     .input =
         {
             .keymap =
@@ -531,6 +536,36 @@ process_config_input_remaps(struct config *cfg) {
 }
 
 static int
+process_config_window(struct config *cfg) {
+    // stack state
+    // 2:   config.window
+    // 1:   config
+    ww_assert(lua_gettop(cfg->vm->L) == 2);
+
+    if (get_int(cfg, "fullscreen_width", &cfg->window.fullscreen_width, "window.fullscreen_width",
+                false) != 0) {
+        return 1;
+    }
+    if (cfg->window.fullscreen_width < 0) {
+        ww_log(LOG_ERROR,
+               "'window.fullscreen_width' must be a non-negative integer (0 = native resolution)");
+        return 1;
+    }
+
+    if (get_int(cfg, "fullscreen_height", &cfg->window.fullscreen_height,
+                "window.fullscreen_height", false) != 0) {
+        return 1;
+    }
+    if (cfg->window.fullscreen_height < 0) {
+        ww_log(LOG_ERROR,
+               "'window.fullscreen_height' must be a non-negative integer (0 = native resolution)");
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 process_config_input(struct config *cfg) {
     // stack state
     // 2:   config.input
@@ -730,6 +765,10 @@ process_config(struct config *cfg) {
     }
 
     if (get_table(cfg, "experimental", process_config_experimental, "experimental", false) != 0) {
+        return 1;
+    }
+
+    if (get_table(cfg, "window", process_config_window, "window", false) != 0) {
         return 1;
     }
 

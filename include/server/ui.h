@@ -31,6 +31,8 @@ struct server_ui {
     struct zxdg_toplevel_decoration_v1 *xdg_decoration;
 
     int32_t width, height;
+    int32_t render_width, render_height;
+    int32_t fullscreen_width, fullscreen_height;
     bool mapped, resize, fullscreen;
 
     struct wl_list views; // server_view.link
@@ -46,6 +48,9 @@ struct server_ui {
 struct server_ui_config {
     struct wl_buffer *background;
     bool tearing;
+
+    int32_t fullscreen_width;
+    int32_t fullscreen_height;
 
     uint32_t ninb_opacity;
 };

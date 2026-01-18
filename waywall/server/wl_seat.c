@@ -87,25 +87,42 @@ static void
 get_pointer_offset(struct server_seat *seat, double *x, double *y) {
     ww_assert(seat->input_focus);
 
-    *x = seat->pointer.x - (double)seat->input_focus->current.x;
-    *y = seat->pointer.y - (double)seat->input_focus->current.y;
+    // Pointer coordinates from compositor are in logical space.
+    double logical_x = seat->pointer.x - (double)seat->input_focus->current.x;
+    double logical_y = seat->pointer.y - (double)seat->input_focus->current.y;
 
-    // If the view is centered, then its X and Y coordinates as stored in server_view_state will be
-    // inbounds, but its actual X and Y coordinates are offscreen in the negatives. This needs to be
-    // accounted for when sending pointer motion.
-    //
-    // TODO: This is a bit stupid, maybe it can be improved at some point when I improve surface
-    // management logic
     if (seat->input_focus->current.centered) {
+        int32_t logical_w = seat->server->ui->width;
+        int32_t logical_h = seat->server->ui->height;
+        int32_t render_w = seat->server->ui->render_width;
+        int32_t render_h = seat->server->ui->render_height;
+
+        if (logical_w > 0 && logical_h > 0 && render_w > 0 && render_h > 0) {
+            *x = logical_x * ((double)render_w / logical_w);
+            *y = logical_y * ((double)render_h / logical_h);
+        } else {
+            *x = logical_x;
+            *y = logical_y;
+        }
+
+        // If the view is centered, then its X and Y coordinates as stored in server_view_state
+        // will be inbounds, but its actual X and Y coordinates are offscreen in the negatives.
+        // This needs to be accounted for when sending pointer motion.
+        //
+        // TODO: This is a bit stupid, maybe it can be improved at some point when I improve
+        // surface management logic
         uint32_t width = seat->input_focus->current.width;
         uint32_t height = seat->input_focus->current.height;
 
-        if ((int32_t)width > seat->server->ui->width) {
-            *x += (double)(width - seat->server->ui->width) / 2;
+        if ((int32_t)width > render_w) {
+            *x += (double)(width - render_w) / 2;
         }
-        if ((int32_t)height > seat->server->ui->height) {
-            *y += (double)(height - seat->server->ui->height) / 2;
+        if ((int32_t)height > render_h) {
+            *y += (double)(height - render_h) / 2;
         }
+    } else {
+        *x = logical_x;
+        *y = logical_y;
     }
 }
 

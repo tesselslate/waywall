@@ -13,6 +13,11 @@ struct config {
     } experimental;
 
     struct {
+        int32_t fullscreen_width;
+        int32_t fullscreen_height;
+    } window;
+
+    struct {
         struct {
             char *layout;
             char *model;
