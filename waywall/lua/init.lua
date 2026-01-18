@@ -141,7 +141,7 @@ local function load_config(autogenerate)
 
         error("expected table from user configuration, got " .. type(result))
     else
-        if result:find("not found:") then
+        if result:find("module 'init' not found:") then
             if not autogenerate then
                 error(result)
             end
