@@ -13,6 +13,7 @@
 #include <luajit-2.1/lua.h>
 #include <luajit-2.1/luajit.h>
 #include <luajit-2.1/lualib.h>
+#include <stdbit.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
@@ -385,7 +386,7 @@ compare_action(const void *a_void, const void *b_void) {
     const struct config_action *a = a_void;
     const struct config_action *b = b_void;
 
-    return __builtin_popcount(b->modifiers) - __builtin_popcount(a->modifiers);
+    return stdc_count_ones(b->modifiers) - stdc_count_ones(a->modifiers);
 }
 
 static int
