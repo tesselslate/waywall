@@ -17,6 +17,7 @@
     - [Input](01_options_input.md)
     - [Theme](01_options_theme.md)
     - [Shaders](01_options_shaders.md)
+    - [Window](01_options_window.md)
     - [Experimental](01_options_experimental.md)
 
 # API Reference
