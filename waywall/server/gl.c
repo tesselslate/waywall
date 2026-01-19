@@ -236,9 +236,6 @@ on_ui_resize(struct wl_listener *listener, void *data) {
     wl_egl_window_resize(gl->surface.window, gl->server->ui->render_width,
                          gl->server->ui->render_height, 0, 0);
 
-    wp_viewport_set_source(gl->surface.viewport, wl_fixed_from_int(0), wl_fixed_from_int(0),
-                           wl_fixed_from_int(gl->server->ui->render_width),
-                           wl_fixed_from_int(gl->server->ui->render_height));
     wp_viewport_set_destination(gl->surface.viewport, gl->server->ui->width, gl->server->ui->height);
 }
 
