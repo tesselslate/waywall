@@ -26,6 +26,9 @@ struct wrap *config_vm_get_wrap(struct config_vm *vm);
 void config_vm_set_wrap(struct config_vm *vm, struct wrap *wrap);
 void config_vm_set_profile(struct config_vm *vm, const char *profile);
 
+void config_vm_coro_add(lua_State *L, struct config_vm_waker *waker);
+void config_vm_coro_del(lua_State *L);
+struct config_vm_waker *config_vm_coro_get(lua_State *L);
 struct config_vm_waker *config_vm_create_waker(lua_State *L, config_vm_waker_destroy_func_t destroy,
                                                void *data);
 int config_vm_exec_bcode(struct config_vm *vm, const unsigned char *bc, size_t bc_size,

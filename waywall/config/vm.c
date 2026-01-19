@@ -30,7 +30,6 @@ static const struct {
 static constexpr int MAX_INSTRUCTIONS = 50000000;
 
 static void waker_destroy(struct config_vm_waker *waker);
-static struct config_vm_waker *waker_lookup(lua_State *L);
 
 static void
 on_debug_hook(lua_State *L, struct lua_Debug *dbg) {
@@ -44,46 +43,18 @@ on_lua_panic(lua_State *L) {
 }
 
 static void
-coro_table_add(lua_State *L, struct config_vm_waker *waker) {
-    ssize_t stack_start = lua_gettop(L);
-
-    lua_pushlightuserdata(L, (void *)&REG_KEYS.coroutines); // stack: n+1
-    lua_rawget(L, LUA_REGISTRYINDEX);                       // stack: n+1
-    lua_pushthread(L);                                      // stack: n+2
-    lua_pushlightuserdata(L, (void *)waker);                // stack: n+3
-    lua_rawset(L, -3);                                      // stack: n+1
-
-    lua_pop(L, 1); // stack: n
-    ww_assert(lua_gettop(L) == stack_start);
-}
-
-static void
-coro_table_del(lua_State *L) {
-    ssize_t stack_start = lua_gettop(L);
-
-    lua_pushlightuserdata(L, (void *)&REG_KEYS.coroutines); // stack: n+1
-    lua_rawget(L, LUA_REGISTRYINDEX);                       // stack: n+1
-    lua_pushthread(L);                                      // stack: n+2
-    lua_pushnil(L);                                         // stack: n+3
-    lua_rawset(L, -3);                                      // stack: n+1
-
-    lua_pop(L, 1); // stack: n
-    ww_assert(lua_gettop(L) == stack_start);
-}
-
-static void
 process_yield(lua_State *L) {
     // Ensure that this coroutine's yield was valid (i.e. it came from a waywall Lua API function
     // and was not from a user call to coroutine.yield).
     //
     // If the yield was invalid, the coroutine will not have any associated waker and will never be
     // able to resume. It should be destroyed immediately.
-    if (waker_lookup(L)) {
+    if (config_vm_coro_get(L)) {
         return;
     }
 
     ww_log(LOG_ERROR, "invalid yield from coroutine %p", L);
-    coro_table_del(L);
+    config_vm_coro_del(L);
 }
 
 static void *
@@ -114,28 +85,11 @@ registry_set(lua_State *L, const char *key, void *value) {
 
 static void
 waker_destroy(struct config_vm_waker *waker) {
-    coro_table_del(waker->L);
+    config_vm_coro_del(waker->L);
     waker->destroy(waker, waker->data);
 
     wl_list_remove(&waker->link);
     free(waker);
-}
-
-static struct config_vm_waker *
-waker_lookup(lua_State *L) {
-    ssize_t stack_start = lua_gettop(L);
-
-    lua_pushlightuserdata(L, (void *)&REG_KEYS.coroutines); // stack: n+1
-    lua_rawget(L, LUA_REGISTRYINDEX);                       // stack: n+1
-    lua_pushthread(L);                                      // stack: n+2
-    lua_rawget(L, -2);                                      // stack: n+2
-
-    struct config_vm_waker *waker = lua_touserdata(L, -1);
-
-    lua_pop(L, 2); // stack: 0
-    ww_assert(lua_gettop(L) == stack_start);
-
-    return waker;
 }
 
 struct config_vm *
@@ -223,6 +177,51 @@ config_vm_set_wrap(struct config_vm *vm, struct wrap *wrap) {
     config_vm_signal_event(vm, "load");
 }
 
+void
+config_vm_coro_add(lua_State *L, struct config_vm_waker *waker) {
+    ssize_t stack_start = lua_gettop(L);
+
+    lua_pushlightuserdata(L, (void *)&REG_KEYS.coroutines); // stack: n+1
+    lua_rawget(L, LUA_REGISTRYINDEX);                       // stack: n+1
+    lua_pushthread(L);                                      // stack: n+2
+    lua_pushlightuserdata(L, (void *)waker);                // stack: n+3
+    lua_rawset(L, -3);                                      // stack: n+1
+
+    lua_pop(L, 1); // stack: n
+    ww_assert(lua_gettop(L) == stack_start);
+}
+
+void
+config_vm_coro_del(lua_State *L) {
+    ssize_t stack_start = lua_gettop(L);
+
+    lua_pushlightuserdata(L, (void *)&REG_KEYS.coroutines); // stack: n+1
+    lua_rawget(L, LUA_REGISTRYINDEX);                       // stack: n+1
+    lua_pushthread(L);                                      // stack: n+2
+    lua_pushnil(L);                                         // stack: n+3
+    lua_rawset(L, -3);                                      // stack: n+1
+
+    lua_pop(L, 1); // stack: n
+    ww_assert(lua_gettop(L) == stack_start);
+}
+
+struct config_vm_waker *
+config_vm_coro_get(lua_State *L) {
+    ssize_t stack_start = lua_gettop(L);
+
+    lua_pushlightuserdata(L, (void *)&REG_KEYS.coroutines); // stack: n+1
+    lua_rawget(L, LUA_REGISTRYINDEX);                       // stack: n+1
+    lua_pushthread(L);                                      // stack: n+2
+    lua_rawget(L, -2);                                      // stack: n+2
+
+    struct config_vm_waker *waker = lua_touserdata(L, -1);
+
+    lua_pop(L, 2); // stack: 0
+    ww_assert(lua_gettop(L) == stack_start);
+
+    return waker;
+}
+
 struct config_vm_waker *
 config_vm_create_waker(lua_State *L, config_vm_waker_destroy_func_t destroy, void *data) {
     struct config_vm *vm = config_vm_from(L);
@@ -232,7 +231,7 @@ config_vm_create_waker(lua_State *L, config_vm_waker_destroy_func_t destroy, voi
     waker->destroy = destroy;
     waker->data = data;
 
-    coro_table_add(L, waker);
+    config_vm_coro_add(L, waker);
 
     wl_list_insert(&vm->wakers, &waker->link);
 
@@ -359,7 +358,7 @@ config_vm_try_action(struct config_vm *vm, size_t index) {
     // Create a new coroutine (Lua thread) and place it in the global coroutines table so that
     // it does not get garbage collected.
     lua_State *coro = lua_newthread(vm->L); // stack: 1
-    coro_table_add(coro, nullptr);
+    config_vm_coro_add(coro, nullptr);
 
     // Retrieve the given action function from the actions table.
     lua_pushlightuserdata(coro, (void *)&REG_KEYS.actions); // stack: 1
@@ -383,13 +382,13 @@ config_vm_try_action(struct config_vm *vm, size_t index) {
         }
         consumed = (!lua_isboolean(coro, -1) || lua_toboolean(coro, -1));
 
-        coro_table_del(coro);
+        config_vm_coro_del(coro);
         break;
     default:
         // The coroutine failed and threw an error. Remove it from the global table and log the
         // error.
         ww_log(LOG_ERROR, "failed to start action: '%s'", lua_tostring(coro, -1));
-        coro_table_del(coro);
+        config_vm_coro_del(coro);
         break;
     }
 
