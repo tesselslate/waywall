@@ -11,9 +11,11 @@ local function event_handler(name)
 
     priv.register(name, function()
         for listener, _ in pairs(listeners) do
-            local ok, result = pcall(listener)
+            local ok, result = pcall(priv.spawn, listener)
             if not ok then
-                priv.log_error("failed to call event listener (" .. name .. "): " .. result)
+                priv.log_error(
+                    "failed to create event listener coroutine (" .. name .. "): " .. result
+                )
             end
         end
     end)

@@ -7,11 +7,6 @@ can be executed while the current execution context is paused.
 Calling this function forbids keybind handlers from marking an input as
 non-consumed. See [Input consumption] for more details.
 
-> [!NOTE]
-> Currently, it is only allowed to call this function from within a keybind
-> handler. Support for calling this function from an event listener may be added
-> at a later date.
-
 ### Arguments
 
   - `ms`: number

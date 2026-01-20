@@ -893,6 +893,66 @@ l_sleep(lua_State *L) {
 }
 
 static int
+l_spawn(lua_State *L) {
+    static constexpr int IDX_FUNC = 1;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("sleep"));
+    }
+
+    if (lua_type(L, IDX_FUNC) != LUA_TFUNCTION) {
+        return luaL_error(L, "expected a function, got '%s'", luaL_typename(L, IDX_FUNC));
+    }
+
+    size_t argc = lua_gettop(L) - IDX_FUNC;
+
+    lua_State *coro = lua_newthread(vm->L); // stack: argc + 2
+    config_vm_coro_add(coro, nullptr);
+
+    // The function and its arguments need to be moved to the coroutine's stack, but we need to keep
+    // a reference to the newly created coroutine on the stack of the caller so that the coroutine
+    // is not immediately garbage collected in the event of an error.
+    lua_pop(L, 1);                // stack: argc + 1
+    lua_xmove(L, coro, argc + 1); // stack: 0 (coroutine: argc + 1)
+    lua_pushthread(coro);         // stack: 0 (coroutine: argc + 2)
+    lua_xmove(coro, L, 1);        // stack: 1 (coroutine: argc + 1)
+
+    int ret = lua_resume(coro, argc);
+
+    switch (ret) {
+    case LUA_YIELD:
+        // There needs to be a waker associated with the coroutine or else it will never be
+        // resumed.
+        if (config_vm_coro_get(coro)) {
+            return 0;
+        }
+
+        config_vm_coro_del(coro);
+        return luaL_error(L, "invalid yield from coroutine");
+    case 0:
+        // The coroutine finished immediately without yielding, so it can be deleted from the
+        // coroutine table.
+        config_vm_coro_del(coro);
+        break;
+    default:
+        // An error occurred. The spawned coroutine is still on the stack of the coroutine which
+        // called spawn so the error message will not get garbage collected.
+
+        config_vm_coro_del(coro);
+        if (lua_type(coro, -1) == LUA_TSTRING) {
+            return luaL_error(L, lua_tostring(coro, -1));
+        } else {
+            return luaL_error(L, "unknown (%d): %s", ret, lua_tostring(coro, -1));
+        }
+    }
+
+    return 0;
+}
+
+static int
 l_state(lua_State *L) {
     static constexpr int IDX_STATE = 1;
 
@@ -1215,6 +1275,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"log_error", l_log_error},
     {"register", l_register},
     {"setenv", l_setenv},
+    {"spawn", l_spawn},
     {nullptr, nullptr},
 };
 
