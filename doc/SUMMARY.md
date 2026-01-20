@@ -34,6 +34,7 @@
     - [press_key](02_waywall_press_key.md)
     - [profile](02_waywall_profile.md)
     - [set_keymap](02_waywall_set_keymap.md)
+    - [set_remaps](02_waywall_set_remaps.md)
     - [set_resolution](02_waywall_set_resolution.md)
     - [set_sensitivity](02_waywall_set_sensitivity.md)
     - [show_floating](02_waywall_show_floating.md)
