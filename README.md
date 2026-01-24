@@ -11,8 +11,7 @@ successor to [resetti](https://github.com/tesselslate/resetti).
 
 # Installation
 
-Waywall is available on Arch through the AUR and on systems with Nix installed
-through Nixpkgs.
+Waywall is available on Arch through the AUR and on systems with Nix through Nixpkgs.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
   - [Nix (Nixpkgs)](https://search.nixos.org/packages?channel=unstable&query=waywall)
