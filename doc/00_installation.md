@@ -1,13 +1,22 @@
 # Installation
 
-Distribution-specific packages are currently only available for Arch through
-the AUR.
+Waywall is available on Arch through the AUR and on systems with Nix installed
+through Nixpkgs.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
+  - [Nix (Nixpkgs)](https://search.nixos.org/packages?channel=unstable&query=waywall)
 
 Users on other distributions must download a prebuilt package from the
 [Releases](https://github.com/tesselslate/waywall/releases) page or build
 waywall from source.
+
+## Installing with Nix
+
+If it is available, Waywall should be installed on your NixOS or Home Manager profile. On other distributions with Nix installed, it can be installed with:
+
+```
+$ nix profile install nixpkgs#waywall
+```
 
 ## Building with the packaging script
 

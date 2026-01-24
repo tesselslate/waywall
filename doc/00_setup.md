@@ -23,6 +23,14 @@ GLFW.
 > script, then you already have the correct version of GLFW available! It can be
 > found at `/usr/local/lib64/waywall-glfw/libglfw.so`.
 
+> [!TIP]
+> If you are using Prism Launcher installed from Nixpkgs, you can skip and 
+> continue to the next step as it already includes the patch.
+> 
+> If you have Nix but are using Prism Launcher from a *different* source, you can
+> install the `glfw3-minecraft` package with `nix profile` and use the path
+> `~/.nix-profile/lib/libglfw.so` in the upcoming steps.
+
 You can compile the patched version of GLFW with the following commands:
 
 ```sh
@@ -66,11 +74,16 @@ on whether you are on PrismLauncher or MultiMC.
 You can configure your instance to use the patched version of GLFW by opening
 its settings (with the `Edit` button on the right pane) and going to `Settings`
 -> `Workarounds`. Then, enable `Native libraries` and `Use system installation
-of GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled.
+of GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled
+or installed.
 
 > [!IMPORTANT]
 > Prism Launcher **will not expand** `~`. If your patched GLFW is within your
 > home directory, you need to type out the absolute path.
+
+> [!TIP]
+> If you are using Prism Launcher installed from Nixpkgs, you can leave the path
+> field empty.
 
 ![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
 

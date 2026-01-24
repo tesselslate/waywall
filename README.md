@@ -11,10 +11,11 @@ successor to [resetti](https://github.com/tesselslate/resetti).
 
 # Installation
 
-Distribution-specific packages are currently only available for Arch through
-the AUR.
+Waywall is available on Arch through the AUR and on systems with Nix installed
+through Nixpkgs.
 
   - [Arch Linux (AUR)](https://aur.archlinux.org/packages/waywall-working-git)
+  - [Nix (Nixpkgs)](https://search.nixos.org/packages?channel=unstable&query=waywall)
 
 Users on other distributions must [build waywall from source](#building-from-source),
 download a prebuilt package from the [Releases](https://github.com/tesselslate/waywall/releases)
