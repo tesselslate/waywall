@@ -29,7 +29,7 @@ GLFW.
 > 
 > If you have Nix but are using Prism Launcher from a *different* source, you can
 > install the `glfw3-minecraft` package with `nix profile` and use the path
-> `~/.nix-profile/lib/libglfw.so` in the upcoming steps.
+> `/home/USER/.nix-profile/lib/libglfw.so` in the upcoming steps.
 
 You can compile the patched version of GLFW with the following commands:
 
@@ -82,7 +82,7 @@ or installed.
 > home directory, you need to type out the absolute path.
 
 > [!TIP]
-> If you are using Prism Launcher installed from Nixpkgs, you can leave the path
+> If you are using Prism Launcher installed from Nixpkgs, you must leave the path
 > field empty.
 
 ![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)

@@ -11,7 +11,39 @@ waywall from source.
 
 ## Installing with Nix
 
-If it is available, Waywall should be installed on your NixOS or Home Manager profile. On other distributions with Nix installed, it can be installed with:
+Waywall is available since NixOS 26.05.
+
+If it is available, Waywall should be installed on your NixOS or Home Manager profile.
+
+### NixOS
+
+```nix
+# module.nix
+{ pkgs, ... }:
+{
+  environment.systemPackages = [
+    pkgs.prismlauncher
+    pkgs.waywall
+  ];
+}
+```
+
+### Home Manager
+
+```nix
+# home.nix
+{ pkgs, ... }:
+{
+  home.packages = [
+    pkgs.prismlauncher
+    pkgs.waywall
+  ];
+}
+```
+
+### Nix Profile
+
+On other distributions with Nix installed, it can be installed with:
 
 ```
 $ nix profile install nixpkgs#waywall
