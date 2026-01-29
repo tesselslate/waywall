@@ -18,7 +18,7 @@ If it is available, Waywall should be installed on your NixOS or Home Manager pr
 ### NixOS
 
 ```nix
-# module.nix
+# configuration.nix
 { pkgs, ... }:
 {
   environment.systemPackages = [
