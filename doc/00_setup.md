@@ -83,7 +83,7 @@ or installed.
 
 > [!TIP]
 > If you are using Prism Launcher installed from Nixpkgs, you must leave the path
-> field empty.
+> field empty to automatically use the patched GLFW.
 
 ![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
 
