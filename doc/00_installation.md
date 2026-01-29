@@ -13,7 +13,7 @@ waywall from source.
 
 waywall is available in Nixpkgs since 26.05.
 
-If it is available, Waywall should be installed on your NixOS or Home Manager profile.
+If it is available, waywall should be installed on your NixOS or Home Manager profile.
 
 ### NixOS
 
