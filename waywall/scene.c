@@ -15,9 +15,9 @@ static constexpr int PACKED_ATLAS_WIDTH = 2048;
 static constexpr int PACKED_ATLAS_HEIGHT = 16;
 static constexpr int ATLAS_WIDTH = 128;
 static constexpr int ATLAS_HEIGHT = 256;
-static constexpr int CHAR_WIDTH = 8;
-static constexpr int CHAR_HEIGHT = 16;
-static constexpr int CHARS_PER_ROW = (ATLAS_WIDTH / CHAR_WIDTH);
+static constexpr int FONT_CHAR_WIDTH = 8;
+static constexpr int FONT_CHAR_HEIGHT = 16;
+static constexpr int CHARS_PER_ROW = (ATLAS_WIDTH / FONT_CHAR_WIDTH);
 
 static_assert(PACKED_ATLAS_SIZE == STATIC_ARRLEN(UTIL_TERMINUS_FONT));
 static_assert(PACKED_ATLAS_WIDTH * PACKED_ATLAS_HEIGHT == ATLAS_WIDTH * ATLAS_HEIGHT);
@@ -227,32 +227,32 @@ text_build(GLuint vbo, struct scene *scene, const char *data,
 
     for (const char *c = data; *c != '\0'; c++) {
         if (*c == '\n') {
-            y += CHAR_HEIGHT * options->size_multiplier;
+            y += FONT_CHAR_HEIGHT * options->size_multiplier;
             x = options->x;
             continue;
         } else if (*c == ' ') {
-            x += CHAR_WIDTH * options->size_multiplier;
+            x += FONT_CHAR_WIDTH * options->size_multiplier;
             continue;
         }
 
         struct box src = {
-            .x = (*c % CHARS_PER_ROW) * CHAR_WIDTH,
-            .y = (*c / CHARS_PER_ROW) * CHAR_HEIGHT,
-            .width = CHAR_WIDTH,
-            .height = CHAR_HEIGHT,
+            .x = (*c % CHARS_PER_ROW) * FONT_CHAR_WIDTH,
+            .y = (*c / CHARS_PER_ROW) * FONT_CHAR_HEIGHT,
+            .width = FONT_CHAR_WIDTH,
+            .height = FONT_CHAR_HEIGHT,
         };
 
         struct box dst = {
             .x = x,
             .y = y,
-            .width = CHAR_WIDTH * options->size_multiplier,
-            .height = CHAR_HEIGHT * options->size_multiplier,
+            .width = FONT_CHAR_WIDTH * options->size_multiplier,
+            .height = FONT_CHAR_HEIGHT * options->size_multiplier,
         };
 
         rect_build(ptr, &src, &dst, (float[4]){1.0, 1.0, 1.0, 1.0}, options->rgba);
         ptr += 6;
 
-        x += CHAR_WIDTH * options->size_multiplier;
+        x += FONT_CHAR_WIDTH * options->size_multiplier;
     }
 
     gl_using_buffer(GL_ARRAY_BUFFER, vbo) {
@@ -738,7 +738,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
 
                 if (set) {
                     size_t x = px % ATLAS_WIDTH;
-                    size_t y = py + (px / ATLAS_WIDTH) * CHAR_HEIGHT;
+                    size_t y = py + (px / ATLAS_WIDTH) * FONT_CHAR_HEIGHT;
                     size_t pos = (y * ATLAS_WIDTH + x) * 4;
 
                     atlas[pos] = 0xFF;
