@@ -124,4 +124,24 @@ main() {
 
     strbuf_free(&buf2);
     strbuf_free(&buf);
+
+    struct str_halves halves = str_halves(str_from("="), '=');
+    ww_assert(str_eq(halves.a, halves.b));
+    ww_assert(str_eq(halves.a, str_lit("")));
+
+    halves = str_halves(str_from("a="), '=');
+    ww_assert(str_eq(halves.a, str_lit("a")));
+    ww_assert(str_eq(halves.b, str_lit("")));
+
+    halves = str_halves(str_from("=b"), '=');
+    ww_assert(str_eq(halves.a, str_lit("")));
+    ww_assert(str_eq(halves.b, str_lit("b")));
+
+    halves = str_halves(str_from("a=b"), '=');
+    ww_assert(str_eq(halves.a, str_lit("a")));
+    ww_assert(str_eq(halves.b, str_lit("b")));
+
+    halves = str_halves(str_from(""), '=');
+    ww_assert(str_eq(halves.a, halves.b));
+    ww_assert(str_eq(halves.a, str_lit("")));
 }

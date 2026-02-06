@@ -19,6 +19,10 @@ struct strs {
     str *data;
 };
 
+struct str_halves {
+    str a, b;
+};
+
 #define strbuf_append(dst, src)                                                                    \
     _Generic((src),                                                                                \
         int: strbuf_append_char,                                                                   \
@@ -41,6 +45,7 @@ strbuf str_clone(str s);
 char *str_clone_cstr(str s);
 bool str_eq(str a, str b);
 str str_from(const char *cstr);
+struct str_halves str_halves(str s, char needle);
 ssize_t str_index(str s, char needle, ssize_t start);
 str str_slice(str s, ssize_t start, ssize_t end);
 struct strs str_split(str s, char sep);

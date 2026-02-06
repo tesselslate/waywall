@@ -151,6 +151,20 @@ str_from(const char *cstr) {
     return (str){len, cstr};
 }
 
+struct str_halves
+str_halves(str s, char needle) {
+    ssize_t split = str_index(s, needle, 0);
+
+    if (split == -1) {
+        return (struct str_halves){};
+    }
+
+    return (struct str_halves){
+        .a = str_slice(s, 0, split),
+        .b = str_slice(s, split + 1, s.len),
+    };
+}
+
 ssize_t
 str_index(str s, char needle, ssize_t start) {
     char *ptr = memchr(s.data + start, needle, s.len - start);
