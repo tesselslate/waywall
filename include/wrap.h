@@ -51,8 +51,13 @@ struct wrap {
     struct wl_listener on_view_destroy;
 };
 
+struct wrap_options {
+    bool allow_mc_x11;
+    bool opengl_debug;
+};
+
 struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-                         struct config *cfg, bool allow_mc_x11);
+                         struct config *cfg, struct wrap_options *options);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 

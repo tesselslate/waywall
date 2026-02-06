@@ -34,6 +34,9 @@ struct server_gl {
         PFNEGLQUERYDMABUFFORMATSEXTPROC QueryDmaBufFormatsEXT;
         PFNEGLQUERYDMABUFMODIFIERSEXTPROC QueryDmaBufModifiersEXT;
 
+        PFNGLDEBUGMESSAGECALLBACKKHRPROC DebugMessageCallbackKHR;
+        PFNGLDEBUGMESSAGECONTROLKHRPROC DebugMessageControlKHR;
+
         EGLDisplay display;
         EGLConfig config;
         EGLContext ctx;
@@ -72,7 +75,7 @@ struct server_gl_shader {
     GLuint program;
 };
 
-struct server_gl *server_gl_create(struct server *server);
+struct server_gl *server_gl_create(struct server *server, bool debug);
 void server_gl_destroy(struct server_gl *gl);
 void server_gl_enter(struct server_gl *gl, bool surface);
 void server_gl_exit(struct server_gl *gl);

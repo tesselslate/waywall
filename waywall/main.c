@@ -72,7 +72,7 @@ handle_signal(int signal, void *data) {
 }
 
 static int
-cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
+cmd_wrap(const char *profile, struct wrap_options *options, char **argv) {
     if (!util_debug_init()) {
         return 1;
     }
@@ -112,7 +112,7 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
 
     ww.timer = ww_timer_create(ww.server);
 
-    ww.wrap = wrap_create(ww.server, ww.inotify, ww.timer, ww.cfg, allow_mc_x11);
+    ww.wrap = wrap_create(ww.server, ww.inotify, ww.timer, ww.cfg, options);
     if (!ww.wrap) {
         goto fail_wrap;
     }
@@ -215,10 +215,12 @@ print_help(const char *argv0) {
         "\twaywall wrap -- CMD      Run the specified command in a new waywall instance",
         "\nOptions:",
         "\t--profile PROFILE        Run waywall with the given configuration profile",
+        "\nAdvanced Options:",
         "\t--allow-mc-x11           Allows Minecraft to run under X11. This will result",
         "\t                         in a degraded experience.",
         "\t--no-env-reexec          Disable re-executing waywall with the parent process'",
         "\t                         environment",
+        "\t--opengl-debug           Enable OpenGL debug logging",
         "",
     };
 
@@ -259,8 +261,9 @@ main(int argc, char **argv) {
     const char *profile = nullptr;
     char **subcommand = nullptr;
 
+    struct wrap_options options = {};
+
     bool expect_profile = false;
-    bool allow_mc_x11 = false;
     for (int i = 2; i < argc; i++) {
         const char *arg = argv[i];
 
@@ -276,7 +279,9 @@ main(int argc, char **argv) {
                     }
                     expect_profile = true;
                 } else if (strcmp(arg, "--allow-mc-x11") == 0) {
-                    allow_mc_x11 = true;
+                    options.allow_mc_x11 = true;
+                } else if (strcmp(arg, "--opengl-debug") == 0) {
+                    options.opengl_debug = true;
                 } else if (strcmp(arg, "--no-env-reexec") == 0) {
                     // This flag is processed by env_reexec(), but it must be ignored here instead
                     // of printing the help message.
@@ -305,7 +310,7 @@ main(int argc, char **argv) {
         }
 
         set_realtime();
-        return cmd_wrap(profile, allow_mc_x11, subcommand);
+        return cmd_wrap(profile, &options, subcommand);
     } else {
         print_help(argv[0]);
         return 1;

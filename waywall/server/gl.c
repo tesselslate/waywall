@@ -138,6 +138,12 @@ static constexpr EGLint CONTEXT_ATTRIBUTES[] = {
     EGL_CONTEXT_MAJOR_VERSION, 2,
     EGL_NONE,
 };
+
+static constexpr EGLint CONTEXT_ATTRIBUTES_DEBUG[] = {
+    EGL_CONTEXT_MAJOR_VERSION, 2,
+    EGL_CONTEXT_OPENGL_DEBUG, EGL_TRUE,
+    EGL_NONE,
+};
 // clang-format on
 
 static const char *REQUIRED_EGL_EXTENSIONS[] = {
@@ -149,6 +155,7 @@ static const char *REQUIRED_EGL_EXTENSIONS[] = {
 static const char *REQUIRED_GL_EXTENSIONS[] = {
     "GL_OES_EGL_image",
     "GL_OES_EGL_image_external",
+    "GL_KHR_debug",
 };
 
 static const struct {
@@ -252,11 +259,32 @@ on_ui_resize(struct wl_listener *listener, void *data) {
                                 gl->server->ui->height);
 }
 
+static void
+gl_debug_log(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length,
+             const GLchar *message, const void *data) {
+    enum ww_log_level level = LOG_INFO;
+    switch (severity) {
+    case GL_DEBUG_SEVERITY_NOTIFICATION_KHR:
+    case GL_DEBUG_SEVERITY_LOW_KHR:
+        level = LOG_INFO;
+        break;
+    case GL_DEBUG_SEVERITY_MEDIUM_KHR:
+        level = LOG_WARN;
+        break;
+    case GL_DEBUG_SEVERITY_HIGH_KHR:
+        level = LOG_ERROR;
+        break;
+    }
+
+    ww_log(level, "[gl] source = %d, type = %d, id = %u: %s", (int)source, (int)type,
+           (unsigned int)id, message);
+}
+
 static bool
 egl_getproc(void *out, const char *name) {
     void *addr = (void *)eglGetProcAddress(name);
     if (!addr) {
-        ww_log(LOG_ERROR, "eglGetProcessAddress(\"%s\") failed", name);
+        ww_log(LOG_ERROR, "eglGetProcAddress(\"%s\") failed", name);
         return false;
     }
 
@@ -618,7 +646,7 @@ compile_program(GLuint *out, GLuint vert, GLuint frag) {
 }
 
 struct server_gl *
-server_gl_create(struct server *server) {
+server_gl_create(struct server *server, bool debug) {
     struct server_gl *gl = zalloc(1, sizeof(*gl));
 
     gl->server = server;
@@ -674,6 +702,15 @@ server_gl_create(struct server *server) {
         goto fail_extensions_gl;
     }
 
+    if (debug) {
+        if (!egl_getproc(&gl->egl.DebugMessageCallbackKHR, "glDebugMessageCallbackKHR")) {
+            goto fail_extensions_gl;
+        }
+        if (!egl_getproc(&gl->egl.DebugMessageControlKHR, "glDebugMessageControlKHR")) {
+            goto fail_extensions_gl;
+        }
+    }
+
     // Query information about the allowed DMABUF formats and modifiers.
     if (get_drm_formats(gl) != 0) {
         goto fail_get_drm_formats;
@@ -686,8 +723,8 @@ server_gl_create(struct server *server) {
         goto fail_choose_config;
     }
 
-    gl->egl.ctx =
-        eglCreateContext(gl->egl.display, gl->egl.config, EGL_NO_CONTEXT, CONTEXT_ATTRIBUTES);
+    gl->egl.ctx = eglCreateContext(gl->egl.display, gl->egl.config, EGL_NO_CONTEXT,
+                                   debug ? CONTEXT_ATTRIBUTES_DEBUG : CONTEXT_ATTRIBUTES);
     if (gl->egl.ctx == EGL_NO_CONTEXT) {
         ww_log(LOG_ERROR, "failed to create EGL context");
         goto fail_create_context;
@@ -710,6 +747,13 @@ server_gl_create(struct server *server) {
             ww_log(LOG_ERROR, "no support for '%s'", REQUIRED_EGL_EXTENSIONS[i]);
             goto fail_extensions_gl;
         }
+    }
+
+    if (debug) {
+        gl->egl.DebugMessageControlKHR(GL_DONT_CARE, GL_DONT_CARE, GL_DONT_CARE, 0, nullptr, true);
+        gl->egl.DebugMessageCallbackKHR(gl_debug_log, nullptr);
+
+        ww_log(LOG_INFO, "enabled GL debug logging");
     }
 
     // Create the OpenGL surface.
