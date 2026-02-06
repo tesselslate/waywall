@@ -200,7 +200,7 @@ mirror_render(struct scene_object *object) {
     GLuint texture = server_gl_buffer_get_texture(capture);
 
     int32_t width, height;
-    server_gl_get_capture_size(scene->gl, &width, &height);
+    server_gl_buffer_get_size(capture, &width, &height);
 
     server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
     glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size,
@@ -401,7 +401,7 @@ draw_stencil(struct scene *scene) {
     if (!capture) {
         return;
     }
-    server_gl_get_capture_size(scene->gl, &width, &height);
+    server_gl_buffer_get_size(capture, &width, &height);
 
     GLuint capture_target = server_gl_buffer_get_target(capture);
     GLuint capture_texture = server_gl_buffer_get_texture(capture);

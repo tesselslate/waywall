@@ -871,12 +871,6 @@ server_gl_get_capture(struct server_gl *gl) {
 }
 
 void
-server_gl_get_capture_size(struct server_gl *gl, int32_t *width, int32_t *height) {
-    ww_assert(gl->capture.current);
-    server_buffer_get_size(gl->capture.current->parent, width, height);
-}
-
-void
 server_gl_set_capture(struct server_gl *gl, struct server_surface *surface) {
     if (gl->capture.surface) {
         ww_panic("cannot overwrite capture surface");
@@ -897,14 +891,19 @@ server_gl_swap_buffers(struct server_gl *gl) {
     eglSwapBuffers(gl->egl.display, gl->surface.egl);
 }
 
-GLuint
-server_gl_buffer_get_texture(struct server_gl_buffer *buffer) {
-    return buffer->texture;
+void
+server_gl_buffer_get_size(struct server_gl_buffer *buffer, int32_t *width, int32_t *height) {
+    buffer->parent->impl->size(buffer->parent->data, width, height);
 }
 
 GLuint
 server_gl_buffer_get_target(struct server_gl_buffer *buffer) {
     return buffer->target;
+}
+
+GLuint
+server_gl_buffer_get_texture(struct server_gl_buffer *buffer) {
+    return buffer->texture;
 }
 
 void
