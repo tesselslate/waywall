@@ -90,6 +90,17 @@ static const struct {
 };
 
 static int
+get_type(struct config *cfg, const char *key) {
+    lua_pushstring(cfg->vm->L, key); // stack: n+1
+    lua_rawget(cfg->vm->L, -2);      // stack: n+1
+
+    int type = lua_type(cfg->vm->L, -1);
+    lua_pop(cfg->vm->L, 1); // stack: n
+
+    return type;
+}
+
+static int
 get_bool(struct config *cfg, const char *key, bool *dst, const char *full_name, bool required) {
     lua_pushstring(cfg->vm->L, key); // stack: n+1
     lua_rawget(cfg->vm->L, -2);      // stack: n+1
@@ -320,7 +331,7 @@ parse_bind(const char *bind, struct config_action *action) {
 }
 
 static int
-parse_ninb_anchor(const char *input, struct config_ninb *out) {
+parse_ninb_anchor(const char *input, enum floating_anchor *out) {
     static const char *anchor_names[] = {
         [ANCHOR_TOPLEFT] = "topleft",
         [ANCHOR_TOP] = "top",
@@ -331,64 +342,14 @@ parse_ninb_anchor(const char *input, struct config_ninb *out) {
         [ANCHOR_BOTTOMRIGHT] = "bottomright",
     };
 
-    str ninb_anchor = str_from(input);
-    ssize_t len = str_index(ninb_anchor, '+', 0);
-    if (len == -1) {
-        len = ninb_anchor.len;
-    }
-    bool has_offset = len != ninb_anchor.len;
-
     for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {
-        if (strncasecmp(anchor_names[i], input, len) == 0) {
-            out->anchor = i;
-
-            if (!has_offset) {
-                return 0;
-            }
-
-            if (str_index(ninb_anchor, '(', len) != len + 1) {
-                goto invalid_offset;
-            }
-            if (str_index(ninb_anchor, ')', len) != ninb_anchor.len - 1) {
-                goto invalid_offset;
-            }
-
-            str offset_inner = str_slice(ninb_anchor, len + 2, ninb_anchor.len - 1);
-            struct str_halves halves = str_halves(offset_inner, ',');
-
-            if (halves.a.len == 0 || halves.b.len == 0) {
-                goto invalid_offset;
-            }
-
-            char *endptr;
-            long x = strtol(halves.a.data, &endptr, 10);
-            if (endptr == halves.a.data || *endptr != ',') {
-                goto invalid_offset;
-            }
-            if (x < INT32_MIN || x > INT32_MAX) {
-                goto invalid_offset;
-            }
-
-            long y = strtol(halves.b.data, &endptr, 10);
-            if (endptr == halves.b.data || endptr != ninb_anchor.data + ninb_anchor.len - 1) {
-                goto invalid_offset;
-            }
-            if (y < INT32_MIN || y > INT32_MAX) {
-                goto invalid_offset;
-            }
-
-            out->offset_x = x;
-            out->offset_y = y;
-
+        if (strcasecmp(anchor_names[i], input) == 0) {
+            *out = i;
             return 0;
         }
     }
 
     ww_log(LOG_ERROR, "invalid value '%s' for 'theme.ninb_anchor'", input);
-    return 1;
-
-invalid_offset:
-    ww_log(LOG_ERROR, "invalid offset in value '%s' for 'theme.ninb_anchor'", input);
     return 1;
 }
 
@@ -698,6 +659,35 @@ process_config_input(struct config *cfg) {
 }
 
 static int
+process_config_theme_ninb_anchor(struct config *cfg) {
+    // stack state
+    // 3: config.theme.ninb_anchor
+    // 2: config.theme
+    // 1: config
+    ww_assert(lua_gettop(cfg->vm->L) == 3);
+
+    char *position = nullptr;
+    if (get_string(cfg, "position", &position, "theme.ninb_anchor.position", true) != 0) {
+        return 1;
+    }
+    int ret = parse_ninb_anchor(position, &cfg->theme.ninb.anchor);
+    free(position);
+    if (ret != 0) {
+        return 1;
+    }
+
+    if (get_int(cfg, "x", &cfg->theme.ninb.offset_x, "theme.ninb_anchor.x", false) != 0) {
+        return 1;
+    }
+
+    if (get_int(cfg, "y", &cfg->theme.ninb.offset_y, "theme.ninb_anchor.y", false) != 0) {
+        return 1;
+    }
+
+    return 0;
+}
+
+static int
 process_config_theme(struct config *cfg) {
     // stack state
     // 2:   config.theme
@@ -740,16 +730,32 @@ process_config_theme(struct config *cfg) {
         return 1;
     }
 
-    char *ninb_anchor = nullptr;
-    if (get_string(cfg, "ninb_anchor", &ninb_anchor, "theme.ninb_anchor", false) != 0) {
-        return 1;
-    }
-    if (ninb_anchor) {
-        int ret = parse_ninb_anchor(ninb_anchor, &cfg->theme.ninb);
+    int ninb_anchor_type = get_type(cfg, "ninb_anchor");
+    switch (ninb_anchor_type) {
+    case LUA_TSTRING:
+        char *ninb_anchor = nullptr;
+        ww_assert(get_string(cfg, "ninb_anchor", &ninb_anchor, "theme.ninb_anchor", true) == 0);
+
+        int ret = parse_ninb_anchor(ninb_anchor, &cfg->theme.ninb.anchor);
         free(ninb_anchor);
         if (ret != 0) {
             return 1;
         }
+
+        break;
+    case LUA_TTABLE:
+        if (get_table(cfg, "ninb_anchor", process_config_theme_ninb_anchor, "theme.ninb_anchor",
+                      true) != 0) {
+            return 1;
+        }
+        break;
+    case LUA_TNIL:
+        break;
+    default:
+        ww_log(LOG_ERROR,
+               "expected 'theme.ninb_anchor' to be of type 'string' or 'table', was '%s'",
+               lua_typename(cfg->vm->L, ninb_anchor_type));
+        return 1;
     }
 
     if (get_double(cfg, "ninb_opacity", &cfg->theme.ninb.opacity, "theme.ninb_opacity", false) !=
