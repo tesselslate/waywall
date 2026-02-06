@@ -30,7 +30,7 @@
 #include <xkbcommon/xkbcommon.h>
 
 #define IS_ANCHORED(wrap, view) (wrap->floating.anchored == view)
-#define SHOULD_ANCHOR(wrap) (wrap->cfg->theme.ninb_anchor != ANCHOR_NONE)
+#define SHOULD_ANCHOR(wrap) (wrap->cfg->theme.ninb.anchor != ANCHOR_NONE)
 
 static void on_anchored_resize(struct wl_listener *listener, void *data);
 
@@ -131,7 +131,7 @@ floating_update_anchored(struct wrap *wrap) {
 
     uint32_t x, y;
 
-    switch (wrap->cfg->theme.ninb_anchor) {
+    switch (wrap->cfg->theme.ninb.anchor) {
     case ANCHOR_TOPLEFT:
         x = 0;
         y = 0;
@@ -661,7 +661,7 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
     config_vm_set_wrap(cfg->vm, wrap);
 
     wrap->cfg = cfg;
-    if (wrap->cfg->theme.ninb_anchor == ANCHOR_NONE) {
+    if (wrap->cfg->theme.ninb.anchor == ANCHOR_NONE) {
         // If anchoring has been disabled, ensure there is no anchored view.
         if (wrap->floating.anchored) {
             unset_anchored(wrap);

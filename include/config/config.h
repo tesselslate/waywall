@@ -47,18 +47,20 @@ struct config {
         char *cursor_icon;
         int cursor_size;
 
-        enum floating_anchor {
-            ANCHOR_TOPLEFT,
-            ANCHOR_TOP,
-            ANCHOR_TOPRIGHT,
-            ANCHOR_LEFT,
-            ANCHOR_RIGHT,
-            ANCHOR_BOTTOMLEFT,
-            ANCHOR_BOTTOMRIGHT,
-            ANCHOR_NONE,
-        } ninb_anchor;
+        struct config_ninb {
+            enum floating_anchor {
+                ANCHOR_TOPLEFT,
+                ANCHOR_TOP,
+                ANCHOR_TOPRIGHT,
+                ANCHOR_LEFT,
+                ANCHOR_RIGHT,
+                ANCHOR_BOTTOMLEFT,
+                ANCHOR_BOTTOMRIGHT,
+                ANCHOR_NONE,
+            } anchor;
 
-        double ninb_opacity;
+            double opacity;
+        } ninb;
     } theme;
 
     struct {

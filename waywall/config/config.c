@@ -56,8 +56,11 @@ static const struct config defaults = {
             .cursor_theme = "",
             .cursor_icon = "",
             .cursor_size = 0,
-            .ninb_anchor = ANCHOR_NONE,
-            .ninb_opacity = 1.0,
+            .ninb =
+                {
+                    .anchor = ANCHOR_NONE,
+                    .opacity = 1.0,
+                },
         },
     .shaders = {},
 };
@@ -681,12 +684,12 @@ process_config_theme(struct config *cfg) {
 
         for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {
             if (strcasecmp(anchor_names[i], ninb_anchor) == 0) {
-                cfg->theme.ninb_anchor = i;
+                cfg->theme.ninb.anchor = i;
                 break;
             }
         }
 
-        if (cfg->theme.ninb_anchor == ANCHOR_NONE) {
+        if (cfg->theme.ninb.anchor == ANCHOR_NONE) {
             ww_log(LOG_ERROR, "invalid value '%s' for 'theme.ninb_anchor'", ninb_anchor);
             free(ninb_anchor);
             return 1;
@@ -694,7 +697,7 @@ process_config_theme(struct config *cfg) {
     }
     free(ninb_anchor);
 
-    if (get_double(cfg, "ninb_opacity", &cfg->theme.ninb_opacity, "theme.ninb_opacity", false) !=
+    if (get_double(cfg, "ninb_opacity", &cfg->theme.ninb.opacity, "theme.ninb_opacity", false) !=
         0) {
         return 1;
     }

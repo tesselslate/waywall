@@ -541,7 +541,7 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     config->fullscreen_width = cfg->window.fullscreen_width;
     config->fullscreen_height = cfg->window.fullscreen_height;
 
-    config->ninb_opacity = cfg->theme.ninb_opacity * UINT32_MAX;
+    config->ninb_opacity = cfg->theme.ninb.opacity * UINT32_MAX;
 
     return config;
 
