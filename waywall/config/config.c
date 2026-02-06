@@ -320,6 +320,79 @@ parse_bind(const char *bind, struct config_action *action) {
 }
 
 static int
+parse_ninb_anchor(const char *input, struct config_ninb *out) {
+    static const char *anchor_names[] = {
+        [ANCHOR_TOPLEFT] = "topleft",
+        [ANCHOR_TOP] = "top",
+        [ANCHOR_TOPRIGHT] = "topright",
+        [ANCHOR_LEFT] = "left",
+        [ANCHOR_RIGHT] = "right",
+        [ANCHOR_BOTTOMLEFT] = "bottomleft",
+        [ANCHOR_BOTTOMRIGHT] = "bottomright",
+    };
+
+    str ninb_anchor = str_from(input);
+    ssize_t len = str_index(ninb_anchor, '+', 0);
+    if (len == -1) {
+        len = ninb_anchor.len;
+    }
+    bool has_offset = len != ninb_anchor.len;
+
+    for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {
+        if (strncasecmp(anchor_names[i], input, len) == 0) {
+            out->anchor = i;
+
+            if (!has_offset) {
+                return 0;
+            }
+
+            if (str_index(ninb_anchor, '(', len) != len + 1) {
+                goto invalid_offset;
+            }
+            if (str_index(ninb_anchor, ')', len) != ninb_anchor.len - 1) {
+                goto invalid_offset;
+            }
+
+            str offset_inner = str_slice(ninb_anchor, len + 2, ninb_anchor.len - 1);
+            struct str_halves halves = str_halves(offset_inner, ',');
+
+            if (halves.a.len == 0 || halves.b.len == 0) {
+                goto invalid_offset;
+            }
+
+            char *endptr;
+            long x = strtol(halves.a.data, &endptr, 10);
+            if (endptr == halves.a.data || *endptr != ',') {
+                goto invalid_offset;
+            }
+            if (x < INT32_MIN || x > INT32_MAX) {
+                goto invalid_offset;
+            }
+
+            long y = strtol(halves.b.data, &endptr, 10);
+            if (endptr == halves.b.data || endptr != ninb_anchor.data + ninb_anchor.len - 1) {
+                goto invalid_offset;
+            }
+            if (y < INT32_MIN || y > INT32_MAX) {
+                goto invalid_offset;
+            }
+
+            out->offset_x = x;
+            out->offset_y = y;
+
+            return 0;
+        }
+    }
+
+    ww_log(LOG_ERROR, "invalid value '%s' for 'theme.ninb_anchor'", input);
+    return 1;
+
+invalid_offset:
+    ww_log(LOG_ERROR, "invalid offset in value '%s' for 'theme.ninb_anchor'", input);
+    return 1;
+}
+
+static int
 parse_remap_half(const char *input, uint32_t *out_data, enum config_remap_type *out_type) {
     for (size_t i = 0; i < STATIC_ARRLEN(util_keycodes); i++) {
         if (strcasecmp(util_keycodes[i].name, input) == 0) {
@@ -672,30 +745,12 @@ process_config_theme(struct config *cfg) {
         return 1;
     }
     if (ninb_anchor) {
-        static const char *anchor_names[] = {
-            [ANCHOR_TOPLEFT] = "topleft",
-            [ANCHOR_TOP] = "top",
-            [ANCHOR_TOPRIGHT] = "topright",
-            [ANCHOR_LEFT] = "left",
-            [ANCHOR_RIGHT] = "right",
-            [ANCHOR_BOTTOMLEFT] = "bottomleft",
-            [ANCHOR_BOTTOMRIGHT] = "bottomright",
-        };
-
-        for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {
-            if (strcasecmp(anchor_names[i], ninb_anchor) == 0) {
-                cfg->theme.ninb.anchor = i;
-                break;
-            }
-        }
-
-        if (cfg->theme.ninb.anchor == ANCHOR_NONE) {
-            ww_log(LOG_ERROR, "invalid value '%s' for 'theme.ninb_anchor'", ninb_anchor);
-            free(ninb_anchor);
+        int ret = parse_ninb_anchor(ninb_anchor, &cfg->theme.ninb);
+        free(ninb_anchor);
+        if (ret != 0) {
             return 1;
         }
     }
-    free(ninb_anchor);
 
     if (get_double(cfg, "ninb_opacity", &cfg->theme.ninb.opacity, "theme.ninb_opacity", false) !=
         0) {

@@ -25,13 +25,13 @@ return config
 
 ## Background
 
-The `background` or `background_png` option determines the background of the 
-waywall window. `background_png` specifies the path to a PNG file, otherwise 
-`background` determines the solid color background. The background is only 
-visible while the Minecraft window does not occupy the entire waywall window 
+The `background` or `background_png` option determines the background of the
+waywall window. `background_png` specifies the path to a PNG file, otherwise
+`background` determines the solid color background. The background is only
+visible while the Minecraft window does not occupy the entire waywall window
 (e.g. while using Thin BT or boat eye.)
 
-For `background`, you may specify either an RGB or RGBA hex color. Different 
+For `background`, you may specify either an RGB or RGBA hex color. Different
 compositors may handle non-opaque background colors differently, and non-opaque
 colors may not appear correctly if waywall is fullscreened.
 
@@ -71,6 +71,12 @@ valid values for `ninb_anchor`:
   - `right`
   - `bottomleft`
   - `bottomright`
+
+You can additionally provide an offset to `ninb_anchor` by appending `+(x,y)`.
+For example, a value of `right+(-20, 20)` will anchor Ninjabrain Bot 20 pixels
+to the left and 20 pixels below the center right side of the window.
+
+<br/>
 
 The `ninb_opacity` option allows you to make the Ninjabrain Bot window
 translucent. The default value of `1.0` results in a fully opaque window, while

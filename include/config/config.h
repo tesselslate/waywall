@@ -58,6 +58,7 @@ struct config {
                 ANCHOR_BOTTOMRIGHT,
                 ANCHOR_NONE,
             } anchor;
+            int32_t offset_x, offset_y;
 
             double opacity;
         } ninb;

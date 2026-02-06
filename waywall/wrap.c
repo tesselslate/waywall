@@ -165,6 +165,8 @@ floating_update_anchored(struct wrap *wrap) {
         return;
     }
 
+    x += wrap->cfg->theme.ninb.offset_x;
+    y += wrap->cfg->theme.ninb.offset_y;
     fview->x = x;
     fview->y = y;
 
