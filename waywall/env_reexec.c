@@ -141,6 +141,20 @@ fail:
     return penv;
 }
 
+static void
+read_current_env() {
+    // Copy the current environment into the passthrough environment used to launch the game.
+    for (char **var = environ; *var; var++) {
+        struct str_halves var_halves = str_halves(str_from(*var), '=');
+
+        struct envvar envvar = {
+            .name = str_clone_cstr(var_halves.a),
+            .value = str_clone_cstr(var_halves.b),
+        };
+        list_envvar_append(&passthrough_env, envvar);
+    }
+}
+
 static bool
 read_passthrough_fd() {
     char *passthrough_fd_env = getenv(PASSTHROUGH_FD_ENV);
@@ -253,6 +267,8 @@ env_reexec(char **argv) {
     for (char **arg = argv; *arg; arg++) {
         if (strcmp(*arg, "--no-env-reexec") == 0) {
             ww_log(LOG_INFO, "skipping env_reexec");
+
+            read_current_env();
             return 0;
         }
     }
