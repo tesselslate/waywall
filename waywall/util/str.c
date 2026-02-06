@@ -138,6 +138,9 @@ str_eq(str a, str b) {
     if (a.len != b.len) {
         return false;
     }
+    if (a.len == b.len && a.len == 0) {
+        return true;
+    }
 
     return (memcmp(a.data, b.data, a.len) == 0);
 }
