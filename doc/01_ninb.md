@@ -35,5 +35,14 @@ make it visible, you can create another action which uses
 > `-Dswing.defaultlaf=javax.swing.plaf.metal.MetalLookAndFeel` to your arguments
 > when launching Ninjabrain Bot.
 
+## Positioning floating windows
+
+You can automatically "anchor" Ninjabrain Bot to a specific position in the
+waywall window by using the [`theme.ninb_anchor`] option.
+
+Additionally, you can manually move all un-anchored floating windows by holding
+shift and dragging them with the left mouse button held down.
+
 [`waywall.show_floating`]: 02_waywall_show_floating.md
 [`helpers.toggle_floating`]: 02_helpers_toggle_floating.md
+[`theme.ninb_anchor`]: 01_options_theme.md#ninjabrain-bot
