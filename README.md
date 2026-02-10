@@ -20,6 +20,10 @@ Users on other distributions must [build waywall from source](#building-from-sou
 download a prebuilt package from the [Releases](https://github.com/tesselslate/waywall/releases)
 page, or [use the `build-packages.sh` script](#building-with-build-packagessh) to build their own.
 
+> [!IMPORTANT]
+> There is currently an incompatibility with Linux Mint, as it's version of libwayland is too old.
+> waywall is unlikely to work on Mint until it is updated.
+
 ## Building with `build-packages.sh`
 
 > [!IMPORTANT]

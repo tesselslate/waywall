@@ -9,6 +9,10 @@ Users on other distributions must download a prebuilt package from the
 [Releases](https://github.com/tesselslate/waywall/releases) page or build
 waywall from source.
 
+> [!IMPORTANT]
+> There is currently an incompatibility with Linux Mint, as it's version of libwayland is too old.
+> waywall is unlikely to work on Mint until it is updated.
+
 ## Installing with Nix
 
 waywall is available in Nixpkgs since 26.05.
