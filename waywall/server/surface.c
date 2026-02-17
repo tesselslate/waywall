@@ -100,9 +100,12 @@ static void
 surface_attach(struct wl_client *client, struct wl_resource *resource,
                struct wl_resource *buffer_resource, int32_t x, int32_t y) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
-    struct server_buffer *buffer = server_buffer_from_resource(buffer_resource);
+    struct server_buffer *buffer = nullptr;
+    if (buffer_resource) {
+        buffer = server_buffer_from_resource(buffer_resource);
+    }
 
-    // If a nullptr buffer (no buffer) is being attached, skip the checks.
+    // If a null buffer (no buffer) is being attached, skip the checks.
     if (!buffer) {
         surface_state_set_buffer(&surface->pending, nullptr);
         surface->pending.present |= SURFACE_STATE_BUFFER;
@@ -143,7 +146,10 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
                           0);
 
         surface_state_set_buffer(&surface->current, surface->pending.buffer);
-        server_buffer_lock(surface->current.buffer);
+
+        if (surface->current.buffer) {
+            server_buffer_lock(surface->current.buffer);
+        }
     }
     if (surface->pending.present & SURFACE_STATE_DAMAGE) {
         struct server_surface_damage *dmg;
