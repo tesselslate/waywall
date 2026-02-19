@@ -1,11 +1,14 @@
 #pragma once
 
 #include "util/box.h"
+#include "util/list.h"
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 #include <wayland-server-core.h>
+
+LIST_DEFINE(struct server_drm_format, list_server_drm_format);
 
 #define server_gl_with(gl, surface)                                                                \
     for (int _glscope = (server_gl_enter((gl), (surface)), 0); _glscope == 0;                      \
@@ -28,6 +31,11 @@ struct server_gl {
         PFNEGLDESTROYIMAGEKHRPROC DestroyImageKHR;
         PFNEGLGETPLATFORMDISPLAYEXTPROC GetPlatformDisplayEXT;
         PFNGLEGLIMAGETARGETTEXTURE2DOESPROC ImageTargetTexture2DOES;
+        PFNEGLQUERYDMABUFFORMATSEXTPROC QueryDmaBufFormatsEXT;
+        PFNEGLQUERYDMABUFMODIFIERSEXTPROC QueryDmaBufModifiersEXT;
+
+        PFNGLDEBUGMESSAGECALLBACKKHRPROC DebugMessageCallbackKHR;
+        PFNGLDEBUGMESSAGECONTROLKHRPROC DebugMessageControlKHR;
 
         EGLDisplay display;
         EGLConfig config;
@@ -46,7 +54,9 @@ struct server_gl {
     struct {
         struct server_surface *surface;
         struct wl_list buffers; // gl_buffer.link
-        struct gl_buffer *current;
+        struct server_gl_buffer *current;
+
+        struct list_server_drm_format formats;
     } capture;
 
     struct wl_listener on_surface_commit;
@@ -58,22 +68,27 @@ struct server_gl {
     } events;
 };
 
+struct server_gl_buffer;
+
 struct server_gl_shader {
     GLuint vert, frag;
     GLuint program;
 };
 
-struct server_gl *server_gl_create(struct server *server);
+struct server_gl *server_gl_create(struct server *server, bool debug);
 void server_gl_destroy(struct server_gl *gl);
 void server_gl_enter(struct server_gl *gl, bool surface);
 void server_gl_exit(struct server_gl *gl);
 
 struct server_gl_shader *server_gl_compile(struct server_gl *gl, const char *vertex,
                                            const char *fragment);
-GLuint server_gl_get_capture(struct server_gl *gl);
-void server_gl_get_capture_size(struct server_gl *gl, int32_t *width, int32_t *height);
+struct server_gl_buffer *server_gl_get_capture(struct server_gl *gl);
 void server_gl_set_capture(struct server_gl *gl, struct server_surface *surface);
 void server_gl_swap_buffers(struct server_gl *gl);
+
+void server_gl_buffer_get_size(struct server_gl_buffer *buffer, int32_t *width, int32_t *height);
+GLuint server_gl_buffer_get_target(struct server_gl_buffer *buffer);
+GLuint server_gl_buffer_get_texture(struct server_gl_buffer *buffer);
 
 void server_gl_shader_destroy(struct server_gl_shader *shader);
 void server_gl_shader_use(struct server_gl_shader *shader);
