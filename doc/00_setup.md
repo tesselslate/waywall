@@ -21,7 +21,7 @@ GLFW.
 > [!TIP]
 > If you used a [prebuilt package] or built your own with the package building
 > script, then you already have the correct version of GLFW available! It can be
-> found at `/usr/local/lib64/waywall-glfw/libglfw.so`.
+> found at `/usr/lib64/waywall-glfw/libglfw.so`.
 
 > [!TIP]
 > If you are using Prism Launcher installed from Nixpkgs, you can skip and 
