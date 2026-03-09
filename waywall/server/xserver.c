@@ -7,6 +7,7 @@
 #include "util/syscall.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <sched.h>
 #include <signal.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -452,6 +453,7 @@ xserver_start(struct xserver *srv) {
     srv->pid = fork();
     if (srv->pid == 0) {
         // Child process
+        sched_setscheduler(0, SCHED_OTHER, &(struct sched_param){.sched_priority = 0});
         xserver_exec(srv, notify_fd[1], log_fd);
         exit(EXIT_FAILURE);
     } else if (srv->pid == -1) {
