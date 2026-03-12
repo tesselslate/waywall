@@ -32,6 +32,7 @@ on_surface_frame_done(void *data, struct wl_callback *wl, uint32_t callback_data
     struct server_surface_frame *frame = data;
 
     wl_callback_send_done(frame->resource, callback_data);
+    wl_resource_destroy(frame->resource);
 }
 
 static const struct wl_callback_listener surface_frame_listener = {
