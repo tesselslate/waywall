@@ -136,6 +136,9 @@ cmd_wrap(const char *profile, bool allow_mc_x11, char **argv) {
     ww.child = fork();
 
     if (ww.child == 0) {
+        // Reset scheduling policy so the child does not inherit SCHED_RR.
+        sched_setscheduler(0, SCHED_OTHER, &(struct sched_param){.sched_priority = 0});
+
         if (env) {
             ww_log(LOG_INFO, "starting child process with passthrough environment");
             util_execvpe(argv[0], argv, env);

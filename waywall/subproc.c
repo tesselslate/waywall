@@ -5,6 +5,7 @@
 #include "util/log.h"
 #include "util/syscall.h"
 #include <fcntl.h>
+#include <sched.h>
 #include <stdlib.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -85,6 +86,8 @@ subproc_exec(struct subproc *subproc, struct strs cmd) {
     pid_t pid = fork();
     if (pid == 0) {
         // Child process
+        sched_setscheduler(0, SCHED_OTHER, &(struct sched_param){.sched_priority = 0});
+
         int out = open("/dev/null", O_WRONLY);
         if (out == -1) {
             ww_log_errno(LOG_ERROR, "failed to open /dev/null in child process");
