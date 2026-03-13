@@ -13,5 +13,5 @@ util_panic(const char *fmt, ...) {
     fprintf(stderr, "\n");
 
     fflush(stderr);
-    exit(EXIT_FAILURE);
+    abort();
 }
