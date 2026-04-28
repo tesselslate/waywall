@@ -55,4 +55,5 @@ executable('waywall',
 
   dependencies: waywall_deps,
   include_directories: includes,
+  install: true,
 )
