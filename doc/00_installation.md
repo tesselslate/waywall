@@ -38,6 +38,13 @@ Prebuilt binary packages for Fedora 42 are provided on the [Releases] page.
 
 Additionally, waywall can be manually [built from source].
 
+## OpenSUSE
+
+Prebuilt binary packages for openSUSE Tumbleweed are available in
+the [official package repositories](https://build.opensuse.org/package/show/openSUSE%3AFactory/waywall).
+
+And can be install with `zypper install waywall`.
+
 ## Nix
 
 waywall is available in Nixpkgs since 26.05.
