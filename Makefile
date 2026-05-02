@@ -1,4 +1,4 @@
-.PHONY: all check clean configure_debug configure_release format lint
+.PHONY: all check clean configure_debug configure_release format install lint
 
 LUA=waywall/lua/api.lua \
 	waywall/lua/helpers.lua \
@@ -22,6 +22,9 @@ configure_release: build/build.ninja
 format: build/build.ninja
 	ninja -C build clang-format
 	stylua $(LUA)
+
+install: build/build.ninja
+	ninja -C build install
 
 lint: build/build.ninja
 	ninja -C build scan-build
