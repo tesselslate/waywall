@@ -43,7 +43,7 @@ Additionally, waywall can be manually [built from source].
 Prebuilt binary packages for openSUSE Tumbleweed are available in
 the [official package repositories](https://build.opensuse.org/package/show/openSUSE%3AFactory/waywall).
 
-And can be install with `zypper install waywall`.
+waywall can be installed with `zypper install waywall`.
 
 ## Nix
 
