@@ -31,6 +31,9 @@ GLFW.
 > install the `glfw3-minecraft` package with `nix profile` and use the path
 > `/home/USER/.nix-profile/lib/libglfw.so` in the upcoming steps.
 
+> [!NOTE]
+> Version 26.1 does not require this patch, instead requiring you to add the java arguments `-DMC_DEBUG_ENABLED -DMC_DEBUG_PREFER_WAYLAND`. 
+
 You can compile the patched version of GLFW with the following commands:
 
 ```sh
