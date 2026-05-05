@@ -36,11 +36,10 @@ local function event_handler(name)
     end
 end
 
-local events = {
-    ["load"] = event_handler("load"),
-    ["resolution"] = event_handler("resolution"),
-    ["state"] = event_handler("state"),
-}
+local events = {}
+events.load         = event_handler("load")
+events.resolution   = event_handler("resolution")
+events.state        = event_handler("state")
 
 local M = {}
 
