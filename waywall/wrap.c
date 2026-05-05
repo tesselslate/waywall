@@ -565,11 +565,11 @@ static const struct server_seat_listener seat_listener = {
 
 struct wrap *
 wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-            struct config *cfg, bool allow_mc_x11) {
+            struct config *cfg, struct wrap_options *options) {
     struct wrap *wrap = zalloc(1, sizeof(*wrap));
-    wrap->allow_mc_x11 = allow_mc_x11;
+    wrap->allow_mc_x11 = options->allow_mc_x11;
 
-    wrap->gl = server_gl_create(server);
+    wrap->gl = server_gl_create(server, options->opengl_debug);
     if (!wrap->gl) {
         ww_log(LOG_ERROR, "failed to initialize OpenGL");
         goto fail_gl;
