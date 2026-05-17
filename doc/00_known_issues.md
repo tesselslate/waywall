@@ -23,6 +23,16 @@ than 5x your monitor refresh rate.
 If neither of these fix the problem, please let us know in [Discord] or on the
 [issue tracker].
 
+## waywall crashing in some Nvidia environments
+
+When using [egl-wayland2] (the default with newer versions of the Nvidia
+drivers), waywall will crash if prevented from rendering for too long
+with an error stating `Data too big for buffer`.
+
+You can switch to egl-wayland, downgrade your NVIDIA driver to a version which
+defaults to egl-wayland, or make sure that waywall does not remain offscreen
+or obscured by other windows for extended periods of time.
+
 ## Display scaling not automatically accounted for
 
 waywall does not currently support either of the Wayland protocols used for
@@ -32,4 +42,5 @@ manually configure waywall to use a specific resolution while fullscreened
 with the [`fullscreen_width` and `fullscreen_height` options](01_options_window.md#fullscreen-resolution).
 
 [Discord]: https://discord.gg/3tm4UpUQ8t
+[egl-wayland2]: https://github.com/NVIDIA/egl-wayland2/
 [issue tracker]: https://github.com/tesselslate/waywall/issues
