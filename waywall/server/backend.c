@@ -4,6 +4,7 @@
 #include "linux-dmabuf-v1-client-protocol.h"
 #include "linux-drm-syncobj-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
+#include "presentation-time-client-protocol.h"
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
@@ -36,6 +37,7 @@ static constexpr int USE_DATA_DEVICE_MANAGER_VERSION = 2;
 static constexpr int USE_LINUX_DMABUF_VERSION = 4;
 static constexpr int USE_LINUX_DRM_SYNCOBJ_VERSION = 1;
 static constexpr int USE_POINTER_CONSTRAINTS_VERSION = 1;
+static constexpr int USE_PRESENTATION_VERSION = 1;
 static constexpr int USE_RELATIVE_POINTER_MANAGER_VERSION = 1;
 static constexpr int USE_SEAT_VERSION = 5;
 static constexpr int USE_SHM_VERSION = 1;
@@ -49,6 +51,17 @@ static constexpr int USE_XDG_WM_BASE_VERSION = 1;
 struct seat_name {
     struct wl_list link; // server_backend.seat.names
     uint32_t name;
+};
+
+static void
+on_presentation_clock_id(void *data, struct wp_presentation *presentation, uint32_t clock_id) {
+    struct server_backend *backend = data;
+
+    backend->presentation_clock_id = clock_id;
+}
+
+static const struct wp_presentation_listener presentation_listener = {
+    .clock_id = on_presentation_clock_id,
 };
 
 static void
@@ -192,6 +205,18 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         backend->pointer_constraints = wl_registry_bind(
             wl, name, &zwp_pointer_constraints_v1_interface, USE_POINTER_CONSTRAINTS_VERSION);
         check_alloc(backend->pointer_constraints);
+    } else if (strcmp(iface, wp_presentation_interface.name) == 0) {
+        if (version < USE_PRESENTATION_VERSION) {
+            ww_log(LOG_WARN, "host compositor provides outdated wp_presentation (%d < %d)", version,
+                   USE_PRESENTATION_VERSION);
+            return;
+        }
+
+        backend->presentation =
+            wl_registry_bind(wl, name, &wp_presentation_interface, USE_PRESENTATION_VERSION);
+        check_alloc(backend->presentation);
+
+        wp_presentation_add_listener(backend->presentation, &presentation_listener, backend);
     } else if (strcmp(iface, zwp_relative_pointer_manager_v1_interface.name) == 0) {
         if (version < USE_RELATIVE_POINTER_MANAGER_VERSION) {
             ww_log(LOG_ERROR,
@@ -377,6 +402,9 @@ server_backend_create() {
     if (!backend->linux_drm_syncobj_manager) {
         ww_log(LOG_INFO, "host compositor does not provide wp_linux_drm_syncobj_manager");
     }
+    if (!backend->presentation) {
+        ww_log(LOG_INFO, "host compositor does not provide wp_presentation");
+    }
     if (!backend->single_pixel_buffer_manager) {
         ww_log(LOG_INFO, "host compositor does not provide wp_single_pixel_buffer_manager");
     }
@@ -440,6 +468,9 @@ server_backend_destroy(struct server_backend *backend) {
     }
     if (backend->linux_drm_syncobj_manager) {
         wp_linux_drm_syncobj_manager_v1_destroy(backend->linux_drm_syncobj_manager);
+    }
+    if (backend->presentation) {
+        wp_presentation_destroy(backend->presentation);
     }
     if (backend->single_pixel_buffer_manager) {
         wp_single_pixel_buffer_manager_v1_destroy(backend->single_pixel_buffer_manager);
