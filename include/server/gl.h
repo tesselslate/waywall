@@ -41,6 +41,9 @@ struct server_gl {
         struct wp_viewport *viewport;
         struct wl_egl_window *window;
         EGLSurface egl;
+
+        struct wl_callback *frame_callback;
+        uint32_t swaps_since_frame_cb;
     } surface;
 
     struct {

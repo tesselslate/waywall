@@ -1,5 +1,6 @@
 #include "server/surface.h"
 #include "server/buffer.h"
+#include "time.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "util/prelude.h"
@@ -23,13 +24,17 @@ static void
 surface_frame_resource_destroy(struct wl_resource *resource) {
     struct server_surface_frame *frame = wl_resource_get_user_data(resource);
 
-    wl_callback_destroy(frame->remote);
+    if (frame->remote) {
+        wl_callback_destroy(frame->remote);
+    }
     free(frame);
 }
 
 static void
 on_surface_frame_done(void *data, struct wl_callback *wl, uint32_t callback_data) {
     struct server_surface_frame *frame = data;
+
+    frame->surface->swaps_since_frame_cb = 0;
 
     wl_callback_send_done(frame->resource, callback_data);
     wl_resource_destroy(frame->resource);
@@ -38,6 +43,13 @@ on_surface_frame_done(void *data, struct wl_callback *wl, uint32_t callback_data
 static const struct wl_callback_listener surface_frame_listener = {
     .done = on_surface_frame_done,
 };
+
+static uint32_t
+current_time() {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (uint32_t)((uint64_t)now.tv_sec * 1000 + (uint64_t)now.tv_nsec / 1000000);
+}
 
 static void
 surface_state_clear(struct server_surface_state *state) {
@@ -147,6 +159,7 @@ surface_commit(struct wl_client *client, struct wl_resource *resource) {
                           0);
 
         surface_state_set_buffer(&surface->current, surface->pending.buffer);
+        surface->swaps_since_frame_cb++;
 
         if (surface->current.buffer) {
             server_buffer_lock(surface->current.buffer);
@@ -208,6 +221,14 @@ static void
 surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t id) {
     struct server_surface *surface = wl_resource_get_user_data(resource);
 
+    // HACK: NVIDIA bug workaround. Check git blame for details.
+    if (surface->swaps_since_frame_cb > 64) {
+        struct wl_resource *resource = wl_resource_create(client, &wl_callback_interface, 1, id);
+        wl_callback_send_done(resource, current_time());
+        wl_resource_destroy(resource);
+        return;
+    }
+
     struct server_surface_frame *frame = zalloc(1, sizeof(*frame));
 
     frame->resource = wl_resource_create(client, &wl_callback_interface, 1, id);
@@ -217,6 +238,8 @@ surface_frame(struct wl_client *client, struct wl_resource *resource, uint32_t i
     frame->remote = wl_surface_frame(surface->remote);
     check_alloc(frame->remote);
     wl_callback_add_listener(frame->remote, &surface_frame_listener, frame);
+
+    frame->surface = surface;
 }
 
 static void

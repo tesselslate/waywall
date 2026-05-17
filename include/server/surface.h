@@ -20,6 +20,8 @@ struct server_surface {
         } present;
     } current, pending;
 
+    uint32_t swaps_since_frame_cb;
+
     const struct server_surface_role *role;
     struct wl_resource *role_resource;
 
