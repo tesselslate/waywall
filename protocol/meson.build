@@ -10,6 +10,7 @@ protocol_sources = []
 protocol_xmls = [
   # standardized protocols (available from wayland-protocols)
   wp_dir + 'stable/linux-dmabuf/linux-dmabuf-v1.xml',
+  wp_dir + 'stable/presentation-time/presentation-time.xml',
   wp_dir + 'stable/viewporter/viewporter.xml',
   wp_dir + 'stable/xdg-shell/xdg-shell.xml',
   wp_dir + 'staging/alpha-modifier/alpha-modifier-v1.xml',
