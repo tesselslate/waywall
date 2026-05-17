@@ -19,6 +19,7 @@ waywall_src = files(
   'server/wl_seat.c',
   'server/wl_shm.c',
   'server/wp_pointer_constraints.c',
+  'server/wp_presentation.c',
   'server/wp_linux_dmabuf.c',
   'server/wp_linux_drm_syncobj.c',
   'server/wp_relative_pointer.c',

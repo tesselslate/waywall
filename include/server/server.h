@@ -22,6 +22,7 @@ struct server {
     struct server_linux_dmabuf *linux_dmabuf;
     struct server_output *output;
     struct server_pointer_constraints *pointer_constraints;
+    struct server_presentation *presentation;
     struct server_relative_pointer *relative_pointer;
     struct server_seat *seat;
     struct server_shm *shm;
