@@ -184,11 +184,11 @@ if user_config.autogen then
 
     local waywall = require("waywall")
     waywall.listen("load", function()
-        sizexy = {}
-        sizexy.x    = 10
-        sizexy.y    = 10
-        sizexy.size = 1
-        autogen_text = waywall.text(autogen_notice, sizexy)
+        local autogen_opts = {}
+        autogen_opts.x = 10
+        autogen_opts.y = 10
+        autogen_opts.size = 1
+        autogen_text = waywall.text(autogen_notice, autogen_opts)
     end)
 end
 

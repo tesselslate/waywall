@@ -37,9 +37,9 @@ local function event_handler(name)
 end
 
 local events = {}
-events.load         = event_handler("load")
-events.resolution   = event_handler("resolution")
-events.state        = event_handler("state")
+events.load = event_handler("load")
+events.resolution = event_handler("resolution")
+events.state = event_handler("state")
 
 local M = {}
 
