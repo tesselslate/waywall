@@ -676,6 +676,7 @@ wrap_set_config(struct wrap *wrap, struct config *cfg) {
         floating_update_anchored(wrap);
     }
 
+    send_keyboard_modifiers(wrap->server->seat);
     return 0;
 }
 

@@ -98,6 +98,7 @@ struct server_seat *server_seat_create(struct server *server, struct config *cfg
 void server_seat_send_click(struct server_seat *seat, struct server_view *view);
 void server_seat_send_keys(struct server_seat *seat, struct server_view *view, size_t num_keys,
                            const struct syn_key[static num_keys]);
+void send_keyboard_modifiers(struct server_seat *seat);
 void server_seat_set_listener(struct server_seat *seat, const struct server_seat_listener *listener,
                               void *data);
 void server_seat_use_config(struct server_seat *seat, struct server_seat_config *config);
