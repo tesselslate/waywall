@@ -167,7 +167,7 @@ str_halves(str s, char needle) {
 
 ssize_t
 str_index(str s, char needle, ssize_t start) {
-    char *ptr = memchr(s.data + start, needle, s.len - start);
+    const char *ptr = memchr(s.data + start, needle, s.len - start);
 
     return (ptr ? ptr - s.data : -1);
 }
