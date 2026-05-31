@@ -46,13 +46,13 @@ fi
 install -Dm644 %{_sourcedir}/LICENSE %{buildroot}%{_datarootdir}/licenses/%{name}/LICENSE
 
 # Install patched GLFW libraries from source directory
-mkdir -p %{buildroot}%{_prefix}/local/lib64/waywall-glfw
+mkdir -p %{buildroot}%{_libdir}/waywall-glfw/
 for file in %{_sourcedir}/waywall-build/glfw/libglfw.so %{_sourcedir}/waywall-build/glfw/libglfw.so.3 %{_sourcedir}/waywall-build/glfw/libglfw.so.3.4; do
     if [ ! -f "$file" ]; then
         echo "Error: $file not found"
         exit 1
     fi
-    install -m644 "$file" %{buildroot}%{_prefix}/local/lib64/waywall-glfw/
+    install -m644 "$file" %{buildroot}%{_libdir}/waywall-glfw/
 done
 
 # Install GLFW documentation from source directory with glfw- prefix
@@ -77,7 +77,7 @@ fi
 %doc %{_docdir}/%{name}/glfw-MAINTAINERS.md
 %doc %{_docdir}/%{name}/doc/*
 %{_bindir}/waywall
-%{_prefix}/local/lib64/waywall-glfw/*
+%{_libdir}/waywall-glfw/*
 
 %post
 
