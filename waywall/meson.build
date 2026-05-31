@@ -32,6 +32,7 @@ waywall_src = files(
   'util/log.c',
   'util/png.c',
   'util/prelude.c',
+  'util/sched.c',
   'util/str.c',
   'util/syscall.c',
   'util/sysinfo.c',
