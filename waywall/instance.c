@@ -45,7 +45,6 @@ check_subdirs(const char *dirname) {
         "logs",
         "resourcepacks",
         "saves",
-        "screenshots",
     };
 
     DIR *dir = opendir(dirname);
