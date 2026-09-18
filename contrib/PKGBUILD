@@ -33,10 +33,10 @@ package() {
     cp -r doc "$pkgdir/usr/share/doc/$pkgname/"
   fi
   #GLFW
-  mkdir -p "$pkgdir/usr/local/lib64/waywall-glfw"
-  install -m644 waywall-build/glfw/libglfw.so "$pkgdir/usr/local/lib64/waywall-glfw/"
-  install -m644 waywall-build/glfw/libglfw.so.3 "$pkgdir/usr/local/lib64/waywall-glfw/"
-  install -m644 waywall-build/glfw/libglfw.so.3.4 "$pkgdir/usr/local/lib64/waywall-glfw/"
+  mkdir -p "$pkgdir/usr/lib64/waywall-glfw"
+  install -m644 waywall-build/glfw/libglfw.so "$pkgdir/usr/lib64/waywall-glfw/"
+  install -m644 waywall-build/glfw/libglfw.so.3 "$pkgdir/usr/lib64/waywall-glfw/"
+  install -m644 waywall-build/glfw/libglfw.so.3.4 "$pkgdir/usr/lib64/waywall-glfw/"
   #GLFW-DOCS
   install -m644 waywall-build/glfw/LICENSE.md "$pkgdir/usr/share/doc/$pkgname/glfw-LICENSE.md"
   install -m644 waywall-build/glfw/CONTRIBUTORS.md "$pkgdir/usr/share/doc/$pkgname/glfw-CONTRIBUTORS.md"
