@@ -7,6 +7,7 @@
 #include "server/surface.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
+#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/debug.h"
 #include "util/log.h"
@@ -434,6 +435,9 @@ server_ui_destroy(struct server_ui *ui) {
     if (ui->root.tearing_control) {
         wp_tearing_control_v1_destroy(ui->root.tearing_control);
     }
+    if (ui->root.keyboard_shortcut_inhibitor) {
+        zwp_keyboard_shortcuts_inhibitor_v1_destroy(ui->root.keyboard_shortcut_inhibitor);
+    }
     if (ui->xdg_decoration) {
         zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
     }
@@ -478,6 +482,28 @@ server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen) {
 }
 
 void
+server_ui_set_keyboard_shortcuts_inhibition(struct server_ui *ui, bool inhibit) {
+    if (!ui->server->backend->keyboard_shortcuts_inhibit_manager) {
+        return;
+    }
+
+    if (inhibit && !ui->root.keyboard_shortcut_inhibitor) {
+        ui->root.keyboard_shortcut_inhibitor = zwp_keyboard_shortcuts_inhibit_manager_v1_inhibit_shortcuts(
+            ui->server->backend->keyboard_shortcuts_inhibit_manager,
+            ui->root.surface,
+            ui->server->backend->seat.remote);
+    } else if (!inhibit && ui->root.keyboard_shortcut_inhibitor) {
+        zwp_keyboard_shortcuts_inhibitor_v1_destroy(ui->root.keyboard_shortcut_inhibitor);
+        ui->root.keyboard_shortcut_inhibitor = nullptr;
+    }
+}
+
+bool
+server_ui_keyboard_shortcuts_inhibited(struct server_ui *ui) {
+    return ui->root.keyboard_shortcut_inhibitor;
+}
+
+void
 server_ui_show(struct server_ui *ui) {
     ww_assert(!ui->mapped);
 
@@ -517,6 +543,7 @@ server_ui_use_config(struct server_ui *ui, struct server_ui_config *config) {
                                           ? WP_TEARING_CONTROL_V1_PRESENTATION_HINT_ASYNC
                                           : WP_TEARING_CONTROL_V1_PRESENTATION_HINT_VSYNC);
     }
+    server_ui_set_keyboard_shortcuts_inhibition(ui, config->inhibit_keyboard_shortcuts);
     if (ui->mapped) {
         wl_surface_attach(ui->root.surface, config->background, 0, 0);
         wl_surface_damage_buffer(ui->root.surface, 0, 0, INT32_MAX, INT32_MAX);
@@ -549,6 +576,7 @@ server_ui_config_create(struct server_ui *ui, struct config *cfg) {
     config->tearing = cfg->experimental.tearing;
     config->fullscreen_width = cfg->window.fullscreen_width;
     config->fullscreen_height = cfg->window.fullscreen_height;
+    config->inhibit_keyboard_shortcuts = cfg->window.inhibit_keyboard_shortcuts;
 
     config->ninb_opacity = cfg->theme.ninb.opacity * UINT32_MAX;
 

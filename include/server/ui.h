@@ -19,6 +19,7 @@ struct server_ui {
         struct wp_viewport *viewport;
 
         struct wp_tearing_control_v1 *tearing_control;
+        struct zwp_keyboard_shortcuts_inhibitor_v1 *keyboard_shortcut_inhibitor;
     } root;
     struct {
         struct wl_buffer *buffer;
@@ -48,6 +49,7 @@ struct server_ui {
 struct server_ui_config {
     struct wl_buffer *background;
     bool tearing;
+    bool inhibit_keyboard_shortcuts;
 
     int32_t fullscreen_width;
     int32_t fullscreen_height;
@@ -103,6 +105,8 @@ struct server_ui *server_ui_create(struct server *server, struct config *cfg);
 void server_ui_destroy(struct server_ui *ui);
 void server_ui_hide(struct server_ui *ui);
 void server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen);
+void server_ui_set_keyboard_shortcuts_inhibition(struct server_ui *ui, bool inhibit);
+bool server_ui_keyboard_shortcuts_inhibited(struct server_ui *ui);
 void server_ui_show(struct server_ui *ui);
 void server_ui_use_config(struct server_ui *ui, struct server_ui_config *config);
 

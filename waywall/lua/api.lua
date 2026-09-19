@@ -151,4 +151,10 @@ M.text = priv.text
 --- Toggle the Waywall window between fullscreen and not
 M.toggle_fullscreen = priv.toggle_fullscreen
 
+--- Set whether host compositor's shortcuts should be inhibited
+M.set_keyboard_shortcuts_inhibition = priv.set_keyboard_shortcuts_inhibition
+
+--- Gets the current keyboard shortcuts inhibition state
+M.keyboard_shortcuts_inhibited = priv.keyboard_shortcuts_inhibited
+
 package.loaded["waywall"] = M

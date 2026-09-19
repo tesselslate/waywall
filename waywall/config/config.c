@@ -32,6 +32,7 @@ static const struct config defaults = {
         {
             .fullscreen_width = 0,
             .fullscreen_height = 0,
+            .inhibit_keyboard_shortcuts = false,
         },
     .input =
         {
@@ -597,6 +598,11 @@ process_config_window(struct config *cfg) {
     if (cfg->window.fullscreen_height < 0) {
         ww_log(LOG_ERROR,
                "'window.fullscreen_height' must be a non-negative integer (0 = native resolution)");
+        return 1;
+    }
+
+    if (get_bool(cfg, "inhibit_keyboard_shortcuts", &cfg->window.inhibit_keyboard_shortcuts,
+                 "window.inhibit_keyboard_shortcuts", false) != 0) {
         return 1;
     }
 

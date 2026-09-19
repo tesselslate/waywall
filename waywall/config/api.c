@@ -1249,6 +1249,47 @@ l_toggle_fullscreen(lua_State *L) {
     return 0;
 }
 
+static int
+l_set_keyboard_shortcuts_inhibition(lua_State *L) {
+    static constexpr int ARG_INHIBIT = 1;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("set_keyboard_shortcuts_inhibition"));
+    }
+
+    luaL_argcheck(L, lua_type(L, ARG_INHIBIT) == LUA_TBOOLEAN, ARG_INHIBIT,
+                  "inhibit must be a boolean");
+    bool inhibit = lua_toboolean(L, ARG_INHIBIT);
+
+    lua_settop(L, ARG_INHIBIT);
+
+    // Body
+    wrap_lua_set_keyboard_shortcuts_inhibition(wrap, inhibit);
+
+    // Epilogue
+    return 0;
+}
+
+static int
+l_keyboard_shortcuts_inhibited(lua_State *L) {
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("keyboard_shortcuts_inhibited"));
+    }
+
+    // Body
+    bool inhibited = wrap_lua_keyboard_shortcuts_inhibited(wrap);
+
+    // Epilogue
+    lua_pushboolean(L, inhibited);
+    return 1;
+}
+
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_res", l_active_res},
@@ -1269,6 +1310,8 @@ static const struct luaL_Reg lua_lib[] = {
     {"state", l_state},
     {"text", l_text},
     {"toggle_fullscreen", l_toggle_fullscreen},
+    {"set_keyboard_shortcuts_inhibition", l_set_keyboard_shortcuts_inhibition},
+    {"keyboard_shortcuts_inhibited", l_keyboard_shortcuts_inhibited},
 
     // private (see init.lua)
     {"log", l_log},
