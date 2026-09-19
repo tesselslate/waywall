@@ -11,6 +11,7 @@
 #include "server/ui.h"
 #include "server/wl_seat.h"
 #include "server/wp_relative_pointer.h"
+#include "server/wp_pointer_constraints.h"
 #include "timer.h"
 #include "util/alloc.h"
 #include "util/box.h"
@@ -1249,6 +1250,30 @@ l_toggle_fullscreen(lua_State *L) {
     return 0;
 }
 
+static int
+l_set_pointer_confinement(lua_State *L) {
+    static constexpr int ARG_CONFINE = 1;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("set_pointer_confinement"));
+    }
+
+    luaL_argcheck(L, lua_type(L, ARG_CONFINE) == LUA_TBOOLEAN, ARG_CONFINE,
+                  "confine must be a boolean");
+    bool confine = lua_toboolean(L, ARG_CONFINE);
+
+    lua_settop(L, ARG_CONFINE);
+
+    // Body
+    server_pointer_constraints_set_confine(wrap->server->pointer_constraints, confine);
+
+    // Epilogue
+    return 0;
+}
+
 static const struct luaL_Reg lua_lib[] = {
     // public (see api.lua)
     {"active_res", l_active_res},
@@ -1269,6 +1294,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"state", l_state},
     {"text", l_text},
     {"toggle_fullscreen", l_toggle_fullscreen},
+    {"set_pointer_confinement", l_set_pointer_confinement},
 
     // private (see init.lua)
     {"log", l_log},

@@ -151,4 +151,7 @@ M.text = priv.text
 --- Toggle the Waywall window between fullscreen and not
 M.toggle_fullscreen = priv.toggle_fullscreen
 
+--- Set whether the pointer should be confined to the waywall window
+M.set_pointer_confinement = priv.set_pointer_confinement
+
 package.loaded["waywall"] = M
