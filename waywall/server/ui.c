@@ -19,6 +19,7 @@
 #include <linux/memfd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
@@ -297,6 +298,8 @@ on_xdg_surface_configure(void *data, struct xdg_surface *xdg_surface, uint32_t s
         wl_signal_emit_mutable(&ui->events.resize, nullptr);
         ui->resize = false;
 
+        ui->mapped = true;
+
         WW_DEBUG(ui.width, ui->width);
         WW_DEBUG(ui.height, ui->height);
     }
@@ -484,11 +487,17 @@ server_ui_show(struct server_ui *ui) {
     wl_surface_commit(ui->root.surface);
     wl_display_roundtrip(display);
 
+    // HACK: We need to wait until the toplevel has received a configure event to be able to attach
+    // a buffer, but on some compositors (e.g. newer, non-monolithic versions of river) it may take
+    // the compositor some time to send a configure event.
+    while (!ui->mapped) {
+        wl_display_roundtrip(display);
+        nanosleep(&(struct timespec){.tv_nsec = 10'000'000}, nullptr);
+    }
+
     wl_surface_attach(ui->root.surface, ui->config->background, 0, 0);
     wl_surface_commit(ui->root.surface);
-    wl_display_roundtrip(display);
 
-    ui->mapped = true;
     wl_signal_emit_mutable(&ui->server->events.map_status, &ui->mapped);
 }
 

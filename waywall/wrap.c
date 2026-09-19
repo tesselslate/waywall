@@ -370,7 +370,6 @@ on_view_create(struct wl_listener *listener, void *data) {
         }
     }
 
-    wrap->view = view;
     wrap->instance = instance_create(view, wrap->inotify);
     if (wrap->instance) {
         strbuf path = instance_get_state_path(wrap->instance);
@@ -390,10 +389,10 @@ on_view_create(struct wl_listener *listener, void *data) {
     // xdg_surface role commit event, so the pending buffer will not have been put into the
     // current state yet. I would like to have a better API for this (perhaps change when the
     // event fires?), but this works for now.
-    ww_assert(wrap->view->surface->pending.buffer);
+    ww_assert(view->surface->pending.buffer);
 
     int32_t width, height;
-    server_buffer_get_size(wrap->view->surface->pending.buffer, &width, &height);
+    server_buffer_get_size(view->surface->pending.buffer, &width, &height);
 
     wrap->server->ui->width = width;
     wrap->server->ui->height = height;
@@ -402,7 +401,7 @@ on_view_create(struct wl_listener *listener, void *data) {
     server_ui_show(wrap->server->ui);
 
     ww_assert(wrap->width > 0 && wrap->height > 0);
-    ww_assert(wrap->view);
+    wrap->view = view;
 
     server_view_set_size(wrap->view, wrap->width, wrap->height);
     server_view_set_centered(wrap->view, true);
