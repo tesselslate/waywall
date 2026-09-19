@@ -47,12 +47,14 @@ struct scene {
 
     int skipped_frames;
 
+    long frame_time_base;
+
     struct wl_listener on_gl_frame;
 };
 
 struct scene_shader {
     struct server_gl_shader *shader;
-    int shader_u_src_size, shader_u_dst_size;
+    int shader_u_src_size, shader_u_dst_size, shader_u_time;
 
     char *name;
 };
