@@ -72,7 +72,7 @@ struct config {
     struct config_vm *vm;
 };
 
-struct config_action {
+ struct config_action {
     enum config_action_type {
         CONFIG_ACTION_NONE,
         CONFIG_ACTION_BUTTON,
@@ -82,9 +82,10 @@ struct config_action {
     uint32_t data;
     uint32_t modifiers;
     bool wildcard_modifiers;
+    bool release;
 
     uint16_t lua_index;
-};
+ };
 
 enum config_remap_type {
     CONFIG_REMAP_NONE,

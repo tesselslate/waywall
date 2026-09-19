@@ -969,6 +969,9 @@ config_find_action(struct config *cfg, const struct config_action *action) {
         if (match->data != action->data) {
             continue;
         }
+        if (match->release != action->release) {
+            continue;
+        }
 
         // People often run into issues with Num Lock (and more rarely, Caps Lock) preventing
         // keybinds from triggering since they are counted as modifiers by XKB.
