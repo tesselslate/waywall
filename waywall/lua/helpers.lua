@@ -99,19 +99,26 @@ end
 -- @param width The width to set the Minecraft window to.
 -- @param height The height to set the Minecraft window to.
 -- @param sens The sensitivity to use when toggling resolution, if any.
+-- @param raw_sens The raw_sensitivity to use when toggling resolution, if any.
 -- @return toggle_res A function which can be used to switch resolutions.
-M.toggle_res = function(width, height, sens)
+M.toggle_res = function(width, height, sens, raw_sens)
     return function()
         local act_width, act_height = waywall.active_res()
         if act_width == width and act_height == height then
             waywall.set_resolution(0, 0)
             waywall.set_sensitivity(0)
+            waywall.set_raw_sensitivity(0)
         else
             waywall.set_resolution(width, height)
             if type(sens) == "number" then
                 waywall.set_sensitivity(sens)
             else
                 waywall.set_sensitivity(0)
+            end
+            if type(raw_sens) == "number" then
+                waywall.set_raw_sensitivity(raw_sens)
+            else
+                waywall.set_raw_sensitivity(0)
             end
         end
 

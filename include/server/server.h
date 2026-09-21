@@ -49,6 +49,7 @@ struct server_config {
 
     bool confine;
     double sens;
+    double raw_sens;
 
     bool applied;
 };
