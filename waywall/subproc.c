@@ -64,7 +64,7 @@ subproc_destroy(struct subproc *subproc) {
     for (ssize_t i = 0; i < subproc->entries.len; i++) {
         struct subproc_entry *entry = &subproc->entries.data[i];
 
-        if (pidfd_send_signal(entry->pidfd, SIGKILL, nullptr, 0) != 0) {
+        if (pidfd_send_signal(entry->pidfd, SIGTERM, nullptr, 0) != 0) {
             if (errno != ESRCH) {
                 ww_log_errno(LOG_ERROR, "failed to kill child process %jd", (intmax_t)entry->pid);
             }
