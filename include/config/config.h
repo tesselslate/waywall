@@ -82,6 +82,7 @@ struct config_action {
     uint32_t data;
     uint32_t modifiers;
     bool wildcard_modifiers;
+    bool release;
 
     uint16_t lua_index;
 };

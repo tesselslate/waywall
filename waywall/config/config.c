@@ -442,7 +442,7 @@ process_config_actions(struct config *cfg) {
     lua_pushnil(cfg->vm->L);  // stack: 4 (IDX_ACTION_KEY)
     while (lua_next(cfg->vm->L, IDX_ACTIONS)) {
         // stack state
-        // 5 (IDX_ACTION_VAL) : config.actions[key] (should be a function)
+        // 5 (IDX_ACTION_VAL) : config.actions[key] (should be a function or table)
         // 4 (IDX_ACTION_KEY) : key                 (should be a string)
         // 3 (IDX_DUP_TABLE)  : duplicate actions table
         // 2 (IDX_ACTIONS)    : config.actions
@@ -454,25 +454,68 @@ process_config_actions(struct config *cfg) {
                    lua_tostring(cfg->vm->L, IDX_ACTION_KEY));
             return 1;
         }
-        if (!lua_isfunction(cfg->vm->L, IDX_ACTION_VAL)) {
-            ww_log(LOG_ERROR, "non-function value for key '%s' found in actions table",
+        if (!lua_isfunction(cfg->vm->L, IDX_ACTION_VAL) &&
+            !lua_istable(cfg->vm->L, IDX_ACTION_VAL)) {
+            ww_log(LOG_ERROR, "non-function/table value for key '%s' found in actions table",
                    lua_tostring(cfg->vm->L, IDX_ACTION_KEY));
             return 1;
         }
 
         const char *bind = lua_tostring(cfg->vm->L, IDX_ACTION_KEY);
-        struct config_action action = {};
-        if (parse_bind(bind, &action) != 0) {
-            return 1;
+
+        if (lua_isfunction(cfg->vm->L, IDX_ACTION_VAL)) {
+            struct config_action action = {};
+            if (parse_bind(bind, &action) != 0) {
+                return 1;
+            }
+
+            add_action(cfg, &action);
+
+            // The key (numerical index) and value (action function) need to be pushed to the top of the
+            // stack to be put in the duplicate table.
+            lua_pushinteger(cfg->vm->L, action.lua_index); // stack: 6 (IDX_ACTION_VAL + 1)
+            lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);     // stack: 7 (IDX_ACTION_VAL + 2)
+            lua_rawset(cfg->vm->L, IDX_DUP_TABLE);         // stack: 5 (IDX_ACTION_VAL)
+        } else {
+            static const char *action_names[] = {
+                "press",
+                "release",
+            };
+
+            for (size_t i = 0; i < sizeof(action_names) / sizeof(action_names[0]); i++) {
+                lua_getfield(cfg->vm->L, IDX_ACTION_VAL, action_names[i]);
+
+                if (lua_isnil(cfg->vm->L, -1)) {
+                    lua_pop(cfg->vm->L, 1);
+                    continue;
+                }
+
+                if (!lua_isfunction(cfg->vm->L, -1)) {
+                    ww_log(LOG_ERROR, "non-function value for '%s' action for key '%s'",
+                           action_names[i], bind);
+                    lua_pop(cfg->vm->L, 1);
+                    return 1;
+                }
+
+                struct config_action action = {};
+                action.release = i == 1;
+
+                if (parse_bind(bind, &action) != 0) {
+                    lua_pop(cfg->vm->L, 1);
+                    return 1;
+                }
+
+                add_action(cfg, &action);
+
+                // The key (numerical index) and value (action function) need to be pushed to the top of the
+                // stack to be put in the duplicate table.
+                lua_pushinteger(cfg->vm->L, action.lua_index); // stack: 7 (IDX_ACTION_VAL + 2)
+                lua_pushvalue(cfg->vm->L, -2);                 // stack: 8 (IDX_ACTION_VAL + 3)
+                lua_rawset(cfg->vm->L, IDX_DUP_TABLE);         // stack: 6 (IDX_ACTION_VAL + 1)
+
+                lua_pop(cfg->vm->L, 1); // stack: 5 (IDX_ACTION_VAL)
+            }
         }
-
-        add_action(cfg, &action);
-
-        // The key (numerical index) and value (action function) need to be pushed to the top of the
-        // stack to be put in the duplicate table.
-        lua_pushinteger(cfg->vm->L, action.lua_index); // stack: 6 (IDX_ACTION_VAL + 1)
-        lua_pushvalue(cfg->vm->L, IDX_ACTION_VAL);     // stack: 7 (IDX_ACTION_VAL + 2)
-        lua_rawset(cfg->vm->L, IDX_DUP_TABLE);         // stack: 5 (IDX_ACTION_VAL)
 
         // Pop the value from the top of the stack. The previous key will be left at the top of the
         // stack for the next call to `lua_next`.
@@ -967,6 +1010,9 @@ config_find_action(struct config *cfg, const struct config_action *action) {
             continue;
         }
         if (match->data != action->data) {
+            continue;
+        }
+        if (match->release != action->release) {
             continue;
         }
 
