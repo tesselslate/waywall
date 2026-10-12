@@ -730,3 +730,13 @@ void
 wrap_lua_toggle_fullscreen(struct wrap *wrap) {
     server_ui_set_fullscreen(wrap->server->ui, !wrap->server->ui->fullscreen);
 }
+
+void
+wrap_lua_set_keyboard_shortcuts_inhibition(struct wrap *wrap, bool inhibit) {
+    server_ui_set_keyboard_shortcuts_inhibition(wrap->server->ui, inhibit);
+}
+
+bool
+wrap_lua_keyboard_shortcuts_inhibited(struct wrap *wrap) {
+    return server_ui_keyboard_shortcuts_inhibited(wrap->server->ui);
+}

@@ -38,6 +38,7 @@ struct server_backend {
     struct wp_single_pixel_buffer_manager_v1 *single_pixel_buffer_manager;
     struct wp_tearing_control_manager_v1 *tearing_control;
     struct zxdg_decoration_manager_v1 *xdg_decoration_manager;
+    struct zwp_keyboard_shortcuts_inhibit_manager_v1 *keyboard_shortcuts_inhibit_manager;
 
     struct {
         struct wl_signal seat_data_device; // data: nullptr
