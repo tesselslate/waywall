@@ -111,6 +111,10 @@ M.profile = priv.profile
 -- are valid keys.)
 M.set_keymap = priv.set_keymap
 
+--- Sets the raw input sensitivity multiplier for relative pointer motion.
+-- @param sensitivity The multiplier to use. A value of zero resets sensitivity.
+M.set_raw_sensitivity = priv.set_raw_sensitivity
+
 --- Sets the input remapping map, corresponding to config.input.remaps.
 -- @param remaps A table containing the remapping map, with the same format as
 -- config.input.remaps.
