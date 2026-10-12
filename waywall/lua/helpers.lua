@@ -34,6 +34,14 @@ end
 M.res_mirror = function(options, width, height)
     local mirror = nil
 
+    waywall.listen("load", function()
+        local active_width, active_height = waywall.active_res()
+
+        if active_width == width and active_height == height then
+            mirror = waywall.mirror(options)
+        end
+    end)
+
     return waywall.listen("resolution", function()
         local active_width, active_height = waywall.active_res()
 
@@ -62,6 +70,14 @@ end
 -- @return cancel A function to cancel the resolution listener for this image
 M.res_image = function(path, options, width, height)
     local image = nil
+
+    waywall.listen("load", function()
+        local active_width, active_height = waywall.active_res()
+
+        if active_width == width and active_height == height then
+            image = waywall.image(path, options)
+        end
+    end)
 
     return waywall.listen("resolution", function()
         local active_width, active_height = waywall.active_res()
