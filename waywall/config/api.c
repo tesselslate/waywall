@@ -828,6 +828,32 @@ l_set_sensitivity(lua_State *L) {
 }
 
 static int
+l_set_raw_sensitivity(lua_State *L) {
+    static constexpr int ARG_SENS = 1;
+
+    // Prologue
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("set_raw_sensitivity"));
+    }
+
+    double sens = luaL_checknumber(L, ARG_SENS);
+    luaL_argcheck(L, sens >= 0, ARG_SENS, "sensitivity must be a positive number");
+
+    lua_settop(L, ARG_SENS);
+
+    // Body
+    if (sens == 0) {
+        sens = wrap->cfg->input.raw_sens;
+    }
+    server_relative_pointer_set_raw_sens(wrap->server->relative_pointer, sens);
+
+    // Epilogue
+    return 0;
+}
+
+static int
 l_show_floating(lua_State *L) {
     static constexpr int ARG_SHOW = 1;
 
@@ -1264,6 +1290,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"set_remaps", l_set_remaps},
     {"set_resolution", l_set_resolution},
     {"set_sensitivity", l_set_sensitivity},
+    {"set_raw_sensitivity", l_set_raw_sensitivity},
     {"show_floating", l_show_floating},
     {"sleep", l_sleep},
     {"state", l_state},

@@ -24,6 +24,7 @@ local config = {
 
         -- mouse options
         sensitivity = 1.0,
+        raw_sensitivity = 1.0,
         confine_pointer = false,
     },
 }
@@ -89,14 +90,21 @@ the same values as your main Wayland session.
 
 ## Mouse sensitivity
 
-The `sensitivity` option applies a constant multiplier to your mouse motion
-while aiming with the camera ingame. The default value of `1.0` results in
-no change, while `2.0` would make it twice as fast and `0.5` would make it
-half as fast.
+The `sensitivity` and `raw_sensitivity` options apply a constant multiplier
+to your mouse motion while aiming with the camera ingame.
+The default value of `1.0` results in no change, while `2.0` would make it
+twice as fast and `0.5` would make it half as fast.
+
+These options take effect:
+- `sensitivity` - when *Raw Input* is disabled ingame,
+- `raw_sensitivity` - when *Raw Input* is enabled or when playing
+  on new versions (≥ 26.3).
+
+When *Raw Input* is enabled the host compositor's sensitivity is not used.
 
 > [!IMPORTANT]
 > This option only affects your camera movement, *not* your mouse movement in
-> menus. Additionally, it only takes effect **when Raw Input is disabled ingame.**
+> menus.
 
 ## Pointer confinement
 

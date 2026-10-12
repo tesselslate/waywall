@@ -47,6 +47,7 @@ static const struct config defaults = {
             .repeat_rate = -1,
             .repeat_delay = -1,
             .sens = 1.0,
+            .raw_sens = 1.0,
             .confine = false,
         },
     .theme =
@@ -647,6 +648,14 @@ process_config_input(struct config *cfg) {
     }
     if (cfg->input.sens <= 0) {
         ww_log(LOG_ERROR, "'input.sensitivity' must be a positive, non-zero number");
+        return 1;
+    }
+
+    if (get_double(cfg, "raw_sensitivity", &cfg->input.raw_sens, "input.raw_sensitivity", false) != 0) {
+        return 1;
+    }
+    if (cfg->input.raw_sens <= 0) {
+        ww_log(LOG_ERROR, "'input.raw_sensitivity' must be a positive, non-zero number");
         return 1;
     }
 

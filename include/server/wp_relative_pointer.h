@@ -10,6 +10,7 @@ struct server_relative_pointer {
 
     struct {
         double sens;
+        double raw_sens;
     } config;
 
     struct server *server;
@@ -31,3 +32,6 @@ struct server_relative_pointer *server_relative_pointer_create(struct server *se
                                                                struct config *cfg);
 void server_relative_pointer_set_sens(struct server_relative_pointer *relative_pointer,
                                       double sens);
+
+void server_relative_pointer_set_raw_sens(struct server_relative_pointer *relative_pointer,
+                                          double sens);
