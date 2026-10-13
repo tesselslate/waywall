@@ -1,10 +1,6 @@
 book
 build
 waywall-build
-/contrib/debian/debhelper-build-stamp
-/contrib/debian/waywall.substvars
-/contrib/debian/files
-/contrib/debian/.debhelper
 
 # clangd
 .cache
