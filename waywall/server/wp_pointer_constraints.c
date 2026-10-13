@@ -92,6 +92,10 @@ unlock_pointer(struct server_pointer_constraints *pointer_constraints, struct wl
         check_alloc(pointer_constraints->confined_pointer);
         wl_surface_commit(pointer_constraints->server->ui->root.surface);
     }
+    if (!pointer_constraints->config.confine && pointer_constraints->confined_pointer) {
+        zwp_confined_pointer_v1_destroy(pointer_constraints->confined_pointer);
+        pointer_constraints->confined_pointer = nullptr;
+    }
 
     if (pointer_constraints->locked) {
         wl_signal_emit_mutable(&pointer_constraints->server->events.pointer_unlock, nullptr);
