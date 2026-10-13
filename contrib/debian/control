@@ -1,13 +1,41 @@
 Source: waywall
 Section: games
 Priority: optional
-Maintainer: ByPaco10 <tesselslate>
-Build-Depends: debhelper-compat (= 13), clang, wayland-protocols, meson, build-essential, git, libspng-dev, libluajit-5.1-dev, libwayland-dev, libxkbcommon-dev, xwayland, cmake, wayland-protocols, wayland-scanner++,
+Maintainer: tesselslate <example@example.com>
+Build-Depends: debhelper-compat (= 13),
+               build-essential,
+               luajit,
+               meson,
+               pkg-config,
+               wayland-protocols,
+               xwayland,
+               libgles2-mesa-dev,
+               libegl-dev,
+               libluajit-5.1-dev,
+               libspng-dev,
+               libwayland-bin,
+               libwayland-dev,
+               libxcb-composite0-dev,
+               libxcb-res0-dev,
+               libxcb-xtest0-dev,
+               libxkbcommon-dev
 Standards-Version: 4.6.2
 Homepage: https://github.com/tesselslate/waywall
 
 Package: waywall
 Architecture: amd64
-Depends: libegl1, libgles2, luajit, libspng0, libwayland-client0, libwayland-cursor0, libwayland-egl1, libwayland-server0, libxcb1, libxcb-composite0, libxcb-res0, libxcb-xtest0, xwayland, libxkbcommon0
+Depends: libegl1,
+         libgles2,
+         luajit,
+         libspng0,
+         libwayland-client0,
+         libwayland-cursor0,
+         libwayland-egl1,
+         libwayland-server0,
+         libxcb1, libxcb-composite0,
+         libxcb-res0,
+         libxcb-xtest0,
+         libxkbcommon0,
+         xwayland
 Description: Wayland compositor for Minecraft speedrunning
- Waywall is a Wayland compositor designed for Minecraft speedrunning.
+ waywall is a Wayland compositor designed for Minecraft speedrunning.
