@@ -89,6 +89,10 @@ The following uniforms are provided to the vertex shader:
 `u_dst_size` contains the size of the destination texture (waywall window) in
 pixels.
 
+### `u_time` (int)
+`u_time` contains the elapsed time since waywall has launched, in milliseconds,
+measured using `CLOCK_MONOTONIC`.
+
 ## Example
 
 The following shaders perform color-keying to only accept the three main colors
