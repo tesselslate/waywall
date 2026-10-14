@@ -524,6 +524,8 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
+    bool pressed = state == WL_KEYBOARD_KEY_STATE_PRESSED;
+
     // Actions should take priority over remaps.
     if (seat->listener) {
         const xkb_keysym_t *syms;
@@ -536,26 +538,40 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
         int nsyms = xkb_keymap_key_get_syms_by_level(seat->keyboard.remote_km.xkb, key + 8, group,
                                                      0, &syms);
 
-        bool consumed = seat->listener->key(seat->listener_data, nsyms, syms,
-                                            state == WL_KEYBOARD_KEY_STATE_PRESSED);
-        if (consumed) {
+        bool consumed = seat->listener->key(seat->listener_data, nsyms, syms, pressed);
+        if (pressed && consumed) {
             return;
         }
     }
 
-    if (try_remap_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED)) {
+    if (try_remap_key(seat, key, pressed)) {
         return;
+    }
+
+    if (!pressed) {
+        bool found = false;
+
+        for (ssize_t i = 0; i < seat->keyboard.pressed.len; i++) {
+            if (seat->keyboard.pressed.data[i] == key) {
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
+            return;
+        }
     }
 
     // TODO: This could probably be improved. Key presses need to be forwarded to X11 so that
     // Ninjabrain Bot can recognize that its hotkeys are being used, even if the focused window is a
     // Wayland toplevel.
     if (!seat->input_focus || strcmp("xwayland", seat->input_focus->impl->name) != 0) {
-        xwl_notify_key(seat->server->xwayland, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        xwl_notify_key(seat->server->xwayland, key, pressed);
     }
 
     struct key_update update =
-        modify_pressed_keys(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        modify_pressed_keys(seat, key, pressed);
     WW_DEBUG(keyboard.num_pressed, seat->keyboard.pressed.len);
 
     if (update.changed_modifiers) {
@@ -563,7 +579,7 @@ on_keyboard_key(void *data, struct wl_keyboard *wl, uint32_t serial, uint32_t ti
     }
 
     if (update.changed_keys) {
-        send_keyboard_key(seat, key, state == WL_KEYBOARD_KEY_STATE_PRESSED);
+        send_keyboard_key(seat, key, pressed);
     }
 }
 
