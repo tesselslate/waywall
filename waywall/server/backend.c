@@ -7,6 +7,7 @@
 #include "relative-pointer-unstable-v1-client-protocol.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
 #include "tearing-control-v1-client-protocol.h"
+#include "keyboard-shortcuts-inhibit-unstable-v1-client-protocol.h"
 #include "util/alloc.h"
 #include "util/log.h"
 #include "viewporter-client-protocol.h"
@@ -45,6 +46,7 @@ static constexpr int USE_TEARING_CONTROL_VERSION = 1;
 static constexpr int USE_VIEWPORTER_VERSION = 1;
 static constexpr int USE_XDG_DECORATION_VERSION = 1;
 static constexpr int USE_XDG_WM_BASE_VERSION = 1;
+static constexpr int USE_KEYBOARD_SHORTCUTS_INHIBIT_VERSION = 1;
 
 struct seat_name {
     struct wl_list link; // server_backend.seat.names
@@ -302,6 +304,16 @@ on_registry_global(void *data, struct wl_registry *wl, uint32_t name, const char
         check_alloc(backend->xdg_wm_base);
 
         xdg_wm_base_add_listener(backend->xdg_wm_base, &xdg_wm_base_listener, backend);
+    } else if (strcmp(iface, zwp_keyboard_shortcuts_inhibit_manager_v1_interface.name) == 0) {
+        if (version < USE_KEYBOARD_SHORTCUTS_INHIBIT_VERSION) {
+            ww_log(LOG_WARN, "host compositor provides outdated zwp_keyboard-shortcuts-inhibit (%d < %d)",
+                   version, USE_KEYBOARD_SHORTCUTS_INHIBIT_VERSION);
+            return;
+        }
+
+        backend->keyboard_shortcuts_inhibit_manager =
+            wl_registry_bind(wl, name, &zwp_keyboard_shortcuts_inhibit_manager_v1_interface,
+                             USE_KEYBOARD_SHORTCUTS_INHIBIT_VERSION);
     }
 }
 
@@ -386,6 +398,9 @@ server_backend_create() {
     if (!backend->xdg_decoration_manager) {
         ww_log(LOG_WARN, "host compositor does not provide zxdg_decoration_manager");
     }
+    if (!backend->keyboard_shortcuts_inhibit_manager) {
+        ww_log(LOG_INFO, "host compositor does not provide zwp_keyboard_shortcuts_inhibit_manager");
+    }
 
     return backend;
 
@@ -449,6 +464,9 @@ server_backend_destroy(struct server_backend *backend) {
     }
     if (backend->xdg_decoration_manager) {
         zxdg_decoration_manager_v1_destroy(backend->xdg_decoration_manager);
+    }
+    if (backend->keyboard_shortcuts_inhibit_manager) {
+        zwp_keyboard_shortcuts_inhibit_manager_v1_destroy(backend->keyboard_shortcuts_inhibit_manager);
     }
 
     wl_registry_destroy(backend->registry);

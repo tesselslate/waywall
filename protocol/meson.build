@@ -22,6 +22,7 @@ protocol_xmls = [
   wp_dir + 'unstable/relative-pointer/relative-pointer-unstable-v1.xml',
   wp_dir + 'unstable/tablet/tablet-unstable-v2.xml',
   wp_dir + 'unstable/xdg-decoration/xdg-decoration-unstable-v1.xml',
+  wp_dir + 'unstable/keyboard-shortcuts-inhibit/keyboard-shortcuts-inhibit-unstable-v1.xml',
 ]
 
 foreach xml : protocol_xmls
