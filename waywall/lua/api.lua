@@ -135,6 +135,13 @@ M.set_sensitivity = priv.set_sensitivity
 -- @param show Whether or not to show floating windows.
 M.show_floating = priv.show_floating
 
+--- Queries or changes the visibility of the first floating window with an exact title match.
+-- @param title The floating window title.
+-- @param show Optional visibility; omit to query without changing focus.
+-- @param focus Whether showing focuses the window (default true).
+-- @return Visibility, or nil if no matching window exists.
+M.window_visible = priv.window_visible
+
 --- Pauses the current action for the given number of milliseconds.
 -- This function may only be called from within a keybind handler. Calling it
 -- from within another context will result in an error.

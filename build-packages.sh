@@ -232,20 +232,20 @@ for distro in "${build_distros[@]}"; do
   if [ "$distro" = "archlinux" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       pacman -Syu --noconfirm
-      pacman -S --noconfirm ninja meson wayland-protocols libegl libgles luajit libspng libxcb libxkbcommon xorg-xwayland
+      pacman -S --noconfirm ninja meson wayland-protocols libegl libgles libdecor luajit libspng libxcb libxkbcommon xorg-xwayland
       chown -R 65534:65534 /build/waywall
       runuser -u nobody -- sh -c 'makepkg -sf --noconfirm'
       chown -R 0:0 /build/waywall
     "
   elif [ "$distro" = "fedora" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall/contrib --entrypoint /bin/bash localhost/pacur/$image_tag -c "
-      dnf install -y libspng-devel cmake meson mesa-libEGL-devel luajit-devel libwayland-client libwayland-server libwayland-cursor libxkbcommon-devel xorg-x11-server-Xwayland-devel wayland-protocols-devel wayland-scanner
+      dnf install -y libdecor-devel libspng-devel cmake meson mesa-libEGL-devel luajit-devel libwayland-client libwayland-server libwayland-cursor libxkbcommon-devel xorg-x11-server-Xwayland-devel wayland-protocols-devel wayland-scanner
       rpmbuild -ba --define '_sourcedir /build/waywall' --define '_srcrpmdir /build/waywall/contrib' --define '_rpmdir /build/waywall/contrib' --define '_builddir /build/waywall/build' /build/waywall/contrib/waywall.spec
     "
   elif [ "$distro" = "debian" ]; then
     podman run --rm --pull=never -v "$WAYWALL_DIR:/build/waywall:Z" --workdir /build/waywall --entrypoint /bin/bash localhost/pacur/$image_tag -c "
       apt-get update
-      apt-get install -y clang libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
+      apt-get install -y libdecor-0-dev clang libgles2-mesa-dev libegl-dev pkg-config debhelper-compat wayland-protocols meson build-essential libspng-dev libluajit-5.1-dev libwayland-dev libxkbcommon-dev xwayland cmake wayland-scanner++ libegl1 luajit libspng0 libwayland-client0 libwayland-cursor0 libwayland-egl1 libwayland-server0 libxcb1 libxcb-composite0-dev libxcb-res0-dev libxcb-xtest0-dev libxkbcommon0 curl git
       cp -r /build/waywall/contrib/debian /build/waywall/
       CC=clang CFLAGS=-gdwarf-4 dpkg-buildpackage -b -us -uc
       cp ../*.deb /build/waywall/contrib/

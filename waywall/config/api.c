@@ -878,6 +878,39 @@ l_show_floating(lua_State *L) {
 }
 
 static int
+l_window_visible(lua_State *L) {
+    static constexpr int ARG_TITLE = 1;
+    static constexpr int ARG_SHOW = 2;
+    static constexpr int ARG_FOCUS = 3;
+
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("window_visible"));
+    }
+    const char *title = luaL_checkstring(L, ARG_TITLE);
+    int show = -1;
+    if (lua_gettop(L) >= ARG_SHOW) {
+        luaL_argcheck(L, lua_type(L, ARG_SHOW) == LUA_TBOOLEAN, ARG_SHOW,
+                      "visibility must be a boolean");
+        show = lua_toboolean(L, ARG_SHOW);
+    }
+    bool focus = true;
+    if (lua_gettop(L) >= ARG_FOCUS) {
+        luaL_argcheck(L, lua_type(L, ARG_FOCUS) == LUA_TBOOLEAN, ARG_FOCUS,
+                      "focus must be a boolean");
+        focus = lua_toboolean(L, ARG_FOCUS);
+    }
+    int result = wrap_lua_window_visible(wrap, title, show, focus);
+    if (result < 0) {
+        lua_pushnil(L);
+    } else {
+        lua_pushboolean(L, result);
+    }
+    return 1;
+}
+
+static int
 l_sleep(lua_State *L) {
     static constexpr int ARG_MS = 1;
 
@@ -1296,6 +1329,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"state", l_state},
     {"text", l_text},
     {"toggle_fullscreen", l_toggle_fullscreen},
+    {"window_visible", l_window_visible},
 
     // private (see init.lua)
     {"log", l_log},

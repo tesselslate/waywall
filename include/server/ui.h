@@ -26,6 +26,9 @@ struct server_ui {
         struct wl_subsurface *subsurface;
     } tree;
 
+    struct libdecor *decor;
+    struct libdecor_frame *decor_frame;
+
     struct xdg_surface *xdg_surface;
     struct xdg_toplevel *xdg_toplevel;
     struct zxdg_toplevel_decoration_v1 *xdg_decoration;

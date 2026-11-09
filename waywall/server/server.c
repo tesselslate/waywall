@@ -21,6 +21,7 @@
 #include "util/log.h"
 #include "util/prelude.h"
 #include "xwayland-shell-v1-server-protocol.h"
+#include <libdecor.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -144,6 +145,11 @@ backend_display_tick(int fd, uint32_t mask, void *data) {
         return 0;
     }
 
+    if (server->ui && server->ui->decor && libdecor_dispatch(server->ui->decor, 0) < 0) {
+        ww_log(LOG_ERROR, "failed to dispatch window decoration events");
+        wl_display_terminate(server->display);
+        return 0;
+    }
     return num_dispatched > 0;
 }
 

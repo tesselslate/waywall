@@ -10,6 +10,8 @@
 #include <GLES2/gl2.h>
 #include <spng.h>
 
+static struct scene_shader *shader_for_target(struct scene *scene, size_t index, GLuint target);
+
 static constexpr int PACKED_ATLAS_SIZE = 4096;
 static constexpr int PACKED_ATLAS_WIDTH = 2048;
 static constexpr int PACKED_ATLAS_HEIGHT = 16;
@@ -191,23 +193,28 @@ mirror_render(struct scene_object *object) {
     struct scene_mirror *mirror = scene_mirror_from_object(object);
     struct scene *scene = mirror->parent;
 
-    GLuint capture_texture = server_gl_get_capture(scene->gl);
-    if (capture_texture == 0) {
+    struct server_gl_buffer *capture = server_gl_get_capture(scene->gl);
+    if (!capture) {
         return;
     }
 
-    int32_t width, height;
-    server_gl_get_capture_size(scene->gl, &width, &height);
+    GLuint target = server_gl_buffer_get_target(capture);
+    GLuint texture = server_gl_buffer_get_texture(capture);
 
-    server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
-    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size,
-                scene->ui->render_width, scene->ui->render_height);
-    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
+    int32_t width, height;
+    server_gl_buffer_get_size(capture, &width, &height);
+
+    struct scene_shader *shader = shader_for_target(scene, mirror->shader_index, target);
+    if (!shader) {
+        return;
+    }
+    server_gl_shader_use(shader->shader);
+    glUniform2f(shader->shader_u_dst_size, scene->ui->render_width, scene->ui->render_height);
+    glUniform2f(shader->shader_u_src_size, width, height);
 
     gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
-        gl_using_texture(GL_TEXTURE_2D, capture_texture) {
-            // Each mirror has 6 vertices in its vertex buffer.
-            draw_vertex_list(&scene->shaders.data[mirror->shader_index], 6);
+        gl_using_texture(target, texture) {
+            draw_vertex_list(shader, 6);
         }
     }
 }
@@ -394,11 +401,18 @@ draw_stencil(struct scene *scene) {
     // The OpenGL context must be current.
 
     int32_t width, height;
-    GLuint tex = server_gl_get_capture(scene->gl);
-    if (tex == 0) {
+    struct server_gl_buffer *capture = server_gl_get_capture(scene->gl);
+    if (!capture) {
         return;
     }
-    server_gl_get_capture_size(scene->gl, &width, &height);
+    server_gl_buffer_get_size(capture, &width, &height);
+
+    GLuint capture_target = server_gl_buffer_get_target(capture);
+    GLuint capture_texture = server_gl_buffer_get_texture(capture);
+    struct scene_shader *shader = shader_for_target(scene, 0, capture_target);
+    if (!shader) {
+        return;
+    }
 
     // It would be possible to listen for resizes instead of checking whether the stencil buffer
     // needs an update every frame, but that would be more complicated and there is also no event
@@ -445,10 +459,13 @@ draw_stencil(struct scene *scene) {
     struct vtx_shader buf[6];
     rect_build(buf, &(struct box){0, 0, 1, 1}, &dst, (float[4]){}, (float[4]){});
     gl_using_buffer(GL_ARRAY_BUFFER, scene->buffers.stencil_rect) {
-        gl_using_texture(GL_TEXTURE_2D, tex) {
+        gl_using_texture(capture_target, capture_texture) {
             glBufferData(GL_ARRAY_BUFFER, sizeof(buf), buf, GL_STATIC_DRAW);
-            server_gl_shader_use(scene->shaders.data[0].shader);
-            draw_vertex_list(&scene->shaders.data[0], 6);
+            server_gl_shader_use(shader->shader);
+            glUniform2f(shader->shader_u_dst_size, scene->ui->render_width,
+                        scene->ui->render_height);
+            glUniform2f(shader->shader_u_src_size, width, height);
+            draw_vertex_list(shader, 6);
         }
     }
 
@@ -672,19 +689,104 @@ shader_find_index(struct scene *scene, const char *key) {
 }
 
 static bool
-shader_create(struct server_gl *gl, struct scene_shader *data, char *name, const char *vertex,
-              const char *fragment) {
-    data->name = name;
-    data->shader = server_gl_compile(gl, vertex ? vertex : SHADER_VERT_TEXCOPY,
-                                     fragment ? fragment : SHADER_FRAG_TEXCOPY);
+shader_compile(struct server_gl *gl, struct scene_shader *data, const char *vertex,
+               const char *fragment) {
+    data->shader = server_gl_compile(gl, vertex, fragment);
     if (!data->shader) {
         return false;
     }
-
     data->shader_u_src_size = glGetUniformLocation(data->shader->program, "u_src_size");
     data->shader_u_dst_size = glGetUniformLocation(data->shader->program, "u_dst_size");
-
     return true;
+}
+
+static void
+shader_destroy(struct scene_shader *data) {
+    if (data->external) {
+        shader_destroy(data->external);
+        free(data->external);
+    }
+    if (data->shader) {
+        server_gl_shader_destroy(data->shader);
+    }
+    free(data->name);
+    free(data->vertex);
+    free(data->fragment);
+    *data = (struct scene_shader){};
+}
+
+static bool
+shader_create(struct server_gl *gl, struct scene_shader *data, char *name, const char *vertex,
+              const char *fragment) {
+    data->name = name;
+    data->vertex = ww_strdup(vertex ? vertex : SHADER_VERT_TEXCOPY);
+    data->fragment = ww_strdup(fragment ? fragment : SHADER_FRAG_TEXCOPY);
+    return shader_compile(gl, data, data->vertex, data->fragment);
+}
+
+static size_t
+shader_version_length(const char *source) {
+    const char *cursor = source;
+    while (true) {
+        cursor += strspn(cursor, " \t\r\n");
+        if (strncmp(cursor, "//", 2) == 0) {
+            cursor = strchr(cursor, '\n');
+            if (!cursor) {
+                return 0;
+            }
+        } else if (strncmp(cursor, "/*", 2) == 0) {
+            cursor = strstr(cursor + 2, "*/");
+            if (!cursor) {
+                return 0;
+            }
+            cursor += 2;
+        } else {
+            break;
+        }
+    }
+    if (strncmp(cursor, "#version", 8) != 0) {
+        return 0;
+    }
+    const char *newline = strchr(cursor, '\n');
+    return newline ? (size_t)(newline + 1 - source) : strlen(source);
+}
+
+static struct scene_shader *
+shader_for_target(struct scene *scene, size_t index, GLuint target) {
+    struct scene_shader *data = &scene->shaders.data[index];
+    if (target != GL_TEXTURE_EXTERNAL_OES) {
+        return data;
+    }
+    if (data->external_failed) {
+        return nullptr;
+    }
+    if (data->external) {
+        return data->external;
+    }
+
+    // Only imported captures need an external sampler; images and text keep sampler2D.
+    static const char prefix[] = "#extension GL_OES_EGL_image_external : require\n"
+                                 "#define sampler2D samplerExternalOES\n";
+    const char *fragment = data->fragment;
+    size_t version_len = shader_version_length(fragment);
+    // GLSL requires an existing #version directive to precede extension directives.
+    char *external = zalloc(strlen(fragment) + sizeof(prefix) + 1, 1);
+    memcpy(external, fragment, version_len);
+    external[version_len] = '\n';
+    memcpy(external + version_len + 1, prefix, sizeof(prefix) - 1);
+    strcpy(external + version_len + sizeof(prefix), fragment + version_len);
+
+    struct scene_shader *variant = zalloc(1, sizeof(*variant));
+    bool ok = shader_compile(scene->gl, variant, data->vertex, external);
+    free(external);
+    if (!ok) {
+        free(variant);
+        data->external_failed = true;
+        ww_log(LOG_ERROR, "failed to create external sampler for shader %s", data->name);
+        return nullptr;
+    }
+    data->external = variant;
+    return variant;
 }
 
 struct scene *
@@ -704,7 +806,7 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
                scene->image_max_size);
 
         scene->shaders.count = cfg->shaders.count + 1;
-        scene->shaders.data = malloc(sizeof(struct scene_shader) * scene->shaders.count);
+        scene->shaders.data = zalloc(scene->shaders.count, sizeof(*scene->shaders.data));
         if (!shader_create(scene->gl, &scene->shaders.data[0], ww_strdup("default"), nullptr,
                            nullptr)) {
             ww_log(LOG_ERROR, "error creating default shader");
@@ -769,6 +871,12 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
     return scene;
 
 fail_compile_texture_copy:
+    server_gl_with(scene->gl, false) {
+        for (size_t i = 0; i < scene->shaders.count; i++) {
+            shader_destroy(&scene->shaders.data[i]);
+        }
+    }
+    free(scene->shaders.data);
     free(scene);
 
     return nullptr;
@@ -783,8 +891,7 @@ scene_destroy(struct scene *scene) {
 
     server_gl_with(scene->gl, false) {
         for (size_t i = 0; i < scene->shaders.count; i++) {
-            server_gl_shader_destroy(scene->shaders.data[i].shader);
-            free(scene->shaders.data[i].name);
+            shader_destroy(&scene->shaders.data[i]);
         }
 
         glDeleteBuffers(2, (GLuint[]){scene->buffers.debug, scene->buffers.stencil_rect});

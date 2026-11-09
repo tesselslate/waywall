@@ -51,8 +51,13 @@ struct wrap {
     struct wl_listener on_view_destroy;
 };
 
+struct wrap_options {
+    bool allow_mc_x11;
+    bool opengl_debug;
+};
+
 struct wrap *wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *timer,
-                         struct config *cfg, bool allow_mc_x11);
+                         struct config *cfg, struct wrap_options *options);
 void wrap_destroy(struct wrap *wrap);
 int wrap_set_config(struct wrap *wrap, struct config *cfg);
 
@@ -61,3 +66,6 @@ void wrap_lua_press_key(struct wrap *wrap, uint32_t keycode);
 int wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height);
 void wrap_lua_show_floating(struct wrap *wrap, bool show);
 void wrap_lua_toggle_fullscreen(struct wrap *wrap);
+
+// A negative show queries visibility; a return value of -1 means no matching window.
+int wrap_lua_window_visible(struct wrap *wrap, const char *title, int show, bool focus);

@@ -43,6 +43,7 @@
     - [state](02_waywall_state.md)
     - [text](02_waywall_text.md)
     - [toggle_fullscreen](02_waywall_toggle_fullscreen.md)
+    - [window_visible](02_waywall_window_visible.md)
   - [waywall.helpers](02_helpers.md)
     - [ingame_only](02_helpers_ingame_only.md)
     - [res_image](02_helpers_res_image.md)

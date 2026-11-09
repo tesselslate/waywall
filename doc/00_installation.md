@@ -95,6 +95,7 @@ distribution's package repositories:
 
   - `egl`
   - `glesv2`
+  - `libdecor`
   - `luajit`
   - `spng`
   - `wayland-client`
