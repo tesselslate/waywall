@@ -6,7 +6,7 @@ pkgdesc="Wayland compositor for Minecraft speedrunning"
 arch=(x86_64)
 url="https://github.com/tesselslate/waywall"
 license=(GPL3)
-depends=(libegl libgles luajit libspng wayland libxcb libxkbcommon xorg-xwayland)
+depends=(libdecor libegl libgles luajit libspng wayland libxcb libxkbcommon xorg-xwayland)
 makedepends=(wayland-protocols meson git)
 source=()
 

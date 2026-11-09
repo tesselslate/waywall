@@ -5,8 +5,8 @@ Summary:        Wayland compositor for Minecraft speedrunning
 License:        GPL-3.0-or-later AND zlib
 URL:            https://github.com/tesselslate/waywall
 
-BuildRequires:  wayland-protocols-devel meson gcc git rpm-build cmake
-Requires:       egl-wayland mesa-libEGL mesa-libGLES luajit libspng libwayland-client libwayland-server libwayland-cursor libwayland-egl libxcb libxkbcommon xorg-x11-server-Xwayland
+BuildRequires:  libdecor-devel wayland-protocols-devel meson gcc git rpm-build cmake
+Requires:       libdecor egl-wayland mesa-libEGL mesa-libGLES luajit libspng libwayland-client libwayland-server libwayland-cursor libwayland-egl libxcb libxkbcommon xorg-x11-server-Xwayland
 
 %description
 Waywall is a Wayland compositor designed for Minecraft speedrunning.

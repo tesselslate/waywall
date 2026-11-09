@@ -55,6 +55,7 @@ xwayland = dependency('xwayland')
 waywall_deps = [
   cc.find_library('m'),
   dependency('threads'),
+  dependency('libdecor-0'),
 
   luajit,
   wayland_client,

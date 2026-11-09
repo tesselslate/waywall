@@ -16,6 +16,7 @@
 #include "viewporter-client-protocol.h"
 #include "xdg-decoration-unstable-v1-client-protocol.h"
 #include "xdg-shell-client-protocol.h"
+#include <libdecor.h>
 #include <linux/memfd.h>
 #include <stdlib.h>
 #include <sys/mman.h>
@@ -317,6 +318,68 @@ static const struct xdg_surface_listener xdg_surface_listener = {
 };
 
 static void
+decor_error(struct libdecor *context, enum libdecor_error error, const char *message) {
+    ww_log(LOG_ERROR, "window decoration error: %s", message);
+}
+
+static struct libdecor_interface decor_interface = {.error = decor_error};
+
+static void
+decor_configure(struct libdecor_frame *frame, struct libdecor_configuration *configuration,
+                void *data) {
+    struct server_ui *ui = data;
+    int width = ui->width > 0 ? ui->width : DEFAULT_WIDTH;
+    int height = ui->height > 0 ? ui->height : DEFAULT_HEIGHT;
+    enum libdecor_window_state state = LIBDECOR_WINDOW_STATE_NONE;
+    libdecor_configuration_get_window_state(configuration, &state);
+    int suggested_width = 0, suggested_height = 0;
+    libdecor_configuration_get_content_size(configuration, frame, &suggested_width,
+                                            &suggested_height);
+    if (suggested_width > 0) {
+        width = suggested_width;
+    }
+    if (suggested_height > 0) {
+        height = suggested_height;
+    }
+    ui->width = width;
+    ui->height = height;
+    ui->fullscreen = !!(state & LIBDECOR_WINDOW_STATE_FULLSCREEN);
+    if (ui->fullscreen && ui->fullscreen_width > 0 && ui->fullscreen_height > 0) {
+        ui->render_width = ui->fullscreen_width;
+        ui->render_height = ui->fullscreen_height;
+    } else {
+        ui->render_width = width;
+        ui->render_height = height;
+    }
+    struct libdecor_state *content = libdecor_state_new(width, height);
+    check_alloc(content);
+    libdecor_frame_commit(frame, content, configuration);
+    libdecor_state_free(content);
+    wp_viewport_set_destination(ui->root.viewport, width, height);
+    ui->configured = true;
+    wl_signal_emit_mutable(&ui->events.resize, nullptr);
+    wl_surface_commit(ui->root.surface);
+}
+
+static void
+decor_close(struct libdecor_frame *frame, void *data) {
+    struct server_ui *ui = data;
+    wl_signal_emit_mutable(&ui->events.close, nullptr);
+}
+
+static void
+decor_commit(struct libdecor_frame *frame, void *data) {
+    struct server_ui *ui = data;
+    wl_surface_commit(ui->root.surface);
+}
+
+static struct libdecor_frame_interface decor_frame_interface = {
+    .configure = decor_configure,
+    .close = decor_close,
+    .commit = decor_commit,
+};
+
+static void
 on_view_surface_commit(struct wl_listener *listener, void *data) {
     struct server_view *view = wl_container_of(listener, view, on_surface_commit);
 
@@ -338,6 +401,17 @@ on_view_surface_commit(struct wl_listener *listener, void *data) {
 
     if (view->subsurface && view->current.centered) {
         layout_centered(view);
+    }
+}
+
+static void
+destroy_toplevel(struct server_ui *ui) {
+    if (ui->decor_frame) {
+        libdecor_frame_unref(ui->decor_frame);
+        libdecor_unref(ui->decor);
+    } else {
+        xdg_toplevel_destroy(ui->xdg_toplevel);
+        xdg_surface_destroy(ui->xdg_surface);
     }
 }
 
@@ -377,24 +451,37 @@ server_ui_create(struct server *server, struct config *cfg) {
 
     wl_subsurface_set_desync(ui->tree.subsurface);
 
-    ui->xdg_surface = xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->root.surface);
-    check_alloc(ui->xdg_surface);
-    xdg_surface_add_listener(ui->xdg_surface, &xdg_surface_listener, ui);
+    if (!server->backend->xdg_decoration_manager) {
+        ui->decor = libdecor_new(server->backend->display, &decor_interface);
+        check_alloc(ui->decor);
+        ui->decor_frame =
+            libdecor_decorate(ui->decor, ui->root.surface, &decor_frame_interface, ui);
+        check_alloc(ui->decor_frame);
+        libdecor_frame_set_title(ui->decor_frame, "waywall");
+        libdecor_frame_set_app_id(ui->decor_frame, "waywall");
+        ui->xdg_surface = libdecor_frame_get_xdg_surface(ui->decor_frame);
+        ui->xdg_toplevel = libdecor_frame_get_xdg_toplevel(ui->decor_frame);
+    } else {
+        ui->xdg_surface =
+            xdg_wm_base_get_xdg_surface(server->backend->xdg_wm_base, ui->root.surface);
+        check_alloc(ui->xdg_surface);
+        xdg_surface_add_listener(ui->xdg_surface, &xdg_surface_listener, ui);
 
-    ui->xdg_toplevel = xdg_surface_get_toplevel(ui->xdg_surface);
-    check_alloc(ui->xdg_toplevel);
-    xdg_toplevel_add_listener(ui->xdg_toplevel, &xdg_toplevel_listener, ui);
+        ui->xdg_toplevel = xdg_surface_get_toplevel(ui->xdg_surface);
+        check_alloc(ui->xdg_toplevel);
+        xdg_toplevel_add_listener(ui->xdg_toplevel, &xdg_toplevel_listener, ui);
 
-    xdg_toplevel_set_title(ui->xdg_toplevel, "waywall");
-    xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
+        xdg_toplevel_set_title(ui->xdg_toplevel, "waywall");
+        xdg_toplevel_set_app_id(ui->xdg_toplevel, "waywall");
 
-    if (server->backend->xdg_decoration_manager) {
-        ui->xdg_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
-            server->backend->xdg_decoration_manager, ui->xdg_toplevel);
-        check_alloc(ui->xdg_decoration);
+        if (server->backend->xdg_decoration_manager) {
+            ui->xdg_decoration = zxdg_decoration_manager_v1_get_toplevel_decoration(
+                server->backend->xdg_decoration_manager, ui->xdg_toplevel);
+            check_alloc(ui->xdg_decoration);
 
-        zxdg_toplevel_decoration_v1_set_mode(ui->xdg_decoration,
-                                             ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+            zxdg_toplevel_decoration_v1_set_mode(ui->xdg_decoration,
+                                                 ZXDG_TOPLEVEL_DECORATION_V1_MODE_SERVER_SIDE);
+        }
     }
 
     wl_list_init(&ui->views);
@@ -421,8 +508,7 @@ fail_config:
         zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
     }
 
-    xdg_toplevel_destroy(ui->xdg_toplevel);
-    xdg_surface_destroy(ui->xdg_surface);
+    destroy_toplevel(ui);
     wl_subsurface_destroy(ui->tree.subsurface);
     wl_surface_destroy(ui->tree.surface);
     bg_buffer_destroy(ui->tree.buffer);
@@ -444,8 +530,7 @@ server_ui_destroy(struct server_ui *ui) {
         zxdg_toplevel_decoration_v1_destroy(ui->xdg_decoration);
     }
 
-    xdg_toplevel_destroy(ui->xdg_toplevel);
-    xdg_surface_destroy(ui->xdg_surface);
+    destroy_toplevel(ui);
     wl_subsurface_destroy(ui->tree.subsurface);
     wl_surface_destroy(ui->tree.surface);
     bg_buffer_destroy(ui->tree.buffer);
@@ -473,7 +558,13 @@ server_ui_set_fullscreen(struct server_ui *ui, bool fullscreen) {
         return;
     }
 
-    if (fullscreen) {
+    if (ui->decor_frame) {
+        if (fullscreen) {
+            libdecor_frame_set_fullscreen(ui->decor_frame, nullptr);
+        } else {
+            libdecor_frame_unset_fullscreen(ui->decor_frame);
+        }
+    } else if (fullscreen) {
         xdg_toplevel_set_fullscreen(ui->xdg_toplevel, nullptr);
     } else {
         xdg_toplevel_unset_fullscreen(ui->xdg_toplevel);
@@ -489,14 +580,21 @@ server_ui_show(struct server_ui *ui) {
 
     struct wl_display *display = ui->server->backend->display;
 
-    wl_surface_attach(ui->root.surface, nullptr, 0, 0);
-    wl_surface_commit(ui->root.surface);
+    if (ui->decor_frame) {
+        libdecor_frame_map(ui->decor_frame);
+    } else {
+        wl_surface_attach(ui->root.surface, nullptr, 0, 0);
+        wl_surface_commit(ui->root.surface);
+    }
     wl_display_roundtrip(display);
 
     // HACK: We need to wait until the toplevel has received a configure event to be able to attach
     // a buffer, but on some compositors (e.g. newer, non-monolithic versions of river) it may take
     // the compositor some time to send a configure event.
     while (!ui->configured) {
+        if (ui->decor) {
+            libdecor_dispatch(ui->decor, 0);
+        }
         wl_display_roundtrip(display);
         nanosleep(&(struct timespec){.tv_nsec = 10'000'000}, nullptr);
     }
