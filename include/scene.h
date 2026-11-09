@@ -51,6 +51,9 @@ struct scene {
 };
 
 struct scene_shader {
+    struct scene_shader *external;
+    char *vertex, *fragment;
+    bool external_failed;
     struct server_gl_shader *shader;
     int shader_u_src_size, shader_u_dst_size;
 
