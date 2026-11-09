@@ -66,3 +66,6 @@ void wrap_lua_press_key(struct wrap *wrap, uint32_t keycode);
 int wrap_lua_set_res(struct wrap *wrap, int32_t width, int32_t height);
 void wrap_lua_show_floating(struct wrap *wrap, bool show);
 void wrap_lua_toggle_fullscreen(struct wrap *wrap);
+
+// A negative show queries visibility; a return value of -1 means no matching window.
+int wrap_lua_window_visible(struct wrap *wrap, const char *title, int show, bool focus);

@@ -77,10 +77,6 @@ floating_find_anchored(struct wrap *wrap) {
 
 static void
 floating_set_visible(struct wrap *wrap, bool visible) {
-    if (wrap->floating.visible == visible) {
-        return;
-    }
-
     wrap->floating.visible = visible;
 
     struct floating_view *fview;
@@ -178,6 +174,9 @@ static struct floating_view *
 floating_view_at(struct wrap *wrap, double x, double y) {
     struct floating_view *fview;
     wl_list_for_each (fview, &wrap->floating.views, link) {
+        if (!fview->view->current.visible) {
+            continue;
+        }
         struct server_buffer *buffer = server_surface_next_buffer(fview->view->surface);
         if (!buffer) {
             continue;
@@ -483,12 +482,7 @@ on_button(void *data, uint32_t button, bool pressed) {
         return false;
     }
 
-    // If a window grab should start, then start it. Otherwise, focus the window that the user
-    // clicked. (Only happens when the floating view is visible)
-    if (!wrap->floating.visible) {
-        return false;
-    }
-
+    // floating_view_at excludes hidden windows, including per-window visibility overrides.
     if (should_grab && !IS_ANCHORED(wrap, fview)) {
         wrap->floating.grab = fview;
         wrap->floating.grab_x = wrap->input.x - fview->x;
@@ -729,4 +723,31 @@ wrap_lua_show_floating(struct wrap *wrap, bool show) {
 void
 wrap_lua_toggle_fullscreen(struct wrap *wrap) {
     server_ui_set_fullscreen(wrap->server->ui, !wrap->server->ui->fullscreen);
+}
+
+int
+wrap_lua_window_visible(struct wrap *wrap, const char *title, int show, bool focus) {
+    struct floating_view *fview;
+    wl_list_for_each (fview, &wrap->floating.views, link) {
+        char *actual = server_view_get_title(fview->view);
+        bool matches = actual && strcmp(actual, title) == 0;
+        free(actual);
+        if (!matches) {
+            continue;
+        }
+        if (show >= 0) {
+            if (!show && wrap->floating.grab == fview) {
+                wrap->floating.grab = nullptr;
+            }
+            server_view_set_visible(fview->view, show != 0);
+            server_view_commit(fview->view);
+            if (show && focus) {
+                server_set_input_focus(wrap->server, fview->view);
+            } else if (!show && server_view_has_focus(fview->view) && wrap->view) {
+                server_set_input_focus(wrap->server, wrap->view);
+            }
+        }
+        return fview->view->current.visible;
+    }
+    return -1;
 }
