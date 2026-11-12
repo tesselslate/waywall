@@ -77,7 +77,7 @@ on whether you are on PrismLauncher or MultiMC.
 
 You can configure your instance to use the patched version of GLFW by opening
 its settings (with the `Edit` button on the right pane) and going to `Settings`
--> `Workarounds`. Then, enable `Native libraries` and `Use system installation
+-> `Workarounds` or `Settings` -> `Tweaks` depending on your version. Then, enable `Native libraries` and `Use system installation
 of GLFW`. Finally, enter the path to the patched `libglfw.so` you just compiled
 or installed.
 
@@ -89,7 +89,10 @@ or installed.
 > If you are using Prism Launcher installed from Nixpkgs, you must leave the path
 > field empty to automatically use the patched GLFW.
 
-![The Prism Launcher menu for enabling patched GLFW](assets/prism-glfw.png)
+| Old version | New version |
+| :---: | :---: |
+| ![old version](assets/prism-glfw.png) | ![new version](assets/prism-glfw-new-version.png) |
+
 
 ### MultiMC
 
