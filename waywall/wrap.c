@@ -446,10 +446,12 @@ on_button(void *data, uint32_t button, bool pressed) {
         action.type = CONFIG_ACTION_BUTTON;
         action.data = button;
         action.modifiers = wrap->input.modifiers;
+        action.release = !pressed;
 
         ssize_t idx = config_find_action(wrap->cfg, &action);
         if (idx >= 0) {
-            if (config_vm_try_action(wrap->cfg->vm, idx)) {
+            bool consumed = config_vm_try_action(wrap->cfg->vm, idx);
+            if (pressed && consumed) {
                 return true;
             }
         }
@@ -505,20 +507,18 @@ static bool
 on_key(void *data, size_t num_syms, const xkb_keysym_t syms[static num_syms], bool pressed) {
     struct wrap *wrap = data;
 
-    if (!pressed) {
-        return false;
-    }
-
     struct config_action action = {};
     action.type = CONFIG_ACTION_KEY;
     action.modifiers = wrap->input.modifiers;
+    action.release = !pressed;
 
     for (size_t i = 0; i < num_syms; i++) {
         action.data = syms[i];
 
         ssize_t idx = config_find_action(wrap->cfg, &action);
         if (idx >= 0) {
-            if (config_vm_try_action(wrap->cfg->vm, idx)) {
+            bool consumed = config_vm_try_action(wrap->cfg->vm, idx);
+            if (pressed && consumed) {
                 return true;
             }
         }
