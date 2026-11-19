@@ -15,6 +15,7 @@ struct config {
     struct {
         int32_t fullscreen_width;
         int32_t fullscreen_height;
+        bool inhibit_keyboard_shortcuts;
     } window;
 
     struct {
