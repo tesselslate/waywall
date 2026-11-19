@@ -1,3 +1,4 @@
+#include <time.h>
 #include "scene.h"
 #include "server/gl.h"
 #include "server/ui.h"
@@ -89,10 +90,10 @@ static void object_add(struct scene *scene, struct scene_object *object,
                        enum scene_object_type type);
 static void object_list_destroy(struct wl_list *list);
 static void object_release(struct scene_object *object);
-static void object_render(struct scene_object *object);
+static void object_render(struct scene_object *object, long frame_time);
 static void object_sort(struct scene *scene, struct scene_object *object);
 
-static void draw_debug_text(struct scene *scene);
+static void draw_debug_text(struct scene *scene, long frame_time);
 static void draw_frame(struct scene *scene);
 static void draw_vertex_list(struct scene_shader *shader, size_t num_vertices);
 static void rect_build(struct vtx_shader out[static 6], const struct box *src,
@@ -135,21 +136,22 @@ image_release(struct scene_object *object) {
 }
 
 static void
-image_render(struct scene_object *object) {
+image_render(struct scene_object *object, long frame_time) {
     // The OpenGL context must be current.
     struct scene_image *image = scene_image_from_object(object);
     struct scene *scene = image->parent;
 
-    server_gl_shader_use(scene->shaders.data[image->shader_index].shader);
-    glUniform2f(scene->shaders.data[image->shader_index].shader_u_dst_size, scene->ui->render_width,
+    struct scene_shader *scene_shader = &scene->shaders.data[image->shader_index];
+    server_gl_shader_use(scene_shader->shader);
+    glUniform2f(scene_shader->shader_u_dst_size, scene->ui->render_width,
                 scene->ui->render_height);
-    glUniform2f(scene->shaders.data[image->shader_index].shader_u_src_size, image->width,
-                image->height);
+    glUniform2f(scene_shader->shader_u_src_size, image->width, image->height);
+    glUniform1i(scene_shader->shader_u_time, (int)frame_time);
 
     gl_using_buffer(GL_ARRAY_BUFFER, image->vbo) {
         gl_using_texture(GL_TEXTURE_2D, image->tex) {
             // Each image has 6 vertices in its vertex buffer.
-            draw_vertex_list(&scene->shaders.data[image->shader_index], 6);
+            draw_vertex_list(scene_shader, 6);
         }
     }
 }
@@ -185,7 +187,7 @@ mirror_release(struct scene_object *object) {
 }
 
 static void
-mirror_render(struct scene_object *object) {
+mirror_render(struct scene_object *object, long frame_time) {
     // The OpenGL context must be current.
 
     struct scene_mirror *mirror = scene_mirror_from_object(object);
@@ -199,15 +201,18 @@ mirror_render(struct scene_object *object) {
     int32_t width, height;
     server_gl_get_capture_size(scene->gl, &width, &height);
 
-    server_gl_shader_use(scene->shaders.data[mirror->shader_index].shader);
-    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_dst_size,
-                scene->ui->render_width, scene->ui->render_height);
-    glUniform2f(scene->shaders.data[mirror->shader_index].shader_u_src_size, width, height);
+    struct scene_shader *scene_shader = &scene->shaders.data[mirror->shader_index];
+    server_gl_shader_use(scene_shader->shader);
+    glUniform2f(scene_shader->shader_u_dst_size, scene->ui->render_width,
+                scene->ui->render_height);
+    glUniform2f(scene_shader->shader_u_src_size, width, height);
+    glUniform2f(scene_shader->shader_u_src_size, width, height);
+    glUniform1i(scene_shader->shader_u_time, (int)frame_time);
 
     gl_using_buffer(GL_ARRAY_BUFFER, mirror->vbo) {
         gl_using_texture(GL_TEXTURE_2D, capture_texture) {
             // Each mirror has 6 vertices in its vertex buffer.
-            draw_vertex_list(&scene->shaders.data[mirror->shader_index], 6);
+            draw_vertex_list(scene_shader, 6);
         }
     }
 }
@@ -278,21 +283,22 @@ text_release(struct scene_object *object) {
 }
 
 static void
-text_render(struct scene_object *object) {
+text_render(struct scene_object *object, long frame_time) {
     // The OpenGL context must be current.
 
     struct scene_text *text = scene_text_from_object(object);
     struct scene *scene = text->parent;
 
-    server_gl_shader_use(scene->shaders.data[text->shader_index].shader);
-    glUniform2f(scene->shaders.data[text->shader_index].shader_u_dst_size, scene->ui->render_width,
+    struct scene_shader *scene_shader = &scene->shaders.data[text->shader_index];
+    server_gl_shader_use(scene_shader->shader);
+    glUniform2f(scene_shader->shader_u_dst_size, scene->ui->render_width,
                 scene->ui->render_height);
-    glUniform2f(scene->shaders.data[text->shader_index].shader_u_src_size, ATLAS_WIDTH,
-                ATLAS_HEIGHT);
+    glUniform2f(scene_shader->shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
+    glUniform1i(scene_shader->shader_u_time, (int)frame_time);
 
     gl_using_buffer(GL_ARRAY_BUFFER, text->vbo) {
         gl_using_texture(GL_TEXTURE_2D, scene->buffers.font_tex) {
-            draw_vertex_list(&scene->shaders.data[text->shader_index], text->vtxcount);
+            draw_vertex_list(scene_shader, text->vtxcount);
         }
     }
 }
@@ -341,16 +347,16 @@ object_release(struct scene_object *object) {
 }
 
 static void
-object_render(struct scene_object *object) {
+object_render(struct scene_object *object, long frame_time) {
     switch (object->type) {
     case SCENE_OBJECT_IMAGE:
-        image_render(object);
+        image_render(object, frame_time);
         break;
     case SCENE_OBJECT_MIRROR:
-        mirror_render(object);
+        mirror_render(object, frame_time);
         break;
     case SCENE_OBJECT_TEXT:
-        text_render(object);
+        text_render(object, frame_time);
         break;
     }
 }
@@ -458,12 +464,13 @@ draw_stencil(struct scene *scene) {
 }
 
 static void
-draw_debug_text(struct scene *scene) {
+draw_debug_text(struct scene *scene, long frame_time) {
     // The OpenGL context must be current.
     server_gl_shader_use(scene->shaders.data[0].shader);
     glUniform2f(scene->shaders.data[0].shader_u_dst_size, scene->ui->render_width,
                 scene->ui->render_height);
     glUniform2f(scene->shaders.data[0].shader_u_src_size, ATLAS_WIDTH, ATLAS_HEIGHT);
+    glUniform1i(scene->shaders.data[0].shader_u_time, (int)frame_time);
 
     const char *str = util_debug_str();
     scene->buffers.debug_vtxcount = text_build(
@@ -521,6 +528,12 @@ draw_frame(struct scene *scene) {
     glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
     glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
 
+    struct timespec cur_time;
+    clock_gettime(CLOCK_MONOTONIC, &cur_time);
+    // frame time in milliseconds
+    long abs_frame_time = cur_time.tv_sec * 1000 + cur_time.tv_nsec / 1'000'000;
+    long frame_time = abs_frame_time - scene->frame_time_base;
+
     struct scene_object *object;
     glEnable(GL_STENCIL_TEST);
     wl_list_for_each (object, &scene->objects.sorted, link) {
@@ -528,27 +541,27 @@ draw_frame(struct scene *scene) {
             break;
         }
 
-        object_render(object);
+        object_render(object, frame_time);
     }
     glDisable(GL_STENCIL_TEST);
 
     wl_list_for_each (object, &scene->objects.unsorted_mirrors, link) {
-        mirror_render(object);
+        mirror_render(object, frame_time);
     }
     wl_list_for_each (object, &scene->objects.unsorted_images, link) {
-        image_render(object);
+        image_render(object, frame_time);
     }
     wl_list_for_each (object, &scene->objects.unsorted_text, link) {
-        text_render(object);
+        text_render(object, frame_time);
     }
     wl_list_for_each (object, &scene->objects.sorted, link) {
         if (object->depth >= 0) {
-            object_render(object);
+            object_render(object, frame_time);
         }
     }
 
     if (util_debug_enabled) {
-        draw_debug_text(scene);
+        draw_debug_text(scene, frame_time);
     }
 
     glUseProgram(0);
@@ -683,6 +696,7 @@ shader_create(struct server_gl *gl, struct scene_shader *data, char *name, const
 
     data->shader_u_src_size = glGetUniformLocation(data->shader->program, "u_src_size");
     data->shader_u_dst_size = glGetUniformLocation(data->shader->program, "u_dst_size");
+    data->shader_u_time = glGetUniformLocation(data->shader->program, "u_time");
 
     return true;
 }
@@ -765,6 +779,11 @@ scene_create(struct config *cfg, struct server_gl *gl, struct server_ui *ui) {
     wl_list_init(&scene->objects.unsorted_images);
     wl_list_init(&scene->objects.unsorted_mirrors);
     wl_list_init(&scene->objects.unsorted_text);
+
+    // Set the frame time base (in milliseconds)
+    struct timespec cur_time;
+    clock_gettime(CLOCK_MONOTONIC, &cur_time);
+    scene->frame_time_base = cur_time.tv_sec * 1000 + cur_time.tv_nsec / 1'000'000;
 
     return scene;
 
