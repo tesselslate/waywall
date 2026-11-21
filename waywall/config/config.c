@@ -341,6 +341,7 @@ parse_ninb_anchor(const char *input, enum floating_anchor *out) {
         [ANCHOR_RIGHT] = "right",
         [ANCHOR_BOTTOMLEFT] = "bottomleft",
         [ANCHOR_BOTTOMRIGHT] = "bottomright",
+        [ANCHOR_NONE] = "",
     };
 
     for (size_t i = 0; i < STATIC_ARRLEN(anchor_names); i++) {
