@@ -85,6 +85,13 @@ log_wl_version() {
     ww_log(LOG_INFO, "libwayland version: %s", WAYLAND_VERSION);
 }
 
+static void
+log_host_compositor() {
+    const char *xdg_session_desktop = getenv("XDG_SESSION_DESKTOP");
+
+    ww_log(LOG_INFO, "XDG_SESSION_DESKTOP: %s", xdg_session_desktop ? xdg_session_desktop : "undefined");
+}
+
 void
 sysinfo_dump_log() {
     ww_log(LOG_INFO, "---- SYSTEM INFO");
@@ -93,6 +100,7 @@ sysinfo_dump_log() {
     log_max_files();
     log_inotify_limits();
     log_wl_version();
+    log_host_compositor();
 
     ww_log(LOG_INFO, "---- END SYSTEM INFO");
 }

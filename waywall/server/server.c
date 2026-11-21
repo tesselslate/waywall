@@ -315,6 +315,7 @@ server_use_config(struct server *server, struct server_config *config) {
     server_ui_use_config(server->ui, config->ui);
 
     server->relative_pointer->config.sens = config->sens;
+    server->relative_pointer->config.raw_sens = config->raw_sens;
     server_pointer_constraints_set_confine(server->pointer_constraints, config->confine);
 
     config->applied = true;
@@ -326,6 +327,7 @@ server_config_create(struct server *server, struct config *cfg) {
 
     config->confine = cfg->input.confine;
     config->sens = cfg->input.sens;
+    config->raw_sens = cfg->input.raw_sens;
 
     config->cursor = server_cursor_config_create(server->cursor, cfg);
     if (!config->cursor) {

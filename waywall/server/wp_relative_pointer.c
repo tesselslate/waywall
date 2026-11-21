@@ -35,8 +35,8 @@ on_relative_pointer_relative_motion(void *data, struct zwp_relative_pointer_v1 *
     double y = trunc(relative_pointer->acc_y);
     relative_pointer->acc_y -= y;
 
-    relative_pointer->acc_x_unaccel += wl_fixed_to_double(dx_unaccel);
-    relative_pointer->acc_y_unaccel += wl_fixed_to_double(dy_unaccel);
+    relative_pointer->acc_x_unaccel += wl_fixed_to_double(dx_unaccel) * relative_pointer->config.raw_sens;
+    relative_pointer->acc_y_unaccel += wl_fixed_to_double(dy_unaccel) * relative_pointer->config.raw_sens;
 
     double x_unaccel = trunc(relative_pointer->acc_x_unaccel);
     relative_pointer->acc_x_unaccel -= x_unaccel;
@@ -197,10 +197,16 @@ server_relative_pointer_create(struct server *server, struct config *cfg) {
     wl_display_add_destroy_listener(server->display, &relative_pointer->on_display_destroy);
 
     relative_pointer->config.sens = cfg->input.sens;
+    relative_pointer->config.raw_sens = cfg->input.raw_sens;
     return relative_pointer;
 }
 
 void
 server_relative_pointer_set_sens(struct server_relative_pointer *relative_pointer, double sens) {
     relative_pointer->config.sens = sens;
+}
+
+void
+server_relative_pointer_set_raw_sens(struct server_relative_pointer *relative_pointer, double sens) {
+    relative_pointer->config.raw_sens = sens;
 }

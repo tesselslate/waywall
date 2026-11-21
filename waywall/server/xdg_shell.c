@@ -245,8 +245,11 @@ xdg_toplevel_set_min_size(struct wl_client *client, struct wl_resource *resource
 static void
 xdg_toplevel_set_parent(struct wl_client *client, struct wl_resource *resource,
                         struct wl_resource *toplevel_resource) {
-    // Unused.
-    wl_client_post_implementation_error(client, "xdg_toplevel.set_parent is not supported");
+    // SDL sends xdg_toplevel::set_parent(null) on startup,
+    // which is a no-op if no parent is already set.
+    if (toplevel_resource != nullptr) {
+        wl_client_post_implementation_error(client, "xdg_toplevel.set_parent is not supported");
+    }
 }
 
 static void

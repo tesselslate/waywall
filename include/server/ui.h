@@ -33,7 +33,7 @@ struct server_ui {
     int32_t width, height;
     int32_t render_width, render_height;
     int32_t fullscreen_width, fullscreen_height;
-    bool mapped, resize, fullscreen;
+    bool mapped, configured, resize, fullscreen;
 
     struct wl_list views; // server_view.link
 

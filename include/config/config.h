@@ -38,6 +38,7 @@ struct config {
 
         int repeat_rate, repeat_delay;
         double sens;
+        double raw_sens;
         bool confine;
     } input;
     struct {

@@ -6,7 +6,7 @@ arguments or performing shell substitutions will require you to run a shell
 script.
 
 If the spawned subprocess does not exit before waywall, it will be killed with
-`SIGKILL` when waywall closes.
+`SIGTERM` when waywall closes.
 
 ### Arguments
 
