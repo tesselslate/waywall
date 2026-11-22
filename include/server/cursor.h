@@ -12,11 +12,14 @@ struct server_cursor {
     struct wl_surface *surface;
     uint32_t last_enter;
     bool show;
+    bool unfocused; // waywall lost keyboard focus: show the cursor regardless of `show`
 
     struct wp_cursor_shape_device_v1 *shape_device;
 
     struct wl_listener on_pointer;
     struct wl_listener on_pointer_enter;
+    struct wl_listener on_keyboard_enter;
+    struct wl_listener on_keyboard_leave;
 };
 
 struct server_cursor_config {

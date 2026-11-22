@@ -40,6 +40,10 @@ struct server_seat {
 
         uint8_t mod_indices[8];
         struct list_uint32 pressed;
+
+        // The host compositor took keyboard focus away from waywall (Alt+Tab etc.). The
+        // focused client was sent wl_keyboard.leave and gets enter again when it comes back.
+        bool remote_unfocused;
     } keyboard;
     struct {
         struct wl_pointer *remote;

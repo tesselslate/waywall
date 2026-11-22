@@ -289,6 +289,18 @@ on_close(struct wl_listener *listener, void *data) {
 }
 
 static void
+on_keyboard_enter(struct wl_listener *listener, void *data) {
+    struct wrap *wrap = wl_container_of(listener, wrap, on_keyboard_enter);
+    config_vm_signal_event(wrap->cfg->vm, "focus");
+}
+
+static void
+on_keyboard_leave(struct wl_listener *listener, void *data) {
+    struct wrap *wrap = wl_container_of(listener, wrap, on_keyboard_leave);
+    config_vm_signal_event(wrap->cfg->vm, "unfocus");
+}
+
+static void
 on_pointer_lock(struct wl_listener *listener, void *data) {
     struct wrap *wrap = wl_container_of(listener, wrap, on_pointer_lock);
     server_cursor_hide(wrap->server->cursor);
@@ -593,6 +605,11 @@ wrap_create(struct server *server, struct inotify *inotify, struct ww_timer *tim
     wrap->on_close.notify = on_close;
     wl_signal_add(&server->ui->events.close, &wrap->on_close);
 
+    wrap->on_keyboard_enter.notify = on_keyboard_enter;
+    wl_signal_add(&server->seat->events.keyboard_enter, &wrap->on_keyboard_enter);
+    wrap->on_keyboard_leave.notify = on_keyboard_leave;
+    wl_signal_add(&server->seat->events.keyboard_leave, &wrap->on_keyboard_leave);
+
     wrap->on_pointer_lock.notify = on_pointer_lock;
     wl_signal_add(&server->events.pointer_lock, &wrap->on_pointer_lock);
 
@@ -639,6 +656,8 @@ wrap_destroy(struct wrap *wrap) {
     }
 
     wl_list_remove(&wrap->on_close.link);
+    wl_list_remove(&wrap->on_keyboard_enter.link);
+    wl_list_remove(&wrap->on_keyboard_leave.link);
     wl_list_remove(&wrap->on_pointer_lock.link);
     wl_list_remove(&wrap->on_pointer_unlock.link);
     wl_list_remove(&wrap->on_resize.link);

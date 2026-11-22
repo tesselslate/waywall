@@ -10,6 +10,7 @@
 #include "server/server.h"
 #include "server/ui.h"
 #include "server/wl_seat.h"
+#include "server/wp_pointer_constraints.h"
 #include "server/wp_relative_pointer.h"
 #include "timer.h"
 #include "util/alloc.h"
@@ -979,6 +980,25 @@ l_spawn(lua_State *L) {
 }
 
 static int
+l_pointer_offset(lua_State *L) {
+    struct config_vm *vm = config_vm_from(L);
+    struct wrap *wrap = config_vm_get_wrap(vm);
+    if (!wrap) {
+        return luaL_error(L, STARTUP_ERRMSG("pointer_offset"));
+    }
+    lua_settop(L, 0);
+
+    // While locked, the pointer stays where the lock started, which is seat->pointer.
+    if (!wrap->server->pointer_constraints->locked) {
+        lua_pushnil(L);
+        return 1;
+    }
+    lua_pushnumber(L, wrap->server->ui->width / 2.0 - wrap->server->seat->pointer.x);
+    lua_pushnumber(L, wrap->server->ui->height / 2.0 - wrap->server->seat->pointer.y);
+    return 2;
+}
+
+static int
 l_state(lua_State *L) {
     static constexpr int IDX_STATE = 1;
 
@@ -1294,6 +1314,7 @@ static const struct luaL_Reg lua_lib[] = {
     {"show_floating", l_show_floating},
     {"sleep", l_sleep},
     {"state", l_state},
+    {"pointer_offset", l_pointer_offset},
     {"text", l_text},
     {"toggle_fullscreen", l_toggle_fullscreen},
 

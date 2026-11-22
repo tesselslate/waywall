@@ -13,6 +13,9 @@ struct server_pointer_constraints {
     } config;
 
     bool locked;
+    // waywall lost keyboard focus while locked: the remote lock was released so the host
+    // compositor puts the pointer at the hint (window centre); it's taken again on focus.
+    bool suspended;
     struct {
         double x, y;
     } hint;
@@ -26,6 +29,8 @@ struct server_pointer_constraints {
 
     struct wl_listener on_input_focus;
     struct wl_listener on_pointer;
+    struct wl_listener on_keyboard_enter;
+    struct wl_listener on_keyboard_leave;
 
     struct wl_listener on_display_destroy;
 };
