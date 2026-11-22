@@ -40,6 +40,8 @@ local events = {}
 events.load = event_handler("load")
 events.resolution = event_handler("resolution")
 events.state = event_handler("state")
+events.focus = event_handler("focus")
+events.unfocus = event_handler("unfocus")
 
 local M = {}
 
@@ -146,6 +148,10 @@ M.sleep = priv.sleep
 -- result.
 -- @return state A table containing information about the instance state.
 M.state = priv.state
+
+--- While the game has the pointer locked: the (x, y) distance from the pointer to the centre
+-- of the waywall window, else nil. Lets a config move the pointer to the centre on "unfocus".
+M.pointer_offset = priv.pointer_offset
 
 --- Creates a "text" object which displays arbitrary text.
 -- @param options The options to create the text with.

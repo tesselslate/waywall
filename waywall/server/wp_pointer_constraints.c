@@ -1,4 +1,5 @@
 #include "server/wp_pointer_constraints.h"
+#include "server/wl_seat.h"
 #include "config/config.h"
 #include "pointer-constraints-unstable-v1-client-protocol.h"
 #include "pointer-constraints-unstable-v1-server-protocol.h"
@@ -299,6 +300,39 @@ on_pointer(struct wl_listener *listener, void *data) {
 }
 
 static void
+on_keyboard_leave(struct wl_listener *listener, void *data) {
+    struct server_pointer_constraints *pointer_constraints =
+        wl_container_of(listener, pointer_constraints, on_keyboard_leave);
+
+    // Tabbing out: release the remote lock (keeping our own `locked` state) so the host
+    // compositor places the pointer at the hint, the centre of the window, like Minecraft
+    // on Windows. Taken again when waywall regains focus (on_keyboard_enter).
+    if (pointer_constraints->locked_pointer) {
+        zwp_locked_pointer_v1_set_cursor_position_hint(
+            pointer_constraints->locked_pointer, wl_fixed_from_double(pointer_constraints->hint.x),
+            wl_fixed_from_double(pointer_constraints->hint.y));
+        wl_surface_commit(pointer_constraints->server->ui->root.surface);
+        zwp_locked_pointer_v1_destroy(pointer_constraints->locked_pointer);
+        pointer_constraints->locked_pointer = nullptr;
+        wl_surface_commit(pointer_constraints->server->ui->root.surface);
+        pointer_constraints->suspended = true;
+    }
+}
+
+static void
+on_keyboard_enter(struct wl_listener *listener, void *data) {
+    struct server_pointer_constraints *pointer_constraints =
+        wl_container_of(listener, pointer_constraints, on_keyboard_enter);
+
+    if (pointer_constraints->suspended) {
+        pointer_constraints->suspended = false;
+        if (pointer_constraints->locked) {
+            lock_pointer(pointer_constraints, server_get_wl_pointer(pointer_constraints->server));
+        }
+    }
+}
+
+static void
 on_display_destroy(struct wl_listener *listener, void *data) {
     struct server_pointer_constraints *pointer_constraints =
         wl_container_of(listener, pointer_constraints, on_display_destroy);
@@ -314,6 +348,8 @@ on_display_destroy(struct wl_listener *listener, void *data) {
 
     wl_list_remove(&pointer_constraints->on_input_focus.link);
     wl_list_remove(&pointer_constraints->on_pointer.link);
+    wl_list_remove(&pointer_constraints->on_keyboard_enter.link);
+    wl_list_remove(&pointer_constraints->on_keyboard_leave.link);
     wl_list_remove(&pointer_constraints->on_display_destroy.link);
 
     free(pointer_constraints);
@@ -340,6 +376,11 @@ server_pointer_constraints_create(struct server *server, struct config *cfg) {
 
     pointer_constraints->on_pointer.notify = on_pointer;
     wl_signal_add(&server->backend->events.seat_pointer, &pointer_constraints->on_pointer);
+
+    pointer_constraints->on_keyboard_enter.notify = on_keyboard_enter;
+    wl_signal_add(&server->seat->events.keyboard_enter, &pointer_constraints->on_keyboard_enter);
+    pointer_constraints->on_keyboard_leave.notify = on_keyboard_leave;
+    wl_signal_add(&server->seat->events.keyboard_leave, &pointer_constraints->on_keyboard_leave);
 
     pointer_constraints->on_display_destroy.notify = on_display_destroy;
     wl_display_add_destroy_listener(server->display, &pointer_constraints->on_display_destroy);

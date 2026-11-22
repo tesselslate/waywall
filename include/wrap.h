@@ -44,6 +44,8 @@ struct wrap {
     } input;
 
     struct wl_listener on_close;
+    struct wl_listener on_keyboard_enter;
+    struct wl_listener on_keyboard_leave;
     struct wl_listener on_pointer_lock;
     struct wl_listener on_pointer_unlock;
     struct wl_listener on_resize;
