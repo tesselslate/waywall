@@ -163,9 +163,25 @@ on_pointer_enter(struct wl_listener *listener, void *data) {
     uint32_t *serial = data;
     cursor->last_enter = *serial;
 
-    if (cursor->show) {
+    if (cursor->show || cursor->unfocused) {
         show_cursor(cursor);
     } else {
+        hide_cursor(cursor);
+    }
+}
+
+static void
+on_keyboard_leave(struct wl_listener *listener, void *data) {
+    struct server_cursor *cursor = wl_container_of(listener, cursor, on_keyboard_leave);
+    cursor->unfocused = true;
+    show_cursor(cursor);
+}
+
+static void
+on_keyboard_enter(struct wl_listener *listener, void *data) {
+    struct server_cursor *cursor = wl_container_of(listener, cursor, on_keyboard_enter);
+    cursor->unfocused = false;
+    if (!cursor->show) {
         hide_cursor(cursor);
     }
 }
@@ -194,6 +210,11 @@ server_cursor_create(struct server *server, struct config *cfg) {
     cursor->on_pointer_enter.notify = on_pointer_enter;
     wl_signal_add(&server->seat->events.pointer_enter, &cursor->on_pointer_enter);
 
+    cursor->on_keyboard_enter.notify = on_keyboard_enter;
+    wl_signal_add(&server->seat->events.keyboard_enter, &cursor->on_keyboard_enter);
+    cursor->on_keyboard_leave.notify = on_keyboard_leave;
+    wl_signal_add(&server->seat->events.keyboard_leave, &cursor->on_keyboard_leave);
+
     struct server_cursor_config *config = server_cursor_config_create(cursor, cfg);
     if (!config) {
         ww_log(LOG_ERROR, "failed to create server cursor config");
@@ -206,6 +227,8 @@ server_cursor_create(struct server *server, struct config *cfg) {
 fail_config:
     wl_surface_destroy(cursor->surface);
     wl_list_remove(&cursor->on_pointer_enter.link);
+    wl_list_remove(&cursor->on_keyboard_enter.link);
+    wl_list_remove(&cursor->on_keyboard_leave.link);
     free(cursor);
     return nullptr;
 }
@@ -219,6 +242,8 @@ server_cursor_destroy(struct server_cursor *cursor) {
     }
     wl_list_remove(&cursor->on_pointer.link);
     wl_list_remove(&cursor->on_pointer_enter.link);
+    wl_list_remove(&cursor->on_keyboard_enter.link);
+    wl_list_remove(&cursor->on_keyboard_leave.link);
 
     free(cursor);
 }

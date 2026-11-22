@@ -513,6 +513,14 @@ on_keyboard_enter(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     struct server_seat *seat = data;
     seat->last_serial = serial;
 
+    // Waywall got focus back: give it back to the client too (see on_keyboard_leave).
+    if (seat->keyboard.remote_unfocused) {
+        seat->keyboard.remote_unfocused = false;
+        if (seat->input_focus) {
+            send_keyboard_enter(seat);
+        }
+    }
+
     wl_signal_emit_mutable(&seat->events.keyboard_enter, &serial);
 
     WW_DEBUG(keyboard.active, true);
@@ -626,6 +634,14 @@ on_keyboard_leave(void *data, struct wl_keyboard *wl, uint32_t serial, struct wl
     seat->last_serial = serial;
 
     reset_keyboard_state(seat);
+
+    // Forward the focus loss, so the client (Minecraft) knows its window isn't active: it
+    // stops applying mouse movement to the camera, like when its window loses focus on
+    // Windows. Without this the game kept turning while the pointer was over waywall.
+    if (!seat->keyboard.remote_unfocused) {
+        send_keyboard_leave(seat);
+        seat->keyboard.remote_unfocused = true;
+    }
 
     wl_signal_emit_mutable(&seat->events.keyboard_leave, &serial);
 
@@ -896,11 +912,17 @@ on_input_focus(struct wl_listener *listener, void *data) {
     struct server_seat *seat = wl_container_of(listener, seat, on_input_focus);
     struct server_view *view = data;
 
-    send_keyboard_leave(seat);
+    if (!seat->keyboard.remote_unfocused) {
+        send_keyboard_leave(seat);
+    }
     send_pointer_leave(seat);
     seat->input_focus = view;
     if (seat->input_focus) {
-        send_keyboard_enter(seat);
+        // While waywall itself is unfocused, the new client gets keyboard enter when waywall
+        // regains focus (on_keyboard_enter).
+        if (!seat->keyboard.remote_unfocused) {
+            send_keyboard_enter(seat);
+        }
         send_pointer_enter(seat);
     }
 }
