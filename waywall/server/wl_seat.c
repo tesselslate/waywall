@@ -472,39 +472,82 @@ process_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
 }
 
 static void
-process_remap(struct server_seat *seat, struct server_seat_remap remap, bool state) {
-    switch (remap.type) {
+process_remap(struct server_seat *seat, enum config_remap_type type, uint32_t dst, bool state) {
+    switch (type) {
     case CONFIG_REMAP_BUTTON:
-        send_pointer_button(seat, remap.dst, state);
+        send_pointer_button(seat, dst, state);
         return;
     case CONFIG_REMAP_KEY:
-        process_remap_key(seat, remap.dst, state);
+        process_remap_key(seat, dst, state);
         return;
     case CONFIG_REMAP_NONE:
         ww_unreachable();
     }
 }
 
-static bool
-try_remap_button(struct server_seat *seat, uint32_t button, bool state) {
-    for (size_t i = 0; i < seat->config->remaps.num_buttons; i++) {
-        if (seat->config->remaps.buttons[i].src == button) {
-            process_remap(seat, seat->config->remaps.buttons[i], state);
-            return true;
+static ssize_t
+find_held_remap(struct server_seat_held_remap *held, size_t num_held, uint32_t src) {
+    for (size_t i = 0; i < num_held; i++) {
+        if (held[i].src == src) {
+            return (ssize_t)i;
         }
+    }
+    return -1;
+}
+
+// Presses use the current remap table and remember where they went. Releases go to the
+// remembered destination, so swapping remap tables while a key is held (e.g. opening the
+// inventory) can't leave the remapped key stuck down. A release with no remembered remap
+// falls through as a raw release of the physical key.
+static bool
+try_remap(struct server_seat *seat, struct server_seat_remap *remaps, size_t num_remaps,
+          struct server_seat_held_remap *held, size_t *num_held, uint32_t src, bool state) {
+    ssize_t idx = find_held_remap(held, *num_held, src);
+
+    if (!state) {
+        if (idx < 0) {
+            return false;
+        }
+
+        struct server_seat_held_remap entry = held[idx];
+        held[idx] = held[--(*num_held)];
+        process_remap(seat, entry.type, entry.dst, false);
+        return true;
+    }
+
+    // Drop a stale entry for this source (e.g. its release was eaten by an action).
+    if (idx >= 0) {
+        held[idx] = held[--(*num_held)];
+    }
+
+    for (size_t i = 0; i < num_remaps; i++) {
+        if (remaps[i].src != src) {
+            continue;
+        }
+
+        if (*num_held < SERVER_SEAT_MAX_HELD_REMAPS) {
+            held[(*num_held)++] = (struct server_seat_held_remap){
+                .src = src,
+                .dst = remaps[i].dst,
+                .type = remaps[i].type,
+            };
+        }
+        process_remap(seat, remaps[i].type, remaps[i].dst, true);
+        return true;
     }
     return false;
 }
 
 static bool
+try_remap_button(struct server_seat *seat, uint32_t button, bool state) {
+    return try_remap(seat, seat->config->remaps.buttons, seat->config->remaps.num_buttons,
+                     seat->held_buttons, &seat->num_held_buttons, button, state);
+}
+
+static bool
 try_remap_key(struct server_seat *seat, uint32_t keycode, bool state) {
-    for (size_t i = 0; i < seat->config->remaps.num_keys; i++) {
-        if (seat->config->remaps.keys[i].src == keycode) {
-            process_remap(seat, seat->config->remaps.keys[i], state);
-            return true;
-        }
-    }
-    return false;
+    return try_remap(seat, seat->config->remaps.keys, seat->config->remaps.num_keys,
+                     seat->held_keys, &seat->num_held_keys, keycode, state);
 }
 
 static void

@@ -8,6 +8,15 @@
 #include <wayland-util.h>
 #include <xkbcommon/xkbcommon.h>
 
+// A remapped key or button that is currently held down. Its release is sent to the same
+// destination as its press, even if the remap table changed in between (set_remaps).
+struct server_seat_held_remap {
+    uint32_t src, dst;
+    enum config_remap_type type;
+};
+
+#define SERVER_SEAT_MAX_HELD_REMAPS 32
+
 enum kb_modifier {
     KB_MOD_SHIFT = (1 << 0),
     KB_MOD_CAPS = (1 << 1),
@@ -45,6 +54,10 @@ struct server_seat {
         struct wl_pointer *remote;
         double x, y;
     } pointer;
+
+    struct server_seat_held_remap held_keys[SERVER_SEAT_MAX_HELD_REMAPS];
+    struct server_seat_held_remap held_buttons[SERVER_SEAT_MAX_HELD_REMAPS];
+    size_t num_held_keys, num_held_buttons;
 
     uint32_t last_serial;
 
